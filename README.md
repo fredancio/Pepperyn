@@ -1,5 +1,3 @@
-![Pepperyn Banner](docs/pepperyn-banner.png)
-
 # Pepperyn
  ---
 # Pepperyn – Assistant IA de gestion du temps proactif
