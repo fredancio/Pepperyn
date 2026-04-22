@@ -1,0 +1,14 @@
+# Fichiers de travail (ne pas envoyer sur GitHub)
+Memory/
+Outputs/
+Partenariats/
+Ressources/
+*.xlsx
+*.pdf
+*.docx
+
+# Fichiers systèmes
+.DS_Store
+Thumbs.db
+*.log
+.Claude/
