@@ -471,7 +471,7 @@ export function AnalysisResult({ data, questionsRestantes }: AnalysisResultProps
                   className={`py-3 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 transition-colors
                     ${chosenFormat === 'excel'
                       ? 'bg-green-100 border-2 border-green-400 text-green-800 cursor-default'
-                      : chosenFormat !== null && chosenFormat !== 'excel'
+                      : chosenFormat !== null
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
                         : 'bg-[#1B73E8] text-white hover:bg-[#0D47A1] disabled:opacity-60'
                     }`}
@@ -489,7 +489,7 @@ export function AnalysisResult({ data, questionsRestantes }: AnalysisResultProps
                   className={`py-3 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 transition-colors
                     ${chosenFormat === 'pdf'
                       ? 'bg-green-100 border-2 border-green-400 text-green-800 cursor-default'
-                      : chosenFormat !== null && chosenFormat !== 'pdf'
+                      : chosenFormat !== null
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
                         : 'bg-red-600 text-white hover:bg-red-700 disabled:opacity-60'
                     }`}
@@ -507,7 +507,7 @@ export function AnalysisResult({ data, questionsRestantes }: AnalysisResultProps
                   className={`py-3 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 transition-colors
                     ${chosenFormat === 'pptx'
                       ? 'bg-green-100 border-2 border-green-400 text-green-800 cursor-default'
-                      : chosenFormat !== null && chosenFormat !== 'pptx'
+                      : chosenFormat !== null
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
                         : 'bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60'
                     }`}
