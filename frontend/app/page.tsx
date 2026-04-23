@@ -30,16 +30,24 @@ export default function LandingPage() {
             </Link>
           </div>
 
-          {/* CTA button */}
-          <Link
-            href="/register"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#1B73E8] text-white text-sm font-semibold rounded-xl hover:bg-[#0D47A1] transition-all duration-200 shadow-sm"
-          >
-            Analyser mes données
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-            </svg>
-          </Link>
+          {/* CTA buttons */}
+          <div className="flex items-center gap-2">
+            <Link
+              href="/login"
+              className="inline-flex items-center px-4 py-2 border border-[#1B73E8] text-[#1B73E8] text-sm font-semibold rounded-xl hover:bg-blue-50 transition-all duration-200"
+            >
+              Se connecter
+            </Link>
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#1B73E8] text-white text-sm font-semibold rounded-xl hover:bg-[#0D47A1] transition-all duration-200 shadow-sm"
+            >
+              Essai gratuit
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </Link>
+          </div>
         </div>
       </nav>
 
