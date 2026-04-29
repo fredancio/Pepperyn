@@ -88,6 +88,30 @@ async def _resolve_auth(
     raise HTTPException(status_code=401, detail="Token invalide ou expiré")
 
 
+@router.get("/analyses/history")
+async def get_analyses_history(
+    authorization: Optional[str] = Header(default=None),
+    x_auth_type: Optional[str] = Header(default=None),
+):
+    """Return the last 20 completed analyses for the authenticated company."""
+    company_id, plan, auth_type = await _resolve_auth(authorization, x_auth_type)
+    try:
+        from main import get_supabase_service
+        supabase = get_supabase_service()
+        result = (
+            supabase.from_("analyses")
+            .select("id, fichier_nom, type_document, created_at, score_confiance")
+            .eq("company_id", company_id)
+            .eq("status", "completed")
+            .order("created_at", desc=True)
+            .limit(20)
+            .execute()
+        )
+        return {"analyses": result.data or []}
+    except Exception:
+        return {"analyses": []}
+
+
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_file(
     file: UploadFile = File(...),

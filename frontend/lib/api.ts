@@ -123,3 +123,17 @@ export async function downloadPptx(analyseId: string): Promise<Blob> {
   }
   return res.blob();
 }
+
+export async function fetchAnalysesHistory(): Promise<Array<{
+  id: string;
+  fichier_nom: string;
+  type_document: string;
+  created_at: string;
+  score_confiance: number;
+}>> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/analyses/history`, { headers });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.analyses || [];
+}

@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Message, Session } from '@/lib/types';
-import { analyzeFile, analyzeText } from '@/lib/api';
+import { analyzeFile, analyzeText, fetchAnalysesHistory } from '@/lib/api';
 import { getCurrentAuthMode, signOutAdmin, clearGuestAuth, getGuestPlan } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { MessageBubble, TypingIndicator } from './MessageBubble';
@@ -75,6 +75,7 @@ export function ChatContainer() {
       if (mode === 'guest') {
         const p = getGuestPlan();
         if (p) setPlan(p);
+        loadSessionHistory();
       } else if (mode === 'admin') {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
@@ -98,13 +99,17 @@ export function ChatContainer() {
   const loadSessionHistory = async () => {
     setLoadingSessions(true);
     try {
-      const { data } = await supabase
-        .from('sessions')
-        .select('*')
-        .eq('is_archived', false)
-        .order('updated_at', { ascending: false })
-        .limit(20);
-      if (data) setSessions(data);
+      const analyses = await fetchAnalysesHistory();
+      const mapped: Session[] = analyses.map(a => ({
+        id: a.id,
+        company_id: '',
+        is_admin_session: false,
+        titre: a.fichier_nom || `Analyse ${a.type_document || ''}`.trim(),
+        is_archived: false,
+        created_at: a.created_at,
+        updated_at: a.created_at,
+      }));
+      setSessions(mapped);
     } catch {
       // silently fail
     } finally {
@@ -210,6 +215,8 @@ export function ChatContainer() {
         setMessages(prev => [...prev, analysisMsg]);
         setAnalysisReceived(true);
         setQuestionsPostAnalysis(0);
+        // Refresh sidebar history
+        loadSessionHistory();
       } else {
         const fallbackMsg = makeLocalMessage('assistant', result.response || 'Analyse terminée avec succès.', 'text');
         setMessages(prev => [...prev, fallbackMsg]);
@@ -239,7 +246,7 @@ export function ChatContainer() {
   return (
     <div className="flex h-screen bg-[#EFF6FF] overflow-hidden">
       {/* Sidebar */}
-      {authMode === 'admin' && (
+      {authMode !== null && (
         <>
           {/* Mobile overlay */}
           {sidebarOpen && (
