@@ -269,10 +269,11 @@ class MemoryService:
                 supabase.from_("company_profile")
                 .select("*")
                 .eq("company_id", company_id)
-                .maybeSingle()
+                .limit(1)
                 .execute()
             )
-            profile = profile_result.data or {}
+            rows = profile_result.data or []
+            profile = rows[0] if rows else {}
         except Exception as e:
             logger.warning(f"[MEMORY] get profile failed: {e}")
 

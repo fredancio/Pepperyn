@@ -70,19 +70,62 @@ async def _resolve_auth(
     try:
         user_response = supabase.auth.get_user(token)
         if user_response and user_response.user:
-            profile_response = (
-                supabase.from_("profiles")
-                .select("company_id, company:companies(plan)")
-                .eq("id", user_response.user.id)
-                .single()
-                .execute()
-            )
-            if profile_response.data:
-                company_id = profile_response.data["company_id"]
-                company_data = profile_response.data.get("company") or {}
-                plan = company_data.get("plan", "free") if isinstance(company_data, dict) else "free"
+            user_id = user_response.user.id
+            logger.warning(f"[AUTH DEBUG] Admin user_id={user_id!r}")
+
+            # Step 1: get company_id from profiles
+            company_id = None
+            try:
+                profile_response = (
+                    supabase.from_("profiles")
+                    .select("company_id")
+                    .eq("id", user_id)
+                    .limit(1)
+                    .execute()
+                )
+                logger.warning(f"[AUTH DEBUG] Profile data={profile_response.data!r}")
+                if profile_response.data:
+                    company_id = profile_response.data[0].get("company_id")
+            except Exception as e:
+                logger.warning(f"[AUTH DEBUG] Profile lookup failed: {e}")
+
+            # Step 2: fallback — lookup company directly by admin_user_id
+            if not company_id:
+                logger.warning(f"[AUTH DEBUG] company_id is None from profile, trying companies table")
+                try:
+                    company_response = (
+                        supabase.from_("companies")
+                        .select("id, plan")
+                        .eq("admin_user_id", user_id)
+                        .limit(1)
+                        .execute()
+                    )
+                    logger.warning(f"[AUTH DEBUG] Companies data={company_response.data!r}")
+                    if company_response.data:
+                        company_id = company_response.data[0]["id"]
+                        plan = company_response.data[0].get("plan", "free")
+                        return company_id, plan, "admin"
+                except Exception as e:
+                    logger.warning(f"[AUTH DEBUG] Companies lookup failed: {e}")
+
+            if company_id:
+                # Get plan from companies
+                plan = "free"
+                try:
+                    plan_response = (
+                        supabase.from_("companies")
+                        .select("plan")
+                        .eq("id", company_id)
+                        .limit(1)
+                        .execute()
+                    )
+                    if plan_response.data:
+                        plan = plan_response.data[0].get("plan", "free")
+                except Exception:
+                    pass
                 return company_id, plan, "admin"
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[AUTH DEBUG] Admin auth exception: {e}")
         pass
 
     raise HTTPException(status_code=401, detail="Token invalide ou expiré")
