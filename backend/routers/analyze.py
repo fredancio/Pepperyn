@@ -323,18 +323,16 @@ def _save_to_db(
     duration_ms: int,
     plan: str,
 ):
-    """Save analysis record to Supabase. Errors are silently ignored."""
+    """Save analysis record to Supabase. Errors are logged but non-blocking."""
     try:
         from main import get_supabase_service
         supabase = get_supabase_service()
 
-        supabase.from_("analyses").insert({
+        insert_payload = {
             "id": analyse_id,
             "company_id": company_id,
-            "session_id": session_id,
             "fichier_nom": filename,
             "fichier_type": ext,
-            "fichier_taille_bytes": file_size,
             "type_document": analysis_result.type_document,
             "contexte_utilisateur": context,
             "mode": mode,
@@ -345,8 +343,23 @@ def _save_to_db(
             "duree_traitement_ms": duration_ms,
             "status": "completed",
             "chat_count": 0,
-        }).execute()
+        }
+        # Only add optional fields if not None (avoids schema mismatch on older tables)
+        if session_id is not None:
+            insert_payload["session_id"] = session_id
+        if file_size is not None:
+            insert_payload["fichier_taille_bytes"] = file_size
 
+        logger.warning(f"[DB DEBUG] Attempting insert — analyse_id={analyse_id} | company_id={company_id} | filename={filename}")
+        result = supabase.from_("analyses").insert(insert_payload).execute()
+        logger.warning(f"[DB DEBUG] Insert success — data={result.data}")
+
+    except Exception as e:
+        logger.error(f"[DB ERROR] _save_to_db failed — analyse_id={analyse_id} | error={type(e).__name__}: {e}")
+
+    try:
+        from main import get_supabase_service
+        supabase = get_supabase_service()
         supabase.from_("usage_logs").insert({
             "company_id": company_id,
             "analyse_id": analyse_id,
@@ -356,9 +369,8 @@ def _save_to_db(
             "cout_estime_euros": cost,
             "duree_ms": duration_ms,
         }).execute()
-
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"[DB ERROR] usage_logs insert failed — {type(e).__name__}: {e}")
 
 
 @router.post("/analyze/text", response_model=TextQueryResponse)
