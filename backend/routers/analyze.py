@@ -155,7 +155,7 @@ async def analyze_file(
     # Retrieve memory context
     memory_section = ""
     actions_section = ""
-    memory_ctx: list = []
+    memory_ctx: dict = {}
     if _memory_service:
         try:
             memory_ctx = _memory_service.get_memory_context(company_id)
@@ -217,7 +217,7 @@ async def analyze_file(
     # Save memory after analysis
     if _memory_service:
         try:
-            _memory_service.save_analysis_memory(company_id, analysis_result.model_dump())
+            _memory_service.save_analysis_memory(company_id, analyse_id, analysis_result.model_dump())
         except Exception:
             pass
 
