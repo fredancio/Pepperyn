@@ -178,7 +178,7 @@ def _validate_structural(raw_sheets: dict) -> QualityGateResult:
         kw_found = [kw for kw in _STRUCTURAL_KEYWORDS if kw in all_text]
         if kw_found:
             mapping_summary.append(f"'{sheet_name}' : {', '.join(kw_found[:3])}")
-        elif numeric_vals > 0:
+        elif numeric_count > 0:
             mapping_summary.append(f"'{sheet_name}' : données numériques non étiquetées")
             assumptions.append(f"Les colonnes de '{sheet_name}' n'ont pas été identifiées automatiquement.")
             penalty += 8

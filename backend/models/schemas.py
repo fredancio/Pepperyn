@@ -134,9 +134,24 @@ class AnalysisResult(BaseModel):
     score_rentabilite: Optional[int] = None
     score_risque: Optional[int] = None
     score_structure: Optional[int] = None
+    score_liquidite: Optional[int] = None
     decision: Optional[str] = None
     memory_insight: Optional[str] = None
     verification_tag: Optional[str] = None
+
+    # V5 — Decision Engine fields
+    diagnostic_immediat: Optional[str] = None
+    impact_financier: List[str] = []
+    avant_apres_actuel: List[str] = []
+    avant_apres_apres: List[str] = []
+    avant_apres_gain: Optional[str] = None
+    simulateur_decision: List[str] = []
+    projection_3mois: List[str] = []
+    projection_6mois: List[str] = []
+    ce_qui_detruit: List[str] = []
+    leviers_croissance: List[str] = []
+    risque_inaction: Optional[str] = None
+    score_interpretations: dict = {}
 
     # Champs legacy (ancien format JSON — backward compat)
     revenus: Optional[RevenusData] = None

@@ -93,7 +93,7 @@ Ne donne aucune explication."""
 CALL_1_PARAMS = {
     "model": "claude-opus-4-6",
     "temperature": 0.2,
-    "max_tokens": 4000,
+    "max_tokens": 5500,
 }
 
 CALL_2_PARAMS = {
@@ -167,34 +167,78 @@ DONNÉES ACTUELLES
     if actions_section:
         prompt += f"\n{actions_section}\n"
 
-    if memory_section:
-        prompt += """
-# CE QUI A CHANGÉ
-(comparé aux analyses précédentes — si historique disponible — max 3 points)
-
-# ALERTES
-(tendances dangereuses détectées sur plusieurs périodes — utiliser ⚠️ devant chaque alerte)
-
-"""
     prompt += """
 Analyse ces données.
-Respecte STRICTEMENT cette structure :
+Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
+
+# DIAGNOSTIC IMMEDIAT
+⚠️ [1 phrase directe sur la situation critique — ton direct, sans nuance inutile]
+👉 DÉCISION PRIORITAIRE : [1 action claire et immédiate]
 
 # RÉSUMÉ EXÉCUTIF
-(max 5 lignes)
-
-# DIAGNOSTIC FINANCIER
-- Revenus :
-- Coûts :
-- Marges :
+[Situation — 1 phrase courte]
+[Problème — 1 phrase courte]
+[Action — 1 phrase courte]
 
 # SCORES
-- Rentabilité : X/10
-- Risque : X/10
-- Structure : X/10
+- Rentabilité : X/10 → [interprétation en 3 mots max]
+- Risque : X/10 → [interprétation en 3 mots max]
+- Structure : X/10 → [interprétation en 3 mots max]
+- Liquidité : X/10 → [interprétation en 3 mots max]
+
+# IMPACT FINANCIER
+⚠️ Estimations basées sur les données disponibles uniquement.
+→ [coût ou inefficience identifiée avec montant si présent dans les données]
+→ [deuxième impact identifié — montant ou "données insuffisantes"]
+→ [marge récupérable ou gain potentiel identifié — montant ou "données insuffisantes"]
+
+# AVANT APRES
+### Situation actuelle
+- [indicateur clé actuel avec chiffre si disponible]
+- [deuxième indicateur clé actuel]
+### Après actions
+- [amélioration concrète attendue]
+- [deuxième amélioration attendue]
+### Gain potentiel
+→ [estimation du gain annuel basé sur les données — si insuffisant écrire "Données insuffisantes pour estimer le gain"]
+
+# SIMULATEUR DECISION
+→ Action : [action clé 1]
+  Impact : [impact attendu]
+  Résultat : [résultat projeté avec chiffre si calculable depuis les données, sinon "impact positif estimé"]
+→ Action : [action clé 2]
+  Impact : [impact attendu]
+  Résultat : [résultat projeté]
+
+# PROJECTION TEMPORELLE
+### 3 mois
+[évolution probable à court terme — basé sur les tendances des données]
+### 6 mois
+[stabilisation ou dégradation à 6 mois si les actions sont ou ne sont pas prises]
+
+# CE QUI DETRUIT
+🔴 [Problème 1 qui détruit la rentabilité + impact financier si chiffrable]
+🔴 [Problème 2 + impact]
+🔴 [Problème 3 + impact]
+
+# LEVIERS CROISSANCE
+🟢 [Levier 1 actionnable immédiatement]
+🟢 [Levier 2 actionnable]
+🟢 [Levier 3 actionnable]
+
+# PLAN D'ACTION
+(priorisé — indiquer : Priorité HAUTE / Priorité MOYENNE — action + impact attendu)
+
+# RISQUE INACTION
+[1 phrase maximum : conséquence concrète si aucune action n'est prise dans les 3 mois]
+
+# DIAGNOSTIC FINANCIER
+- Revenus : [analyse détaillée des revenus]
+- Coûts : [analyse détaillée des coûts]
+- Marges : [analyse détaillée des marges]
 
 # CE QUI A CHANGÉ
-(comparé aux analyses précédentes si historique disponible — sinon écrire "Première analyse")
+(comparé aux analyses précédentes si historique disponible — sinon écrire "Première analyse" — max 3 points)
 
 # ALERTES
 (tendances dangereuses détectées — utiliser ⚠️ devant chaque alerte — max 3)
@@ -205,16 +249,15 @@ Respecte STRICTEMENT cette structure :
 # OPPORTUNITÉS
 (max 3 points — utiliser 🟢 devant chaque point)
 
-# PLAN D'ACTION
-(priorisé — indiquer : Priorité HAUTE / Priorité MOYENNE)
-
 # DÉCISION
 (quelques phrases claires — orientées action immédiate)
 
-Avant de répondre, vérifie que :
-- chaque recommandation est concrète
-- aucune donnée n'est inventée
-- la réponse est exploitable immédiatement"""
+RÈGLES ABSOLUES :
+- Zéro hallucination : aucun chiffre inventé, aucune donnée absente du document
+- Si un montant manque pour estimer : écrire explicitement "Données insuffisantes"
+- Phrases courtes, ton direct, verbes d'action
+- Le dirigeant doit comprendre sa situation en 5 secondes
+- Chaque recommandation doit être concrète et exploitable immédiatement"""
     return prompt
 
 
@@ -238,9 +281,10 @@ RÈGLES ABSOLUES :
 - Retourne UNIQUEMENT le texte final corrigé — propre, sans aucune trace du processus de vérification.
 - INTERDIT : annotations inline, notes d'audit, ~~strikethrough~~, > blockquotes, "Note d'audit", "→ Reformulé", commentaires entre parenthèses expliquant une correction.
 - Les corrections sont appliquées SILENCIEUSEMENT : le lecteur final ne doit jamais savoir qu'une correction a eu lieu.
-- Ne change JAMAIS le format ni les titres de section (# RÉSUMÉ EXÉCUTIF, # DIAGNOSTIC FINANCIER, # SCORES, # CE QUI A CHANGÉ, # ALERTES, # PROBLÈMES CRITIQUES, # OPPORTUNITÉS, # PLAN D'ACTION, # DÉCISION).
+- Ne change JAMAIS le format ni les titres de section (# DIAGNOSTIC IMMEDIAT, # RÉSUMÉ EXÉCUTIF, # SCORES, # IMPACT FINANCIER, # AVANT APRES, # SIMULATEUR DECISION, # PROJECTION TEMPORELLE, # CE QUI DETRUIT, # LEVIERS CROISSANCE, # PLAN D'ACTION, # RISQUE INACTION, # DIAGNOSTIC FINANCIER, # CE QUI A CHANGÉ, # ALERTES, # PROBLÈMES CRITIQUES, # OPPORTUNITÉS, # DÉCISION).
 - L'ordre des sections est FIXE et IMMUABLE — ne les réorganise jamais.
-- Si une information n'est pas dans les données sources, supprime-la ou remplace-la par une formulation prudente ("données insuffisantes pour confirmer").
+- Si une information n'est pas dans les données sources, supprime-la ou remplace-la par "Données insuffisantes".
+- CRITIQUE : dans IMPACT FINANCIER, AVANT APRES, SIMULATEUR DECISION — supprimer tout chiffre inventé. Garder uniquement les montants présents dans les données sources ou écrire "Données insuffisantes".
 
 Commence par [VERIFIED] ou [CORRECTED] sur la première ligne, puis le texte complet et propre."""
 
@@ -272,13 +316,14 @@ def _clean_verified_text(text: str) -> str:
 
 
 def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, Any]:
-    """Parse the v3 text analysis into structured fields."""
+    """Parse the v5 text analysis into structured fields."""
 
     def extract_section(label: str) -> str:
         pattern = rf"#\s*{re.escape(label)}\s*\n(.*?)(?=\n#\s|\Z)"
         match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
         return match.group(1).strip() if match else ""
 
+    # ── Standard sections ────────────────────────────────────────────────────
     resume = extract_section("RÉSUMÉ EXÉCUTIF")
     diagnostic_raw = extract_section("DIAGNOSTIC FINANCIER")
     ce_qui_a_change_raw = extract_section("CE QUI A CHANGÉ")
@@ -289,7 +334,17 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
     scores_raw = extract_section("SCORES")
     decision = extract_section("DÉCISION")
 
-    # Parse diagnostic lines
+    # ── V5 new sections ──────────────────────────────────────────────────────
+    diagnostic_immediat_raw = extract_section("DIAGNOSTIC IMMEDIAT")
+    impact_financier_raw = extract_section("IMPACT FINANCIER")
+    avant_apres_raw = extract_section("AVANT APRES")
+    simulateur_raw = extract_section("SIMULATEUR DECISION")
+    projection_raw = extract_section("PROJECTION TEMPORELLE")
+    ce_qui_detruit_raw = extract_section("CE QUI DETRUIT")
+    leviers_raw = extract_section("LEVIERS CROISSANCE")
+    risque_inaction_raw = extract_section("RISQUE INACTION")
+
+    # ── Parse diagnostic lines ───────────────────────────────────────────────
     diag_revenus = diag_couts = diag_marges = ""
     for line in diagnostic_raw.splitlines():
         l = line.strip()
@@ -300,65 +355,123 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
         elif l.lower().startswith("- marges"):
             diag_marges = l.split(":", 1)[-1].strip()
 
-    # Parse problèmes as list
-    problemes = [
-        l.strip().lstrip("🔴").strip()
-        for l in problemes_raw.splitlines()
+    # ── Parse list sections ──────────────────────────────────────────────────
+    def _parse_list(raw: str, strip_prefix: str = "") -> list[str]:
+        return [
+            l.strip().lstrip(strip_prefix).strip()
+            for l in raw.splitlines()
+            if l.strip() and not l.strip().startswith("#")
+        ]
+
+    problemes = _parse_list(problemes_raw, "🔴")
+    opportunites = _parse_list(opportunites_raw, "🟢")
+    plan_action = _parse_list(plan_raw, "-")
+    ce_qui_a_change = _parse_list(ce_qui_a_change_raw, "-")
+    alertes = _parse_list(alertes_raw, "⚠️")
+
+    # ── Parse V5 — impact financier ──────────────────────────────────────────
+    impact_financier = [
+        l.strip().lstrip("→").strip()
+        for l in impact_financier_raw.splitlines()
+        if l.strip() and l.strip().startswith("→")
+    ]
+    if not impact_financier:
+        impact_financier = [
+            l.strip()
+            for l in impact_financier_raw.splitlines()
+            if l.strip() and not l.strip().startswith(("⚠️", "#"))
+        ]
+
+    # ── Parse V5 — avant/après ───────────────────────────────────────────────
+    avant_apres_actuel: list[str] = []
+    avant_apres_apres: list[str] = []
+    avant_apres_gain: Optional[str] = None
+    current_aa = None
+    for line in avant_apres_raw.splitlines():
+        l = line.strip()
+        ll = l.lower()
+        if "situation actuelle" in ll:
+            current_aa = "actuel"
+        elif "après actions" in ll or "apres actions" in ll:
+            current_aa = "apres"
+        elif "gain potentiel" in ll:
+            current_aa = "gain"
+        elif l.startswith("-") or l.startswith("→"):
+            text = l.lstrip("-→ ").strip()
+            if text:
+                if current_aa == "actuel":
+                    avant_apres_actuel.append(text)
+                elif current_aa == "apres":
+                    avant_apres_apres.append(text)
+                elif current_aa == "gain":
+                    avant_apres_gain = text
+
+    # ── Parse V5 — simulateur décision ──────────────────────────────────────
+    simulateur_decision = [
+        l.strip()
+        for l in simulateur_raw.splitlines()
         if l.strip() and not l.strip().startswith("#")
     ]
 
-    # Parse opportunités as list
-    opportunites = [
-        l.strip().lstrip("🟢").strip()
-        for l in opportunites_raw.splitlines()
-        if l.strip() and not l.strip().startswith("#")
-    ]
+    # ── Parse V5 — projection temporelle ────────────────────────────────────
+    projection_3mois: list[str] = []
+    projection_6mois: list[str] = []
+    current_proj = None
+    for line in projection_raw.splitlines():
+        l = line.strip()
+        if "3 mois" in l.lower():
+            current_proj = "3"
+        elif "6 mois" in l.lower():
+            current_proj = "6"
+        elif l and not l.startswith("#"):
+            if current_proj == "3":
+                projection_3mois.append(l)
+            elif current_proj == "6":
+                projection_6mois.append(l)
 
-    # Parse plan d'action as list
-    plan_action = [
-        l.strip().lstrip("-").strip()
-        for l in plan_raw.splitlines()
-        if l.strip() and not l.strip().startswith("#")
-    ]
+    # ── Parse V5 — ce qui détruit / leviers ─────────────────────────────────
+    ce_qui_detruit = _parse_list(ce_qui_detruit_raw, "🔴")
+    leviers_croissance = _parse_list(leviers_raw, "🟢")
+    risque_inaction = risque_inaction_raw.strip()
 
-    # Parse ce_qui_a_change as list
-    ce_qui_a_change = [
-        l.strip().lstrip("-").strip()
-        for l in ce_qui_a_change_raw.splitlines()
-        if l.strip() and not l.strip().startswith("#")
-    ]
-
-    # Parse alertes as list
-    alertes = [
-        l.strip().lstrip("⚠️").strip()
-        for l in alertes_raw.splitlines()
-        if l.strip() and not l.strip().startswith("#")
-    ]
-
-    # Parse scores — robust to markdown bold (**Rentabilité** : 3/10),
-    # extra spaces, and "X / 10" formatting variations.
-    score_rentabilite = score_risque = score_structure = None
+    # ── Parse scores ─────────────────────────────────────────────────────────
+    score_rentabilite = score_risque = score_structure = score_liquidite = None
+    score_interpretations: dict[str, str] = {}
 
     def _extract_score(haystack: str) -> Optional[int]:
-        """Find the first X/10 pattern in a string."""
         m = re.search(r"(\d+)\s*/\s*10", haystack)
         return int(m.group(1)) if m else None
 
-    # First pass: look inside the dedicated SCORES section
+    def _extract_interp(line: str) -> str:
+        """Extract text after → on a score line."""
+        if "→" in line:
+            return line.split("→", 1)[-1].strip()
+        return ""
+
     for line in scores_raw.splitlines():
         ll = line.lower()
         val = _extract_score(line)
         if val is None:
             continue
+        interp = _extract_interp(line)
         if "rentabilit" in ll:
             score_rentabilite = val
+            if interp:
+                score_interpretations["rentabilite"] = interp
         elif "risque" in ll:
             score_risque = val
+            if interp:
+                score_interpretations["risque"] = interp
         elif "structure" in ll:
             score_structure = val
+            if interp:
+                score_interpretations["structure"] = interp
+        elif "liquidit" in ll:
+            score_liquidite = val
+            if interp:
+                score_interpretations["liquidite"] = interp
 
     # Second pass: scan the full text if any score is still missing
-    # (handles cases where the SCORES section was cut or reformatted)
     if any(s is None for s in [score_rentabilite, score_risque, score_structure]):
         for line in text.splitlines():
             ll = line.lower()
@@ -371,8 +484,10 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
                 score_risque = val
             elif "structure" in ll and score_structure is None:
                 score_structure = val
+            elif "liquidit" in ll and score_liquidite is None:
+                score_liquidite = val
 
-    # Extract verification tag
+    # ── Extract verification tag ─────────────────────────────────────────────
     verification_tag = "VERIFIED"
     if text.strip().startswith("[CORRECTED]"):
         verification_tag = "CORRECTED"
@@ -392,9 +507,23 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
         "score_rentabilite": score_rentabilite,
         "score_risque": score_risque,
         "score_structure": score_structure,
+        "score_liquidite": score_liquidite,
         "decision": decision,
         "synthese": resume,  # backward compat
         "verification_tag": verification_tag,
+        # V5
+        "diagnostic_immediat": diagnostic_immediat_raw.strip(),
+        "impact_financier": impact_financier,
+        "avant_apres_actuel": avant_apres_actuel,
+        "avant_apres_apres": avant_apres_apres,
+        "avant_apres_gain": avant_apres_gain,
+        "simulateur_decision": simulateur_decision,
+        "projection_3mois": projection_3mois,
+        "projection_6mois": projection_6mois,
+        "ce_qui_detruit": ce_qui_detruit,
+        "leviers_croissance": leviers_croissance,
+        "risque_inaction": risque_inaction,
+        "score_interpretations": score_interpretations,
     }
 
 
