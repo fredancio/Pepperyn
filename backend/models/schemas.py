@@ -159,6 +159,12 @@ class AnalysisResult(BaseModel):
     plan_action_haute: List[str] = []
     plan_action_secondaire: List[str] = []
 
+    # V9 — En résumé + gain transformations
+    avant_apres_gain_transformations: List[str] = []
+    en_resume_impact: Optional[str] = None
+    en_resume_plan: Optional[str] = None
+    en_resume_projection: Optional[str] = None
+
     # Champs legacy (ancien format JSON — backward compat)
     revenus: Optional[RevenusData] = None
     couts: Optional[CoutsData] = None

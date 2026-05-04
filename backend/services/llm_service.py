@@ -198,6 +198,7 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 → [Détail impact 2 — montant ou "Données insuffisantes"]
 → [Détail impact 3 — marge récupérable ou "Données insuffisantes"]
 ⚠️ Estimations basées sur les données disponibles uniquement.
+👉 En résumé : [synthèse en 1 phrase courte — ex : "La structure actuelle détruit X€/an de marge nette"]
 
 # AVANT APRES
 ### 📉 AUJOURD'HUI
@@ -207,7 +208,10 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 - [amélioration concrète attendue]
 - [deuxième amélioration attendue]
 ### 💥 GAIN POTENTIEL
-→ [montant estimé sur base des données — si insuffisant écrire "Données insuffisantes"]
+→ [montant estimé / an — si insuffisant écrire "Données insuffisantes"]
+→ Rentabilité : [comment la rentabilité s'améliore — ex : "marge nette passe de X% à Y%"]
+→ Investissement : [capacité d'investissement libérée — ex : "X€ réallouables" OU "Non quantifiable"]
+→ Modèle : [stabilisation attendue — ex : "structure viable en 6 mois"]
 
 # SIMULATEUR DECISION
 → Action : [action clé 1]
@@ -222,6 +226,7 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 [évolution probable à court terme — basé sur les tendances des données]
 ### 6 mois
 [stabilisation ou dégradation à 6 mois si les actions sont ou ne sont pas prises]
+👉 En résumé : [trajectoire en 1 phrase — si actions engagées = X / si inaction = Y]
 
 # CE QUI DETRUIT
 🔴 [Problème 1 qui détruit la rentabilité + impact financier si chiffrable]
@@ -241,6 +246,7 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 ### ACTIONS SECONDAIRES
 - [action 4]
 - [action 5]
+👉 En résumé : [en 1 phrase : ce que ce plan change concrètement pour l'entreprise]
 
 # RISQUE INACTION
 [1 phrase maximum : conséquence concrète si aucune action n'est prise dans les 3 mois]
@@ -295,7 +301,7 @@ RÈGLES ABSOLUES :
 - INTERDIT : annotations inline, notes d'audit, ~~strikethrough~~, > blockquotes, "Note d'audit", "→ Reformulé", commentaires entre parenthèses expliquant une correction.
 - Les corrections sont appliquées SILENCIEUSEMENT : le lecteur final ne doit jamais savoir qu'une correction a eu lieu.
 - Ne change JAMAIS le format ni les titres de section (# DIAGNOSTIC IMMEDIAT, # RÉSUMÉ EXÉCUTIF, # SCORES, # IMPACT FINANCIER, # AVANT APRES, # SIMULATEUR DECISION, # PROJECTION TEMPORELLE, # CE QUI DETRUIT, # LEVIERS CROISSANCE, # PLAN D'ACTION, # RISQUE INACTION, # DIAGNOSTIC FINANCIER, # CE QUI A CHANGÉ, # ALERTES, # PROBLÈMES CRITIQUES, # OPPORTUNITÉS, # DÉCISION).
-- Ne change JAMAIS les sous-titres internes (### PRIORITÉ ABSOLUE, ### ACTIONS SECONDAIRES, ### 📉 AUJOURD'HUI, ### 📈 APRÈS ACTION, ### 💥 GAIN POTENTIEL, ⚡ TENSION, 💸 PERTE STRUCTURELLE ESTIMÉE).
+- Ne change JAMAIS les sous-titres internes (### PRIORITÉ ABSOLUE, ### ACTIONS SECONDAIRES, ### 📉 AUJOURD'HUI, ### 📈 APRÈS ACTION, ### 💥 GAIN POTENTIEL, ⚡ TENSION, 💸 PERTE STRUCTURELLE ESTIMÉE, 👉 En résumé, → Rentabilité :, → Investissement :, → Modèle :).
 - Le style doit rester DIRECT et FRONTAL : interdit de reformuler en ton neutre ou académique.
 - L'ordre des sections est FIXE et IMMUABLE — ne les réorganise jamais.
 - Si une information n'est pas dans les données sources, supprime-la ou remplace-la par "Données insuffisantes".
@@ -400,7 +406,8 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
             continue
         if l.startswith("-") or l.startswith("•"):
             text = l.lstrip("-• ").strip()
-            if text:
+            # Skip "En résumé" lines that appear at the end of the plan section
+            if text and not text.startswith("\U0001f449"):
                 if current_plan_section == "haute":
                     plan_action_haute.append(text)
                 else:
@@ -426,8 +433,11 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
             synthese_text = synthese_text.lstrip("→ ").strip()
             impact_financier_synthese = synthese_text
         elif l.startswith("→"):
-            impact_financier.append(l.lstrip("→").strip())
-        elif not l.startswith(("⚠️", "#")) and not impact_financier_synthese:
+            detail = l.lstrip("→").strip()
+            # Skip "En résumé" that somehow lands here
+            if detail and not detail.startswith("\U0001f449"):
+                impact_financier.append(detail)
+        elif not l.startswith(("⚠️", "#", "\U0001f449")) and not impact_financier_synthese:
             # Fallback: first non-marker line is synthesis
             impact_financier_synthese = l
     if not impact_financier:
@@ -439,11 +449,29 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
             and "SYNTHÈSE" not in l.upper()
         ]
 
-    # ── Parse V6 — avant/après (nouveaux headers) ────────────────────────────
+    # ── Parse V9 — "En résumé" lines ─────────────────────────────────────────
+    def _extract_en_resume(raw: str) -> Optional[str]:
+        """Extract the 👉 En résumé line from a section's raw text."""
+        for ln in raw.splitlines():
+            s = ln.strip()
+            if s.startswith("\U0001f449") and "résumé" in s.lower():
+                cleaned = s.lstrip("\U0001f449").strip()
+                if cleaned.lower().startswith("en résumé"):
+                    cleaned = cleaned[len("en résumé"):].lstrip(" :").strip()
+                return cleaned
+        return None
+
+    en_resume_impact = _extract_en_resume(impact_financier_raw)
+    en_resume_plan = _extract_en_resume(plan_raw)
+    en_resume_projection = _extract_en_resume(projection_raw)
+
+    # ── Parse V6/V9 — avant/après (nouveaux headers) ─────────────────────────
     avant_apres_actuel: list[str] = []
     avant_apres_apres: list[str] = []
     avant_apres_gain: Optional[str] = None
+    avant_apres_gain_transformations: list[str] = []
     current_aa = None
+    gain_amount_captured = False
     for line in avant_apres_raw.splitlines():
         l = line.strip()
         ll = l.lower()
@@ -454,6 +482,7 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
             current_aa = "apres"
         elif "gain potentiel" in ll:
             current_aa = "gain"
+            gain_amount_captured = False
         elif l.startswith("-") or l.startswith("→"):
             text = l.lstrip("-→ ").strip()
             if text:
@@ -462,7 +491,13 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
                 elif current_aa == "apres":
                     avant_apres_apres.append(text)
                 elif current_aa == "gain":
-                    avant_apres_gain = text
+                    if not gain_amount_captured:
+                        avant_apres_gain = text
+                        gain_amount_captured = True
+                    elif any(kw in text.lower() for kw in [
+                        "rentabilité", "rentabilite", "investissement", "modèle", "modele"
+                    ]):
+                        avant_apres_gain_transformations.append(text)
 
     # ── Parse V6 — phrase_tension depuis DIAGNOSTIC IMMEDIAT ─────────────────
     phrase_tension: Optional[str] = None
@@ -489,7 +524,7 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
             current_proj = "3"
         elif "6 mois" in l.lower():
             current_proj = "6"
-        elif l and not l.startswith("#"):
+        elif l and not l.startswith("#") and not l.startswith("\U0001f449"):
             if current_proj == "3":
                 projection_3mois.append(l)
             elif current_proj == "6":
@@ -595,6 +630,11 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
         "impact_financier_synthese": impact_financier_synthese,
         "plan_action_haute": plan_action_haute,
         "plan_action_secondaire": plan_action_secondaire,
+        # V9
+        "avant_apres_gain_transformations": avant_apres_gain_transformations,
+        "en_resume_impact": en_resume_impact,
+        "en_resume_plan": en_resume_plan,
+        "en_resume_projection": en_resume_projection,
     }
 
 

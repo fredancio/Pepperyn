@@ -442,8 +442,9 @@ def _build_resume_executif(resume: str, styles: dict) -> list:
     return story
 
 
-def _build_impact_financier(synthese: str | None, items: list[str], styles: dict) -> list:
-    """Impact financier: choc line first, then details."""
+def _build_impact_financier(synthese: str | None, items: list[str], styles: dict,
+                            en_resume: str | None = None) -> list:
+    """Impact financier: choc line first, then details, then En résumé."""
     if not synthese and not items:
         return []
     story = []
@@ -489,11 +490,15 @@ def _build_impact_financier(synthese: str | None, items: list[str], styles: dict
 
     t.setStyle(TableStyle(style_cmds))
     story.append(t)
+    if en_resume:
+        story.append(Spacer(1, 3))
+        story.extend(_en_resume_box(en_resume, styles))
     story.append(Spacer(1, 8))
     return story
 
 
-def _build_avant_apres(actuel: list[str], apres: list[str], gain: str | None, styles: dict) -> list:
+def _build_avant_apres(actuel: list[str], apres: list[str], gain: str | None, styles: dict,
+                       gain_transformations: list[str] | None = None) -> list:
     """Two-column before/after comparison table."""
     if not actuel and not apres:
         return []
@@ -550,15 +555,27 @@ def _build_avant_apres(actuel: list[str], apres: list[str], gain: str | None, st
                                textColor=GREEN_DARK, leading=17)
             )],
         ]
+        # V9 — transformation lines (Rentabilité / Investissement / Modèle)
+        for tf in (gain_transformations or []):
+            gain_rows.append([Paragraph(
+                f'<font color="#15803D">→  {_rl(tf)}</font>',
+                ParagraphStyle("gain_tf", fontName="Helvetica", fontSize=8.5,
+                               textColor=GREEN, leading=13)
+            )])
+
         tg = Table(gain_rows, colWidths=[CONTENT_W])
-        tg.setStyle(TableStyle([
-            ("BACKGROUND",    (0, 0), (-1, -1), GREEN_LIGHT),
-            ("TOPPADDING",    (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        style_cmds_gain = [
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
             ("LEFTPADDING",   (0, 0), (-1, -1), 12),
             ("BOX",           (0, 0), (-1, -1), 1.5, GREEN),
             ("LINEBELOW",     (0, 0), (-1, 0),  0.3, GREEN),
-        ]))
+            ("BACKGROUND",    (0, 0), (-1, 1),  GREEN_LIGHT),
+        ]
+        if gain_transformations:
+            style_cmds_gain.append(("BACKGROUND", (0, 2), (-1, -1), colors.HexColor("#F0FFF4")))
+            style_cmds_gain.append(("LINEABOVE",  (0, 2), (-1, 2),  0.3, colors.HexColor("#86EFAC")))
+        tg.setStyle(TableStyle(style_cmds_gain))
         story.append(tg)
 
     story.append(Spacer(1, 8))
@@ -647,7 +664,8 @@ def _build_simulateur(sim_lines: list[str], styles: dict) -> list:
     return story
 
 
-def _build_projection(p3: list[str], p6: list[str], styles: dict) -> list:
+def _build_projection(p3: list[str], p6: list[str], styles: dict,
+                      en_resume: str | None = None) -> list:
     """Two-column 3-month / 6-month projection."""
     if not p3 and not p6:
         return []
@@ -684,6 +702,9 @@ def _build_projection(p3: list[str], p6: list[str], styles: dict) -> list:
         ("VALIGN",        (0, 0), (-1, -1), "TOP"),
     ]))
     story.append(t)
+    if en_resume:
+        story.append(Spacer(1, 3))
+        story.extend(_en_resume_box(en_resume, styles))
     story.append(Spacer(1, 8))
     return story
 
@@ -710,6 +731,27 @@ def _build_risque_inaction(risque: str, styles: dict) -> list:
     story.append(t)
     story.append(Spacer(1, 8))
     return story
+
+
+def _en_resume_box(text: str, styles: dict) -> list:
+    """Blue left-border accent box — 'En résumé' synthesis line."""
+    if not text:
+        return []
+    cell = Paragraph(
+        f'<b>👉 En résumé :</b>  {_rl(text)}',
+        ParagraphStyle("en_resume_style", fontName="Helvetica-Bold", fontSize=9,
+                       textColor=BLUE_DARK, leading=14)
+    )
+    t = Table([[cell]], colWidths=[CONTENT_W])
+    t.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), BLUE_LIGHT),
+        ("TOPPADDING",    (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 12),
+        ("LINEBEFORE",    (0, 0), (-1, -1), 3, BLUE_MAIN),
+    ]))
+    return [t, Spacer(1, 2)]
 
 
 def _build_separator_detailed(styles: dict) -> list:
@@ -867,13 +909,16 @@ def generate_pdf_report(result: dict) -> bytes:
     # ── 4. IMPACT FINANCIER ─────────────────────────────────────────────────
     impact_synthese = result.get("impact_financier_synthese")
     impact = result.get("impact_financier") or []
-    story.extend(_build_impact_financier(impact_synthese, impact, styles))
+    story.extend(_build_impact_financier(impact_synthese, impact, styles,
+                                         en_resume=result.get("en_resume_impact")))
 
     # ── 5. AVANT / APRÈS ────────────────────────────────────────────────────
     actuel = result.get("avant_apres_actuel") or []
     apres  = result.get("avant_apres_apres") or []
     gain   = result.get("avant_apres_gain")
-    story.extend(_build_avant_apres(actuel, apres, gain, styles))
+    gain_transf = result.get("avant_apres_gain_transformations") or []
+    story.extend(_build_avant_apres(actuel, apres, gain, styles,
+                                    gain_transformations=gain_transf))
 
     # ── 6. SIMULATEUR DE DÉCISION ───────────────────────────────────────────
     sim = result.get("simulateur_decision") or []
@@ -882,7 +927,8 @@ def generate_pdf_report(result: dict) -> bytes:
     # ── 7. PROJECTION TEMPORELLE ────────────────────────────────────────────
     p3 = result.get("projection_3mois") or []
     p6 = result.get("projection_6mois") or []
-    story.extend(_build_projection(p3, p6, styles))
+    story.extend(_build_projection(p3, p6, styles,
+                                   en_resume=result.get("en_resume_projection")))
 
     # ── 8. CE QUI DÉTRUIT VOTRE RENTABILITÉ ─────────────────────────────────
     ce_qui_detruit = result.get("ce_qui_detruit") or []
@@ -975,6 +1021,10 @@ def generate_pdf_report(result: dict) -> bytes:
                 story.append(t)
                 story.append(Spacer(1, 2))
 
+        # V9 — En résumé plan d'action
+        en_resume_plan = result.get("en_resume_plan")
+        if en_resume_plan:
+            story.extend(_en_resume_box(en_resume_plan, styles))
         story.append(Spacer(1, 8))
 
     # ── 11. SI RIEN NE CHANGE ───────────────────────────────────────────────
