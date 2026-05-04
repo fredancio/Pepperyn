@@ -320,6 +320,42 @@ def _draw_header(canvas, doc, result: dict):
 
 # ─── V5 Block Builders ────────────────────────────────────────────────────────
 
+def _build_financial_headline(synthese: str | None, styles: dict) -> list:
+    """Standalone financial headline — very first block, maximum visibility."""
+    if not synthese:
+        return []
+    rows = [
+        [Paragraph(
+            '<font color="#94A3B8"><b>💸  PERTE STRUCTURELLE ESTIMÉE</b></font>',
+            ParagraphStyle("fh_label", fontName="Helvetica-Bold", fontSize=8.5,
+                           textColor=colors.HexColor("#94A3B8"), leading=12)
+        )],
+        [Paragraph(
+            f'<font color="#FCD34D"><b>→  {_rl(synthese)}</b></font>',
+            ParagraphStyle("fh_val", fontName="Helvetica-Bold", fontSize=15,
+                           textColor=colors.HexColor("#FCD34D"), leading=20)
+        )],
+        [Paragraph(
+            "⚠️  Estimation basée sur les données disponibles uniquement",
+            ParagraphStyle("fh_note", fontName="Helvetica-Oblique", fontSize=7.5,
+                           textColor=colors.HexColor("#64748B"), leading=11)
+        )],
+    ]
+    t = Table(rows, colWidths=[CONTENT_W])
+    t.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, 1), SLATE),
+        ("BACKGROUND",    (0, 2), (-1, 2), colors.HexColor("#162032")),
+        ("TOPPADDING",    (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+        ("BOX",           (0, 0), (-1, -1), 2, AMBER),
+        ("LINEBELOW",     (0, 1), (-1, 1), 0.3, colors.HexColor("#334155")),
+        ("ROUNDEDCORNERS", [5, 5, 5, 5]),
+    ]))
+    return [t, Spacer(1, 8)]
+
+
 def _build_diagnostic_immediat(diag: str, tension: str | None, styles: dict) -> list:
     """Hero block — dark slate with diagnostic + decision + tension."""
     if not diag:
@@ -419,7 +455,7 @@ def _build_impact_financier(synthese: str | None, items: list[str], styles: dict
     # Row 0 — PERTE ESTIMÉE choc (dark background, bold prominent)
     if synthese:
         synth_p = Paragraph(
-            f'<font color="#94A3B8">💸  PERTE ESTIMÉE</font>  '
+            f'<font color="#94A3B8">💸  PERTE STRUCTURELLE ESTIMÉE</font>  '
             f'<font color="#FCD34D"><b>→  {_rl(synthese)}</b></font>',
             ParagraphStyle("synth", fontName="Helvetica-Bold", fontSize=11,
                            textColor=colors.HexColor("#FCD34D"), leading=17)
@@ -620,10 +656,10 @@ def _build_projection(p3: list[str], p6: list[str], styles: dict) -> list:
     story.append(Spacer(1, 4))
 
     col_w = CONTENT_W / 2 - 2
-    left_rows = [[Paragraph("3 MOIS", styles["proj_head"])]]
+    left_rows = [[Paragraph("📅  3 MOIS — PREMIERS EFFETS", styles["proj_head"])]]
     for l in (p3 or ["Données insuffisantes"]):
         left_rows.append([Paragraph(_rl(l), styles["proj_body"])])
-    right_rows = [[Paragraph("6 MOIS", styles["proj_head"])]]
+    right_rows = [[Paragraph("📅  6 MOIS — RÉSULTAT ATTENDU", styles["proj_head"])]]
     for l in (p6 or ["Données insuffisantes"]):
         right_rows.append([Paragraph(_rl(l), styles["proj_body"])])
 
@@ -802,6 +838,9 @@ def generate_pdf_report(result: dict) -> bytes:
         story.append(HRFlowable(width=CONTENT_W, thickness=0.5, color=GRAY_TEXT))
         story.append(Spacer(1, 10))
 
+    # ── 0.5. FINANCIAL HEADLINE — PERTE STRUCTURELLE (tout en haut) ─────────
+    story.extend(_build_financial_headline(result.get("impact_financier_synthese"), styles))
+
     # ── 1. DIAGNOSTIC IMMÉDIAT (hero block) ─────────────────────────────────
     diag_imm = result.get("diagnostic_immediat", "")
     tension = result.get("phrase_tension", "")
@@ -889,7 +928,7 @@ def generate_pdf_report(result: dict) -> bytes:
         # PRIORITÉ HAUTE — proéminent
         if actions_haute:
             ph_label = Paragraph(
-                '<font color="#DC2626"><b>🔴  PRIORITÉ HAUTE — FAITES CES 3 CHOSES EN PREMIER</b></font>',
+                '<font color="#DC2626"><b>🔴  PRIORITÉ ABSOLUE — FAITES CES 3 CHOSES EN PREMIER</b></font>',
                 styles["subsection"]
             )
             story.append(ph_label)

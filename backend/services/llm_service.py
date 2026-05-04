@@ -193,7 +193,7 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 - Liquidité : X/10 → [UN SEUL MOT : critique / tendue / correcte / confortable]
 
 # IMPACT FINANCIER
-💸 PERTE ESTIMÉE : → [X€/an — chiffre issu des données — OU "Impact non chiffrable sur les données disponibles"]
+💸 PERTE STRUCTURELLE ESTIMÉE : → [X€/an — chiffre issu des données — OU "Impact non chiffrable sur les données disponibles"]
 → [Détail impact 1 — montant si disponible dans les données]
 → [Détail impact 2 — montant ou "Données insuffisantes"]
 → [Détail impact 3 — marge récupérable ou "Données insuffisantes"]
@@ -234,7 +234,7 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 🟢 [Levier 3 actionnable]
 
 # PLAN D'ACTION
-### PRIORITÉ HAUTE (3 actions max — celles qui changent tout)
+### PRIORITÉ ABSOLUE (3 actions max — celles qui changent tout)
 - [action 1] → [impact en 5 mots]
 - [action 2] → [impact en 5 mots]
 - [action 3] → [impact en 5 mots]
@@ -295,7 +295,7 @@ RÈGLES ABSOLUES :
 - INTERDIT : annotations inline, notes d'audit, ~~strikethrough~~, > blockquotes, "Note d'audit", "→ Reformulé", commentaires entre parenthèses expliquant une correction.
 - Les corrections sont appliquées SILENCIEUSEMENT : le lecteur final ne doit jamais savoir qu'une correction a eu lieu.
 - Ne change JAMAIS le format ni les titres de section (# DIAGNOSTIC IMMEDIAT, # RÉSUMÉ EXÉCUTIF, # SCORES, # IMPACT FINANCIER, # AVANT APRES, # SIMULATEUR DECISION, # PROJECTION TEMPORELLE, # CE QUI DETRUIT, # LEVIERS CROISSANCE, # PLAN D'ACTION, # RISQUE INACTION, # DIAGNOSTIC FINANCIER, # CE QUI A CHANGÉ, # ALERTES, # PROBLÈMES CRITIQUES, # OPPORTUNITÉS, # DÉCISION).
-- Ne change JAMAIS les sous-titres internes (### PRIORITÉ HAUTE, ### PRIORITÉ SECONDAIRE, ### 📉 AUJOURD'HUI, ### 📈 APRÈS ACTION, ### 💥 GAIN POTENTIEL, ⚡ TENSION, 💸 SYNTHÈSE).
+- Ne change JAMAIS les sous-titres internes (### PRIORITÉ ABSOLUE, ### ACTIONS SECONDAIRES, ### 📉 AUJOURD'HUI, ### 📈 APRÈS ACTION, ### 💥 GAIN POTENTIEL, ⚡ TENSION, 💸 PERTE STRUCTURELLE ESTIMÉE).
 - Le style doit rester DIRECT et FRONTAL : interdit de reformuler en ton neutre ou académique.
 - L'ordre des sections est FIXE et IMMUABLE — ne les réorganise jamais.
 - Si une information n'est pas dans les données sources, supprime-la ou remplace-la par "Données insuffisantes".
@@ -395,7 +395,7 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
             ll = l.lower()
             if "secondaire" in ll or "actions secondaires" in ll:
                 current_plan_section = "secondaire"
-            elif "haute" in ll or "priorité" in ll or "priorite" in ll:
+            elif "haute" in ll or "absolu" in ll or "priorité" in ll or "priorite" in ll:
                 current_plan_section = "haute"
             continue
         if l.startswith("-") or l.startswith("•"):
@@ -417,7 +417,8 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
         if not l:
             continue
         if (l.startswith("💸") or "SYNTHÈSE" in l.upper() or "SYNTHESE" in l.upper()
-                or "PERTE ESTIMÉE" in l.upper() or "PERTE ESTIMEE" in l.upper()):
+                or "PERTE ESTIMÉE" in l.upper() or "PERTE ESTIMEE" in l.upper()
+                or "PERTE STRUCTURELLE" in l.upper()):
             # Extract after the colon (and optional →)
             synthese_text = l.replace("💸", "").strip()
             if ":" in synthese_text:
