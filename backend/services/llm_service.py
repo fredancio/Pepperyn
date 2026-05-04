@@ -176,9 +176,10 @@ Analyse ces données.
 Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 
 # DIAGNOSTIC IMMEDIAT
-⚠️ [1 phrase DIRECTE et FRONTALE — jamais neutre — ex : "Votre modèle est structurellement non rentable" — PAS "accuse un déficit"]
+⚠️ DIAGNOSTIC CRITIQUE
+[1 phrase DIRECTE et FRONTALE — jamais neutre — ex : "Votre modèle est actuellement non viable sans correction rapide" — PAS "accuse un déficit" — PAS de nuance]
 👉 DÉCISION PRIORITAIRE : [1 action immédiate — verbe d'action fort]
-⚡ TENSION : [1 phrase d'urgence — ex : "Sans action dans 60 jours, votre trésorerie atteint son seuil critique"]
+⚡ TENSION : [1 phrase d'urgence forte — ex : "La trajectoire actuelle n'est pas soutenable" ou "Sans correction, la rentabilité est compromise"]
 
 # RÉSUMÉ EXÉCUTIF
 [Situation — 1 phrase courte]
@@ -192,7 +193,7 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 - Liquidité : X/10 → [UN SEUL MOT : critique / tendue / correcte / confortable]
 
 # IMPACT FINANCIER
-💸 SYNTHÈSE : [1 phrase choc — ex : "Vous perdez potentiellement X€ par an" — chiffre issu des données OU "Impact non chiffrable sur les données disponibles"]
+💸 PERTE ESTIMÉE : → [X€/an — chiffre issu des données — OU "Impact non chiffrable sur les données disponibles"]
 → [Détail impact 1 — montant si disponible dans les données]
 → [Détail impact 2 — montant ou "Données insuffisantes"]
 → [Détail impact 3 — marge récupérable ou "Données insuffisantes"]
@@ -237,7 +238,7 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 - [action 1] → [impact en 5 mots]
 - [action 2] → [impact en 5 mots]
 - [action 3] → [impact en 5 mots]
-### PRIORITÉ SECONDAIRE
+### ACTIONS SECONDAIRES
 - [action 4]
 - [action 5]
 
@@ -392,7 +393,7 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
             continue
         if l.startswith("#"):
             ll = l.lower()
-            if "secondaire" in ll:
+            if "secondaire" in ll or "actions secondaires" in ll:
                 current_plan_section = "secondaire"
             elif "haute" in ll or "priorité" in ll or "priorite" in ll:
                 current_plan_section = "haute"
@@ -415,11 +416,13 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
         l = line.strip()
         if not l:
             continue
-        if l.startswith("💸") or "SYNTHÈSE" in l.upper() or "SYNTHESE" in l.upper():
-            # Extract after the colon
+        if (l.startswith("💸") or "SYNTHÈSE" in l.upper() or "SYNTHESE" in l.upper()
+                or "PERTE ESTIMÉE" in l.upper() or "PERTE ESTIMEE" in l.upper()):
+            # Extract after the colon (and optional →)
             synthese_text = l.replace("💸", "").strip()
             if ":" in synthese_text:
                 synthese_text = synthese_text.split(":", 1)[-1].strip()
+            synthese_text = synthese_text.lstrip("→ ").strip()
             impact_financier_synthese = synthese_text
         elif l.startswith("→"):
             impact_financier.append(l.lstrip("→").strip())

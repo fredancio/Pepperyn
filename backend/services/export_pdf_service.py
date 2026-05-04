@@ -334,12 +334,20 @@ def _build_diagnostic_immediat(diag: str, tension: str | None, styles: dict) -> 
             decision_line = stripped.lstrip("👉").replace("DÉCISION PRIORITAIRE :", "").strip()
         elif stripped.startswith("⚡") or "TENSION" in stripped.upper():
             pass  # handled separately via tension param
+        elif "DIAGNOSTIC CRITIQUE" in stripped.upper():
+            pass  # label row — handled below
         elif stripped:
             main_line = stripped.lstrip("⚠️").strip()
 
     rows = []
+    # Label row — "DIAGNOSTIC CRITIQUE"
+    rows.append([Paragraph(
+        '<font color="#FCD34D"><b>⚠️  DIAGNOSTIC CRITIQUE</b></font>',
+        ParagraphStyle("diag_label", fontName="Helvetica-Bold", fontSize=8,
+                       textColor=colors.HexColor("#FCD34D"), leading=11)
+    )])
     if main_line:
-        rows.append([Paragraph(f"⚠️  {_rl(main_line)}", styles["hero_main"])])
+        rows.append([Paragraph(_rl(main_line), styles["hero_main"])])
     if decision_line:
         rows.append([Paragraph(f"👉  DÉCISION PRIORITAIRE : {_rl(decision_line)}", styles["hero_decision"])])
 
@@ -408,12 +416,13 @@ def _build_impact_financier(synthese: str | None, items: list[str], styles: dict
 
     rows = []
 
-    # Row 0 — synthèse choc (dark background, prominent)
+    # Row 0 — PERTE ESTIMÉE choc (dark background, bold prominent)
     if synthese:
         synth_p = Paragraph(
-            f'<font color="#FCD34D"><b>💸  {_rl(synthese)}</b></font>',
-            ParagraphStyle("synth", fontName="Helvetica-Bold", fontSize=10.5,
-                           textColor=colors.HexColor("#FCD34D"), leading=16)
+            f'<font color="#94A3B8">💸  PERTE ESTIMÉE</font>  '
+            f'<font color="#FCD34D"><b>→  {_rl(synthese)}</b></font>',
+            ParagraphStyle("synth", fontName="Helvetica-Bold", fontSize=11,
+                           textColor=colors.HexColor("#FCD34D"), leading=17)
         )
         rows.append([synth_p])
 
@@ -491,19 +500,28 @@ def _build_avant_apres(actuel: list[str], apres: list[str], gain: str | None, st
     t.setStyle(TableStyle(style_cmds))
     story.append(t)
 
-    # Gain potentiel — full width green row
+    # GAIN TOTAL POTENTIEL — proéminent, full width green
     if gain:
-        gain_cell = Paragraph(
-            f'<font color="#15803D"><b>💥  GAIN POTENTIEL : </b></font>{_rl(gain)}',
-            styles["body"]
-        )
-        tg = Table([[gain_cell]], colWidths=[CONTENT_W])
+        gain_rows = [
+            [Paragraph(
+                '<font color="#15803D"><b>💥  GAIN TOTAL POTENTIEL</b></font>',
+                ParagraphStyle("gain_label", fontName="Helvetica-Bold", fontSize=8,
+                               textColor=GREEN, leading=11)
+            )],
+            [Paragraph(
+                f'<font color="#14532D"><b>→  {_rl(gain)}</b></font>',
+                ParagraphStyle("gain_val", fontName="Helvetica-Bold", fontSize=12,
+                               textColor=GREEN_DARK, leading=17)
+            )],
+        ]
+        tg = Table(gain_rows, colWidths=[CONTENT_W])
         tg.setStyle(TableStyle([
             ("BACKGROUND",    (0, 0), (-1, -1), GREEN_LIGHT),
             ("TOPPADDING",    (0, 0), (-1, -1), 6),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ("LEFTPADDING",   (0, 0), (-1, -1), 10),
-            ("BOX",           (0, 0), (-1, -1), 1, GREEN),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 12),
+            ("BOX",           (0, 0), (-1, -1), 1.5, GREEN),
+            ("LINEBELOW",     (0, 0), (-1, 0),  0.3, GREEN),
         ]))
         story.append(tg)
 
@@ -899,7 +917,7 @@ def generate_pdf_report(result: dict) -> bytes:
         if actions_sec:
             story.append(Spacer(1, 3))
             ps_label = Paragraph(
-                '<font color="#5F6368"><b>PRIORITÉ SECONDAIRE</b></font>',
+                '<font color="#5F6368"><b>ACTIONS SECONDAIRES</b></font>',
                 styles["body_gray"]
             )
             story.append(ps_label)
@@ -924,7 +942,7 @@ def generate_pdf_report(result: dict) -> bytes:
     risque_inaction = result.get("risque_inaction", "")
     story.extend(_build_risque_inaction(risque_inaction, styles))
 
-    # ── 12. DÉCISION ────────────────────────────────────────────────────────
+    # ── 12. DÉCISION + TRIGGER FINAL ────────────────────────────────────────
     decision = result.get("decision", "")
     if decision:
         story.append(_section_header("⚡  DÉCISION", BLUE_MAIN, styles))
@@ -940,7 +958,27 @@ def generate_pdf_report(result: dict) -> bytes:
             ("BOX",           (0, 0), (-1, -1), 1.5, BLUE_MAIN),
         ]))
         story.append(t)
-        story.append(Spacer(1, 8))
+        story.append(Spacer(1, 4))
+
+    # TRIGGER FINAL — toujours affiché (CTA fixe)
+    trigger_cell = Paragraph(
+        '👉  <b>RECOMMANDATION :</b>  Mettre en œuvre les actions prioritaires '
+        'dans les <b>30 prochains jours</b>.',
+        ParagraphStyle("trigger_final", fontName="Helvetica-Bold", fontSize=10,
+                       textColor=BLUE_DARK, leading=15)
+    )
+    t_trigger = Table([[trigger_cell]], colWidths=[CONTENT_W])
+    t_trigger.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), BLUE_LIGHT),
+        ("TOPPADDING",    (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+        ("BOX",           (0, 0), (-1, -1), 2, BLUE_DARK),
+        ("ROUNDEDCORNERS", [4, 4, 4, 4]),
+    ]))
+    story.append(t_trigger)
+    story.append(Spacer(1, 10))
 
     # ── 13. ÉVOLUTION VS ANALYSE PRÉCÉDENTE ─────────────────────────────────
     memory_insight = result.get("memory_insight", "")
