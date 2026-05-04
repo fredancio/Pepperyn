@@ -334,13 +334,6 @@ async def analyze_file(
     # Cache analysis result dict for on-demand PDF/PPTX generation
     _analysis_result_cache[analyse_id] = analysis_result.model_dump()
 
-    # Save memory after analysis
-    if _memory_service:
-        try:
-            _memory_service.save_analysis_memory(company_id, analyse_id, analysis_result.model_dump())
-        except Exception:
-            pass
-
     # Increment analysis usage counter (server-side, after success)
     _usage_service.increment_analysis(company_id)
 
@@ -376,7 +369,8 @@ async def analyze_file(
     except Exception:
         pass  # CRM sync is non-blocking
 
-    # Persist to Supabase (non-blocking)
+    # Persist to Supabase (non-blocking) — DOIT être avant save_analysis_memory
+    # car financial_metrics.analyse_id référence analyses.id (FK constraint)
     _save_to_db(
         analyse_id=analyse_id,
         company_id=company_id,
@@ -392,6 +386,13 @@ async def analyze_file(
         duration_ms=duration_ms,
         plan=plan,
     )
+
+    # Save memory APRÈS _save_to_db (FK: financial_metrics.analyse_id → analyses.id)
+    if _memory_service:
+        try:
+            _memory_service.save_analysis_memory(company_id, analyse_id, analysis_result.model_dump())
+        except Exception as e:
+            logger.error(f"[MEMORY] save_analysis_memory failed: {e}")
 
     return AnalyzeResponse(
         success=True,
