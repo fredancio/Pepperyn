@@ -125,6 +125,11 @@ def _build_styles() -> dict[str, ParagraphStyle]:
             fontName="Helvetica", fontSize=7.5,
             textColor=GRAY_TEXT, alignment=TA_CENTER,
         ),
+        "small": ParagraphStyle(
+            "small", parent=base["Normal"],
+            fontName="Helvetica", fontSize=8,
+            textColor=GRAY_TEXT, leading=12, spaceAfter=1,
+        ),
     }
 
 
@@ -269,6 +274,97 @@ def generate_pdf_report(result: dict) -> bytes:
     )
 
     story: list[Any] = []
+
+    # ── 0. FIABILITÉ DES DONNÉES (obligatoire, première section) ───────────
+    dq = result.get("data_quality") or {}
+    if dq:
+        dq_score   = dq.get("score_data", 70) if isinstance(dq, dict) else getattr(dq, "score_data", 70)
+        dq_status  = (dq.get("status", "ok") if isinstance(dq, dict) else getattr(dq, "status", "ok")).lower()
+        dq_format  = dq.get("document_format", "") if isinstance(dq, dict) else getattr(dq, "document_format", "")
+        dq_mapping = dq.get("mapping_summary", []) if isinstance(dq, dict) else getattr(dq, "mapping_summary", [])
+        dq_anomaly = dq.get("anomalies", []) if isinstance(dq, dict) else getattr(dq, "anomalies", [])
+        dq_assumpt = dq.get("assumptions", []) if isinstance(dq, dict) else getattr(dq, "assumptions", [])
+
+        status_color = {"ok": GREEN, "warning": AMBER, "blocked": RED}.get(dq_status, GRAY_TEXT)
+        status_bg    = {"ok": GREEN_LIGHT, "warning": AMBER_LIGHT, "blocked": RED_LIGHT}.get(dq_status, GRAY_BG)
+        status_label = {"ok": "✅ OK", "warning": "⚠️ AVERTISSEMENT", "blocked": "🚫 BLOQUÉ"}.get(dq_status, dq_status.upper())
+
+        story.append(_section_header("🔍  FIABILITÉ DES DONNÉES", status_color, styles))
+        story.append(Spacer(1, 4))
+
+        # Tableau score + statut
+        score_ia   = result.get("score_confiance", 0)
+        rows_dq = [
+            [Paragraph("<b>Score fiabilité données source</b>", styles["body"]),
+             Paragraph(f"<b>{dq_score}/100</b>", styles["body"]),
+             Paragraph(f"<b>{status_label}</b>", styles["body"])],
+            [Paragraph("<b>Confiance analyse IA</b>", styles["body"]),
+             Paragraph(f"<b>{score_ia}%</b>", styles["body"]),
+             Paragraph("Qualité du raisonnement IA", styles["small"])],
+        ]
+        col_w = [CONTENT_W * 0.45, CONTENT_W * 0.2, CONTENT_W * 0.35]
+        t_scores = Table(rows_dq, colWidths=col_w)
+        t_scores.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), status_bg),
+            ("BACKGROUND", (0, 1), (-1, 1), BLUE_LIGHT),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+            ("BOX",           (0, 0), (-1, -1), 0.5, status_color),
+            ("LINEBELOW",     (0, 0), (-1, 0),  0.3, GRAY_TEXT),
+        ]))
+        story.append(t_scores)
+        story.append(Spacer(1, 4))
+
+        # Format document
+        fmt_label = {
+            "structural_pl": "Document structurel (P&L / Bilan / Budget)",
+            "erp_transactional": "Données transactionnelles (ERP / exports comptables)",
+        }.get(dq_format, dq_format or "Indéterminé")
+        story.append(Paragraph(f"<b>Format détecté :</b> {_rl(fmt_label)}", styles["small"]))
+        story.append(Spacer(1, 2))
+
+        # Mapping
+        if dq_mapping:
+            story.append(Paragraph("<b>Mapping détecté :</b>", styles["small"]))
+            for m in dq_mapping[:4]:
+                story.append(Paragraph(f"  • {_rl(m)}", styles["small"]))
+            story.append(Spacer(1, 2))
+
+        # Anomalies
+        if dq_anomaly:
+            story.append(Paragraph(f"<b>Anomalies ({len(dq_anomaly)}) :</b>", styles["small"]))
+            for a in dq_anomaly[:5]:
+                story.append(Paragraph(f"  ⚠️ {_rl(a)}", styles["small"]))
+            story.append(Spacer(1, 2))
+
+        # Hypothèses / Limites
+        if dq_assumpt:
+            story.append(Paragraph("<b>Limites de l'analyse :</b>", styles["small"]))
+            for a in dq_assumpt[:3]:
+                story.append(Paragraph(f"  ℹ️ {_rl(a)}", styles["small"]))
+            story.append(Spacer(1, 2))
+
+        # Avertissement mode dégradé
+        if dq_status == "warning":
+            warn_cell = Paragraph(
+                "⚠️  <b>Analyse basée sur des données partiellement fiables.</b> "
+                "Certaines conclusions peuvent être biaisées. Validez les données sources avant toute décision.",
+                styles["body"]
+            )
+            t_warn = Table([[warn_cell]], colWidths=[CONTENT_W])
+            t_warn.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), AMBER_LIGHT),
+                ("BOX",        (0, 0), (-1, -1), 1.0, AMBER),
+                ("TOPPADDING",    (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+            ]))
+            story.append(t_warn)
+            story.append(Spacer(1, 2))
+
+        story.append(HRFlowable(width=CONTENT_W, thickness=0.5, color=GRAY_TEXT))
+        story.append(Spacer(1, 10))
 
     # ── 1. Résumé exécutif ──────────────────────────────────────────────────
     resume = result.get("resume_executif") or result.get("synthese", "")

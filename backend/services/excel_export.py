@@ -74,10 +74,11 @@ def generate_excel_report(
     original_data: dict[str, Any],
     filename: str = "analyse",
 ) -> bytes:
-    """Generate a 4-tab Excel report. Returns bytes."""
+    """Generate a 5-tab Excel report (incl. Data Quality). Returns bytes."""
     wb = openpyxl.Workbook()
     wb.remove(wb.active)
 
+    _create_data_quality_tab(wb, analysis)   # ← premier onglet visible
     _create_synthese_tab(wb, analysis, filename)
     _create_diagnostic_tab(wb, analysis)
     _create_plan_action_tab(wb, analysis)
@@ -87,6 +88,81 @@ def generate_excel_report(
     wb.save(buf)
     buf.seek(0)
     return buf.getvalue()
+
+
+def _create_data_quality_tab(wb: openpyxl.Workbook, analysis: AnalysisResult):
+    """Onglet DATA QUALITY — fiabilité des données source."""
+    ws = wb.create_sheet("📊 Data Quality")
+    ws.sheet_view.showGridLines = False
+    ws.sheet_properties.tabColor = "15803D"  # vert
+
+    dq = analysis.data_quality
+    if dq is None:
+        ws["A1"] = "Validation des données non disponible."
+        return
+
+    dq_score   = dq.score_data if hasattr(dq, "score_data") else (dq.get("score_data", 70) if isinstance(dq, dict) else 70)
+    dq_status  = (dq.status if hasattr(dq, "status") else (dq.get("status", "ok") if isinstance(dq, dict) else "ok")).lower()
+    dq_format  = dq.document_format if hasattr(dq, "document_format") else (dq.get("document_format", "") if isinstance(dq, dict) else "")
+    dq_mapping = dq.mapping_summary if hasattr(dq, "mapping_summary") else (dq.get("mapping_summary", []) if isinstance(dq, dict) else [])
+    dq_anomaly = dq.anomalies if hasattr(dq, "anomalies") else (dq.get("anomalies", []) if isinstance(dq, dict) else [])
+    dq_assumpt = dq.assumptions if hasattr(dq, "assumptions") else (dq.get("assumptions", []) if isinstance(dq, dict) else [])
+
+    status_colors = {"ok": "15803D", "warning": "D97706", "blocked": "DC2626"}
+    status_labels = {"ok": "✅ OK", "warning": "⚠️ AVERTISSEMENT", "blocked": "🚫 BLOQUÉ"}
+    tab_color = status_colors.get(dq_status, "5F6368")
+    ws.sheet_properties.tabColor = tab_color
+
+    # Titre
+    ws.merge_cells("A1:D1")
+    ws["A1"] = "FIABILITÉ DES DONNÉES SOURCE — PEPPERYN"
+    ws["A1"].font = Font(name="Calibri", bold=True, size=14, color="FFFFFF")
+    ws["A1"].fill = PatternFill(start_color=tab_color, end_color=tab_color, fill_type="solid")
+    ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 36
+
+    score_ia = analysis.score_confiance
+    rows = [
+        ("Score fiabilité données", f"{dq_score}/100"),
+        ("Statut",                  status_labels.get(dq_status, dq_status.upper())),
+        ("Confiance analyse IA",    f"{score_ia}%"),
+        ("Format détecté",          {
+            "structural_pl":      "Document structurel (P&L / Bilan / Budget)",
+            "erp_transactional":  "Données transactionnelles (ERP)",
+        }.get(dq_format, dq_format or "Indéterminé")),
+        ("Date analyse",            datetime.now().strftime("%d/%m/%Y %H:%M")),
+    ]
+    for r_idx, (label, value) in enumerate(rows, 3):
+        ws[f"A{r_idx}"] = label
+        ws[f"B{r_idx}"] = value
+        ws[f"A{r_idx}"].font = Font(name="Calibri", bold=True, size=10)
+        ws[f"B{r_idx}"].font = Font(name="Calibri", size=10)
+
+    row = 10
+    for section_title, items in [
+        ("MAPPING DÉTECTÉ", dq_mapping),
+        ("ANOMALIES", dq_anomaly),
+        ("LIMITES / HYPOTHÈSES", dq_assumpt),
+    ]:
+        if items:
+            ws[f"A{row}"] = section_title
+            ws[f"A{row}"].font = Font(name="Calibri", bold=True, size=10, color="FFFFFF")
+            ws[f"A{row}"].fill = PatternFill(start_color="5F6368", end_color="5F6368", fill_type="solid")
+            ws.merge_cells(f"A{row}:D{row}")
+            row += 1
+            for item in items[:8]:
+                ws[f"A{row}"] = f"• {item}"
+                ws[f"A{row}"].font = Font(name="Calibri", size=9)
+                ws.merge_cells(f"A{row}:D{row}")
+                ws[f"A{row}"].alignment = Alignment(wrap_text=True)
+                ws.row_dimensions[row].height = 20
+                row += 1
+            row += 1
+
+    ws.column_dimensions["A"].width = 32
+    ws.column_dimensions["B"].width = 55
+    ws.column_dimensions["C"].width = 20
+    ws.column_dimensions["D"].width = 20
 
 
 # ─── Onglet 1 : Synthèse ──────────────────────────────────────────────────────

@@ -99,6 +99,17 @@ class Recommandation(BaseModel):
     delai: Optional[str] = None
 
 
+class DataQualityInfo(BaseModel):
+    """Section fiabilité des données injectée dans chaque rapport."""
+    score_data: int = Field(default=70, ge=0, le=100)
+    status: str = "ok"           # "ok" | "warning" | "blocked"
+    document_format: str = "unknown"
+    mapping_summary: List[str] = []
+    anomalies: List[str] = []
+    assumptions: List[str] = []
+    sheets_detected: List[str] = []
+
+
 class AnalysisResult(BaseModel):
     # Identifiant DB (renseigné après sauvegarde)
     id: Optional[str] = None
@@ -106,6 +117,9 @@ class AnalysisResult(BaseModel):
     # Champs communs
     type_document: str = "AUTRE"
     score_confiance: int = Field(default=70, ge=0, le=100)
+
+    # Fiabilité des données source (gate obligatoire)
+    data_quality: Optional[DataQualityInfo] = None
 
     # Champs v3 (nouveau format)
     resume_executif: Optional[str] = None

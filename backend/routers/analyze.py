@@ -14,11 +14,12 @@ logger = logging.getLogger(__name__)
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Header
 from jose import jwt, JWTError
 
-from models.schemas import AnalyzeResponse, TextQueryRequest, TextQueryResponse
+from models.schemas import AnalyzeResponse, TextQueryRequest, TextQueryResponse, DataQualityInfo
 from connectors import FileConnector
 from services.llm_service import run_full_pipeline, get_anthropic_client, call_chat_intelligent
 from services.excel_export import generate_excel_report
 from services.usage_service import UsageService
+from services.data_quality_gate import validate_excel_before_analysis
 try:
     from services.memory_service import MemoryService
     _memory_service = MemoryService()
@@ -198,6 +199,43 @@ async def analyze_file(
             detail=f"Fichier trop volumineux ({len(file_bytes)//1024}KB). Maximum: {MAX_FILE_SIZE_MB}MB"
         )
 
+    # ── DATA QUALITY GATE (obligatoire, avant toute analyse) ────────────────
+    quality_gate = validate_excel_before_analysis(file_bytes, file.filename)
+    logger.warning(
+        f"[QUALITY GATE] {file.filename} → status={quality_gate.status} "
+        f"score={quality_gate.score_data} format={quality_gate.document_format}"
+    )
+
+    if not quality_gate.can_analyze:
+        # Fichier bloqué : retourner uniquement le rapport qualité, pas d'analyse financière
+        from models.schemas import AnalysisResult
+        blocked_result = AnalysisResult(
+            type_document="AUTRE",
+            score_confiance=0,
+            resume_executif=(
+                f"⛔ Analyse bloquée — données insuffisantes\n\n"
+                f"{quality_gate.blocking_reason or 'Le fichier ne contient pas de données financières exploitables.'}"
+            ),
+            problemes_critiques=[quality_gate.blocking_reason or "Données insuffisantes"],
+            decision="Fournir un fichier Excel avec des données financières structurées et complètes.",
+            data_quality=DataQualityInfo(
+                score_data=quality_gate.score_data,
+                status="blocked",
+                document_format=quality_gate.document_format,
+                mapping_summary=quality_gate.mapping_summary,
+                anomalies=quality_gate.anomalies,
+                assumptions=quality_gate.assumptions,
+                sheets_detected=quality_gate.sheets_detected,
+            ),
+        )
+        return AnalyzeResponse(
+            success=False,
+            message="Analyse bloquée — qualité des données insuffisante",
+            result=blocked_result,
+            tokens_used=0,
+            cout_estime=0.0,
+        )
+
     # Parse file (Step 1: pre-processing, 0 tokens)
     try:
         parsed_data = FileConnector(file_bytes, file.filename).fetch()
@@ -230,6 +268,9 @@ async def analyze_file(
         except Exception:
             pass
 
+    # Inject data quality context into LLM prompt
+    quality_section = quality_gate.to_prompt_section()
+
     # Track analysis_started event
     _usage_service.track_activity(company_id, "analysis_started", {
         "filename": file.filename,
@@ -245,6 +286,7 @@ async def analyze_file(
             business_model=business_model,
             memory_section=memory_section,
             actions_section=actions_section,
+            quality_section=quality_section,
         )
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -262,6 +304,17 @@ async def analyze_file(
                 analysis_result.memory_insight = memory_insight
         except Exception:
             pass
+
+    # Attach data quality info to result
+    analysis_result.data_quality = DataQualityInfo(
+        score_data=quality_gate.score_data,
+        status=quality_gate.status,
+        document_format=quality_gate.document_format,
+        mapping_summary=quality_gate.mapping_summary,
+        anomalies=quality_gate.anomalies,
+        assumptions=quality_gate.assumptions,
+        sheets_detected=quality_gate.sheets_detected,
+    )
 
     # Assign the analyse_id to the result object so the frontend can use it
     analyse_id = str(uuid.uuid4())
