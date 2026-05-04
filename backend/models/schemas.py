@@ -153,6 +153,12 @@ class AnalysisResult(BaseModel):
     risque_inaction: Optional[str] = None
     score_interpretations: dict = {}
 
+    # V6 — Impact & Tension
+    phrase_tension: Optional[str] = None
+    impact_financier_synthese: Optional[str] = None
+    plan_action_haute: List[str] = []
+    plan_action_secondaire: List[str] = []
+
     # Champs legacy (ancien format JSON — backward compat)
     revenus: Optional[RevenusData] = None
     couts: Optional[CoutsData] = None

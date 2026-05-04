@@ -44,24 +44,28 @@ Types disponibles (un seul):
 - AUTRE           : tout autre type de document financier"""
 
 
-ANALYSIS_SYSTEM_V3 = """Tu es un expert en finance d'entreprise opérationnelle et stratégique. Tu interviens sur :
-1. Comptabilité générale et analytique
-2. Contrôle de gestion
-3. Trésorerie
-4. FP&A (Financial Planning & Analysis)
-5. Stratégie financière
-6. Opérations financières
+ANALYSIS_SYSTEM_V3 = """Tu es un expert en finance d'entreprise opérationnelle. Tu aides les dirigeants à prendre des décisions immédiates.
 
-Ton rôle est d'aider à prendre des décisions, pas d'expliquer.
+TON STYLE — RÈGLES ABSOLUES :
+- Tu écris comme un expert qui DÉCIDE, pas un consultant qui DÉCRIT.
+- Phrases COURTES. Maximum 15 mots par phrase.
+- Verbes d'action : agis, réduis, coupe, accélère, stoppe, renégocie, fixe, mesure.
+- Ton DIRECT : interdit "il semble que", "on pourrait considérer", "il convient de".
+- Exprime la gravité sans filtre : si c'est critique → "C'est critique."
+- Zéro nuance inutile. Chaque mot sert la décision.
+- INTERDIT : "accuse un déficit", "présente des marges", "montre des signes". Utilise : "est", "perd", "risque", "doit".
 
-Tu travailles uniquement à partir des données fournies.
-Tu n'inventes jamais d'informations.
-Si une donnée est manquante ou incertaine, tu le signales explicitement.
+TA MISSION :
+Le dirigeant lit ce rapport et comprend en 5 secondes :
+→ Quel est son problème exact
+→ Ce qu'il doit faire maintenant
+→ Ce qu'il risque s'il n'agit pas
 
-Tu dois produire une analyse :
-- structurée
-- concise
-- orientée action
+DONNÉES :
+- Tu travailles UNIQUEMENT à partir des données fournies.
+- Tu n'inventes JAMAIS de chiffres ni d'informations.
+- Si une donnée est absente : écrire "Données insuffisantes" — pas d'estimation approximative.
+- Tout chiffre doit être issu des données ou explicitement marqué comme estimation.
 
 Tu respectes STRICTEMENT le format demandé."""
 
@@ -172,8 +176,9 @@ Analyse ces données.
 Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 
 # DIAGNOSTIC IMMEDIAT
-⚠️ [1 phrase directe sur la situation critique — ton direct, sans nuance inutile]
-👉 DÉCISION PRIORITAIRE : [1 action claire et immédiate]
+⚠️ [1 phrase DIRECTE et FRONTALE — jamais neutre — ex : "Votre modèle est structurellement non rentable" — PAS "accuse un déficit"]
+👉 DÉCISION PRIORITAIRE : [1 action immédiate — verbe d'action fort]
+⚡ TENSION : [1 phrase d'urgence — ex : "Sans action dans 60 jours, votre trésorerie atteint son seuil critique"]
 
 # RÉSUMÉ EXÉCUTIF
 [Situation — 1 phrase courte]
@@ -181,26 +186,27 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 [Action — 1 phrase courte]
 
 # SCORES
-- Rentabilité : X/10 → [interprétation en 3 mots max]
-- Risque : X/10 → [interprétation en 3 mots max]
-- Structure : X/10 → [interprétation en 3 mots max]
-- Liquidité : X/10 → [interprétation en 3 mots max]
+- Rentabilité : X/10 → [UN SEUL MOT : critique / insuffisant / correct / solide]
+- Risque : X/10 → [UN SEUL MOT : faible / modéré / élevé / critique]
+- Structure : X/10 → [UN SEUL MOT : instable / fragile / acceptable / solide]
+- Liquidité : X/10 → [UN SEUL MOT : critique / tendue / correcte / confortable]
 
 # IMPACT FINANCIER
+💸 SYNTHÈSE : [1 phrase choc — ex : "Vous perdez potentiellement X€ par an" — chiffre issu des données OU "Impact non chiffrable sur les données disponibles"]
+→ [Détail impact 1 — montant si disponible dans les données]
+→ [Détail impact 2 — montant ou "Données insuffisantes"]
+→ [Détail impact 3 — marge récupérable ou "Données insuffisantes"]
 ⚠️ Estimations basées sur les données disponibles uniquement.
-→ [coût ou inefficience identifiée avec montant si présent dans les données]
-→ [deuxième impact identifié — montant ou "données insuffisantes"]
-→ [marge récupérable ou gain potentiel identifié — montant ou "données insuffisantes"]
 
 # AVANT APRES
-### Situation actuelle
+### 📉 AUJOURD'HUI
 - [indicateur clé actuel avec chiffre si disponible]
 - [deuxième indicateur clé actuel]
-### Après actions
+### 📈 APRÈS ACTION
 - [amélioration concrète attendue]
 - [deuxième amélioration attendue]
-### Gain potentiel
-→ [estimation du gain annuel basé sur les données — si insuffisant écrire "Données insuffisantes pour estimer le gain"]
+### 💥 GAIN POTENTIEL
+→ [montant estimé sur base des données — si insuffisant écrire "Données insuffisantes"]
 
 # SIMULATEUR DECISION
 → Action : [action clé 1]
@@ -227,7 +233,13 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 🟢 [Levier 3 actionnable]
 
 # PLAN D'ACTION
-(priorisé — indiquer : Priorité HAUTE / Priorité MOYENNE — action + impact attendu)
+### PRIORITÉ HAUTE (3 actions max — celles qui changent tout)
+- [action 1] → [impact en 5 mots]
+- [action 2] → [impact en 5 mots]
+- [action 3] → [impact en 5 mots]
+### PRIORITÉ SECONDAIRE
+- [action 4]
+- [action 5]
 
 # RISQUE INACTION
 [1 phrase maximum : conséquence concrète si aucune action n'est prise dans les 3 mois]
@@ -282,6 +294,8 @@ RÈGLES ABSOLUES :
 - INTERDIT : annotations inline, notes d'audit, ~~strikethrough~~, > blockquotes, "Note d'audit", "→ Reformulé", commentaires entre parenthèses expliquant une correction.
 - Les corrections sont appliquées SILENCIEUSEMENT : le lecteur final ne doit jamais savoir qu'une correction a eu lieu.
 - Ne change JAMAIS le format ni les titres de section (# DIAGNOSTIC IMMEDIAT, # RÉSUMÉ EXÉCUTIF, # SCORES, # IMPACT FINANCIER, # AVANT APRES, # SIMULATEUR DECISION, # PROJECTION TEMPORELLE, # CE QUI DETRUIT, # LEVIERS CROISSANCE, # PLAN D'ACTION, # RISQUE INACTION, # DIAGNOSTIC FINANCIER, # CE QUI A CHANGÉ, # ALERTES, # PROBLÈMES CRITIQUES, # OPPORTUNITÉS, # DÉCISION).
+- Ne change JAMAIS les sous-titres internes (### PRIORITÉ HAUTE, ### PRIORITÉ SECONDAIRE, ### 📉 AUJOURD'HUI, ### 📈 APRÈS ACTION, ### 💥 GAIN POTENTIEL, ⚡ TENSION, 💸 SYNTHÈSE).
+- Le style doit rester DIRECT et FRONTAL : interdit de reformuler en ton neutre ou académique.
 - L'ordre des sections est FIXE et IMMUABLE — ne les réorganise jamais.
 - Si une information n'est pas dans les données sources, supprime-la ou remplace-la par "Données insuffisantes".
 - CRITIQUE : dans IMPACT FINANCIER, AVANT APRES, SIMULATEUR DECISION — supprimer tout chiffre inventé. Garder uniquement les montants présents dans les données sources ou écrire "Données insuffisantes".
@@ -365,24 +379,63 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
 
     problemes = _parse_list(problemes_raw, "🔴")
     opportunites = _parse_list(opportunites_raw, "🟢")
-    plan_action = _parse_list(plan_raw, "-")
     ce_qui_a_change = _parse_list(ce_qui_a_change_raw, "-")
     alertes = _parse_list(alertes_raw, "⚠️")
 
-    # ── Parse V5 — impact financier ──────────────────────────────────────────
-    impact_financier = [
-        l.strip().lstrip("→").strip()
-        for l in impact_financier_raw.splitlines()
-        if l.strip() and l.strip().startswith("→")
-    ]
+    # ── Parse V6 — plan d'action HAUTE / SECONDAIRE ──────────────────────────
+    plan_action_haute: list[str] = []
+    plan_action_secondaire: list[str] = []
+    current_plan_section = "haute"
+    for line in plan_raw.splitlines():
+        l = line.strip()
+        if not l:
+            continue
+        if l.startswith("#"):
+            ll = l.lower()
+            if "secondaire" in ll:
+                current_plan_section = "secondaire"
+            elif "haute" in ll or "priorité" in ll or "priorite" in ll:
+                current_plan_section = "haute"
+            continue
+        if l.startswith("-") or l.startswith("•"):
+            text = l.lstrip("-• ").strip()
+            if text:
+                if current_plan_section == "haute":
+                    plan_action_haute.append(text)
+                else:
+                    plan_action_secondaire.append(text)
+    # backward compat: flat list = haute + secondaire
+    plan_action = plan_action_haute + plan_action_secondaire
+
+    # ── Parse V5 — impact financier + synthèse ───────────────────────────────
+    impact_financier_synthese: Optional[str] = None
+    impact_financier_raw_lines = impact_financier_raw.splitlines()
+    impact_financier = []
+    for line in impact_financier_raw_lines:
+        l = line.strip()
+        if not l:
+            continue
+        if l.startswith("💸") or "SYNTHÈSE" in l.upper() or "SYNTHESE" in l.upper():
+            # Extract after the colon
+            synthese_text = l.replace("💸", "").strip()
+            if ":" in synthese_text:
+                synthese_text = synthese_text.split(":", 1)[-1].strip()
+            impact_financier_synthese = synthese_text
+        elif l.startswith("→"):
+            impact_financier.append(l.lstrip("→").strip())
+        elif not l.startswith(("⚠️", "#")) and not impact_financier_synthese:
+            # Fallback: first non-marker line is synthesis
+            impact_financier_synthese = l
     if not impact_financier:
+        # Further fallback
         impact_financier = [
             l.strip()
-            for l in impact_financier_raw.splitlines()
-            if l.strip() and not l.strip().startswith(("⚠️", "#"))
+            for l in impact_financier_raw_lines
+            if l.strip() and not l.strip().startswith(("⚠️", "#", "💸"))
+            and "SYNTHÈSE" not in l.upper()
         ]
 
-    # ── Parse V5 — avant/après ───────────────────────────────────────────────
+    # ── Parse V6 — avant/après (nouveaux headers) ────────────────────────────
     avant_apres_actuel: list[str] = []
     avant_apres_apres: list[str] = []
     avant_apres_gain: Optional[str] = None
@@ -390,9 +443,10 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
     for line in avant_apres_raw.splitlines():
         l = line.strip()
         ll = l.lower()
-        if "situation actuelle" in ll:
+        # Recognize both V5 and V6 header formats
+        if "aujourd'hui" in ll or "aujourd hui" in ll or "situation actuelle" in ll:
             current_aa = "actuel"
-        elif "après actions" in ll or "apres actions" in ll:
+        elif "après action" in ll or "apres action" in ll:
             current_aa = "apres"
         elif "gain potentiel" in ll:
             current_aa = "gain"
@@ -405,6 +459,14 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
                     avant_apres_apres.append(text)
                 elif current_aa == "gain":
                     avant_apres_gain = text
+
+    # ── Parse V6 — phrase_tension depuis DIAGNOSTIC IMMEDIAT ─────────────────
+    phrase_tension: Optional[str] = None
+    for line in diagnostic_immediat_raw.splitlines():
+        l = line.strip()
+        if l.startswith("⚡") or "TENSION" in l.upper():
+            phrase_tension = l.replace("⚡", "").replace("TENSION :", "").strip()
+            break
 
     # ── Parse V5 — simulateur décision ──────────────────────────────────────
     simulateur_decision = [
@@ -524,6 +586,11 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
         "leviers_croissance": leviers_croissance,
         "risque_inaction": risque_inaction,
         "score_interpretations": score_interpretations,
+        # V6
+        "phrase_tension": phrase_tension,
+        "impact_financier_synthese": impact_financier_synthese,
+        "plan_action_haute": plan_action_haute,
+        "plan_action_secondaire": plan_action_secondaire,
     }
 
 

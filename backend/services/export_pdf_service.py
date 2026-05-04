@@ -219,7 +219,7 @@ def _bullet_rows(items: list[str], icon: str, text_color, bg_color, styles: dict
 
 
 def _score_table(scores: dict[str, int | None], interpretations: dict, styles: dict) -> Table:
-    """4 score circles with colour + interpretation."""
+    """4 score circles — number + label + colored interpretation badge."""
     score_data = [
         ("Rentabilité", scores.get("rentabilite"), interpretations.get("rentabilite", "")),
         ("Risque",      scores.get("risque"),      interpretations.get("risque", "")),
@@ -231,18 +231,38 @@ def _score_table(scores: dict[str, int | None], interpretations: dict, styles: d
         if val is None:
             cells.append(Spacer(1, 1))
             continue
-        color = "#15803D" if val >= 8 else "#D97706" if val >= 5 else "#DC2626"
-        score_p = Paragraph(f'<font color="{color}"><b>{val}</b></font>', styles["score_value"])
+        color_hex = "#15803D" if val >= 8 else "#D97706" if val >= 5 else "#DC2626"
+        bg_hex    = "#F0FDF4" if val >= 8 else "#FFFBEB" if val >= 5 else "#FEF2F2"
+        score_p = Paragraph(
+            f'<font color="{color_hex}"><b>{val}/10</b></font>',
+            ParagraphStyle("sv2", fontName="Helvetica-Bold", fontSize=15,
+                           leading=19, alignment=TA_CENTER)
+        )
         label_p = Paragraph(label, styles["score_label"])
         rows_inner = [[score_p], [label_p]]
         if interp:
-            rows_inner.append([Paragraph(_rl(interp), styles["score_interp"])])
+            # Interpretation as colored pill
+            interp_p = Paragraph(
+                f'<font color="{color_hex}"><b>{_rl(interp.upper())}</b></font>',
+                ParagraphStyle("si2", fontName="Helvetica-Bold", fontSize=8,
+                               leading=11, alignment=TA_CENTER)
+            )
+            interp_cell = Table([[interp_p]], colWidths=[34 * mm])
+            interp_cell.setStyle(TableStyle([
+                ("BACKGROUND",    (0, 0), (-1, -1), colors.HexColor(bg_hex)),
+                ("BOX",           (0, 0), (-1, -1), 0.8, colors.HexColor(color_hex)),
+                ("TOPPADDING",    (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ("ROUNDEDCORNERS", [3, 3, 3, 3]),
+            ]))
+            rows_inner.append([interp_cell])
         inner = Table(rows_inner, colWidths=[38 * mm])
         inner.setStyle(TableStyle([
             ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
-            ("TOPPADDING",    (0, 0), (-1, -1), 3),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-            ("BOX",           (0, 0), (-1, -1), 1.5, colors.HexColor(color)),
+            ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING",    (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("BOX",           (0, 0), (-1, -1), 1.5, colors.HexColor(color_hex)),
             ("ROUNDEDCORNERS", [6, 6, 6, 6]),
         ]))
         cells.append(inner)
@@ -300,8 +320,8 @@ def _draw_header(canvas, doc, result: dict):
 
 # ─── V5 Block Builders ────────────────────────────────────────────────────────
 
-def _build_diagnostic_immediat(diag: str, styles: dict) -> list:
-    """Hero block — full-width red/dark with bold diagnostic + decision."""
+def _build_diagnostic_immediat(diag: str, tension: str | None, styles: dict) -> list:
+    """Hero block — dark slate with diagnostic + decision + tension."""
     if not diag:
         return []
     story = []
@@ -312,6 +332,8 @@ def _build_diagnostic_immediat(diag: str, styles: dict) -> list:
         stripped = line.strip()
         if stripped.startswith("👉") or "DÉCISION PRIORITAIRE" in stripped.upper():
             decision_line = stripped.lstrip("👉").replace("DÉCISION PRIORITAIRE :", "").strip()
+        elif stripped.startswith("⚡") or "TENSION" in stripped.upper():
+            pass  # handled separately via tension param
         elif stripped:
             main_line = stripped.lstrip("⚠️").strip()
 
@@ -320,20 +342,44 @@ def _build_diagnostic_immediat(diag: str, styles: dict) -> list:
         rows.append([Paragraph(f"⚠️  {_rl(main_line)}", styles["hero_main"])])
     if decision_line:
         rows.append([Paragraph(f"👉  DÉCISION PRIORITAIRE : {_rl(decision_line)}", styles["hero_decision"])])
+
     if not rows:
         rows.append([Paragraph(_rl(diag), styles["hero_main"])])
 
-    t = Table(rows, colWidths=[CONTENT_W])
-    t.setStyle(TableStyle([
+    style_cmds = [
         ("BACKGROUND",    (0, 0), (-1, -1), SLATE),
         ("TOPPADDING",    (0, 0), (-1, -1), 8),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
         ("LEFTPADDING",   (0, 0), (-1, -1), 12),
         ("RIGHTPADDING",  (0, 0), (-1, -1), 12),
         ("ROUNDEDCORNERS", [6, 6, 6, 6]),
-        ("LINEBELOW", (0, 0), (-1, 0), 0.5, colors.HexColor("#374151")),
-    ]))
-    story.append(KeepTogether([t]))
+    ]
+    if len(rows) > 1:
+        style_cmds.append(("LINEBELOW", (0, 0), (-1, 0), 0.5, colors.HexColor("#374151")))
+
+    t = Table(rows, colWidths=[CONTENT_W])
+    t.setStyle(TableStyle(style_cmds))
+
+    # Tension line: amber box directly below the hero
+    elements = [t]
+    if tension:
+        tension_cell = Paragraph(
+            f"⚡  {_rl(tension)}",
+            ParagraphStyle("tension_inline",
+                fontName="Helvetica-Bold", fontSize=9,
+                textColor=DARK, leading=14)
+        )
+        t_tension = Table([[tension_cell]], colWidths=[CONTENT_W])
+        t_tension.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), colors.HexColor("#FEF3C7")),  # amber-100
+            ("TOPPADDING",    (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 12),
+            ("BOX",           (0, 0), (-1, -1), 1, AMBER),
+        ]))
+        elements.append(t_tension)
+
+    story.append(KeepTogether(elements))
     story.append(Spacer(1, 8))
     return story
 
@@ -352,32 +398,51 @@ def _build_resume_executif(resume: str, styles: dict) -> list:
     return story
 
 
-def _build_impact_financier(items: list[str], styles: dict) -> list:
-    """Dark slate block with financial impact estimates."""
-    if not items:
+def _build_impact_financier(synthese: str | None, items: list[str], styles: dict) -> list:
+    """Impact financier: choc line first, then details."""
+    if not synthese and not items:
         return []
     story = []
     story.append(_section_header("💸  IMPACT FINANCIER ESTIMÉ", SLATE, styles))
     story.append(Spacer(1, 2))
 
-    rows = [[Paragraph(
+    rows = []
+
+    # Row 0 — synthèse choc (dark background, prominent)
+    if synthese:
+        synth_p = Paragraph(
+            f'<font color="#FCD34D"><b>💸  {_rl(synthese)}</b></font>',
+            ParagraphStyle("synth", fontName="Helvetica-Bold", fontSize=10.5,
+                           textColor=colors.HexColor("#FCD34D"), leading=16)
+        )
+        rows.append([synth_p])
+
+    # Row 1 — disclaimer
+    rows.append([Paragraph(
         "⚠️  Estimations basées sur les données disponibles uniquement.",
         styles["small"]
-    )]]
-    for item in items[:5]:
+    )])
+
+    # Rows — details
+    for item in items[:4]:
         rows.append([Paragraph(f"→  {_rl(item)}", styles["body"])])
 
     t = Table(rows, colWidths=[CONTENT_W])
-    t.setStyle(TableStyle([
-        ("BACKGROUND",    (0, 0), (-1, 0), SLATE_LIGHT),
-        ("BACKGROUND",    (0, 1), (-1, -1), colors.HexColor("#F8FAFC")),
+    style_cmds = [
         ("TOPPADDING",    (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
         ("LEFTPADDING",   (0, 0), (-1, -1), 10),
         ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
         ("BOX",           (0, 0), (-1, -1), 1, SLATE),
-        ("LINEBELOW",     (0, 0), (-1, 0), 0.5, GRAY_BORDER),
-    ]))
+    ]
+    if synthese:
+        style_cmds.append(("BACKGROUND", (0, 0), (-1, 0), SLATE))
+        style_cmds.append(("BACKGROUND", (0, 1), (-1, -1), SLATE_LIGHT))
+        style_cmds.append(("LINEBELOW",  (0, 0), (-1, 0), 0.5, GRAY_BORDER))
+    else:
+        style_cmds.append(("BACKGROUND", (0, 0), (-1, -1), SLATE_LIGHT))
+
+    t.setStyle(TableStyle(style_cmds))
     story.append(t)
     story.append(Spacer(1, 8))
     return story
@@ -395,8 +460,8 @@ def _build_avant_apres(actuel: list[str], apres: list[str], gain: str | None, st
 
     # Header row
     header_row = [
-        Paragraph("📉  Situation actuelle", styles["subsection"]),
-        Paragraph("📈  Après actions", styles["subsection"]),
+        Paragraph("📉  AUJOURD'HUI", styles["subsection"]),
+        Paragraph("📈  APRÈS ACTION", styles["subsection"]),
     ]
     # Content rows
     max_len = max(len(actuel), len(apres), 1)
@@ -721,7 +786,8 @@ def generate_pdf_report(result: dict) -> bytes:
 
     # ── 1. DIAGNOSTIC IMMÉDIAT (hero block) ─────────────────────────────────
     diag_imm = result.get("diagnostic_immediat", "")
-    story.extend(_build_diagnostic_immediat(diag_imm, styles))
+    tension = result.get("phrase_tension", "")
+    story.extend(_build_diagnostic_immediat(diag_imm, tension, styles))
 
     # ── 2. RÉSUMÉ EXÉCUTIF ──────────────────────────────────────────────────
     resume = result.get("resume_executif") or result.get("synthese", "")
@@ -742,8 +808,9 @@ def generate_pdf_report(result: dict) -> bytes:
         story.append(Spacer(1, 8))
 
     # ── 4. IMPACT FINANCIER ─────────────────────────────────────────────────
+    impact_synthese = result.get("impact_financier_synthese")
     impact = result.get("impact_financier") or []
-    story.extend(_build_impact_financier(impact, styles))
+    story.extend(_build_impact_financier(impact_synthese, impact, styles))
 
     # ── 5. AVANT / APRÈS ────────────────────────────────────────────────────
     actuel = result.get("avant_apres_actuel") or []
@@ -776,35 +843,81 @@ def generate_pdf_report(result: dict) -> bytes:
         story.extend(_bullet_rows(leviers, "🟢", GREEN, GREEN_LIGHT, styles))
         story.append(Spacer(1, 8))
 
-    # ── 10. PLAN D'ACTION ───────────────────────────────────────────────────
-    actions = result.get("plan_action") or []
-    if not actions:
-        recs = result.get("recommandations", [])
-        actions = [
-            f"[{r.get('priorite','').upper()}] {r.get('action', '')}" for r in recs if isinstance(r, dict)
-        ]
-    if actions:
-        story.append(_section_header(f"🎯  PLAN D'ACTION ({len(actions)} actions)", BLUE_MAIN, styles))
-        story.append(Spacer(1, 3))
-        for action in actions:
-            clean = action.lstrip("🎯 ")
-            is_haute = "priorité haute" in clean.lower() or "priorité: haute" in clean.lower()
-            is_moy   = "priorité moyenne" in clean.lower() or "[MOY" in clean.upper()
-            badge_color = "#DC2626" if is_haute else "#D97706" if is_moy else "#1B73E8"
-            badge = "HAUTE" if is_haute else "MOY." if is_moy else "—"
-            text = f'<font color="{badge_color}"><b>[{badge}]</b></font>  {_rl(clean)}'
-            cell = Paragraph(text, styles["body"])
-            t = Table([[cell]], colWidths=[CONTENT_W])
-            t.setStyle(TableStyle([
-                ("BACKGROUND",    (0, 0), (-1, -1), BLUE_LIGHT),
-                ("TOPPADDING",    (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-                ("LEFTPADDING",   (0, 0), (-1, -1), 8),
-                ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
-                ("BOX",           (0, 0), (-1, -1), 0.5, BLUE_MAIN),
-            ]))
-            story.append(t)
-            story.append(Spacer(1, 2))
+    # ── 10. PLAN D'ACTION (HAUTE / SECONDAIRE) ──────────────────────────────
+    actions_haute = result.get("plan_action_haute") or []
+    actions_sec   = result.get("plan_action_secondaire") or []
+    # Fallback pour anciennes analyses ou format plat
+    if not actions_haute and not actions_sec:
+        all_actions = result.get("plan_action") or []
+        if not all_actions:
+            recs = result.get("recommandations", [])
+            all_actions = [f"{r.get('action', '')}" for r in recs if isinstance(r, dict)]
+        for a in all_actions:
+            al = a.lower()
+            if "haute" in al or "haute" in al:
+                actions_haute.append(a)
+            else:
+                actions_sec.append(a)
+        # If still no split, put all in haute (max 3) + sec
+        if not actions_haute:
+            actions_haute = all_actions[:3]
+            actions_sec   = all_actions[3:]
+
+    total_actions = len(actions_haute) + len(actions_sec)
+    if total_actions > 0:
+        story.append(_section_header(f"🎯  PLAN D'ACTION ({total_actions} actions)", BLUE_MAIN, styles))
+        story.append(Spacer(1, 4))
+
+        # PRIORITÉ HAUTE — proéminent
+        if actions_haute:
+            ph_label = Paragraph(
+                '<font color="#DC2626"><b>🔴  PRIORITÉ HAUTE — FAITES CES 3 CHOSES EN PREMIER</b></font>',
+                styles["subsection"]
+            )
+            story.append(ph_label)
+            story.append(Spacer(1, 3))
+            for action in actions_haute[:3]:
+                clean = action.lstrip("🎯-• ").strip()
+                cell = Paragraph(
+                    f'<font color="#DC2626"><b>→</b></font>  {_rl(clean)}',
+                    ParagraphStyle("ph_action", fontName="Helvetica-Bold", fontSize=9,
+                                   textColor=DARK, leading=14)
+                )
+                t = Table([[cell]], colWidths=[CONTENT_W])
+                t.setStyle(TableStyle([
+                    ("BACKGROUND",    (0, 0), (-1, -1), RED_LIGHT),
+                    ("TOPPADDING",    (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                    ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+                    ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
+                    ("BOX",           (0, 0), (-1, -1), 1, RED),
+                ]))
+                story.append(t)
+                story.append(Spacer(1, 3))
+
+        # PRIORITÉ SECONDAIRE — discret
+        if actions_sec:
+            story.append(Spacer(1, 3))
+            ps_label = Paragraph(
+                '<font color="#5F6368"><b>PRIORITÉ SECONDAIRE</b></font>',
+                styles["body_gray"]
+            )
+            story.append(ps_label)
+            story.append(Spacer(1, 3))
+            for action in actions_sec:
+                clean = action.lstrip("🎯-• ").strip()
+                cell = Paragraph(f"·  {_rl(clean)}", styles["body_gray"])
+                t = Table([[cell]], colWidths=[CONTENT_W])
+                t.setStyle(TableStyle([
+                    ("BACKGROUND",    (0, 0), (-1, -1), GRAY_BG),
+                    ("TOPPADDING",    (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+                    ("BOX",           (0, 0), (-1, -1), 0.3, GRAY_BORDER),
+                ]))
+                story.append(t)
+                story.append(Spacer(1, 2))
+
         story.append(Spacer(1, 8))
 
     # ── 11. SI RIEN NE CHANGE ───────────────────────────────────────────────
