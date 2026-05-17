@@ -134,6 +134,17 @@ async def delete_account(
     except Exception as e:
         errors.append(f"usage_limits: {e}")
 
+    # 4b. Supprimer entities + workspaces (ON DELETE CASCADE devrait suffire,
+    #     mais on supprime explicitement pour garantir la propreté)
+    try:
+        supabase.from_("entities").delete().eq("company_id", company_id).execute()
+    except Exception as e:
+        errors.append(f"entities: {e}")
+    try:
+        supabase.from_("workspaces").delete().eq("company_id", company_id).execute()
+    except Exception as e:
+        errors.append(f"workspaces: {e}")
+
     # 5. Supprimer le profil
     try:
         supabase.from_("profiles").delete().eq("id", auth_user_id).execute()

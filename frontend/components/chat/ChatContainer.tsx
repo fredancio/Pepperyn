@@ -3,15 +3,21 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Message, Session } from '@/lib/types';
-import { analyzeFile, analyzeText, fetchAnalysesHistory } from '@/lib/api';
+import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, type BillingUsage, type Entity } from '@/lib/api';
 import { getCurrentAuthMode, signOutAdmin, clearGuestAuth, getGuestPlan } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { MessageBubble, TypingIndicator } from './MessageBubble';
 import { InputBar } from './InputBar';
 import { PwaInstallButton } from '@/components/ui/PwaInstallButton';
 import { Spinner } from '@/components/ui/Spinner';
+import { UpgradeModal } from '@/components/ui/UpgradeModal';
+import { CreditsModal } from '@/components/ui/CreditsModal';
+import {
+  canAccess, getQuota, planDisplayLabel, planEmoji, planBadgeColors, normalizePlan,
+  type Feature,
+} from '@/lib/featureGate';
 
-const MAX_CHAT_QUESTIONS_FREE = 5;
+const MAX_CHAT_QUESTIONS_FREE = 3; // FREE = 3 interactions contextuelles par analyse
 
 function makeLocalMessage(role: 'user' | 'assistant', content: string, content_type: Message['content_type'] = 'text', metadata?: Record<string, unknown>): Message {
   return {
@@ -39,9 +45,9 @@ const QUICK_SUGGESTIONS = [
   { icon: '🔍', label: 'Détecter anomalies', text: 'Détecte les anomalies dans mes données financières' },
 ];
 
-const LIMIT_MESSAGE = `Vous avez atteint la limite de 5 questions pour cette analyse (version gratuite).
+const LIMIT_MESSAGE = `Vous avez atteint la limite de 3 interactions contextuelles pour cette analyse (plan gratuit).
 
-💡 Pour des conversations illimitées, un accès équipe et des exports enrichis, découvrez les versions avancées de Pepperyn (bientôt disponibles).
+💡 Passez au plan PRO pour un usage conversationnel étendu, des exports Excel & PowerPoint, et une mémoire persistante complète — à partir de 59€/mois.
 
 Ou démarrez une nouvelle analyse avec un nouveau fichier.`;
 
@@ -59,6 +65,10 @@ export function ChatContainer() {
   // Question counter for free plan (post-analysis)
   const [analysisReceived, setAnalysisReceived] = useState(false);
   const [questionsPostAnalysis, setQuestionsPostAnalysis] = useState(0);
+  const [upgradeFeature, setUpgradeFeature] = useState<Feature | null>(null);
+  const [showCreditsModal, setShowCreditsModal] = useState(false);
+  const [usageData, setUsageData] = useState<BillingUsage | null>(null);
+  const [entities, setEntities] = useState<Entity[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasMessages = messages.length > 1;
 
@@ -92,6 +102,13 @@ export function ChatContainer() {
         }
         loadSessionHistory();
       }
+      // Fetch live usage quota from billing API
+      const usage = await fetchBillingUsage();
+      if (usage) setUsageData(usage);
+
+      // Fetch entities for sidebar
+      const ents = await fetchEntities();
+      if (ents.length > 0) setEntities(ents);
     }
     init();
   }, []);
@@ -301,33 +318,178 @@ export function ChatContainer() {
               </button>
             </div>
 
-            {/* Sessions list */}
-            <div className="flex-1 overflow-y-auto p-3">
-              <p className="text-xs font-semibold text-[#5F6368] px-2 mb-2 uppercase tracking-wide">
-                Historique
-              </p>
-              {loadingSessions ? (
-                <div className="flex justify-center py-4">
-                  <Spinner size="sm" />
+            {/* Sidebar content */}
+            <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-4">
+
+              {/* ── Quota analyses ─────────────────────────────────────── */}
+              {(() => {
+                const used    = usageData?.analyses_used    ?? sessions.length;
+                const limit   = usageData?.total_allowed    ?? getQuota(plan);
+                const bonus   = usageData?.bonus_analyses   ?? 0;
+                const pct     = limit > 0 ? Math.min(100, (used / limit) * 100) : 100;
+                const isOver  = used >= limit;
+                const isWarn  = pct >= 70 && !isOver;
+                return (
+                  <div className={`rounded-xl p-3 border ${
+                    isOver ? 'bg-red-50 border-red-100' : isWarn ? 'bg-amber-50 border-amber-100' : 'bg-[#EFF6FF] border-blue-100'
+                  }`}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-semibold text-[#1A1A2E]">Analyses ce mois</span>
+                      <span className={`text-xs font-bold ${
+                        isOver ? 'text-red-600' : isWarn ? 'text-amber-600' : 'text-[#1B73E8]'
+                      }`}>
+                        {used}/{limit}
+                        {bonus > 0 && <span className="ml-1 text-green-600">(+{bonus} bonus)</span>}
+                      </span>
+                    </div>
+                    {/* Progress bar */}
+                    <div className="h-1.5 bg-white/60 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          isOver ? 'bg-red-500' : isWarn ? 'bg-amber-400' : 'bg-[#1B73E8]'
+                        }`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    {/* CTAs */}
+                    <div className="mt-2 flex flex-col gap-1">
+                      <button
+                        onClick={() => setShowCreditsModal(true)}
+                        className={`w-full text-xs font-semibold hover:underline text-left ${
+                          isOver ? 'text-red-600' : 'text-[#1B73E8]'
+                        }`}
+                      >
+                        {isOver ? '⚠️ Quota épuisé — Acheter des crédits →' : '💳 Acheter des crédits supplémentaires →'}
+                      </button>
+                      {!canAccess(plan, 'export_excel') && (
+                        <button
+                          onClick={() => setUpgradeFeature('entities')}
+                          className="w-full text-xs text-amber-700 font-semibold hover:underline text-left"
+                        >
+                          Passer à PRO → 15 analyses/mois
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* ── Section Entités ────────────────────────────────────── */}
+              <div>
+                <div className="flex items-center justify-between px-2 mb-1.5">
+                  <p className="text-xs font-semibold text-[#5F6368] uppercase tracking-wide">
+                    Entités
+                  </p>
+                  {!canAccess(plan, 'entities') && (
+                    <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">
+                      POWER
+                    </span>
+                  )}
                 </div>
-              ) : sessions.length === 0 ? (
-                <p className="text-xs text-[#5F6368] px-2 py-2">Aucune session précédente</p>
-              ) : (
+
+                {canAccess(plan, 'entities') ? (
+                  /* User has access: show real entities from API */
+                  <div className="flex flex-col gap-1">
+                    {(entities.length > 0
+                      ? entities
+                      : [{ id: 'placeholder', name: adminName || 'Entité principale', is_primary: true }] as Entity[]
+                    ).map(entity => (
+                      <div
+                        key={entity.id}
+                        className="flex items-center gap-2 px-3 py-2 bg-[#EFF6FF] border border-blue-100 rounded-xl"
+                      >
+                        <div className="w-6 h-6 bg-[#1B73E8] rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          {entity.name?.[0]?.toUpperCase() || 'E'}
+                        </div>
+                        <span className="text-xs font-medium text-[#1A1A2E] truncate">{entity.name}</span>
+                        {entity.is_primary && (
+                          <span className="ml-auto text-xs text-[#5F6368] bg-gray-100 px-1.5 rounded">principal</span>
+                        )}
+                      </div>
+                    ))}
+                    <button className="flex items-center gap-2 px-3 py-2 text-xs text-[#1B73E8] hover:bg-[#EFF6FF] rounded-xl transition-colors">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Ajouter une entité
+                    </button>
+                  </div>
+                ) : (
+                  /* User doesn't have access: teaser locked */
+                  <button
+                    onClick={() => setUpgradeFeature('entities')}
+                    className="w-full text-left px-3 py-2.5 rounded-xl border border-dashed border-gray-200 hover:border-amber-300 hover:bg-amber-50/50 transition-colors group"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-base">🏢</span>
+                      <span className="text-xs font-semibold text-[#1A1A2E] group-hover:text-amber-700">
+                        Multi-entités
+                      </span>
+                      <svg className="w-3.5 h-3.5 text-[#5F6368] ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </div>
+                    <p className="text-xs text-[#5F6368]">Gérez plusieurs sociétés ou clients séparément</p>
+                  </button>
+                )}
+              </div>
+
+              {/* ── Historique ─────────────────────────────────────────── */}
+              <div className="flex-1">
+                <p className="text-xs font-semibold text-[#5F6368] px-2 mb-1.5 uppercase tracking-wide">
+                  Historique
+                </p>
+                {loadingSessions ? (
+                  <div className="flex justify-center py-4">
+                    <Spinner size="sm" />
+                  </div>
+                ) : sessions.length === 0 ? (
+                  <p className="text-xs text-[#5F6368] px-2 py-2">Aucune session précédente</p>
+                ) : (
+                  <div className="flex flex-col gap-1">
+                    {sessions.map(session => (
+                      <button
+                        key={session.id}
+                        onClick={() => loadSession(session)}
+                        className={`w-full text-left px-3 py-2.5 rounded-xl text-sm transition-colors ${
+                          sessionId === session.id
+                            ? 'bg-[#EFF6FF] text-[#1B73E8] font-medium'
+                            : 'text-[#1A1A2E] hover:bg-gray-50'
+                        }`}
+                      >
+                        <p className="truncate font-medium text-xs">{session.titre || 'Analyse sans titre'}</p>
+                        <p className="text-xs text-[#5F6368] mt-0.5">
+                          {new Date(session.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Features verrouillées (teaser) ─────────────────────── */}
+              {!canAccess(plan, 'export_excel') && (
                 <div className="flex flex-col gap-1">
-                  {sessions.map(session => (
+                  <p className="text-xs font-semibold text-[#5F6368] px-2 uppercase tracking-wide">
+                    Débloquer avec PRO / POWER
+                  </p>
+                  {([
+                    { feature: 'memory_full' as Feature,   icon: '🧠', label: 'Mémoire persistante complète' },
+                    { feature: 'conversational' as Feature, icon: '💬', label: 'Usage conversationnel étendu' },
+                    { feature: 'multi_period' as Feature,   icon: '📅', label: 'Analyse multi-périodes' },
+                    { feature: 'simulator' as Feature,      icon: '⚡', label: 'Simulateur de décisions' },
+                    { feature: 'multi_user' as Feature,     icon: '👥', label: 'Multi-utilisateurs' },
+                  ]).map(({ feature, icon, label }) => (
                     <button
-                      key={session.id}
-                      onClick={() => loadSession(session)}
-                      className={`w-full text-left px-3 py-2.5 rounded-xl text-sm transition-colors ${
-                        sessionId === session.id
-                          ? 'bg-[#EFF6FF] text-[#1B73E8] font-medium'
-                          : 'text-[#1A1A2E] hover:bg-gray-50'
-                      }`}
+                      key={feature}
+                      onClick={() => setUpgradeFeature(feature)}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs text-[#5F6368] hover:bg-gray-50 transition-colors group w-full text-left"
                     >
-                      <p className="truncate font-medium text-xs">{session.titre || 'Analyse sans titre'}</p>
-                      <p className="text-xs text-[#5F6368] mt-0.5">
-                        {new Date(session.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                      </p>
+                      <span>{icon}</span>
+                      <span className="flex-1 group-hover:text-[#1A1A2E]">{label}</span>
+                      <svg className="w-3.5 h-3.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
                     </button>
                   ))}
                 </div>
@@ -393,13 +555,9 @@ export function ChatContainer() {
           {/* Right actions */}
           <div className="flex items-center gap-2">
             {/* Plan badge */}
-            <div className={`hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold ${
-              plan === 'premium' ? 'bg-amber-100 text-amber-700' :
-              plan === 'standard' || plan === 'standard_beta' ? 'bg-blue-100 text-blue-700' :
-              'bg-gray-100 text-[#5F6368]'
-            }`}>
-              {plan === 'premium' ? '⭐' : plan === 'standard' || plan === 'standard_beta' ? '🚀' : '🆓'}
-              <span className="capitalize">{plan === 'standard_beta' ? 'Beta' : plan}</span>
+            <div className={`hidden sm:flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold ${planBadgeColors(plan)}`}>
+              <span>{planEmoji(plan)}</span>
+              <span>{planDisplayLabel(plan)}</span>
             </div>
 
             <PwaInstallButton />
@@ -484,6 +642,7 @@ export function ChatContainer() {
                 <MessageBubble
                   key={msg.id}
                   message={msg}
+                  plan={plan}
                   questionsRestantes={
                     msg.content_type === 'analysis' && plan === 'free'
                       ? questionsRestantes
@@ -507,8 +666,8 @@ export function ChatContainer() {
               : 'bg-[#EFF6FF] border-blue-100 text-[#5F6368]'
           }`}>
             {questionsRestantes === 0
-              ? '⚠️ Limite atteinte — Démarrez une nouvelle analyse ou découvrez les versions avancées'
-              : `Questions restantes dans cette session : ${questionsRestantes}/${MAX_CHAT_QUESTIONS_FREE}`
+              ? '⚠️ 3 interactions atteintes — Nouvelle analyse ou passez au plan PRO pour continuer'
+              : `Interactions contextuelles restantes : ${questionsRestantes}/${MAX_CHAT_QUESTIONS_FREE}`
             }
           </div>
         )}
@@ -526,12 +685,38 @@ export function ChatContainer() {
                   : 'Posez une question de suivi...'
               }
             />
-            <p className="text-center text-xs text-[#5F6368]/50 pb-2 italic">
-              ✨ Bien d'autres options seront disponibles dans les versions payantes à venir !
-            </p>
+            {!canAccess(plan, 'conversational') && (
+              <p className="text-center text-xs text-[#5F6368]/50 pb-2 italic">
+                ✨ Usage conversationnel étendu, exports Excel & PowerPoint disponibles en{' '}
+                <button
+                  onClick={() => setUpgradeFeature('conversational')}
+                  className="underline hover:text-[#1B73E8] transition-colors"
+                >
+                  plan PRO →
+                </button>
+              </p>
+            )}
           </>
         )}
       </div>
+
+      {/* Upgrade modal */}
+      {upgradeFeature && (
+        <UpgradeModal
+          feature={upgradeFeature}
+          onClose={() => setUpgradeFeature(null)}
+        />
+      )}
+
+      {/* Credits modal */}
+      {showCreditsModal && (
+        <CreditsModal
+          plan={plan}
+          analysesUsed={usageData?.analyses_used ?? sessions.length}
+          analysesLimit={usageData?.total_allowed ?? getQuota(plan)}
+          onClose={() => setShowCreditsModal(false)}
+        />
+      )}
     </div>
   );
 }

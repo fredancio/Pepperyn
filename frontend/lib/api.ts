@@ -137,3 +137,46 @@ export async function fetchAnalysesHistory(): Promise<Array<{
   const data = await res.json();
   return data.analyses || [];
 }
+
+export interface Entity {
+  id: string;
+  name: string;
+  industry?: string;
+  business_model?: string;
+  is_primary: boolean;
+  workspace_id: string;
+  created_at: string;
+}
+
+export async function fetchEntities(): Promise<Entity[]> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_URL}/api/entities`, { headers });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.data || [];
+  } catch {
+    return [];
+  }
+}
+
+export interface BillingUsage {
+  analyses_used: number;
+  analyses_limit: number;
+  bonus_analyses: number;
+  total_allowed: number;
+  analyses_remaining: number;
+  year_month: string;
+}
+
+export async function fetchBillingUsage(): Promise<BillingUsage | null> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_URL}/api/billing/usage`, { headers });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.data || null;
+  } catch {
+    return null;
+  }
+}

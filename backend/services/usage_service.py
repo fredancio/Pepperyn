@@ -1,21 +1,28 @@
 """
-Usage Service — Pepperyn v3.
+Usage Service — Pepperyn V11.
 
 Gère les limites d'usage, le reset mensuel automatique et le tracking chat.
 Toute logique de limite est ici — AUCUNE logique côté frontend.
 
-Plans :
-  FREE       → 3 analyses/mois  · 5 messages/analyse
-  PRO        → 30 analyses/mois · chat illimité (soft cap → downgrade Sonnet)
-  PREMIUM    → illimité
+Plans V11 (source : master plan Final) :
+  FREE       → 1 analyse/mois   · 3 interactions contextuelles/analyse
+  PRO        → 15 analyses/mois · usage conversationnel étendu (soft cap Sonnet)
+  POWER      → 75 analyses/mois · usage avancé inclus
+  SCALE      → 250 analyses/mois· usage intensif inclus
   ENTERPRISE → illimité
 
-Tables Supabase requises (voir migrations/v2_usage_limits.sql) :
+Add-ons (crédits supplémentaires, achetables via Stripe) :
+  Starter Pack : +10 analyses  → 19€
+  Growth Pack  : +50 analyses  → 69€
+  Scale Pack   : +200 analyses → 199€
+
+Tables Supabase requises :
   usage_limits :
-    company_id   UUID    NOT NULL
-    year_month   TEXT    NOT NULL  -- ex: "2026-04"
-    analyses_count INT  DEFAULT 0
-    chat_count   INT    DEFAULT 0
+    company_id      UUID    NOT NULL
+    year_month      TEXT    NOT NULL  -- ex: "2026-04"
+    analyses_count  INT     DEFAULT 0
+    chat_count      INT     DEFAULT 0
+    bonus_analyses  INT     DEFAULT 0  -- crédits achetés en add-on
     PRIMARY KEY (company_id, year_month)
 
   user_activity :
@@ -29,16 +36,26 @@ from datetime import datetime, timezone
 from typing import Optional, Tuple
 
 
-# ─── Plan limits ─────────────────────────────────────────────────────────────
+# ─── Plan limits V11 ─────────────────────────────────────────────────────────
 
 PLAN_LIMITS: dict[str, dict] = {
-    "free":           {"analyses": 3,   "chat_per_analysis": 5,    "chat_soft_cap": None},
-    "pro":            {"analyses": 30,  "chat_per_analysis": None,  "chat_soft_cap": 200},
-    "premium":        {"analyses": None,"chat_per_analysis": None,  "chat_soft_cap": None},
-    "enterprise":     {"analyses": None,"chat_per_analysis": None,  "chat_soft_cap": None},
-    # Legacy mappings
-    "standard":       {"analyses": 30,  "chat_per_analysis": None,  "chat_soft_cap": 200},
-    "standard_beta":  {"analyses": 30,  "chat_per_analysis": None,  "chat_soft_cap": 200},
+    # V11 plans
+    "free":           {"analyses": 1,    "chat_per_analysis": 3,    "chat_soft_cap": None},
+    "pro":            {"analyses": 15,   "chat_per_analysis": None,  "chat_soft_cap": 500},
+    "power":          {"analyses": 75,   "chat_per_analysis": None,  "chat_soft_cap": 2000},
+    "scale":          {"analyses": 250,  "chat_per_analysis": None,  "chat_soft_cap": None},
+    "enterprise":     {"analyses": None, "chat_per_analysis": None,  "chat_soft_cap": None},
+    # Legacy plan names (kept for backward compat)
+    "premium":        {"analyses": 75,   "chat_per_analysis": None,  "chat_soft_cap": 2000},
+    "standard":       {"analyses": 15,   "chat_per_analysis": None,  "chat_soft_cap": 500},
+    "standard_beta":  {"analyses": 15,   "chat_per_analysis": None,  "chat_soft_cap": 500},
+}
+
+# Add-on packs (prêts à brancher sur Stripe)
+ADDON_PACKS: dict[str, dict] = {
+    "starter": {"analyses": 10,  "price_eur": 19,  "label": "Starter Pack"},
+    "growth":  {"analyses": 50,  "price_eur": 69,  "label": "Growth Pack"},
+    "scale":   {"analyses": 200, "price_eur": 199, "label": "Scale Pack"},
 }
 
 
@@ -100,6 +117,7 @@ class UsageService:
         Check if company can run an analysis this month.
         Returns (allowed: bool, reason: str).
         MUST be called before every analysis — never skipped.
+        Bonus analyses (add-on packs) count toward the total available.
         """
         limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["free"])
         max_analyses = limits["analyses"]
@@ -109,13 +127,62 @@ class UsageService:
 
         usage = self._get_or_create_usage_row(company_id)
         current = usage.get("analyses_count", 0)
+        bonus = usage.get("bonus_analyses", 0)
+        total_allowed = max_analyses + bonus
 
-        if current >= max_analyses:
+        if current >= total_allowed:
+            if bonus > 0:
+                return False, (
+                    f"Limite de {max_analyses} analyses/mois + {bonus} crédits bonus épuisée. "
+                    "Achetez un pack de crédits supplémentaires ou passez au plan supérieur."
+                )
             return False, (
-                f"Limite de {max_analyses} analyses/mois atteinte (plan {plan}). "
-                "Passez au plan supérieur pour continuer."
+                f"Limite de {max_analyses} analyse{'s' if max_analyses > 1 else ''}/mois atteinte (plan {plan.upper()}). "
+                "Achetez des crédits supplémentaires ou passez au plan supérieur."
             )
         return True, ""
+
+    def get_usage_this_month(self, company_id: str, plan: str) -> dict:
+        """
+        Return usage summary for the current month.
+        Used by frontend to display quota progress.
+        """
+        limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["free"])
+        max_analyses = limits["analyses"]
+        usage = self._get_or_create_usage_row(company_id)
+        used = usage.get("analyses_count", 0)
+        bonus = usage.get("bonus_analyses", 0)
+        total_allowed = (max_analyses + bonus) if max_analyses is not None else None
+
+        return {
+            "plan": plan,
+            "analyses_used": used,
+            "analyses_limit": max_analyses,
+            "bonus_analyses": bonus,
+            "total_allowed": total_allowed,
+            "analyses_remaining": max(0, total_allowed - used) if total_allowed is not None else None,
+            "year_month": _current_year_month(),
+        }
+
+    def add_bonus_analyses(self, company_id: str, quantity: int) -> None:
+        """
+        Add bonus analyses to the current month (called after Stripe payment webhook).
+        Thread-safe using Supabase atomic update.
+        """
+        sb = self._get_supabase()
+        if not sb:
+            return
+
+        year_month = _current_year_month()
+        try:
+            # Ensure row exists
+            usage = self._get_or_create_usage_row(company_id)
+            current_bonus = usage.get("bonus_analyses", 0)
+            sb.from_("usage_limits").update({
+                "bonus_analyses": current_bonus + quantity
+            }).eq("company_id", company_id).eq("year_month", year_month).execute()
+        except Exception:
+            pass
 
     def increment_analysis(self, company_id: str) -> None:
         """

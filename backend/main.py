@@ -83,11 +83,15 @@ from routers.auth import router as auth_router
 from routers.analyze import router as analyze_router
 from routers.feedback import router as feedback_router
 from routers.webhooks import router as webhooks_router
+from routers.billing import router as billing_router
+from routers.entities import router as entities_router
 
 app.include_router(auth_router)
 app.include_router(analyze_router)
 app.include_router(feedback_router)
 app.include_router(webhooks_router)
+app.include_router(billing_router)
+app.include_router(entities_router)
 
 
 # ── Admin endpoints ───────────────────────────────────────────

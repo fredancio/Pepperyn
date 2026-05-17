@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import type { AnalysisResult as AnalysisResultType } from '@/lib/types';
 import { downloadExcel, downloadPdf, downloadPptx } from '@/lib/api';
+import { UpgradeModal } from '@/components/ui/UpgradeModal';
+import { canAccess, type Feature } from '@/lib/featureGate';
 
 type ExportFormat = 'excel' | 'pdf' | 'pptx' | null;
 
@@ -42,6 +44,7 @@ function InlineMarkdown({ text }: { text: string }) {
 interface AnalysisResultProps {
   data: Record<string, unknown>;
   questionsRestantes?: number | null;
+  plan?: string;
 }
 
 function formatCurrency(value: number): string {
@@ -109,7 +112,7 @@ function CollapseSection({ title, count, color, children, defaultOpen = true }: 
   );
 }
 
-export function AnalysisResult({ data, questionsRestantes }: AnalysisResultProps) {
+export function AnalysisResult({ data, questionsRestantes, plan = 'free' }: AnalysisResultProps) {
   const result = data as unknown as AnalysisResultType & {
     resume_executif?: string;
     diagnostic_revenus?: string;
@@ -140,6 +143,7 @@ export function AnalysisResult({ data, questionsRestantes }: AnalysisResultProps
   const [downloading, setDownloading] = useState<ExportFormat>(null);
   const [chosenFormat, setChosenFormat] = useState<ExportFormat>(null);
   const [exportError, setExportError] = useState<string>('');
+  const [upgradeFeature, setUpgradeFeature] = useState<Feature | null>(null);
 
   // Detect v3 format
   const isV3 = !!(result.resume_executif || result.decision || (result.problemes_critiques && result.problemes_critiques.length > 0));
@@ -571,25 +575,41 @@ export function AnalysisResult({ data, questionsRestantes }: AnalysisResultProps
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {/* Excel */}
-                <button
-                  onClick={() => handleDownload('excel')}
-                  disabled={!!downloading || (!!chosenFormat && chosenFormat !== 'excel')}
-                  className={`py-3 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 transition-colors
-                    ${chosenFormat === 'excel'
-                      ? 'bg-green-100 border-2 border-green-400 text-green-800 cursor-default'
-                      : chosenFormat !== null
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
-                        : 'bg-[#1B73E8] text-white hover:bg-[#0D47A1] disabled:opacity-60'
-                    }`}
-                >
-                  <span className="text-lg">📊</span>
-                  <span className="text-xs">
-                    {downloading === 'excel' ? 'Génération...' : chosenFormat === 'excel' ? '✓ Excel' : 'Excel (.xlsx)'}
-                  </span>
-                </button>
+                {/* Excel — gated PRO+ */}
+                {canAccess(plan, 'export_excel') ? (
+                  <button
+                    onClick={() => handleDownload('excel')}
+                    disabled={!!downloading || (!!chosenFormat && chosenFormat !== 'excel')}
+                    className={`py-3 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 transition-colors
+                      ${chosenFormat === 'excel'
+                        ? 'bg-green-100 border-2 border-green-400 text-green-800 cursor-default'
+                        : chosenFormat !== null
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+                          : 'bg-[#1B73E8] text-white hover:bg-[#0D47A1] disabled:opacity-60'
+                      }`}
+                  >
+                    <span className="text-lg">📊</span>
+                    <span className="text-xs">
+                      {downloading === 'excel' ? 'Génération...' : chosenFormat === 'excel' ? '✓ Excel' : 'Excel (.xlsx)'}
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setUpgradeFeature('export_excel')}
+                    className="py-3 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 transition-colors bg-gray-50 border-2 border-dashed border-gray-200 text-[#5F6368] hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 group"
+                  >
+                    <span className="text-lg">📊</span>
+                    <span className="text-xs flex items-center gap-1">
+                      Excel (.xlsx)
+                      <svg className="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </span>
+                    <span className="text-xs text-blue-500 font-semibold opacity-0 group-hover:opacity-100 -mt-0.5">PRO →</span>
+                  </button>
+                )}
 
-                {/* PDF */}
+                {/* PDF — always free */}
                 <button
                   onClick={() => handleDownload('pdf')}
                   disabled={!!downloading || (!!chosenFormat && chosenFormat !== 'pdf')}
@@ -607,31 +627,55 @@ export function AnalysisResult({ data, questionsRestantes }: AnalysisResultProps
                   </span>
                 </button>
 
-                {/* PowerPoint */}
-                <button
-                  onClick={() => handleDownload('pptx')}
-                  disabled={!!downloading || (!!chosenFormat && chosenFormat !== 'pptx')}
-                  className={`py-3 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 transition-colors
-                    ${chosenFormat === 'pptx'
-                      ? 'bg-green-100 border-2 border-green-400 text-green-800 cursor-default'
-                      : chosenFormat !== null
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
-                        : 'bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60'
-                    }`}
-                >
-                  <span className="text-lg">📑</span>
-                  <span className="text-xs">
-                    {downloading === 'pptx' ? 'Génération...' : chosenFormat === 'pptx' ? '✓ PowerPoint' : 'PowerPoint'}
-                  </span>
-                </button>
+                {/* PowerPoint — gated PRO+ */}
+                {canAccess(plan, 'export_pptx') ? (
+                  <button
+                    onClick={() => handleDownload('pptx')}
+                    disabled={!!downloading || (!!chosenFormat && chosenFormat !== 'pptx')}
+                    className={`py-3 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 transition-colors
+                      ${chosenFormat === 'pptx'
+                        ? 'bg-green-100 border-2 border-green-400 text-green-800 cursor-default'
+                        : chosenFormat !== null
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed opacity-50'
+                          : 'bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60'
+                      }`}
+                  >
+                    <span className="text-lg">📑</span>
+                    <span className="text-xs">
+                      {downloading === 'pptx' ? 'Génération...' : chosenFormat === 'pptx' ? '✓ PowerPoint' : 'PowerPoint'}
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setUpgradeFeature('export_pptx')}
+                    className="py-3 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 transition-colors bg-gray-50 border-2 border-dashed border-gray-200 text-[#5F6368] hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600 group"
+                  >
+                    <span className="text-lg">📑</span>
+                    <span className="text-xs flex items-center gap-1">
+                      PowerPoint
+                      <svg className="w-3 h-3 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </span>
+                    <span className="text-xs text-orange-500 font-semibold opacity-0 group-hover:opacity-100 -mt-0.5">PRO →</span>
+                  </button>
+                )}
               </div>
             </div>
           )}
 
-          {/* Compteur questions restantes */}
+          {/* Upgrade modal */}
+          {upgradeFeature && (
+            <UpgradeModal
+              feature={upgradeFeature}
+              onClose={() => setUpgradeFeature(null)}
+            />
+          )}
+
+          {/* Compteur interactions restantes */}
           {qRestantes !== null && (
             <p className="text-center text-xs text-[#5F6368]">
-              Questions restantes dans cette session : {qRestantes}/{5}
+              Interactions contextuelles restantes : {qRestantes}/3
             </p>
           )}
         </div>

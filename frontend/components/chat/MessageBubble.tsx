@@ -4,13 +4,14 @@ import { AnalysisResult } from './AnalysisResult';
 interface MessageBubbleProps {
   message: Message;
   questionsRestantes?: number | null;
+  plan?: string;
 }
 
 function formatTime(dateStr: string): string {
   return new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
-export function MessageBubble({ message, questionsRestantes }: MessageBubbleProps) {
+export function MessageBubble({ message, questionsRestantes, plan = 'free' }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
 
@@ -22,7 +23,7 @@ export function MessageBubble({ message, questionsRestantes }: MessageBubbleProp
           <span className="text-white text-xs font-bold">P</span>
         </div>
         <div className="flex-1">
-          <AnalysisResult data={message.metadata as Record<string, unknown>} questionsRestantes={questionsRestantes} />
+          <AnalysisResult data={message.metadata as Record<string, unknown>} questionsRestantes={questionsRestantes} plan={plan} />
           <p className="text-xs text-[#5F6368] mt-1 ml-1">{formatTime(message.created_at)}</p>
         </div>
       </div>

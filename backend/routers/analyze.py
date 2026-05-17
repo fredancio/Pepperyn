@@ -334,6 +334,13 @@ async def analyze_file(
     # Cache analysis result dict for on-demand PDF/PPTX generation
     _analysis_result_cache[analyse_id] = analysis_result.model_dump()
 
+    # ── SÉCURITÉ : suppression fichier source ───────────────────────────────
+    # Le fichier uploadé (file_bytes) est en mémoire Python uniquement —
+    # il n'est jamais écrit sur disque. Il sera libéré par le GC Python
+    # à la fin de cette requête. Conforme au master plan "auto-delete source file".
+    del file_bytes  # libération explicite immédiate
+    logger.info(f"[SECURITY] Fichier source supprimé de la mémoire après analyse — {analyse_id}")
+
     # Increment analysis usage counter (server-side, after success)
     _usage_service.increment_analysis(company_id)
 
