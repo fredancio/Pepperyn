@@ -733,6 +733,164 @@ def _build_risque_inaction(risque: str, styles: dict) -> list:
     return story
 
 
+def _confidence_badge(score: int | None, styles: dict) -> list:
+    """Small inline confidence badge — shown at top of Margin / Cash sections."""
+    if score is None:
+        return []
+    color_hex = "#15803D" if score >= 75 else "#D97706" if score >= 50 else "#DC2626"
+    bg_hex    = "#F0FDF4" if score >= 75 else "#FFFBEB" if score >= 50 else "#FEF2F2"
+    label     = "Fiabilité données" if score >= 75 else "Fiabilité partielle" if score >= 50 else "Données insuffisantes"
+    cell = Paragraph(
+        f'<font color="{color_hex}"><b>{score}%</b></font>'
+        f'<font color="#5F6368">  ·  {label}</font>',
+        ParagraphStyle("conf_badge", fontName="Helvetica", fontSize=7.5,
+                       leading=11, alignment=TA_RIGHT)
+    )
+    t = Table([[cell]], colWidths=[CONTENT_W])
+    t.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), colors.HexColor(bg_hex)),
+        ("BOX",           (0, 0), (-1, -1), 0.5, colors.HexColor(color_hex)),
+        ("TOPPADDING",    (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
+    ]))
+    return [t, Spacer(1, 3)]
+
+
+def _build_margin_intelligence(items: list[str], confidence: int | None,
+                                en_resume: str | None, styles: dict) -> list:
+    """Margin Intelligence — analyse des marges, destruction/création, leviers."""
+    if not items:
+        return []
+    story = []
+    story.append(_section_header("📊  MARGIN INTELLIGENCE", BLUE_DARK, styles))
+    story.append(Spacer(1, 3))
+    story.extend(_confidence_badge(confidence, styles))
+
+    for item in items:
+        s = item.strip()
+        if not s:
+            continue
+        if s.startswith("🔴"):
+            clean = s.lstrip("🔴 ").strip()
+            icon, bg, border = "🔴", RED_LIGHT, RED
+        elif s.startswith("🟢"):
+            clean = s.lstrip("🟢 ").strip()
+            icon, bg, border = "🟢", GREEN_LIGHT, GREEN
+        elif s.startswith("⚠️"):
+            clean = s.lstrip("⚠️ ").strip()
+            icon, bg, border = "⚠️", AMBER_LIGHT, AMBER
+        else:
+            clean = s.lstrip("→ ").strip()
+            icon, bg, border = "→", SLATE_LIGHT, GRAY_BORDER
+
+        cell = Paragraph(
+            f"<b>{icon}</b>  {_rl(clean)}",
+            ParagraphStyle("mi_item", fontName="Helvetica", fontSize=8.5,
+                           textColor=DARK, leading=13)
+        )
+        t = Table([[cell]], colWidths=[CONTENT_W])
+        t.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), bg),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
+            ("BOX",           (0, 0), (-1, -1), 0.5, border),
+        ]))
+        story.append(t)
+        story.append(Spacer(1, 2))
+
+    if en_resume:
+        story.append(Spacer(1, 2))
+        story.extend(_en_resume_box(en_resume, styles))
+    story.append(Spacer(1, 8))
+    return story
+
+
+def _build_cash_forecast(items: list[str], bfr: list[str], confidence: int | None,
+                          en_resume: str | None, styles: dict) -> list:
+    """Cash Forecast & Liquidity Risk — projections trésorerie, BFR, risques."""
+    if not items:
+        return []
+    story = []
+    story.append(_section_header("💰  CASH FORECAST & RISQUE LIQUIDITÉ", BLUE_DARK, styles))
+    story.append(Spacer(1, 3))
+    story.extend(_confidence_badge(confidence, styles))
+
+    # Disclaimer
+    disc = Paragraph(
+        "⚠️  Projection indicative — estimation basée sur les données disponibles. "
+        "Pas une prévision exacte.",
+        ParagraphStyle("cf_disc", fontName="Helvetica-Oblique", fontSize=7.5,
+                       textColor=GRAY_TEXT, leading=11)
+    )
+    story.append(disc)
+    story.append(Spacer(1, 4))
+
+    for item in items:
+        s = item.strip()
+        if not s:
+            continue
+        if s.startswith("⚠️"):
+            clean = s.lstrip("⚠️ ").strip()
+            bg, border = RED_LIGHT, RED
+            label = "⚠️  RISQUE"
+            cell = Paragraph(
+                f'<b>{label} :</b>  {_rl(clean)}',
+                ParagraphStyle("cf_risk", fontName="Helvetica-Bold", fontSize=9,
+                               textColor=colors.HexColor("#7F1D1D"), leading=14)
+            )
+        else:
+            clean = s.lstrip("→ ").strip()
+            bg, border = BLUE_LIGHT, GRAY_BORDER
+            cell = Paragraph(
+                f"→  {_rl(clean)}",
+                ParagraphStyle("cf_item", fontName="Helvetica", fontSize=8.5,
+                               textColor=DARK, leading=13)
+            )
+        t = Table([[cell]], colWidths=[CONTENT_W])
+        t.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), bg),
+            ("TOPPADDING",    (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
+            ("BOX",           (0, 0), (-1, -1), 0.5, border),
+        ]))
+        story.append(t)
+        story.append(Spacer(1, 2))
+
+    # BFR mini table if available
+    if bfr:
+        story.append(Spacer(1, 3))
+        bfr_header = Paragraph(
+            '<b>📐  INDICATEURS BFR</b>',
+            ParagraphStyle("bfr_h", fontName="Helvetica-Bold", fontSize=8,
+                           textColor=BLUE_DARK, leading=12)
+        )
+        story.append(bfr_header)
+        story.append(Spacer(1, 2))
+        for b in bfr:
+            cell = Paragraph(f"·  {_rl(b.lstrip('→ ').strip())}", styles["body_gray"])
+            t = Table([[cell]], colWidths=[CONTENT_W])
+            t.setStyle(TableStyle([
+                ("BACKGROUND",    (0, 0), (-1, -1), SLATE_LIGHT),
+                ("TOPPADDING",    (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+                ("BOX",           (0, 0), (-1, -1), 0.3, GRAY_BORDER),
+            ]))
+            story.append(t)
+            story.append(Spacer(1, 2))
+
+    if en_resume:
+        story.append(Spacer(1, 2))
+        story.extend(_en_resume_box(en_resume, styles))
+    story.append(Spacer(1, 8))
+    return story
+
+
 def _en_resume_box(text: str, styles: dict) -> list:
     """Blue left-border accent box — 'En résumé' synthesis line."""
     if not text:
@@ -905,6 +1063,23 @@ def generate_pdf_report(result: dict) -> bytes:
         story.append(Spacer(1, 6))
         story.append(_score_table(scores, interpretations, styles))
         story.append(Spacer(1, 8))
+
+    # ── 3b. MARGIN INTELLIGENCE ─────────────────────────────────────────────
+    story.extend(_build_margin_intelligence(
+        items=result.get("margin_intelligence") or [],
+        confidence=result.get("margin_confidence"),
+        en_resume=result.get("en_resume_margin"),
+        styles=styles,
+    ))
+
+    # ── 3c. CASH FORECAST & LIQUIDITY RISK ──────────────────────────────────
+    story.extend(_build_cash_forecast(
+        items=result.get("cash_forecast") or [],
+        bfr=result.get("bfr_indicators") or [],
+        confidence=result.get("cash_forecast_confidence"),
+        en_resume=result.get("en_resume_cash"),
+        styles=styles,
+    ))
 
     # ── 4. IMPACT FINANCIER ─────────────────────────────────────────────────
     impact_synthese = result.get("impact_financier_synthese")

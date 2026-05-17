@@ -6,9 +6,11 @@ from enum import Enum
 class Plan(str, Enum):
     free = "free"
     pro = "pro"
-    premium = "premium"
+    power = "power"
+    scale = "scale"
     enterprise = "enterprise"
     # Legacy mappings
+    premium = "premium"
     standard = "standard"
     standard_beta = "standard_beta"
 
@@ -164,6 +166,15 @@ class AnalysisResult(BaseModel):
     en_resume_impact: Optional[str] = None
     en_resume_plan: Optional[str] = None
     en_resume_projection: Optional[str] = None
+
+    # V10 — Margin Intelligence + Cash Forecast
+    margin_intelligence: List[str] = []
+    margin_confidence: Optional[int] = None
+    en_resume_margin: Optional[str] = None
+    cash_forecast: List[str] = []
+    cash_forecast_confidence: Optional[int] = None
+    en_resume_cash: Optional[str] = None
+    bfr_indicators: List[str] = []
 
     # Champs legacy (ancien format JSON — backward compat)
     revenus: Optional[RevenusData] = None

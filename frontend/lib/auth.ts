@@ -18,13 +18,27 @@ export async function signUpAdmin(
   password: string,
   prenom: string,
   industry: string,
-  businessModel: string
+  businessModel: string,
+  extra?: {
+    nom?: string;
+    organisation?: string;
+    user_type?: string;
+    usage_type?: string;
+  }
 ) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: { prenom, industry, business_model: businessModel },
+      data: {
+        prenom,
+        nom: extra?.nom ?? '',
+        industry,
+        business_model: businessModel,
+        organisation: extra?.organisation ?? '',
+        user_type: extra?.user_type ?? '',
+        usage_type: extra?.usage_type ?? '',
+      },
     },
   });
   if (error) throw error;

@@ -127,6 +127,14 @@ export function AnalysisResult({ data, questionsRestantes }: AnalysisResultProps
     memory_insight?: string;
     _questionsRestantes?: number;
     _memoryInsight?: string | null;
+    // V10
+    margin_intelligence?: string[];
+    margin_confidence?: number;
+    en_resume_margin?: string;
+    cash_forecast?: string[];
+    cash_forecast_confidence?: number;
+    en_resume_cash?: string;
+    bfr_indicators?: string[];
   };
 
   const [downloading, setDownloading] = useState<ExportFormat>(null);
@@ -423,6 +431,105 @@ export function AnalysisResult({ data, questionsRestantes }: AnalysisResultProps
                 <ScoreCircle label="Structure" value={result.score_structure as number} />
               )}
             </div>
+          )}
+
+          {/* MARGIN INTELLIGENCE */}
+          {result.margin_intelligence && result.margin_intelligence.length > 0 && (
+            <CollapseSection title="📊 MARGIN INTELLIGENCE" color="bg-blue-600">
+              <div className="flex flex-col gap-2">
+                {result.margin_confidence != null && (
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium ${
+                    result.margin_confidence >= 75 ? 'bg-green-50 text-green-700 border border-green-200' :
+                    result.margin_confidence >= 50 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                    'bg-red-50 text-red-700 border border-red-200'
+                  }`}>
+                    Fiabilité données : {result.margin_confidence}%
+                    <span className="ml-1 opacity-70">
+                      {result.margin_confidence >= 75 ? '· Données suffisantes' :
+                       result.margin_confidence >= 50 ? '· Fiabilité partielle' :
+                       '· Données insuffisantes'}
+                    </span>
+                  </div>
+                )}
+                {result.margin_intelligence.map((item, i) => {
+                  const s = item.replace(/^→\s*/, '');
+                  const isRed = item.startsWith('🔴');
+                  const isGreen = item.startsWith('🟢');
+                  const isWarn = item.startsWith('⚠️');
+                  return (
+                    <div key={i} className={`flex items-start gap-2 p-3 rounded-lg text-sm border ${
+                      isRed ? 'bg-red-50 border-red-100' :
+                      isGreen ? 'bg-green-50 border-green-100' :
+                      isWarn ? 'bg-amber-50 border-amber-100' :
+                      'bg-slate-50 border-slate-100'
+                    }`}>
+                      <span className="text-[#1A1A2E] leading-relaxed"><InlineMarkdown text={s} /></span>
+                    </div>
+                  );
+                })}
+                {result.en_resume_margin && (
+                  <div className="border-l-4 border-[#1B73E8] bg-blue-50 px-4 py-2 rounded-r-lg mt-1">
+                    <span className="text-xs font-bold text-[#1B73E8]">👉 En résumé : </span>
+                    <span className="text-xs text-[#1A1A2E]">{result.en_resume_margin}</span>
+                  </div>
+                )}
+              </div>
+            </CollapseSection>
+          )}
+
+          {/* CASH FORECAST */}
+          {result.cash_forecast && result.cash_forecast.length > 0 && (
+            <CollapseSection title="💰 CASH FORECAST & RISQUE LIQUIDITÉ" color="bg-blue-600">
+              <div className="flex flex-col gap-2">
+                {result.cash_forecast_confidence != null && (
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium ${
+                    result.cash_forecast_confidence >= 75 ? 'bg-green-50 text-green-700 border border-green-200' :
+                    result.cash_forecast_confidence >= 50 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                    'bg-red-50 text-red-700 border border-red-200'
+                  }`}>
+                    Fiabilité cash forecast : {result.cash_forecast_confidence}%
+                    <span className="ml-1 opacity-70">
+                      {result.cash_forecast_confidence >= 75 ? '· Données suffisantes' :
+                       result.cash_forecast_confidence >= 50 ? '· Fiabilité partielle' :
+                       '· Données insuffisantes'}
+                    </span>
+                  </div>
+                )}
+                <p className="text-xs text-[#5F6368] italic">
+                  ⚠️ Projection indicative — estimation basée sur les données disponibles.
+                </p>
+                {result.cash_forecast.map((item, i) => {
+                  const isRisk = item.startsWith('⚠️');
+                  const s = item.replace(/^→\s*/, '').replace(/^⚠️\s*/, '');
+                  return (
+                    <div key={i} className={`flex items-start gap-2 p-3 rounded-lg text-sm border ${
+                      isRisk ? 'bg-red-50 border-red-200' : 'bg-blue-50 border-blue-100'
+                    }`}>
+                      {isRisk && <span className="text-red-500 flex-shrink-0 font-bold text-xs mt-0.5">⚠️ RISQUE</span>}
+                      <span className="text-[#1A1A2E] leading-relaxed"><InlineMarkdown text={s} /></span>
+                    </div>
+                  );
+                })}
+                {result.bfr_indicators && result.bfr_indicators.length > 0 && (
+                  <div className="mt-1">
+                    <p className="text-xs font-bold text-[#1A1A2E] mb-1">📐 Indicateurs BFR</p>
+                    <div className="flex flex-col gap-1">
+                      {result.bfr_indicators.map((b, i) => (
+                        <div key={i} className="px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-xs text-[#1A1A2E]">
+                          <InlineMarkdown text={b.replace(/^→\s*/, '')} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {result.en_resume_cash && (
+                  <div className="border-l-4 border-[#1B73E8] bg-blue-50 px-4 py-2 rounded-r-lg mt-1">
+                    <span className="text-xs font-bold text-[#1B73E8]">👉 En résumé : </span>
+                    <span className="text-xs text-[#1A1A2E]">{result.en_resume_cash}</span>
+                  </div>
+                )}
+              </div>
+            </CollapseSection>
           )}
 
           {/* Décision */}

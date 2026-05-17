@@ -14,27 +14,51 @@ const BUSINESS_MODELS = [
   { value: 'autre', label: 'Autre' },
 ];
 
+const USER_TYPES = [
+  { value: 'dirigeant', label: 'Dirigeant' },
+  { value: 'cfo', label: 'CFO / DAF' },
+  { value: 'controleur', label: 'Contrôleur de gestion' },
+  { value: 'consultant', label: 'Consultant' },
+  { value: 'fiduciaire', label: 'Expert-comptable / Fiduciaire' },
+  { value: 'autre', label: 'Autre' },
+];
+
+const USAGE_TYPES = [
+  { value: 'ma_societe', label: 'Ma société' },
+  { value: 'plusieurs_clients', label: 'Plusieurs clients' },
+  { value: 'plusieurs_filiales', label: 'Plusieurs filiales' },
+];
+
 export default function RegisterPage() {
   const [step, setStep] = useState<Step>('form');
   const [prenom, setPrenom] = useState('');
+  const [nom, setNom] = useState('');
   const [email, setEmail] = useState('');
+  const [organisation, setOrganisation] = useState('');
   const [industry, setIndustry] = useState('');
   const [businessModel, setBusinessModel] = useState('');
+  const [userType, setUserType] = useState('');
+  const [usageType, setUsageType] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [acceptCgu, setAcceptCgu] = useState(false);
+  const [acceptData, setAcceptData] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prenom || !email || !industry || !businessModel || !password) {
+    if (!prenom || !nom || !email || !organisation || !industry || !businessModel || !userType || !usageType || !password) {
       setError('Veuillez remplir tous les champs');
       return;
     }
     if (!acceptCgu) {
       setError('Veuillez accepter les CGU et la politique de confidentialité');
+      return;
+    }
+    if (!acceptData) {
+      setError('Veuillez accepter le traitement de vos données financières');
       return;
     }
     if (password !== confirmPassword) {
@@ -49,7 +73,13 @@ export default function RegisterPage() {
     setLoading(true);
     setError('');
     try {
-      await signUpAdmin(email, password, prenom, industry, businessModel);
+      // Pass extended metadata — signUpAdmin will store what it can
+      await signUpAdmin(email, password, prenom, industry, businessModel, {
+        nom,
+        organisation,
+        user_type: userType,
+        usage_type: usageType,
+      });
       setStep('confirmation');
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'inscription");
@@ -62,24 +92,18 @@ export default function RegisterPage() {
     return (
       <div className="min-h-screen bg-[#EFF6FF] flex flex-col items-center justify-center px-4 py-12">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 border border-gray-100 text-center">
-          {/* Logo */}
           <img src="/favicon.png?v=4" alt="Pepperyn" className="w-20 h-20 mx-auto mb-4 object-contain" />
-
-          {/* Success icon */}
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <svg className="w-8 h-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-
           <h2 className="text-2xl font-bold text-[#1A1A2E] mb-2">
             ✅ Votre espace Pepperyn est créé !
           </h2>
           <p className="text-[#5F6368] mb-6">
-            Bienvenue, <strong>{prenom}</strong>. Votre espace est prêt.
+            Bienvenue, <strong>{prenom} {nom}</strong>. Votre espace est prêt.
           </p>
-
-          {/* Email verification notice */}
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left">
             <div className="flex items-start gap-2">
               <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -93,12 +117,7 @@ export default function RegisterPage() {
               </div>
             </div>
           </div>
-
-          <Button
-            size="lg"
-            className="w-full"
-            onClick={() => window.location.href = '/app/chat'}
-          >
+          <Button size="lg" className="w-full" onClick={() => window.location.href = '/app/chat'}>
             Accéder à Pepperyn →
           </Button>
         </div>
@@ -113,7 +132,7 @@ export default function RegisterPage() {
         <img src="/favicon.png?v=4" alt="Pepperyn" className="w-20 h-20 object-contain" />
         <div className="text-center">
           <h1 className="text-2xl font-bold text-[#1A1A2E]">Créer votre espace entreprise</h1>
-          <p className="text-sm text-[#5F6368]">Commencez avec 3 analyses gratuites</p>
+          <p className="text-sm text-[#5F6368]">Commencez gratuitement — sans carte bancaire</p>
         </div>
       </div>
 
@@ -121,20 +140,52 @@ export default function RegisterPage() {
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
 
-          {/* Prénom */}
+          {/* Identité */}
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Prénom"
+              type="text"
+              value={prenom}
+              onChange={e => setPrenom(e.target.value)}
+              placeholder="Marie"
+              autoComplete="given-name"
+              required
+            />
+            <Input
+              label="Nom"
+              type="text"
+              value={nom}
+              onChange={e => setNom(e.target.value)}
+              placeholder="Dupont"
+              autoComplete="family-name"
+              required
+            />
+          </div>
+
+          {/* Email */}
           <Input
-            label="Votre prénom"
-            type="text"
-            value={prenom}
-            onChange={e => setPrenom(e.target.value)}
-            placeholder="Marie"
-            autoComplete="given-name"
+            label="Adresse email professionnelle"
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="vous@entreprise.com"
+            autoComplete="email"
             required
           />
 
-          {/* Industrie */}
+          {/* Organisation */}
           <Input
-            label="Industrie"
+            label="Nom de l'organisation"
+            type="text"
+            value={organisation}
+            onChange={e => setOrganisation(e.target.value)}
+            placeholder="Ex : Acme SAS, Cabinet Dupont..."
+            required
+          />
+
+          {/* Secteur */}
+          <Input
+            label="Secteur d'activité"
             type="text"
             value={industry}
             onChange={e => setIndustry(e.target.value)}
@@ -158,16 +209,48 @@ export default function RegisterPage() {
             </select>
           </div>
 
-          {/* Email */}
-          <Input
-            label="Adresse email professionnelle"
-            type="email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            placeholder="vous@entreprise.com"
-            autoComplete="email"
-            required
-          />
+          {/* Type d'utilisateur */}
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-[#1A1A2E]">Votre rôle</label>
+            <select
+              value={userType}
+              onChange={e => setUserType(e.target.value)}
+              required
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-[#1A1A2E] bg-white focus:outline-none focus:ring-2 focus:ring-[#1B73E8] focus:border-transparent"
+            >
+              <option value="">Sélectionnez...</option>
+              {USER_TYPES.map(ut => (
+                <option key={ut.value} value={ut.value}>{ut.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Type d'usage */}
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-[#1A1A2E]">Vous utilisez Pepperyn pour</label>
+            <div className="grid grid-cols-1 gap-2">
+              {USAGE_TYPES.map(ut => (
+                <label
+                  key={ut.value}
+                  className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${
+                    usageType === ut.value
+                      ? 'border-[#1B73E8] bg-[#EFF6FF]'
+                      : 'border-gray-200 hover:border-[#1B73E8]/40'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="usageType"
+                    value={ut.value}
+                    checked={usageType === ut.value}
+                    onChange={e => setUsageType(e.target.value)}
+                    className="text-[#1B73E8] focus:ring-[#1B73E8]"
+                  />
+                  <span className="text-sm text-[#1A1A2E]">{ut.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
 
           {/* Mot de passe */}
           <div className="flex flex-col gap-1">
@@ -212,7 +295,7 @@ export default function RegisterPage() {
             required
           />
 
-          {/* CGU checkbox */}
+          {/* CGU */}
           <div className="flex items-start gap-2.5">
             <input
               type="checkbox"
@@ -229,6 +312,23 @@ export default function RegisterPage() {
             </label>
           </div>
 
+          {/* Consentement données financières */}
+          <div className="flex items-start gap-2.5">
+            <input
+              type="checkbox"
+              id="accept-data"
+              checked={acceptData}
+              onChange={e => setAcceptData(e.target.checked)}
+              className="mt-1 w-4 h-4 rounded border-gray-300 text-[#1B73E8] focus:ring-[#1B73E8] cursor-pointer"
+            />
+            <label htmlFor="accept-data" className="text-sm text-[#5F6368] leading-snug cursor-pointer">
+              Je consens au traitement de mes données financières par Pepperyn à des fins d'analyse.{' '}
+              <Link href="/legal/donnees-securisees" target="_blank" className="text-[#1B73E8] hover:underline">
+                Comment vos données sont sécurisées
+              </Link>
+            </label>
+          </div>
+
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-xl p-3">
               <p className="text-sm text-red-600">{error}</p>
@@ -241,9 +341,9 @@ export default function RegisterPage() {
               <svg className="w-4 h-4 text-[#1B73E8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span className="text-sm font-medium text-[#1B73E8]">Plan gratuit inclus</span>
+              <span className="text-sm font-medium text-[#1B73E8]">Plan gratuit activé</span>
             </div>
-            <p className="text-xs text-[#5F6368]">3 analyses offertes · Pas de carte bancaire requise</p>
+            <p className="text-xs text-[#5F6368]">1 analyse / mois · Export PDF · Pas de carte bancaire</p>
           </div>
 
           <Button type="submit" loading={loading} className="w-full" size="lg">

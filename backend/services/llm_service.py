@@ -192,6 +192,28 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 - Structure : X/10 → [UN SEUL MOT : instable / fragile / acceptable / solide]
 - Liquidité : X/10 → [UN SEUL MOT : critique / tendue / correcte / confortable]
 
+# MARGIN INTELLIGENCE
+Score fiabilité : [0-100]%
+Raisons fiabilité : [si score < 70% : expliquer ce qui manque — sinon écrire "Données suffisantes"]
+→ Marge brute : [% ou "Données insuffisantes"]
+→ Marge opérationnelle : [% ou "Données insuffisantes"]
+→ Marge nette : [% ou "Données insuffisantes"]
+🔴 Destruction marge : [facteur principal qui érode la marge — chiffre si calculable, sinon "Non chiffrable"]
+🟢 Création marge : [levier principal d'amélioration des marges — impact estimé si possible]
+⚠️ Activité sous-performante : [si identifiable — sinon "Non identifiable sur les données disponibles"]
+👉 En résumé : [1 phrase sur la santé des marges et la priorité d'action]
+
+# CASH FORECAST
+Score fiabilité : [0-100]%
+Raisons fiabilité : [si score < 70% : DSO manquant / échéancier absent / historique limité / etc. — sinon "Données suffisantes"]
+→ Projection 30 jours : [estimation — ex : "Trésorerie stable" ou "Risque de tension si X"]
+→ Projection 90 jours : [scénario probable — ex : "Dégradation probable sans action sur le BFR"]
+→ DSO estimé : [jours ou "Données insuffisantes"]
+→ DPO estimé : [jours ou "Données insuffisantes"]
+→ BFR estimé : [montant€ ou "Données insuffisantes"]
+⚠️ Risque liquidité : [risque trésorerie principal — avec échéance estimée si possible]
+👉 En résumé : [1 phrase sur la situation de trésorerie et le risque principal]
+
 # IMPACT FINANCIER
 💸 PERTE STRUCTURELLE ESTIMÉE : → [X€/an — chiffre issu des données — OU "Impact non chiffrable sur les données disponibles"]
 → [Détail impact 1 — montant si disponible dans les données]
@@ -300,7 +322,7 @@ RÈGLES ABSOLUES :
 - Retourne UNIQUEMENT le texte final corrigé — propre, sans aucune trace du processus de vérification.
 - INTERDIT : annotations inline, notes d'audit, ~~strikethrough~~, > blockquotes, "Note d'audit", "→ Reformulé", commentaires entre parenthèses expliquant une correction.
 - Les corrections sont appliquées SILENCIEUSEMENT : le lecteur final ne doit jamais savoir qu'une correction a eu lieu.
-- Ne change JAMAIS le format ni les titres de section (# DIAGNOSTIC IMMEDIAT, # RÉSUMÉ EXÉCUTIF, # SCORES, # IMPACT FINANCIER, # AVANT APRES, # SIMULATEUR DECISION, # PROJECTION TEMPORELLE, # CE QUI DETRUIT, # LEVIERS CROISSANCE, # PLAN D'ACTION, # RISQUE INACTION, # DIAGNOSTIC FINANCIER, # CE QUI A CHANGÉ, # ALERTES, # PROBLÈMES CRITIQUES, # OPPORTUNITÉS, # DÉCISION).
+- Ne change JAMAIS le format ni les titres de section (# DIAGNOSTIC IMMEDIAT, # RÉSUMÉ EXÉCUTIF, # SCORES, # MARGIN INTELLIGENCE, # CASH FORECAST, # IMPACT FINANCIER, # AVANT APRES, # SIMULATEUR DECISION, # PROJECTION TEMPORELLE, # CE QUI DETRUIT, # LEVIERS CROISSANCE, # PLAN D'ACTION, # RISQUE INACTION, # DIAGNOSTIC FINANCIER, # CE QUI A CHANGÉ, # ALERTES, # PROBLÈMES CRITIQUES, # OPPORTUNITÉS, # DÉCISION).
 - Ne change JAMAIS les sous-titres internes (### PRIORITÉ ABSOLUE, ### ACTIONS SECONDAIRES, ### 📉 AUJOURD'HUI, ### 📈 APRÈS ACTION, ### 💥 GAIN POTENTIEL, ⚡ TENSION, 💸 PERTE STRUCTURELLE ESTIMÉE, 👉 En résumé, → Rentabilité :, → Investissement :, → Modèle :).
 - Le style doit rester DIRECT et FRONTAL : interdit de reformuler en ton neutre ou académique.
 - L'ordre des sections est FIXE et IMMUABLE — ne les réorganise jamais.
@@ -357,6 +379,8 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
 
     # ── V5 new sections ──────────────────────────────────────────────────────
     diagnostic_immediat_raw = extract_section("DIAGNOSTIC IMMEDIAT")
+    margin_intelligence_raw = extract_section("MARGIN INTELLIGENCE")
+    cash_forecast_raw = extract_section("CASH FORECAST")
     impact_financier_raw = extract_section("IMPACT FINANCIER")
     avant_apres_raw = extract_section("AVANT APRES")
     simulateur_raw = extract_section("SIMULATEUR DECISION")
@@ -449,8 +473,8 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
             and "SYNTHÈSE" not in l.upper()
         ]
 
-    # ── Parse V9 — "En résumé" lines ─────────────────────────────────────────
-    def _extract_en_resume(raw: str) -> Optional[str]:
+    # ── Parse V9/V10 — helpers ───────────────────────────────────────────────
+    def _extract_en_resume_inner(raw: str) -> Optional[str]:
         """Extract the 👉 En résumé line from a section's raw text."""
         for ln in raw.splitlines():
             s = ln.strip()
@@ -461,9 +485,55 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
                 return cleaned
         return None
 
-    en_resume_impact = _extract_en_resume(impact_financier_raw)
-    en_resume_plan = _extract_en_resume(plan_raw)
-    en_resume_projection = _extract_en_resume(projection_raw)
+    # ── Parse V10 — Margin Intelligence ─────────────────────────────────────
+    def _extract_confidence_score(raw: str) -> Optional[int]:
+        """Extract 'Score fiabilité : XX%' from a section."""
+        for ln in raw.splitlines():
+            s = ln.strip().lower()
+            if "score fiabilité" in s or "score fiabilite" in s:
+                m = re.search(r"(\d{1,3})\s*%", ln)
+                if m:
+                    return min(100, max(0, int(m.group(1))))
+        return None
+
+    def _parse_indicator_lines(raw: str) -> list[str]:
+        """Parse → / 🔴 / 🟢 / ⚠️ lines from a raw section, skip meta lines."""
+        results = []
+        for ln in raw.splitlines():
+            s = ln.strip()
+            if not s:
+                continue
+            # Skip score/confidence meta lines and "En résumé" summaries
+            sl = s.lower()
+            if sl.startswith("score fiabilité") or sl.startswith("score fiabilite"):
+                continue
+            if sl.startswith("raisons") and ":" in sl:
+                continue
+            if s.startswith("\U0001f449"):
+                continue
+            if s.startswith("→") or s.startswith("🔴") or s.startswith("🟢") or s.startswith("⚠️"):
+                results.append(s)
+        return results
+
+    margin_intelligence = _parse_indicator_lines(margin_intelligence_raw)
+    margin_confidence = _extract_confidence_score(margin_intelligence_raw)
+    en_resume_margin = _extract_en_resume_inner(margin_intelligence_raw) if margin_intelligence_raw else None
+
+    cash_forecast = _parse_indicator_lines(cash_forecast_raw)
+    cash_forecast_confidence = _extract_confidence_score(cash_forecast_raw)
+    en_resume_cash = _extract_en_resume_inner(cash_forecast_raw) if cash_forecast_raw else None
+
+    # BFR indicators — extract DSO / DPO / BFR lines specifically
+    bfr_indicators: list[str] = []
+    for ln in cash_forecast_raw.splitlines():
+        s = ln.strip()
+        if any(kw in s.lower() for kw in ["dso", "dpo", "bfr", "besoin en fonds"]):
+            bfr_indicators.append(s)
+
+    # ── Parse V9 — "En résumé" lines ─────────────────────────────────────────
+    en_resume_impact = _extract_en_resume_inner(impact_financier_raw)
+    en_resume_plan = _extract_en_resume_inner(plan_raw)
+    en_resume_projection = _extract_en_resume_inner(projection_raw)
 
     # ── Parse V6/V9 — avant/après (nouveaux headers) ─────────────────────────
     avant_apres_actuel: list[str] = []
@@ -635,6 +705,14 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
         "en_resume_impact": en_resume_impact,
         "en_resume_plan": en_resume_plan,
         "en_resume_projection": en_resume_projection,
+        # V10 — Margin Intelligence + Cash Forecast
+        "margin_intelligence": margin_intelligence,
+        "margin_confidence": margin_confidence,
+        "en_resume_margin": en_resume_margin,
+        "cash_forecast": cash_forecast,
+        "cash_forecast_confidence": cash_forecast_confidence,
+        "en_resume_cash": en_resume_cash,
+        "bfr_indicators": bfr_indicators,
     }
 
 
