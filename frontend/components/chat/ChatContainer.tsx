@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Message, Session } from '@/lib/types';
-import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, type BillingUsage, type Entity } from '@/lib/api';
+import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, deleteAnalysesHistory, type BillingUsage, type Entity } from '@/lib/api';
 import { getCurrentAuthMode, signOutAdmin, clearGuestAuth, getGuestPlan } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { MessageBubble, TypingIndicator } from './MessageBubble';
@@ -69,6 +69,8 @@ export function ChatContainer() {
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [usageData, setUsageData] = useState<BillingUsage | null>(null);
   const [entities, setEntities] = useState<Entity[]>([]);
+  const [confirmDeleteHistory, setConfirmDeleteHistory] = useState(false);
+  const [deletingHistory, setDeletingHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasMessages = messages.length > 1;
 
@@ -131,6 +133,23 @@ export function ChatContainer() {
       // silently fail
     } finally {
       setLoadingSessions(false);
+    }
+  };
+
+  const handleDeleteHistory = async () => {
+    setDeletingHistory(true);
+    try {
+      await deleteAnalysesHistory();
+      setSessions([]);
+      setMessages([WELCOME_MESSAGE]);
+      setSessionId(undefined);
+      setAnalysisReceived(false);
+      setQuestionsPostAnalysis(0);
+    } catch {
+      // silently fail — user stays on current state
+    } finally {
+      setDeletingHistory(false);
+      setConfirmDeleteHistory(false);
     }
   };
 
@@ -463,6 +482,44 @@ export function ChatContainer() {
                         </p>
                       </button>
                     ))}
+                  </div>
+                )}
+
+                {/* ── Supprimer historique ─────────────────────────────── */}
+                {sessions.length > 0 && (
+                  <div className="mt-2 px-2">
+                    {!confirmDeleteHistory ? (
+                      <button
+                        onClick={() => setConfirmDeleteHistory(true)}
+                        className="flex items-center gap-1.5 text-xs text-[#5F6368] hover:text-red-500 transition-colors w-full"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Effacer l&apos;historique
+                      </button>
+                    ) : (
+                      <div className="bg-red-50 border border-red-100 rounded-xl p-3">
+                        <p className="text-xs text-red-700 font-medium mb-2">
+                          Êtes-vous sûr de vouloir supprimer l&apos;historique d&apos;analyse pour cette entité ?
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleDeleteHistory}
+                            disabled={deletingHistory}
+                            className="flex-1 py-1.5 bg-red-500 text-white text-xs font-bold rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50"
+                          >
+                            {deletingHistory ? 'Suppression...' : 'Supprimer'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteHistory(false)}
+                            className="flex-1 py-1.5 bg-gray-100 text-[#1A1A2E] text-xs font-medium rounded-lg hover:bg-gray-200 transition-colors"
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
