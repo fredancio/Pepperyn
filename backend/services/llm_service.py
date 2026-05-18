@@ -10,13 +10,18 @@ Architecture v3 :
   Step 6: Export Excel       (openpyxl — 0 tokens)
 
 Routing modèle :
-  Analyse       → claude-opus-4-6    ($15/M input, $75/M output)
-  Vérification  → claude-sonnet-4-6  ($3/M input,  $15/M output)
-  Chat simple   → claude-sonnet-4-6
-  Chat complexe → claude-opus-4-6
-  Classification / Scoring → claude-haiku-4-5 ($0.25/M input, $1.25/M output)
+  Analyse fichier  → claude-opus-4-6    ($15/M input, $75/M output)  ~0.30€/analyse
+  Vérification     → claude-sonnet-4-6  ($3/M input,  $15/M output)
+  Chat (ALL plans) → claude-haiku-4-5   ($0.25/M input, $1.25/M output) ~0.001€/message
+  Classification / Scoring → claude-haiku-4-5
 
-Estimated cost: ~0.30€ per analysis (Opus)
+Décision de routing chat :
+  Tout le chat conversationnel est forcé sur Haiku, sans exception.
+  Opus et Sonnet sont RÉSERVÉS au pipeline d'analyse fichier uniquement.
+  Raison : un utilisateur POWER avec 2 000 messages Opus coûte 252€ pour un plan à 129€.
+  Haiku est largement suffisant pour les questions de suivi sur une analyse déjà produite.
+
+Estimated cost: ~0.30€ per analysis (Opus) + ~0.001€ per chat message (Haiku)
 """
 import json
 import os
@@ -893,34 +898,12 @@ def _fallback_parse(content: str, doc_type: str) -> dict[str, Any]:
 
 # ─── Chat intelligence ───────────────────────────────────────────────────────
 
-_COMPLEX_CHAT_KEYWORDS = [
-    "projette", "prévision", "forecast", "budget", "stratégie", "plan financier",
-    "dcf", "valorisation", "rachat", "fusion", "acquisition", "levée de fonds",
-    "restructur", "trésorerie à", "flux de trésorerie", "modèle financier",
-    "analyse sectorielle", "benchmark", "risque de crédit", "covenant",
-    "multiple", "ebitda", "ebita", "wacc", "coût du capital",
-]
-
-_SIMPLE_CHAT_THRESHOLD = 120  # words
-
-
-def detect_chat_complexity(message: str) -> str:
-    """
-    Detect whether a chat message requires Opus (complex) or Sonnet (simple).
-    Returns 'opus' or 'sonnet'.
-    Complex = long message OR contains strategic/analytical keywords.
-    """
-    word_count = len(message.split())
-    lower = message.lower()
-
-    if word_count >= _SIMPLE_CHAT_THRESHOLD:
-        return "opus"
-
-    for kw in _COMPLEX_CHAT_KEYWORDS:
-        if kw in lower:
-            return "opus"
-
-    return "sonnet"
+# Chat model — TOUJOURS Haiku, sans exception.
+# Opus et Sonnet sont réservés au pipeline d'analyse fichier (run_full_pipeline).
+# Décision financière : Haiku = ~0.001€/message vs Opus = ~0.10€/message.
+# Sur 2 000 messages POWER : 2€ (Haiku) vs 200€ (Opus). Pas négociable.
+CHAT_MODEL = "claude-haiku-4-5-20251001"
+CHAT_MAX_TOKENS = 800
 
 
 async def call_chat_intelligent(
@@ -930,18 +913,14 @@ async def call_chat_intelligent(
     model_tier: str = "normal",
 ) -> tuple[str, str]:
     """
-    Route chat message to Sonnet or Opus based on complexity + model_tier.
-    model_tier: 'normal' → auto-detect | 'downgraded' → force Sonnet
+    Appelle Haiku pour toute interaction conversationnelle.
+
+    model_tier est conservé pour compatibilité ascendante mais n'influence
+    plus le choix du modèle — tout le chat est sur Haiku.
 
     Returns (response_text, model_used)
     """
     client = get_anthropic_client()
-
-    if model_tier == "downgraded":
-        model = "claude-sonnet-4-6"
-    else:
-        complexity = detect_chat_complexity(message)
-        model = "claude-opus-4-6" if complexity == "opus" else "claude-sonnet-4-6"
 
     system = CHAT_SYSTEM
     if analysis_context:
@@ -951,10 +930,10 @@ async def call_chat_intelligent(
     messages.append({"role": "user", "content": message})
 
     response = client.messages.create(
-        model=model,
-        max_tokens=800,
+        model=CHAT_MODEL,
+        max_tokens=CHAT_MAX_TOKENS,
         system=system,
         messages=messages,
     )
 
-    return response.content[0].text.strip(), model
+    return response.content[0].text.strip(), CHAT_MODEL

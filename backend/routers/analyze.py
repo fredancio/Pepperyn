@@ -531,7 +531,8 @@ async def chat_with_analysis(
 ):
     """
     Chat endpoint with server-side limit enforcement.
-    Enforces FREE plan (5 msg/analysis) and PRO soft cap (200 → Sonnet downgrade).
+    Modèle : Haiku sur tous les plans (décision financière — voir llm_service.py).
+    Limites : FREE 3 msg/analyse · PRO 300 msg/mois · POWER 1500 msg/mois · SCALE illimité.
     """
     company_id, plan, auth_type = await _resolve_auth(authorization, x_auth_type)
 
@@ -552,8 +553,8 @@ async def chat_with_analysis(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur IA: {str(e)}")
 
-    # Increment chat count after successful response
-    _usage_service.increment_chat(request.analysis_id)
+    # Increment chat count after successful response (per-analysis + monthly)
+    _usage_service.increment_chat(request.analysis_id, company_id)
 
     # Track chat_message event (Supabase)
     _usage_service.track_activity(company_id, "chat_message", {

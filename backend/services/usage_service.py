@@ -39,16 +39,18 @@ from typing import Optional, Tuple
 # ─── Plan limits V11 ─────────────────────────────────────────────────────────
 
 PLAN_LIMITS: dict[str, dict] = {
-    # V11 plans
-    "free":           {"analyses": 1,    "chat_per_analysis": 3,    "chat_soft_cap": None},
-    "pro":            {"analyses": 15,   "chat_per_analysis": None,  "chat_soft_cap": 500},
-    "power":          {"analyses": 75,   "chat_per_analysis": None,  "chat_soft_cap": 2000},
-    "scale":          {"analyses": 250,  "chat_per_analysis": None,  "chat_soft_cap": None},
-    "enterprise":     {"analyses": None, "chat_per_analysis": None,  "chat_soft_cap": None},
+    # V11 plans — chat_monthly_cap = limite messages chat/mois (Haiku, ~0.001€/msg)
+    # Avec Haiku sur tout le chat, même le cap max (2000) = ~2€ de coût LLM.
+    # Ces caps sont conservés comme garde-fou et incitation à monter de plan.
+    "free":           {"analyses": 1,    "chat_per_analysis": 3,    "chat_soft_cap": None, "chat_monthly_cap": 9},
+    "pro":            {"analyses": 15,   "chat_per_analysis": None,  "chat_soft_cap": None, "chat_monthly_cap": 300},
+    "power":          {"analyses": 75,   "chat_per_analysis": None,  "chat_soft_cap": None, "chat_monthly_cap": 1500},
+    "scale":          {"analyses": 250,  "chat_per_analysis": None,  "chat_soft_cap": None, "chat_monthly_cap": None},
+    "enterprise":     {"analyses": None, "chat_per_analysis": None,  "chat_soft_cap": None, "chat_monthly_cap": None},
     # Legacy plan names (kept for backward compat)
-    "premium":        {"analyses": 75,   "chat_per_analysis": None,  "chat_soft_cap": 2000},
-    "standard":       {"analyses": 15,   "chat_per_analysis": None,  "chat_soft_cap": 500},
-    "standard_beta":  {"analyses": 15,   "chat_per_analysis": None,  "chat_soft_cap": 500},
+    "premium":        {"analyses": 75,   "chat_per_analysis": None,  "chat_soft_cap": None, "chat_monthly_cap": 1500},
+    "standard":       {"analyses": 15,   "chat_per_analysis": None,  "chat_soft_cap": None, "chat_monthly_cap": 300},
+    "standard_beta":  {"analyses": 15,   "chat_per_analysis": None,  "chat_soft_cap": None, "chat_monthly_cap": 300},
 }
 
 # Add-on packs (prêts à brancher sur Stripe)
@@ -232,6 +234,24 @@ class UsageService:
         except Exception:
             return 0
 
+    def get_monthly_chat_count(self, company_id: str) -> int:
+        """Get total chat messages sent this month for a company."""
+        sb = self._get_supabase()
+        if not sb:
+            return 0
+        year_month = _current_year_month()
+        try:
+            result = (
+                sb.from_("usage_limits")
+                .select("chat_count")
+                .eq("company_id", company_id)
+                .eq("year_month", year_month)
+                .execute()
+            )
+            return (result.data[0].get("chat_count", 0) if result.data else 0) or 0
+        except Exception:
+            return 0
+
     def can_chat(
         self,
         company_id: str,
@@ -241,50 +261,86 @@ class UsageService:
         """
         Check if company can send a chat message.
         Returns (allowed: bool, reason: str, model_tier: str)
-        model_tier: 'normal' | 'downgraded' (PRO soft cap → Sonnet)
-        MUST be called before every chat message.
+
+        model_tier est toujours 'normal' — tout le chat est sur Haiku.
+        Conservé pour compatibilité avec l'appelant dans analyze.py.
+
+        Limites vérifiées (ordre de priorité) :
+          1. Per-analysis hard cap (FREE : 3 messages/analyse)
+          2. Monthly chat cap (PRO : 300/mois, POWER : 1500/mois)
         """
         limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["free"])
 
-        # Per-analysis limit (FREE plan)
+        # 1. Per-analysis hard cap (FREE plan uniquement)
         if limits["chat_per_analysis"] is not None and analysis_id:
             current = self.get_analysis_chat_count(analysis_id)
             if current >= limits["chat_per_analysis"]:
                 return (
                     False,
-                    f"Limite de {limits['chat_per_analysis']} messages par analyse atteinte. "
-                    "Démarrez une nouvelle analyse ou passez au plan supérieur.",
+                    f"Limite de {limits['chat_per_analysis']} messages par analyse atteinte (plan gratuit). "
+                    "Démarrez une nouvelle analyse ou passez au plan PRO.",
                     "normal",
                 )
 
-        # Soft cap check (PRO → downgrade to Sonnet, not block)
-        if limits["chat_soft_cap"] is not None and analysis_id:
-            current = self.get_analysis_chat_count(analysis_id)
-            if current >= limits["chat_soft_cap"]:
-                return True, "", "downgraded"
+        # 2. Monthly cap (PRO / POWER)
+        monthly_cap = limits.get("chat_monthly_cap")
+        if monthly_cap is not None:
+            monthly_count = self.get_monthly_chat_count(company_id)
+            if monthly_count >= monthly_cap:
+                return (
+                    False,
+                    f"Limite mensuelle de {monthly_cap} messages atteinte (plan {plan.upper()}). "
+                    "Passez au plan supérieur pour continuer ce mois-ci.",
+                    "normal",
+                )
 
         return True, "", "normal"
 
-    def increment_chat(self, analysis_id: Optional[str]) -> None:
-        """Increment chat count for a specific analysis AFTER message sent."""
-        if not analysis_id:
-            return
+    def increment_chat(self, analysis_id: Optional[str], company_id: Optional[str] = None) -> None:
+        """
+        Increment chat count after a message is sent.
+        Updates TWO counters :
+          - analyses.chat_count  (per-analysis, used for FREE hard cap)
+          - usage_limits.chat_count  (monthly, used for PRO/POWER monthly cap)
+        """
         sb = self._get_supabase()
         if not sb:
             return
-        try:
-            result = (
-                sb.from_("analyses")
-                .select("chat_count")
-                .eq("id", analysis_id)
-                .execute()
-            )
-            current = (result.data[0] if result.data else {}).get("chat_count", 0) or 0
-            sb.from_("analyses").update({
-                "chat_count": current + 1
-            }).eq("id", analysis_id).execute()
-        except Exception:
-            pass
+
+        # Per-analysis counter
+        if analysis_id:
+            try:
+                result = (
+                    sb.from_("analyses")
+                    .select("chat_count")
+                    .eq("id", analysis_id)
+                    .execute()
+                )
+                current = (result.data[0] if result.data else {}).get("chat_count", 0) or 0
+                sb.from_("analyses").update({
+                    "chat_count": current + 1
+                }).eq("id", analysis_id).execute()
+            except Exception:
+                pass
+
+        # Monthly counter (for PRO/POWER caps)
+        if company_id:
+            year_month = _current_year_month()
+            try:
+                self._get_or_create_usage_row(company_id)
+                result = (
+                    sb.from_("usage_limits")
+                    .select("chat_count")
+                    .eq("company_id", company_id)
+                    .eq("year_month", year_month)
+                    .execute()
+                )
+                current = (result.data[0].get("chat_count", 0) if result.data else 0) or 0
+                sb.from_("usage_limits").update({
+                    "chat_count": current + 1
+                }).eq("company_id", company_id).eq("year_month", year_month).execute()
+            except Exception:
+                pass
 
     # ─── Activity tracking ────────────────────────────────────────────────────
 
