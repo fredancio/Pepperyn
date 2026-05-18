@@ -156,6 +156,40 @@ async def get_analyses_history(
         return {"analyses": []}
 
 
+@router.delete("/analyses/history")
+async def delete_analyses_history(
+    authorization: Optional[str] = Header(default=None),
+    x_auth_type: Optional[str] = Header(default=None),
+):
+    """
+    Supprime tout l'historique d'analyses de la company connectée.
+    Supprime aussi les messages associés (cascade) et remet les compteurs à zéro.
+    """
+    company_id, plan, auth_type = await _resolve_auth(authorization, x_auth_type)
+    try:
+        from main import get_supabase_service
+        supabase = get_supabase_service()
+
+        # Compter avant suppression pour le retour
+        count_res = (
+            supabase.from_("analyses")
+            .select("id", count="exact")
+            .eq("company_id", company_id)
+            .execute()
+        )
+        deleted_count = count_res.count or 0
+
+        # Supprimer les analyses (ON DELETE CASCADE supprime financial_metrics liés)
+        supabase.from_("analyses").delete().eq("company_id", company_id).execute()
+
+        # Supprimer les sessions + messages (messages cascadent avec sessions)
+        supabase.from_("sessions").delete().eq("company_id", company_id).execute()
+
+        return {"success": True, "deleted": deleted_count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur suppression historique: {str(e)}")
+
+
 @router.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_file(
     file: UploadFile = File(...),

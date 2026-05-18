@@ -138,6 +138,19 @@ export async function fetchAnalysesHistory(): Promise<Array<{
   return data.analyses || [];
 }
 
+export async function deleteAnalysesHistory(): Promise<{ success: boolean; deleted: number }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/analyses/history`, {
+    method: 'DELETE',
+    headers,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || "Erreur lors de la suppression de l'historique");
+  }
+  return res.json();
+}
+
 export interface Entity {
   id: string;
   name: string;
