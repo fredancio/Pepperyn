@@ -11,7 +11,7 @@ export type Plan = 'free' | 'pro' | 'power' | 'scale' | 'enterprise'
   | 'premium' | 'standard' | 'standard_beta';
 
 export type Feature =
-  | 'entities'           // Gestion multi-entités dans la sidebar (POWER+)
+  | 'entities'           // Gestion multi-entités (PRO+) — absorbé depuis POWER
   | 'export_excel'       // Export Excel (.xlsx) (PRO+)
   | 'export_pptx'        // Export PowerPoint (.pptx) (PRO+)
   | 'export_pdf'         // Export PDF (FREE)
@@ -20,9 +20,10 @@ export type Feature =
   | 'memory_full'        // Mémoire persistante complète + suivi tendances (PRO+)
   | 'multi_period'       // Analyse multi-périodes (PRO+)
   | 'projections'        // Projections financières avancées (PRO+)
-  | 'simulator'          // Simulateur de décisions (POWER+)
+  | 'simulator'          // Simulateur de décisions (PRO+) — absorbé depuis POWER
   | 'multi_user'         // Workspace collaboratif multi-users (SCALE+)
-  | 'priority_support';  // Support prioritaire (SCALE+)
+  | 'priority_support'   // Support prioritaire (SCALE+)
+  | 'erp_integration';   // Connexion ERP/CRM/comptabilité sur devis (SCALE+)
 
 // ── Hiérarchie plan (index = niveau) ────────────────────────────────────────
 const PLAN_LEVEL: Record<Plan, number> = {
@@ -53,6 +54,7 @@ export function planLevel(plan: string): number {
 }
 
 // ── Seuil minimum par feature ────────────────────────────────────────────────
+// V12 : 3 plans (FREE / PRO / SCALE) — POWER supprimé, ses features absorbées par PRO
 const FEATURE_MIN_LEVEL: Record<Feature, number> = {
   export_pdf:       0, // free
   memory:           0, // free (mémoire légère incluse)
@@ -60,12 +62,13 @@ const FEATURE_MIN_LEVEL: Record<Feature, number> = {
   export_pptx:      1, // pro+
   conversational:   1, // pro+ (free = 3 interactions/analyse seulement)
   memory_full:      1, // pro+ (mémoire persistante complète)
-  multi_period:         1, // pro+
-  projections:          1, // pro+
-  entities:             2, // power+
-  simulator:            2, // power+
-  multi_user:           3, // scale+
-  priority_support:     3, // scale+
+  multi_period:     1, // pro+
+  projections:      1, // pro+
+  entities:         1, // pro+ (absorbé depuis POWER)
+  simulator:        1, // pro+ (absorbé depuis POWER)
+  multi_user:       3, // scale+
+  priority_support: 3, // scale+
+  erp_integration:  3, // scale+ (connexion ERP/CRM sur devis)
 };
 
 /** Vérifie si un plan a accès à une feature */
@@ -170,33 +173,33 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     emoji: '🔮',
   },
 
-  // ── POWER ────────────────────────────────────────────────────────────────────
+  // ── PRO (absorbé depuis POWER) ───────────────────────────────────────────────
   entities: {
     label: 'Multi-entités',
     description: 'Gérez plusieurs sociétés, filiales ou portefeuilles clients avec une mémoire et un historique distincts par entité.',
-    requiredPlan: 'POWER',
-    requiredPlanPrice: '129€/mois',
+    requiredPlan: 'PRO',
+    requiredPlanPrice: '59€/mois',
     benefits: [
-      '75 analyses / mois',
+      '15 analyses / mois',
       'Multi-entités avec mémoire persistante par entité',
       'Simulateur de décisions',
       'Projections avancées',
       'Comparaison de périodes',
-      'Analyse comparative',
+      'Exports Excel, PDF et PowerPoint',
     ],
     emoji: '🏢',
   },
   simulator: {
     label: 'Simulateur de décisions',
     description: 'Simulez l\'impact financier de chaque décision avant de l\'exécuter — recrutement, investissement, restructuration.',
-    requiredPlan: 'POWER',
-    requiredPlanPrice: '129€/mois',
+    requiredPlan: 'PRO',
+    requiredPlanPrice: '59€/mois',
     benefits: [
       'Simulateur de décisions',
-      '75 analyses / mois',
+      '15 analyses / mois',
       'Multi-entités',
       'Projections avancées',
-      'Analyse comparative',
+      'Exports Excel, PDF et PowerPoint',
     ],
     emoji: '⚡',
   },
@@ -212,7 +215,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
       'Multi-users avec permissions utilisateurs',
       'Workspace collaboratif',
       'Gouvernance des analyses',
-      'Collaboration équipe finance',
+      'Connexion ERP/CRM sur devis',
     ],
     emoji: '👥',
   },
@@ -225,9 +228,23 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
       'Support prioritaire',
       'Workspace collaboratif',
       '250 analyses / mois',
-      'Gouvernance des analyses',
+      'Connexion ERP/CRM sur devis',
     ],
     emoji: '🎯',
+  },
+  erp_integration: {
+    label: 'Connexion ERP / CRM',
+    description: 'Connectez Pepperyn directement à vos systèmes existants — ERP, CRM, logiciels comptables — pour un pilotage financier en temps réel.',
+    requiredPlan: 'SCALE',
+    requiredPlanPrice: '349€/mois',
+    benefits: [
+      'Connexion ERP, CRM, comptabilité sur devis',
+      'Onboarding et implémentation inclus dans le devis',
+      'Workflows personnalisés selon vos processus',
+      '250 analyses / mois',
+      'Support prioritaire dédié',
+    ],
+    emoji: '🔗',
   },
 };
 

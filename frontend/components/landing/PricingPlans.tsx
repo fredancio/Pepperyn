@@ -14,61 +14,36 @@ const plans = [
       '1 analyse / mois',
       'Export PDF',
       'Mémoire légère',
-      'Données anonymisées',
       '3 interactions contextuelles incluses',
     ],
+    extras: null,
     microcopy: 'Parfait pour tester Pepperyn sur vos propres données.',
     cta: 'Commencer gratuitement',
     ctaHref: '/register',
   },
   {
     name: 'PRO',
-    subtitle: 'Pour dirigeants de PME',
+    subtitle: 'Pour dirigeants de PME, CFO et experts-comptables',
     price: '59€',
     period: '/mois',
-    tagline: 'Votre copilote financier personnel.',
-    highlighted: false,
-    badge: null,
+    tagline: 'Votre copilote financier complet.',
+    highlighted: true,
+    badge: '⭐ LE PLUS POPULAIRE',
     color: 'blue',
     features: [
       '15 analyses / mois',
       'Usage conversationnel inclus',
       'Exports Excel, PDF et PowerPoint',
-      'Mémoire persistante',
-      'Suivi des tendances financières',
-      'Alertes et dérives automatiques',
-      'Analyse multi-périodes',
-      'Projections simples',
-      'Priorisation intelligente',
+      'Mémoire persistante complète',
+      'Multi-entités (clients, filiales, dossiers)',
+      'Simulateur de décisions financières',
+      'Analyse multi-périodes & comparaisons',
+      'Projections et alertes automatiques',
+      'Crédits supplémentaires disponibles à la demande',
     ],
-    microcopy: 'Détectez les problèmes avant qu\'ils impactent votre rentabilité.',
-    cta: 'Commencer',
-    ctaHref: '/register',
-  },
-  {
-    name: 'POWER',
-    subtitle: 'Pour CFO, consultants et experts-comptables',
-    price: '129€',
-    period: '/mois',
-    tagline: 'Pilotage financier multi-entités.',
-    highlighted: true,
-    badge: '⭐ LE PLUS UTILISÉ',
-    color: 'red',
-    features: [
-      '75 analyses / mois',
-      'Usage avancé inclus',
-      'Multi-entités',
-      'Mémoire persistante par entité',
-      'Simulateur de décisions',
-      'Projections avancées',
-      'Comparaison de périodes',
-      'Analyse comparative',
-      'Exports premium',
-      'Historique enrichi',
-      'Détection des tendances récurrentes',
-    ],
-    microcopy: 'Transformez vos données financières en décisions rapides et actionnables.',
-    cta: 'Passer à Power',
+    extras: null,
+    microcopy: 'Gérez plusieurs clients ou entités depuis un seul outil.',
+    cta: 'Passer à PRO',
     ctaHref: '/register',
   },
   {
@@ -82,19 +57,19 @@ const plans = [
     color: 'purple',
     features: [
       '250 analyses / mois',
-      'Usage intensif inclus',
-      'Multi-users',
-      'Multi-entités avancé',
-      'Permissions utilisateurs',
-      'Workspace collaboratif',
-      'Historique avancé',
-      'Gouvernance des analyses',
-      'Support prioritaire',
-      'Collaboration équipe finance',
-      'Gestion avancée des entités',
+      'Chat illimité',
+      'Tout le plan PRO inclus',
+      'Workspace multi-utilisateurs',
+      'Permissions & gouvernance des analyses',
+      'Support prioritaire dédié',
+      'Crédits supplémentaires disponibles à la demande',
     ],
-    microcopy: 'Industrialisez votre pilotage financier sans alourdir votre organisation.',
-    cta: 'Passer à Scale',
+    extras: {
+      label: '🔗 Connexion ERP, CRM & systèmes comptables — sur devis',
+      detail: 'Intégrez Pepperyn directement à vos outils existants (ERP, CRM, logiciels comptables, BI…). Chaque intégration fait l\'objet d\'un onboarding dédié avec devis d\'implémentation personnalisé.',
+    },
+    microcopy: 'Industrialisez votre pilotage financier à l\'échelle de votre organisation.',
+    cta: 'Passer à SCALE',
     ctaHref: '/register',
   },
 ];
@@ -106,10 +81,9 @@ const addons = [
 ];
 
 const colorMap: Record<string, { ring: string; badge: string; bg: string; text: string; cta: string; ctaText: string }> = {
-  green:  { ring: 'border-green-200',  badge: 'bg-green-100 text-green-700',   bg: 'bg-white',          text: 'text-[#1A1A2E]', cta: 'bg-green-600 text-white hover:bg-green-700',  ctaText: 'text-white' },
-  blue:   { ring: 'border-blue-200',   badge: 'bg-blue-100 text-blue-700',     bg: 'bg-white',          text: 'text-[#1A1A2E]', cta: 'bg-[#1B73E8] text-white hover:bg-[#0D47A1]', ctaText: 'text-white' },
-  red:    { ring: 'border-[#1B73E8]',  badge: 'bg-amber-400 text-white',       bg: 'bg-[#0A2540]',      text: 'text-white',     cta: 'bg-white text-[#1B73E8] hover:bg-blue-50',   ctaText: 'text-[#1B73E8]' },
-  purple: { ring: 'border-purple-200', badge: 'bg-purple-100 text-purple-700', bg: 'bg-white',          text: 'text-[#1A1A2E]', cta: 'bg-[#7C3AED] text-white hover:bg-[#6D28D9]', ctaText: 'text-white' },
+  green:  { ring: 'border-green-200',  badge: 'bg-green-100 text-green-700',   bg: 'bg-white',     text: 'text-[#1A1A2E]', cta: 'bg-green-600 text-white hover:bg-green-700',  ctaText: 'text-white' },
+  blue:   { ring: 'border-[#1B73E8]',  badge: 'bg-amber-400 text-white',       bg: 'bg-[#0A2540]', text: 'text-white',     cta: 'bg-white text-[#1B73E8] hover:bg-blue-50',   ctaText: 'text-[#1B73E8]' },
+  purple: { ring: 'border-purple-200', badge: 'bg-purple-100 text-purple-700', bg: 'bg-white',     text: 'text-[#1A1A2E]', cta: 'bg-[#7C3AED] text-white hover:bg-[#6D28D9]', ctaText: 'text-white' },
 };
 
 export function PricingPlans() {
@@ -132,7 +106,7 @@ export function PricingPlans() {
         </div>
 
         {/* Plans grid */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch mt-12">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch mt-12">
           {plans.map((plan) => {
             const c = colorMap[plan.color];
             const isHighlighted = plan.highlighted;
@@ -190,6 +164,14 @@ export function PricingPlans() {
                   ))}
                 </ul>
 
+                {/* ERP/CRM extras block (SCALE only) */}
+                {plan.extras && (
+                  <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
+                    <p className="text-sm font-bold text-purple-900 mb-1">{plan.extras.label}</p>
+                    <p className="text-xs text-purple-700 leading-relaxed">{plan.extras.detail}</p>
+                  </div>
+                )}
+
                 {/* Microcopy */}
                 <p className={`text-xs italic leading-snug ${isHighlighted ? 'text-slate-400' : 'text-[#5F6368]'}`}>
                   &ldquo;{plan.microcopy}&rdquo;
@@ -210,9 +192,12 @@ export function PricingPlans() {
         {/* Add-ons section */}
         <div className="mt-14 bg-white border border-gray-100 rounded-2xl p-8 shadow-sm">
           <div className="text-center mb-6">
-            <h3 className="text-xl font-bold text-[#1A1A2E] mb-1">Besoin de plus de capacité ?</h3>
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#EFF6FF] border border-blue-100 rounded-full mb-3">
+              <span className="text-xs font-semibold text-[#1B73E8]">Disponible sur les plans PRO et SCALE</span>
+            </div>
+            <h3 className="text-xl font-bold text-[#1A1A2E] mb-1">Besoin de plus de capacité ce mois-ci ?</h3>
             <p className="text-sm text-[#5F6368]">
-              Ajoutez des analyses supplémentaires à la demande, sans changer de plan.
+              Achetez des analyses supplémentaires à la demande — sans changer de plan, sans engagement.
             </p>
           </div>
           <div className="grid sm:grid-cols-3 gap-4">
@@ -227,7 +212,7 @@ export function PricingPlans() {
             ))}
           </div>
           <p className="text-center text-xs text-[#5F6368] italic mt-4">
-            Conçu pour absorber les pics d&apos;activité sans interruption.
+            Conçu pour absorber les pics d&apos;activité sans bloquer votre travail.
           </p>
         </div>
 
