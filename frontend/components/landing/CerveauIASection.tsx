@@ -64,13 +64,12 @@ export function CerveauIASection() {
             </div>
             <div>
               <h4 className="text-base font-bold text-[#1A1A2E] mb-2">
-                La vérité que personne ne dit
+                Ce qui rend un copilote financier réellement utile
               </h4>
               <p className="text-sm text-[#5F6368] leading-relaxed">
-                Le problème n'est pas le modèle d'IA. C'est que le modèle ne sait pas qui vous
-                êtes. Un copilote financier réellement utile, c'est un modèle entraîné sur{' '}
-                <em>vos</em> données, avec <em>votre</em> logique métier, accessible uniquement
-                par <em>vous</em>.
+                Le problème n&apos;est pas le modèle d&apos;IA.<br />
+                Le problème est qu&apos;un modèle générique ne comprend ni votre entreprise, ni votre logique financière.<br />
+                Un copilote financier réellement utile s&apos;appuie sur vos données, votre historique et votre contexte métier pour produire des analyses pertinentes, cohérentes et actionnables.
               </p>
             </div>
           </div>
