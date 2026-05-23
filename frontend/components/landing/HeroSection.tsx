@@ -14,12 +14,6 @@ export function HeroSection() {
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           {/* Left column */}
           <div className="flex flex-col items-start gap-4">
-            {/* Beta banner — petite pill transparente */}
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#1B73E8]/10 border border-[#1B73E8]/20 rounded-full">
-              <span className="w-2 h-2 bg-[#1B73E8] rounded-full" />
-              <span className="text-sm font-medium text-[#1B73E8]">Accès bêta ouvert — places limitées</span>
-            </div>
-
             {/* Headline — all blue */}
             <h1 className="text-4xl lg:text-5xl xl:text-6xl font-extrabold text-[#1B73E8] leading-tight">
               Scanner financier pour entreprises
@@ -33,16 +27,16 @@ export function HeroSection() {
             {/* Description */}
             <p className="text-base text-[#5F6368] leading-relaxed max-w-lg">
               En quelques secondes, identifiez ce qui fonctionne,
-              ce qui vous coûte et ce que vous devez faire ensuite —
+              ce qui vous coûte et les décisions à prioriser —
               revenus, coûts, marges, anomalies et recommandations activables.
             </p>
 
             {/* Bullets — bulles rondes bleues */}
             <ul className="flex flex-col gap-2">
               {[
-                'ce qui vous fait gagner de l\'argent',
-                'ce qui vous en fait perdre',
-                'les actions à prioriser',
+                'les leviers de rentabilité',
+                'les dérives qui impactent vos marges',
+                'les actions prioritaires à forte valeur',
               ].map((item) => (
                 <li key={item} className="flex items-center gap-2.5 text-sm text-[#1A1A2E]">
                   <span className="w-5 h-5 rounded-full bg-[#1B73E8] flex items-center justify-center flex-shrink-0">
@@ -59,7 +53,7 @@ export function HeroSection() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
                 </span>
-                <strong>et surtout une mémoire persistante !</strong>
+                <strong>et surtout une mémoire financière persistante</strong>
               </li>
             </ul>
 
