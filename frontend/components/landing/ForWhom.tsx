@@ -2,7 +2,7 @@ export function ForWhom() {
   const profiles = [
     {
       emoji: '💼',
-      role: 'CFO & Directeurs Financiers',
+      role: 'Directions financières',
       lines: [
         'Obtenez des analyses structurées en secondes.',
         'Préparez vos CODIR sans ressaisie.',
@@ -35,8 +35,7 @@ export function ForWhom() {
             <span className="text-sm font-medium text-[#1B73E8]">Pour qui ?</span>
           </div>
           <h2 className="text-3xl lg:text-4xl font-extrabold text-[#1A1A2E]">
-            À qui est destiné Pepperyn dans sa version finale{' '}
-            <span className="text-[#1B73E8]">(coming soon)</span> ?
+            À qui est destiné Pepperyn ?
           </h2>
         </div>
 
