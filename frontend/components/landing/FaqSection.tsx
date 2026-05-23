@@ -8,16 +8,16 @@ interface FaqItem {
 
 const firstAnswer = (
   <div className="text-[#5F6368] leading-relaxed text-sm flex flex-col gap-4">
-    <p>Les versions payantes offriront :</p>
+    <p>Les versions payantes offrent :</p>
 
     <div>
-      <p className="font-semibold text-[#1A1A2E] mb-1">Pour la version PRO :</p>
-      <p>des analyses et requêtes illimitées ainsi qu&apos;une mémoire persistante.</p>
+      <p className="font-semibold text-[#1A1A2E] mb-1">Plan PRO — 59€/mois :</p>
+      <p>15 analyses par mois, exports Excel/PDF/PowerPoint, mémoire persistante complète, multi-entités, simulateur de décisions financières, analyse multi-périodes et projections.</p>
     </div>
 
     <div>
-      <p className="font-semibold text-[#1A1A2E] mb-1">Et pour la version PREMIUM :</p>
-      <p>une automatisation sur mesure basée sur vos process et systèmes internes, l&apos;intégration de n&apos;importe quel système déjà en place (ERP, CRM, Agendas, etc.), une logique multi-agentique reposant sur différentes IA spécialisées, un développement sur-mesure selon les besoins et process de votre entreprise, du benchmarking sectoriel, la budgétisation, des alertes proactives, des projections et analyses financières fines, un onboarding complet &amp; la formation de votre équipe financière, ainsi qu&apos;un support à vie.</p>
+      <p className="font-semibold text-[#1A1A2E] mb-1">Plan SCALE — 349€/mois :</p>
+      <p>250 analyses par mois, chat illimité, workspace multi-utilisateurs, permissions et gouvernance des analyses, support prioritaire dédié, et connexion ERP/CRM/systèmes comptables sur devis avec onboarding dédié.</p>
     </div>
 
     <p><span className="font-semibold text-[#1A1A2E]">En résumé :</span> une infrastructure IA entièrement dédiée à votre entreprise.</p>
@@ -118,7 +118,7 @@ const firstAnswer = (
     </div>
 
     <div>
-      <p className="font-semibold text-[#1A1A2E] mb-2">Le futur : &ldquo;l&apos;IA vous alerte avant que le problème n&apos;explose&rdquo;</p>
+      <p className="font-semibold text-[#1A1A2E] mb-2">Pepperyn vous alerte avant que le problème n&apos;explose :</p>
       <ul className="flex flex-col gap-1 pl-4">
         {['Cash runway < 90 jours', 'Marge brute en baisse 3 mois', 'Dérive coûts acquisition', 'DSO qui explose', '…'].map(item => (
           <li key={item} className="flex items-start gap-2">
@@ -163,12 +163,12 @@ const firstAnswer = (
 
 const faqs: FaqItem[] = [
   {
-    question: 'Quelles différences entre cette version gratuite et les versions payantes à venir ?',
+    question: 'Quelles différences entre le plan gratuit et les plans payants ?',
     answer: firstAnswer,
   },
   {
     question: 'Combien de temps dure une analyse ?',
-    answer: "En version gratuite, l'analyse prend quelques secondes. Les analyses avancées (multi-fichiers, croisement ERP) sont disponibles dans les versions payantes à venir.",
+    answer: "En version gratuite, l'analyse prend quelques secondes. Les analyses avancées (multi-fichiers, croisement ERP) sont disponibles dans les plans PRO et SCALE.",
   },
   {
     question: 'Quels formats de fichiers sont acceptés ?',
@@ -180,16 +180,16 @@ const faqs: FaqItem[] = [
   },
   {
     question: "Combien d'analyses puis-je faire gratuitement ?",
-    answer: "3 analyses par mois, sans carte bancaire. Pour des analyses illimitées, un accès équipe et des exports enrichis, rendez-vous dans les versions payantes à venir.",
+    answer: "1 analyse par mois, sans carte bancaire. Pour plus de capacité, des exports enrichis et un accès équipe, découvrez nos plans PRO et SCALE.",
   },
   {
     question: 'Comment fonctionne le système de PIN pour mon équipe ?',
-    answer: "Le partage d'accès équipe via code PIN sera disponible dans les versions payantes qui suivront le MVP. En version gratuite, l'accès est individuel.",
+    answer: "Le partage d'accès équipe est disponible dans les plans PRO et SCALE. En plan gratuit, l'accès est individuel.",
   },
 ];
 
 export function FaqSection() {
-  const [openIndex, setOpenIndex] = useState<number | null>(0);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
     <section className="py-20 lg:py-28 bg-[#EFF6FF]" id="faq">

@@ -80,7 +80,7 @@ export function Testimonials() {
             <span className="text-sm font-medium text-amber-700">Ils nous font confiance</span>
           </div>
           <h2 className="text-3xl lg:text-4xl font-extrabold text-[#1A1A2E] mb-4">
-            Ce que disent nos utilisateurs bêta
+            Ce que disent nos utilisateurs
           </h2>
           <p className="text-lg text-[#5F6368] max-w-2xl mx-auto">
             Rejoignez les équipes financières qui gagnent des heures chaque semaine
