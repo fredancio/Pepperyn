@@ -372,6 +372,7 @@ async def analyze_file(
     # Le fichier uploadé (file_bytes) est en mémoire Python uniquement —
     # il n'est jamais écrit sur disque. Il sera libéré par le GC Python
     # à la fin de cette requête. Conforme au master plan "auto-delete source file".
+    file_size_bytes = len(file_bytes)  # stocker avant suppression
     del file_bytes  # libération explicite immédiate
     logger.info(f"[SECURITY] Fichier source supprimé de la mémoire après analyse — {analyse_id}")
 
@@ -418,7 +419,7 @@ async def analyze_file(
         session_id=session_id,
         filename=file.filename,
         ext=ext,
-        file_size=len(file_bytes),
+        file_size=file_size_bytes,
         analysis_result=analysis_result,
         context=context,
         mode=mode,
