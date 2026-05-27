@@ -1,6 +1,29 @@
 import Link from 'next/link';
 
-const plans = [
+type PlanExtras = {
+  label: string;
+  detail: string;
+  services?: {
+    title: string;
+    items: string[];
+  };
+};
+
+const plans: {
+  name: string;
+  subtitle: string;
+  price: string;
+  period: string;
+  tagline: string;
+  highlighted: boolean;
+  badge: string | null;
+  color: string;
+  features: string[];
+  extras: PlanExtras | null;
+  microcopy: string;
+  cta: string;
+  ctaHref: string;
+}[] = [
   {
     name: 'FREE',
     subtitle: 'Découvrez Pepperyn',
@@ -24,7 +47,7 @@ const plans = [
   {
     name: 'PRO',
     subtitle: 'Pour dirigeants de PME, CFO et experts-comptables',
-    price: '59€',
+    price: '79€',
     period: '/mois',
     tagline: 'Votre copilote financier complet.',
     highlighted: true,
@@ -32,7 +55,7 @@ const plans = [
     color: 'blue',
     features: [
       '15 analyses / mois',
-      'Usage conversationnel inclus',
+      '75 interactions contextuelles / mois',
       'Exports Excel, PDF et PowerPoint',
       'Mémoire persistante complète',
       'Multi-entités (clients, filiales, dossiers)',
@@ -48,29 +71,48 @@ const plans = [
   },
   {
     name: 'SCALE',
-    subtitle: 'Pour départements financiers et cabinets',
+    subtitle: 'Pour départements financiers, cabinets & groupes multi-entités',
     price: '349€',
     period: '/mois',
-    tagline: 'AI Financial Operating System.',
+    tagline: 'Votre AI Financial Operating System sur-mesure.',
     highlighted: false,
     badge: null,
     color: 'purple',
     features: [
       '250 analyses / mois',
-      'Chat illimité',
-      'Tout le plan PRO inclus',
-      'Workspace multi-utilisateurs',
+      '500 interactions contextuelles / mois',
+      '✦ Tout le plan PRO inclus',
+      'Workspace multi-utilisateurs & rôles',
       'Permissions & gouvernance des analyses',
-      'Support prioritaire dédié',
-      'Crédits supplémentaires disponibles à la demande',
+      'Architecture multi-filiales & consolidation',
+      'Intégrations ERP, CRM & logiciels comptables',
+      'Workflows financiers personnalisés',
+      'Reporting automatisé & tableaux de bord',
+      'Hébergement dédié / déploiement on-premise',
+      'LLM privé / open-source en option',
+      'Onboarding dédié & SLA support prioritaire',
     ],
     extras: {
-      label: '🔗 Connexion ERP, CRM & systèmes comptables — sur devis',
-      detail: 'Intégrez Pepperyn directement à vos outils existants (ERP, CRM, logiciels comptables, BI…). Chaque intégration fait l\'objet d\'un onboarding dédié avec devis d\'implémentation personnalisé.',
+      label: '🔧 Implémentation sur-mesure incluse',
+      detail: 'Chaque déploiement SCALE fait l\'objet d\'un onboarding personnalisé : cartographie de vos systèmes, intégrations, formation équipe et suivi continu. Devis d\'implémentation fourni à la signature.',
+      services: {
+        title: 'SERVICES DISPONIBLES SUR DEVIS',
+        items: [
+          'Connexions ERP/CRM',
+          'Intégrations comptables',
+          'Workflows personnalisés',
+          'Reporting automatisé',
+          'Dashboards consolidés',
+          'Hébergement dédié',
+          'VPS privé',
+          'Déploiement on-premise',
+          'LLM privé / open-source',
+        ],
+      },
     },
     microcopy: 'Industrialisez votre pilotage financier à l\'échelle de votre organisation.',
-    cta: 'Passer à SCALE',
-    ctaHref: '/register',
+    cta: 'Nous contacter',
+    ctaHref: '/contact',
   },
 ];
 
@@ -166,9 +208,28 @@ export function PricingPlans() {
 
                 {/* ERP/CRM extras block (SCALE only) */}
                 {plan.extras && (
-                  <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
-                    <p className="text-sm font-bold text-purple-900 mb-1">{plan.extras.label}</p>
-                    <p className="text-xs text-purple-700 leading-relaxed">{plan.extras.detail}</p>
+                  <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 space-y-3">
+                    <div>
+                      <p className="text-sm font-bold text-purple-900 mb-1">{plan.extras.label}</p>
+                      <p className="text-xs text-purple-700 leading-relaxed">{plan.extras.detail}</p>
+                    </div>
+                    {plan.extras.services && (
+                      <div className="border-t border-purple-200 pt-3">
+                        <p className="text-xs font-bold text-purple-900 uppercase tracking-widest mb-2">
+                          {plan.extras.services.title}
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {plan.extras.services.items.map((s, i) => (
+                            <span
+                              key={i}
+                              className="text-xs px-2 py-0.5 bg-white text-purple-800 rounded-full border border-purple-300 font-medium"
+                            >
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -217,45 +278,22 @@ export function PricingPlans() {
         </div>
 
         {/* Enterprise section */}
-        <div className="mt-8 bg-[#0A2540] rounded-2xl p-8 text-white">
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Enterprise & Private AI</span>
-              </div>
-              <h3 className="text-xl font-bold text-white mb-1">
-                Pour entreprises souhaitant intégrer Pepperyn à leurs systèmes internes
+        <div className="mt-8 bg-[#0A2540] rounded-2xl p-7 text-white">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-400">Besoins ultra-spécifiques ?</span>
+              <h3 className="text-lg font-bold text-white mt-1 mb-1">
+                Architecture IA financière 100% privée & sur-mesure
               </h3>
-              <p className="text-sm text-slate-300 mb-4">
-                Une architecture IA financière privée, sécurisée et adaptée à vos processus.
-              </p>
-              <div className="grid sm:grid-cols-2 gap-x-8 gap-y-1.5">
-                {[
-                  'Connexions ERP / CRM',
-                  'Intégrations comptables',
-                  'Workflows personnalisés',
-                  'Reporting automatisé',
-                  'Hébergement dédié / VPS privé',
-                  'Déploiement on-premise',
-                  'LLM privé / open-source',
-                  'Architecture multi-filiales',
-                ].map((item) => (
-                  <div key={item} className="flex items-center gap-2 text-sm text-slate-300">
-                    <svg className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                    </svg>
-                    {item}
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-slate-400 mt-4">
-                👉 Ces services nécessitent onboarding, configuration et intégration spécifique —{' '}
-                et font l&apos;objet d&apos;un devis personnalisé avec frais d&apos;implémentation.
+              <p className="text-sm text-slate-300 max-w-xl">
+                Déploiement isolé dans votre infrastructure, LLM open-source sur vos serveurs,
+                intégrations propriétaires, conformité RGPD renforcée, SLA entreprise.
+                Au-delà du plan SCALE — devis sur demande.
               </p>
             </div>
             <div className="flex-shrink-0">
               <Link
-                href="mailto:contact@pepperyn.com"
+                href="/contact"
                 className="inline-flex items-center gap-2 px-6 py-3.5 bg-white text-[#1B73E8] font-bold text-sm rounded-xl hover:bg-blue-50 transition-colors whitespace-nowrap"
               >
                 Parler à un expert →

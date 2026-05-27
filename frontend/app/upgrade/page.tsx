@@ -7,19 +7,19 @@ const plans = [
     id: 'free', name: 'FREE', subtitle: 'Découvrez Pepperyn', price: '0€', period: '',
     color: 'green', highlighted: false, badge: null,
     features: ['1 analyse / mois', 'Export PDF', 'Mémoire légère', '3 interactions contextuelles incluses'],
-    cta: 'Plan actuel', ctaDisabled: true,
+    cta: 'Plan actuel', ctaDisabled: true, ctaHref: null,
   },
   {
-    id: 'pro', name: 'PRO', subtitle: 'Pour dirigeants de PME, CFO et experts-comptables', price: '59€', period: '/mois',
+    id: 'pro', name: 'PRO', subtitle: 'Pour dirigeants de PME, CFO et experts-comptables', price: '79€', period: '/mois',
     color: 'blue', highlighted: true, badge: '⭐ LE PLUS POPULAIRE',
-    features: ['15 analyses / mois', 'Usage conversationnel inclus', 'Exports Excel, PDF et PowerPoint', 'Mémoire persistante complète', 'Multi-entités (clients, filiales, dossiers)', 'Simulateur de décisions financières', 'Analyse multi-périodes & comparaisons', 'Projections et alertes automatiques', 'Crédits supplémentaires disponibles à la demande'],
-    cta: 'Passer à PRO', ctaDisabled: false,
+    features: ['15 analyses / mois', '75 interactions contextuelles / mois', 'Exports Excel, PDF et PowerPoint', 'Mémoire persistante complète', 'Multi-entités (clients, filiales, dossiers)', 'Simulateur de décisions financières', 'Analyse multi-périodes & comparaisons', 'Projections et alertes automatiques', 'Crédits supplémentaires disponibles à la demande'],
+    cta: 'Passer à PRO', ctaDisabled: false, ctaHref: null,
   },
   {
-    id: 'scale', name: 'SCALE', subtitle: 'Pour départements financiers et cabinets', price: '349€', period: '/mois',
+    id: 'scale', name: 'SCALE', subtitle: 'Pour départements financiers, cabinets & groupes multi-entités', price: '349€', period: '/mois',
     color: 'purple', highlighted: false, badge: null,
-    features: ['250 analyses / mois', 'Chat illimité', 'Tout le plan PRO inclus', 'Workspace multi-utilisateurs', 'Permissions & gouvernance des analyses', 'Support prioritaire dédié', 'Crédits supplémentaires disponibles à la demande'],
-    cta: 'Passer à SCALE', ctaDisabled: false,
+    features: ['250 analyses / mois', '500 interactions contextuelles / mois', '✦ Tout le plan PRO inclus', 'Workspace multi-utilisateurs & rôles', 'Permissions & gouvernance des analyses', 'Architecture multi-filiales & consolidation', 'Intégrations ERP, CRM & logiciels comptables', 'Workflows financiers personnalisés', 'Reporting automatisé & tableaux de bord', 'Hébergement dédié / déploiement on-premise', 'LLM privé / open-source en option', 'Onboarding dédié & SLA support prioritaire'],
+    cta: 'Nous contacter', ctaDisabled: false, ctaHref: '/contact',
   },
 ];
 
@@ -69,15 +69,6 @@ export default function UpgradePage() {
           <p className="text-[#5F6368]">Pepperyn ne se contente pas d'analyser. Il vous indique quoi faire.</p>
           <p className="text-sm text-[#5F6368] italic mt-1">Chaque mois d'inaction détruit de la valeur.</p>
 
-          <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-100 rounded-xl">
-            <span className="text-[#1B73E8]">✉️</span>
-            <span className="text-sm text-[#1B73E8] font-medium">
-              Pour activer votre plan, contactez-nous :
-            </span>
-            <Link href="mailto:contact@pepperyn.com" className="text-[#1B73E8] font-bold underline hover:no-underline">
-              contact@pepperyn.com
-            </Link>
-          </div>
         </div>
 
         {/* Plans grid */}
@@ -121,13 +112,21 @@ export default function UpgradePage() {
                   ))}
                 </ul>
 
-                {!plan.ctaDisabled && (
-                  <a
-                    href={`mailto:contact@pepperyn.com?subject=Activation plan ${plan.name}&body=Bonjour, je souhaite activer le plan ${plan.name} pour mon compte Pepperyn.`}
+                {!plan.ctaDisabled && plan.ctaHref && (
+                  <Link
+                    href={plan.ctaHref}
                     className={`w-full py-2.5 rounded-xl font-bold text-sm text-center transition-all block ${c.cta}`}
                   >
                     {plan.cta}
-                  </a>
+                  </Link>
+                )}
+                {!plan.ctaDisabled && !plan.ctaHref && (
+                  <button
+                    onClick={() => handleUpgrade(plan.id)}
+                    className={`w-full py-2.5 rounded-xl font-bold text-sm text-center transition-all block ${c.cta}`}
+                  >
+                    {clicked === plan.id ? 'Bientôt disponible…' : plan.cta}
+                  </button>
                 )}
                 {plan.ctaDisabled && (
                   <div className={`w-full py-2.5 rounded-xl font-bold text-sm text-center ${c.cta}`}>
@@ -156,7 +155,7 @@ export default function UpgradePage() {
                   <p className="text-xs text-[#5F6368]">{a.desc}</p>
                 </div>
                 <a
-                  href={`mailto:contact@pepperyn.com?subject=Achat ${a.name}&body=Bonjour, je souhaite acheter le ${a.name} (${a.desc}) pour ${a.price}.`}
+                  href={`mailto:info@finflate.com?subject=Achat ${a.name}&body=Bonjour, je souhaite acheter le ${a.name} (${a.desc}) pour ${a.price}.`}
                   className="text-lg font-extrabold text-[#1B73E8] hover:text-[#0D47A1] transition-colors ml-3"
                 >
                   {a.price}
@@ -178,7 +177,7 @@ export default function UpgradePage() {
               <p className="text-sm text-slate-300">Connexions ERP/CRM, hébergement dédié, LLM privé, architecture multi-filiales — sur devis.</p>
             </div>
             <Link
-              href="mailto:contact@pepperyn.com"
+              href="/contact"
               className="flex-shrink-0 px-5 py-3 bg-white text-[#1B73E8] font-bold text-sm rounded-xl hover:bg-blue-50 transition-colors whitespace-nowrap"
             >
               Parler à un expert →
