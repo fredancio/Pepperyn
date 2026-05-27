@@ -42,7 +42,8 @@ export async function analyzeFile(
   file: File,
   context: string,
   mode: 'quick' | 'complete' = 'complete',
-  sessionId?: string
+  sessionId?: string,
+  entityId?: string
 ) {
   const headers = await getAuthHeaders();
   const formData = new FormData();
@@ -50,6 +51,7 @@ export async function analyzeFile(
   formData.append('context', context);
   formData.append('mode', mode);
   if (sessionId) formData.append('session_id', sessionId);
+  if (entityId) formData.append('entity_id', entityId);
 
   const res = await fetch(`${API_URL}/api/analyze`, {
     method: 'POST',
@@ -124,15 +126,19 @@ export async function downloadPptx(analyseId: string): Promise<Blob> {
   return res.blob();
 }
 
-export async function fetchAnalysesHistory(): Promise<Array<{
+export async function fetchAnalysesHistory(entityId?: string): Promise<Array<{
   id: string;
   fichier_nom: string;
   type_document: string;
   created_at: string;
   score_confiance: number;
+  entity_id?: string;
 }>> {
   const headers = await getAuthHeaders();
-  const res = await fetch(`${API_URL}/api/analyses/history`, { headers });
+  const url = entityId
+    ? `${API_URL}/api/analyses/history?entity_id=${entityId}`
+    : `${API_URL}/api/analyses/history`;
+  const res = await fetch(url, { headers });
   if (!res.ok) return [];
   const data = await res.json();
   return data.analyses || [];

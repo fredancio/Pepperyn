@@ -69,6 +69,7 @@ export function ChatContainer() {
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [usageData, setUsageData] = useState<BillingUsage | null>(null);
   const [entities, setEntities] = useState<Entity[]>([]);
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [showAddEntity, setShowAddEntity] = useState(false);
   const [newEntityName, setNewEntityName] = useState('');
   const [addingEntity, setAddingEntity] = useState(false);
@@ -121,7 +122,7 @@ export function ChatContainer() {
   const loadSessionHistory = async () => {
     setLoadingSessions(true);
     try {
-      const analyses = await fetchAnalysesHistory();
+      const analyses = await fetchAnalysesHistory(selectedEntityId || undefined);
       const mapped: Session[] = analyses.map(a => ({
         id: a.id,
         company_id: '',
@@ -138,6 +139,14 @@ export function ChatContainer() {
       setLoadingSessions(false);
     }
   };
+
+  // Reload history whenever the selected entity changes
+  useEffect(() => {
+    if (authMode && authMode !== 'none') {
+      loadSessionHistory();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEntityId, authMode]);
 
   const handleAddEntity = async () => {
     if (!newEntityName.trim()) return;
@@ -252,7 +261,7 @@ export function ChatContainer() {
     setIsTyping(true);
 
     try {
-      const result = await analyzeFile(file, context, mode, sessionId);
+      const result = await analyzeFile(file, context, mode, sessionId, selectedEntityId || undefined);
       if (result.session_id) setSessionId(result.session_id);
 
       if (result.message) {
@@ -434,14 +443,26 @@ export function ChatContainer() {
                     ).map(entity => (
                       <div
                         key={entity.id}
-                        className="flex items-center gap-2 px-3 py-2 bg-[#EFF6FF] border border-blue-100 rounded-xl"
+                        onClick={() => {
+                          const newId = selectedEntityId === entity.id ? null : entity.id;
+                          setSelectedEntityId(newId);
+                          setSessions([]);
+                          setMessages([WELCOME_MESSAGE]);
+                        }}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer transition-all border ${
+                          selectedEntityId === entity.id
+                            ? 'bg-[#1B73E8] border-[#1B73E8] text-white'
+                            : 'bg-[#EFF6FF] border-blue-100 hover:border-[#1B73E8]/40'
+                        }`}
                       >
-                        <div className="w-6 h-6 bg-[#1B73E8] rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                        <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                          selectedEntityId === entity.id ? 'bg-white/20 text-white' : 'bg-[#1B73E8] text-white'
+                        }`}>
                           {entity.name?.[0]?.toUpperCase() || 'E'}
                         </div>
-                        <span className="text-xs font-medium text-[#1A1A2E] truncate">{entity.name}</span>
+                        <span className={`text-xs font-medium truncate ${selectedEntityId === entity.id ? 'text-white' : 'text-[#1A1A2E]'}`}>{entity.name}</span>
                         {entity.is_primary && (
-                          <span className="ml-auto text-xs text-[#5F6368] bg-gray-100 px-1.5 rounded">principal</span>
+                          <span className={`ml-auto text-xs px-1.5 rounded ${selectedEntityId === entity.id ? 'bg-white/20 text-white' : 'text-[#5F6368] bg-gray-100'}`}>principal</span>
                         )}
                       </div>
                     ))}

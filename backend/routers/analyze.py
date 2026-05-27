@@ -134,19 +134,25 @@ async def _resolve_auth(
 
 @router.get("/analyses/history")
 async def get_analyses_history(
+    entity_id: Optional[str] = None,
     authorization: Optional[str] = Header(default=None),
     x_auth_type: Optional[str] = Header(default=None),
 ):
-    """Return the last 20 completed analyses for the authenticated company."""
+    """Return the last 20 completed analyses for the authenticated company, optionally filtered by entity."""
     company_id, plan, auth_type = await _resolve_auth(authorization, x_auth_type)
     try:
         from main import get_supabase_service
         supabase = get_supabase_service()
-        result = (
+        query = (
             supabase.from_("analyses")
-            .select("id, fichier_nom, type_document, created_at, score_confiance")
+            .select("id, fichier_nom, type_document, created_at, score_confiance, entity_id")
             .eq("company_id", company_id)
             .eq("status", "completed")
+        )
+        if entity_id:
+            query = query.eq("entity_id", entity_id)
+        result = (
+            query
             .order("created_at", desc=True)
             .limit(20)
             .execute()
@@ -196,6 +202,7 @@ async def analyze_file(
     context: str = Form(default=""),
     mode: str = Form(default="complete"),
     session_id: Optional[str] = Form(default=None),
+    entity_id: Optional[str] = Form(default=None),
     authorization: Optional[str] = Header(default=None),
     x_auth_type: Optional[str] = Header(default=None),
 ):
@@ -423,6 +430,7 @@ async def analyze_file(
         analysis_result=analysis_result,
         context=context,
         mode=mode,
+        entity_id=entity_id,
         total_tokens=total_tokens,
         cost=cost,
         duration_ms=duration_ms,
@@ -461,6 +469,7 @@ def _save_to_db(
     cost: float,
     duration_ms: int,
     plan: str,
+    entity_id: Optional[str] = None,
 ):
     """Save analysis record to Supabase. Errors are logged but non-blocking."""
     try:
@@ -488,6 +497,8 @@ def _save_to_db(
             insert_payload["session_id"] = session_id
         if file_size is not None:
             insert_payload["fichier_taille_bytes"] = file_size
+        if entity_id is not None:
+            insert_payload["entity_id"] = entity_id
 
         logger.warning(f"[DB DEBUG] Attempting insert — analyse_id={analyse_id} | company_id={company_id} | filename={filename}")
         result = supabase.from_("analyses").insert(insert_payload).execute()
