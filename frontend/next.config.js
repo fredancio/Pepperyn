@@ -1,8 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // PWA support
   async headers() {
     return [
+      // Ne jamais mettre en cache le HTML des pages
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=0, must-revalidate' },
+        ],
+      },
+      // Service Worker
       {
         source: '/sw.js',
         headers: [
