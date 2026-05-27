@@ -62,6 +62,7 @@ export function ChatContainer() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [adminName, setAdminName] = useState<string>('');
+  const [adminEmail, setAdminEmail] = useState<string>('');
   // Question counter for free plan (post-analysis)
   const [analysisReceived, setAnalysisReceived] = useState(false);
   const [questionsPostAnalysis, setQuestionsPostAnalysis] = useState(0);
@@ -95,6 +96,7 @@ export function ChatContainer() {
       } else if (mode === 'admin') {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+          if (user.email) setAdminEmail(user.email);
           const { data: profile } = await supabase
             .from('profiles')
             .select('prenom, company:companies(plan)')
@@ -627,6 +629,17 @@ export function ChatContainer() {
 
             {/* Sidebar footer */}
             <div className="p-3 border-t border-gray-100 flex flex-col gap-1">
+              {adminEmail.toLowerCase() === 'fredanciaux16@gmail.com' && (
+                <Link
+                  href="/admin"
+                  className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-[#1B73E8] hover:bg-blue-50 transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  CRM Admin
+                </Link>
+              )}
               <Link
                 href="/app/settings"
                 className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-[#5F6368] hover:bg-gray-50 transition-colors"
@@ -817,35 +830,4 @@ export function ChatContainer() {
             {!canAccess(plan, 'conversational') && (
               <p className="text-center text-xs text-[#5F6368]/50 pb-2 italic">
                 ✨ Usage conversationnel étendu, exports Excel & PowerPoint disponibles en{' '}
-                <button
-                  onClick={() => setUpgradeFeature('conversational')}
-                  className="underline hover:text-[#1B73E8] transition-colors"
-                >
-                  plan PRO →
-                </button>
-              </p>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Upgrade modal */}
-      {upgradeFeature && (
-        <UpgradeModal
-          feature={upgradeFeature}
-          onClose={() => setUpgradeFeature(null)}
-        />
-      )}
-
-      {/* Credits modal */}
-      {showCreditsModal && (
-        <CreditsModal
-          plan={plan}
-          analysesUsed={usageData?.analyses_used ?? sessions.length}
-          analysesLimit={usageData?.total_allowed ?? getQuota(plan)}
-          onClose={() => setShowCreditsModal(false)}
-        />
-      )}
-    </div>
-  );
-}
+               
