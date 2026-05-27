@@ -142,7 +142,7 @@ export function ChatContainer() {
 
   // Reload history whenever the selected entity changes
   useEffect(() => {
-    if (authMode && authMode !== 'none') {
+    if (authMode) {
       loadSessionHistory();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
