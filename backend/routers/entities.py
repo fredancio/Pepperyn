@@ -107,12 +107,12 @@ async def create_entity(
     """
     company_id, plan = await _resolve_company(authorization)
 
-    # Plan gating — multi-entities requires POWER+
+    # Plan gating — multi-entities requires PRO+
     PLAN_LEVEL = {"free": 0, "pro": 1, "power": 2, "scale": 3, "enterprise": 4}
-    if PLAN_LEVEL.get(plan, 0) < PLAN_LEVEL["power"]:
+    if PLAN_LEVEL.get(plan, 0) < PLAN_LEVEL["pro"]:
         raise HTTPException(
             status_code=403,
-            detail="La gestion multi-entités est disponible à partir du plan POWER."
+            detail="La gestion multi-entités est disponible à partir du plan PRO."
         )
 
     if not body.name or len(body.name.strip()) < 2:

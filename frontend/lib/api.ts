@@ -161,6 +161,20 @@ export interface Entity {
   created_at: string;
 }
 
+export async function createEntity(name: string): Promise<Entity> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/entities`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Erreur création entité');
+  }
+  return res.json();
+}
+
 export async function fetchEntities(): Promise<Entity[]> {
   try {
     const headers = await getAuthHeaders();

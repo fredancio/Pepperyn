@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Message, Session } from '@/lib/types';
-import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, deleteAnalysesHistory, type BillingUsage, type Entity } from '@/lib/api';
+import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, type BillingUsage, type Entity } from '@/lib/api';
 import { getCurrentAuthMode, signOutAdmin, clearGuestAuth, getGuestPlan } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { MessageBubble, TypingIndicator } from './MessageBubble';
@@ -69,6 +69,9 @@ export function ChatContainer() {
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [usageData, setUsageData] = useState<BillingUsage | null>(null);
   const [entities, setEntities] = useState<Entity[]>([]);
+  const [showAddEntity, setShowAddEntity] = useState(false);
+  const [newEntityName, setNewEntityName] = useState('');
+  const [addingEntity, setAddingEntity] = useState(false);
   const [confirmDeleteHistory, setConfirmDeleteHistory] = useState(false);
   const [deletingHistory, setDeletingHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -133,6 +136,22 @@ export function ChatContainer() {
       // silently fail
     } finally {
       setLoadingSessions(false);
+    }
+  };
+
+  const handleAddEntity = async () => {
+    if (!newEntityName.trim()) return;
+    setAddingEntity(true);
+    try {
+      await createEntity(newEntityName.trim());
+      const updated = await fetchEntities();
+      setEntities(updated);
+      setNewEntityName('');
+      setShowAddEntity(false);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Erreur lors de la création');
+    } finally {
+      setAddingEntity(false);
     }
   };
 
@@ -426,12 +445,44 @@ export function ChatContainer() {
                         )}
                       </div>
                     ))}
-                    <button className="flex items-center gap-2 px-3 py-2 text-xs text-[#1B73E8] hover:bg-[#EFF6FF] rounded-xl transition-colors">
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                      Ajouter une entité
-                    </button>
+                    {showAddEntity ? (
+                      <div className="flex flex-col gap-1.5 px-1">
+                        <input
+                          autoFocus
+                          type="text"
+                          value={newEntityName}
+                          onChange={e => setNewEntityName(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') handleAddEntity(); if (e.key === 'Escape') setShowAddEntity(false); }}
+                          placeholder="Nom de l'entité..."
+                          className="w-full px-2.5 py-1.5 text-xs border border-[#1B73E8]/40 rounded-lg focus:outline-none focus:border-[#1B73E8]"
+                        />
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={handleAddEntity}
+                            disabled={addingEntity || !newEntityName.trim()}
+                            className="flex-1 py-1 text-xs font-semibold bg-[#1B73E8] text-white rounded-lg hover:bg-[#1557b0] disabled:opacity-50"
+                          >
+                            {addingEntity ? '...' : 'Créer'}
+                          </button>
+                          <button
+                            onClick={() => { setShowAddEntity(false); setNewEntityName(''); }}
+                            className="flex-1 py-1 text-xs text-[#5F6368] bg-gray-100 rounded-lg hover:bg-gray-200"
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowAddEntity(true)}
+                        className="flex items-center gap-2 px-3 py-2 text-xs text-[#1B73E8] hover:bg-[#EFF6FF] rounded-xl transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Ajouter une entité
+                      </button>
+                    )}
                   </div>
                 ) : (
                   /* User doesn't have access: teaser locked */
