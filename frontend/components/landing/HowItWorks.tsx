@@ -120,7 +120,7 @@ export function HowItWorks() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
             </svg>
           </a>
-          <p className="text-sm text-[#5F6368] mt-3">3 analyses gratuites • Sans carte bancaire</p>
+          <p className="text-sm text-[#5F6368] mt-3">1 analyse gratuite • Sans carte bancaire</p>
         </div>
       </div>
     </section>

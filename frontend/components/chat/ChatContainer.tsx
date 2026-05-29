@@ -47,7 +47,7 @@ const QUICK_SUGGESTIONS = [
 
 const LIMIT_MESSAGE = `Vous avez atteint la limite de 3 interactions contextuelles pour cette analyse (plan gratuit).
 
-💡 Passez au plan PRO pour un usage conversationnel étendu, des exports Excel & PowerPoint, et une mémoire persistante complète — à partir de 59€/mois.
+💡 Passez au plan PRO pour un usage conversationnel étendu, des exports Excel & PowerPoint, et une mémoire persistante complète — à partir de 79€/mois.
 
 Ou démarrez une nouvelle analyse avec un nouveau fichier.`;
 

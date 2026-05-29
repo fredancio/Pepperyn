@@ -148,7 +148,7 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
         </div>
 
         <p className="text-center text-xs text-[#5F6368]">
-          3 analyses gratuites · sans CB
+          1 analyse gratuite · sans CB
         </p>
       </div>
     );

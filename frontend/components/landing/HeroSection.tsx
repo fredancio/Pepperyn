@@ -113,8 +113,8 @@ export function HeroSection() {
               </span>
               <span className="w-1 h-1 rounded-full bg-gray-300 hidden sm:block" />
               <span className="flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-[#1B73E8] font-bold text-xs">3</span>
-                analyses gratuites · sans CB
+                <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-[#1B73E8] font-bold text-xs">1</span>
+                analyse gratuite · sans CB
               </span>
             </div>
           </div>
