@@ -110,7 +110,19 @@ async def delete_account(
 
     errors = []
 
-    # 1. Supprimer les analyses
+    # 1. Supprimer les sessions + messages (messages cascadent avec sessions)
+    try:
+        supabase.from_("sessions").delete().eq("company_id", company_id).execute()
+    except Exception as e:
+        errors.append(f"sessions: {e}")
+
+    # 2. Supprimer les feedbacks
+    try:
+        supabase.from_("feedback").delete().eq("company_id", company_id).execute()
+    except Exception as e:
+        errors.append(f"feedback: {e}")
+
+    # 3. Supprimer les analyses (ON DELETE CASCADE supprime financial_metrics liés)
     try:
         supabase.from_("analyses").delete().eq("company_id", company_id).execute()
     except Exception as e:
