@@ -1,6 +1,7 @@
 import { HeroSection } from '@/components/landing/HeroSection';
 import { ForWhom } from '@/components/landing/ForWhom';
 import { CerveauIASection } from '@/components/landing/CerveauIASection';
+import { PricingPlans } from '@/components/landing/PricingPlans';
 import { FaqSection } from '@/components/landing/FaqSection';
 import { Footer } from '@/components/landing/Footer';
 import Link from 'next/link';
@@ -24,6 +25,9 @@ export default function LandingPage() {
           <div className="hidden md:flex items-center gap-6">
             <Link href="#pour-qui" className="text-sm text-[#5F6368] hover:text-[#1A1A2E] transition-colors">
               Pour qui ?
+            </Link>
+            <Link href="#tarifs" className="text-sm text-[#5F6368] hover:text-[#1A1A2E] transition-colors">
+              Tarifs
             </Link>
             <Link href="#faq" className="text-sm text-[#5F6368] hover:text-[#1A1A2E] transition-colors">
               FAQ
@@ -56,6 +60,7 @@ export default function LandingPage() {
         <HeroSection />
         <ForWhom />
         <CerveauIASection />
+        <PricingPlans />
         <FaqSection />
 
         {/* CTA section */}
