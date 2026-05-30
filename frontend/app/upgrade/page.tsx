@@ -187,19 +187,20 @@ export default function UpgradePage() {
           </div>
           <div className="grid sm:grid-cols-3 gap-3">
             {addons.map((a) => (
-              <div key={a.id} className="flex items-center justify-between p-4 bg-[#EFF6FF] border border-blue-100 rounded-xl">
+              <button
+                key={a.id}
+                onClick={() => handleUpgrade(a.id)}
+                disabled={loading === a.id}
+                className="flex items-center justify-between p-4 bg-[#EFF6FF] border border-blue-100 rounded-xl hover:border-[#1B73E8] hover:shadow-sm transition-all w-full text-left disabled:opacity-70 group"
+              >
                 <div>
                   <p className="text-sm font-bold text-[#1A1A2E]">{a.name}</p>
                   <p className="text-xs text-[#5F6368]">{a.desc}</p>
                 </div>
-                <button
-                  onClick={() => handleUpgrade(a.id)}
-                  disabled={loading === a.id}
-                  className="text-lg font-extrabold text-[#1B73E8] hover:text-[#0D47A1] transition-colors ml-3 disabled:opacity-70"
-                >
+                <span className="text-lg font-extrabold text-[#1B73E8] group-hover:text-[#0D47A1] ml-3">
                   {loading === a.id ? '…' : a.price}
-                </button>
-              </div>
+                </span>
+              </button>
             ))}
           </div>
           <p className="text-center text-xs text-[#5F6368] italic mt-3">
