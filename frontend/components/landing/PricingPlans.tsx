@@ -263,13 +263,17 @@ export function PricingPlans() {
           </div>
           <div className="grid sm:grid-cols-3 gap-4">
             {addons.map((a) => (
-              <div key={a.name} className="flex items-center justify-between p-4 bg-[#EFF6FF] border border-blue-100 rounded-xl">
+              <Link
+                key={a.name}
+                href="/register"
+                className="flex items-center justify-between p-4 bg-[#EFF6FF] border border-blue-100 rounded-xl hover:border-[#1B73E8] hover:shadow-sm transition-all group"
+              >
                 <div>
                   <p className="text-sm font-bold text-[#1A1A2E]">{a.name}</p>
                   <p className="text-xs text-[#5F6368]">{a.desc}</p>
                 </div>
-                <span className="text-lg font-extrabold text-[#1B73E8]">{a.price}</span>
-              </div>
+                <span className="text-lg font-extrabold text-[#1B73E8] group-hover:text-[#0D47A1]">{a.price}</span>
+              </Link>
             ))}
           </div>
           <p className="text-center text-xs text-[#5F6368] italic mt-4">
