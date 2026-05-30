@@ -109,10 +109,11 @@ class BillingService:
         logger.info(f"[WEBHOOK] Événement reçu : {etype}")
 
         if etype == "checkout.session.completed":
-            session      = event["data"]["object"]
-            company_id   = session["metadata"].get("company_id", "")
-            plan_or_addon = session["metadata"].get("plan_or_addon", "")
-            customer_id  = session.get("customer")
+            session       = event["data"]["object"]
+            metadata      = session["metadata"]
+            company_id    = metadata["company_id"] if "company_id" in metadata else ""
+            plan_or_addon = metadata["plan_or_addon"] if "plan_or_addon" in metadata else ""
+            customer_id   = session["customer"] if "customer" in session else None
 
             if plan_or_addon.startswith("addon_"):
                 qty = ADDON_QUANTITIES.get(plan_or_addon, 0)
@@ -131,10 +132,9 @@ class BillingService:
                 }
 
         elif etype == "customer.subscription.deleted":
-            obj        = event["data"]["object"]
-            customer_id = obj.get("customer", "")
-            # Retrouver company_id via stripe_customer_id
-            company_id = self._get_company_by_customer(customer_id)
+            obj         = event["data"]["object"]
+            customer_id = obj["customer"] if "customer" in obj else ""
+            company_id  = self._get_company_by_customer(customer_id)
             return {"action": "downgrade_free", "company_id": company_id}
 
         elif etype == "invoice.payment_failed":
