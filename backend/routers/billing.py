@@ -297,11 +297,16 @@ async def stripe_webhook(
       - invoice.payment_failed
     """
     payload = await request.body()
+    logger.info(f"[WEBHOOK] Reçu — sig présente: {bool(stripe_signature)}, payload: {len(payload)} bytes")
 
     try:
         result = _get_billing().process_webhook_event(payload, stripe_signature or "")
     except ValueError as e:
+        logger.warning(f"[WEBHOOK] Erreur validation: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"[WEBHOOK] Erreur inattendue: {type(e).__name__}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erreur webhook: {str(e)}")
 
     # Appliquer l'action résultante
     if result.get("action") == "update_plan":

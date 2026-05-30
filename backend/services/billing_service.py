@@ -102,8 +102,8 @@ class BillingService:
             event = stripe.Webhook.construct_event(
                 payload, sig_header, STRIPE_WEBHOOK_SECRET
             )
-        except stripe.error.SignatureVerificationError:
-            raise ValueError("Signature webhook invalide")
+        except Exception as e:
+            raise ValueError(f"Webhook verification failed ({type(e).__name__}): {e}")
 
         etype = event["type"]
         logger.info(f"[WEBHOOK] Événement reçu : {etype}")
