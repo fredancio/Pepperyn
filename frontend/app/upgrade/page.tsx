@@ -10,7 +10,7 @@ const plans = [
     cta: 'Plan actuel', ctaDisabled: true, ctaHref: null,
   },
   {
-    id: 'pro', name: 'PRO', subtitle: 'CFO, CEO, DAF, CFO de transition, dirigeants PME & startups, experts-comptables', price: '79€', period: '/mois',
+    id: 'pro', name: 'PRO', subtitle: 'CFO, CEO, CFO de transition, dirigeants PME & startups, experts-comptables…', price: '79€', period: '/mois',
     color: 'blue', highlighted: true, badge: '⭐ LE PLUS POPULAIRE',
     features: ['15 analyses / mois', '75 interactions contextuelles / mois', 'Exports Excel, PDF et PowerPoint', 'Mémoire persistante complète', 'Multi-entités (clients, filiales, dossiers)', 'Simulateur de décisions financières', 'Analyse multi-périodes & comparaisons', 'Projections financières', 'Crédits supplémentaires disponibles à la demande'],
     cta: 'Passer à PRO', ctaDisabled: false, ctaHref: null,
