@@ -1,6 +1,9 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
+import { supabase } from '@/lib/supabase';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 const plans = [
   {
@@ -36,10 +39,38 @@ const colorMap: Record<string, { ring: string; bg: string; cta: string }> = {
 };
 
 export default function UpgradePage() {
-  const [clicked, setClicked] = useState<string | null>(null);
+  const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
-  const handleUpgrade = (planId: string) => {
-    setClicked(planId);
+  const handleUpgrade = async (planId: string) => {
+    setLoading(planId);
+    setError('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!session) throw new Error('Connectez-vous d\'abord.');
+
+      const res = await fetch(`${API_URL}/api/billing/checkout`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          plan_or_addon: planId,
+          customer_email: user?.email,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.data?.checkout_url) {
+        window.location.href = data.data.checkout_url;
+      } else {
+        throw new Error(data.detail || 'Impossible de créer la session de paiement.');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue.');
+      setLoading(null);
+    }
   };
 
   return (
@@ -70,6 +101,12 @@ export default function UpgradePage() {
           <p className="text-sm text-[#5F6368] italic mt-1">Chaque mois d'inaction détruit de la valeur.</p>
 
         </div>
+
+        {error && (
+          <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
         {/* Plans grid */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch mb-12">
@@ -123,9 +160,10 @@ export default function UpgradePage() {
                 {!plan.ctaDisabled && !plan.ctaHref && (
                   <button
                     onClick={() => handleUpgrade(plan.id)}
-                    className={`w-full py-2.5 rounded-xl font-bold text-sm text-center transition-all block ${c.cta}`}
+                    disabled={loading === plan.id}
+                    className={`w-full py-2.5 rounded-xl font-bold text-sm text-center transition-all block disabled:opacity-70 ${c.cta}`}
                   >
-                    {clicked === plan.id ? 'Bientôt disponible…' : plan.cta}
+                    {loading === plan.id ? 'Redirection…' : plan.cta}
                   </button>
                 )}
                 {plan.ctaDisabled && (
@@ -154,12 +192,13 @@ export default function UpgradePage() {
                   <p className="text-sm font-bold text-[#1A1A2E]">{a.name}</p>
                   <p className="text-xs text-[#5F6368]">{a.desc}</p>
                 </div>
-                <a
-                  href={`mailto:info@finflate.com?subject=Achat ${a.name}&body=Bonjour, je souhaite acheter le ${a.name} (${a.desc}) pour ${a.price}.`}
-                  className="text-lg font-extrabold text-[#1B73E8] hover:text-[#0D47A1] transition-colors ml-3"
+                <button
+                  onClick={() => handleUpgrade(a.id)}
+                  disabled={loading === a.id}
+                  className="text-lg font-extrabold text-[#1B73E8] hover:text-[#0D47A1] transition-colors ml-3 disabled:opacity-70"
                 >
-                  {a.price}
-                </a>
+                  {loading === a.id ? '…' : a.price}
+                </button>
               </div>
             ))}
           </div>

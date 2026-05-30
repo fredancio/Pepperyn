@@ -306,12 +306,16 @@ async def stripe_webhook(
     # Appliquer l'action résultante
     if result.get("action") == "update_plan":
         company_id = result.get("company_id")
-        new_plan = result.get("plan")
+        new_plan   = result.get("plan")
+        customer_id = result.get("stripe_customer_id")
         if company_id and new_plan:
             try:
                 from main import get_supabase_service
                 sb = get_supabase_service()
-                sb.from_("companies").update({"plan": new_plan}).eq("id", company_id).execute()
+                update_data = {"plan": new_plan}
+                if customer_id:
+                    update_data["stripe_customer_id"] = customer_id
+                sb.from_("companies").update(update_data).eq("id", company_id).execute()
                 logger.info(f"[WEBHOOK] Plan mis à jour : {company_id} → {new_plan}")
             except Exception as e:
                 logger.error(f"[WEBHOOK] Erreur update plan: {e}")
