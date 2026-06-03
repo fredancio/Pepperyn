@@ -10,9 +10,10 @@ interface InputBarProps {
   placeholder?: string;
   uploadOnly?: boolean;
   onFileChange?: (file: File | null) => void;
+  plan?: string;
 }
 
-export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, uploadOnly, onFileChange }: InputBarProps) {
+export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, uploadOnly, onFileChange, plan = 'free' }: InputBarProps) {
   const [text, setText] = useState('');
   const [showFileZone, setShowFileZone] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -149,9 +150,11 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
           ))}
         </div>
 
-        <p className="text-center text-xs text-[#5F6368]">
-          1 analyse gratuite · sans CB
-        </p>
+        {plan === 'free' && (
+          <p className="text-center text-xs text-[#5F6368]">
+            1 analyse gratuite · sans CB
+          </p>
+        )}
 
         {/* Guide de démarrage — discret, toujours accessible */}
         <div className="mt-1">

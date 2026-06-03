@@ -757,6 +757,7 @@ export function ChatContainer() {
                     placeholder="uploadez un fichier"
                     uploadOnly={true}
                     onFileChange={setUploadedFile}
+                    plan={plan}
                   />
                 </div>
 
@@ -767,10 +768,6 @@ export function ChatContainer() {
                   ))}
                 </div>
 
-                {/* Versions payantes */}
-                <p className="text-xs text-[#5F6368]/60 text-center italic">
-                  ✨ Bien d&apos;autres options seront disponibles dans les versions payantes à venir !
-                </p>
               </div>
             </div>
           ) : (
