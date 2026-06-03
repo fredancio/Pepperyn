@@ -33,7 +33,11 @@ export function Footer() {
 
           {/* Légal */}
           <div className="flex flex-col gap-3">
-            <p className="text-sm font-semibold text-white">Légal</p>
+            <p className="text-sm font-semibold text-white">Ressources</p>
+            <Link href="/guide-donnees" className="text-sm text-gray-400 hover:text-white transition-colors">
+              Guide de préparation des données
+            </Link>
+            <p className="text-sm font-semibold text-white mt-2">Légal</p>
             <Link href="/legal/mentions-legales" className="text-sm text-gray-400 hover:text-white transition-colors">
               Mentions légales
             </Link>

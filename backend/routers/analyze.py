@@ -248,17 +248,17 @@ async def analyze_file(
     )
 
     if not quality_gate.can_analyze:
-        # Fichier bloqué : retourner uniquement le rapport qualité, pas d'analyse financière
+        # Fichier bloqué : retourner un message de coaching actionnable
         from models.schemas import AnalysisResult
+        coaching_msg = quality_gate.build_coaching_message(file.filename)
         blocked_result = AnalysisResult(
-            type_document="AUTRE",
+            type_document="COACHING_QUALITE",
             score_confiance=0,
-            resume_executif=(
-                f"⛔ Analyse bloquée — données insuffisantes\n\n"
-                f"{quality_gate.blocking_reason or 'Le fichier ne contient pas de données financières exploitables.'}"
-            ),
-            problemes_critiques=[quality_gate.blocking_reason or "Données insuffisantes"],
-            decision="Fournir un fichier Excel avec des données financières structurées et complètes.",
+            resume_executif=coaching_msg,
+            problemes_critiques=quality_gate.anomalies or [quality_gate.blocking_reason or "Structure insuffisante"],
+            decision="Restructurez votre fichier en suivant le guide ou le prompt Copilot fourni, puis re-uploadez.",
+            copilot_prompt=quality_gate._generate_copilot_prompt(),
+            coaching_issues=quality_gate.anomalies or [],
             data_quality=DataQualityInfo(
                 score_data=quality_gate.score_data,
                 status="blocked",
@@ -271,7 +271,7 @@ async def analyze_file(
         )
         return AnalyzeResponse(
             success=False,
-            message="Analyse bloquée — qualité des données insuffisante",
+            message="coaching_qualite",
             result=blocked_result,
             tokens_used=0,
             cout_estime=0.0,
@@ -311,6 +311,11 @@ async def analyze_file(
 
     # Inject data quality context into LLM prompt
     quality_section = quality_gate.to_prompt_section()
+
+    # Si warning : préparer le message de coaching à injecter en préambule du résultat
+    quality_coaching_preamble = None
+    if quality_gate.status == "warning":
+        quality_coaching_preamble = quality_gate.build_coaching_message(file.filename)
 
     # Track analysis_started event
     _usage_service.track_activity(company_id, "analysis_started", {
@@ -356,6 +361,15 @@ async def analyze_file(
         assumptions=quality_gate.assumptions,
         sheets_detected=quality_gate.sheets_detected,
     )
+
+    # Pour les fichiers en warning : injecter le coaching en préambule du résumé
+    if quality_coaching_preamble and quality_gate.status == "warning":
+        analysis_result.resume_executif = (
+            quality_coaching_preamble
+            + "\n\n---\n\n"
+            + "## Analyse effectuée sur les données disponibles\n\n"
+            + (analysis_result.resume_executif or "")
+        )
 
     # Assign the analyse_id to the result object so the frontend can use it
     analyse_id = str(uuid.uuid4())

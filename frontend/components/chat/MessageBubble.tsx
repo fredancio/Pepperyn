@@ -1,5 +1,6 @@
 import type { Message } from '@/lib/types';
 import { AnalysisResult } from './AnalysisResult';
+import { CoachingMessage } from './CoachingMessage';
 
 interface MessageBubbleProps {
   message: Message;
@@ -16,6 +17,27 @@ export function MessageBubble({ message, questionsRestantes, plan = 'free' }: Me
   const isAssistant = message.role === 'assistant';
 
   if (message.content_type === 'analysis' && message.metadata) {
+    const meta = message.metadata as Record<string, unknown>;
+
+    // Coaching qualité : rendu spécial bienveillant
+    if (meta.type_document === 'COACHING_QUALITE') {
+      return (
+        <div className="flex items-start gap-3 max-w-[96%] animate-slide-up">
+          <div className="w-8 h-8 bg-amber-400 rounded-full flex-shrink-0 flex items-center justify-center mt-1 shadow-sm">
+            <span className="text-white text-xs">🔍</span>
+          </div>
+          <div className="flex-1">
+            <CoachingMessage
+              filename={meta._filename as string | undefined}
+              issues={(meta.coaching_issues as string[]) || (meta.problemes_critiques as string[]) || []}
+              copilotPrompt={meta.copilot_prompt as string | undefined}
+            />
+            <p className="text-xs text-[#5F6368] mt-1 ml-1">{formatTime(message.created_at)}</p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex items-start gap-3 max-w-[92%] animate-slide-up">
         {/* Bot avatar */}
@@ -23,7 +45,7 @@ export function MessageBubble({ message, questionsRestantes, plan = 'free' }: Me
           <span className="text-white text-xs font-bold">P</span>
         </div>
         <div className="flex-1">
-          <AnalysisResult data={message.metadata as Record<string, unknown>} questionsRestantes={questionsRestantes} plan={plan} />
+          <AnalysisResult data={meta} questionsRestantes={questionsRestantes} plan={plan} />
           <p className="text-xs text-[#5F6368] mt-1 ml-1">{formatTime(message.created_at)}</p>
         </div>
       </div>

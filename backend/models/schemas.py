@@ -141,6 +141,10 @@ class AnalysisResult(BaseModel):
     memory_insight: Optional[str] = None
     verification_tag: Optional[str] = None
 
+    # Coaching qualité fichier
+    copilot_prompt: Optional[str] = None
+    coaching_issues: List[str] = []
+
     # V5 — Decision Engine fields
     diagnostic_immediat: Optional[str] = None
     impact_financier: List[str] = []

@@ -445,6 +445,149 @@ def _detect_financial_columns(columns: list[str]) -> dict[str, list[str]]:
     return {k: v for k, v in categories.items() if v}
 
 
+def assess_file_quality(file_bytes: bytes, filename: str) -> dict[str, Any]:
+    """
+    Pre-analysis quality check. Evaluates the file before sending to LLM.
+    Returns:
+      - score (0-100)
+      - issues: list of detected problems
+      - recommendation: "ok" | "warn" | "block"
+      - user_message: human-readable explanation in French
+    """
+    issues: list[str] = []
+    score = 100
+    ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
+
+    try:
+        if ext in ('xlsx', 'xls'):
+            wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
+            sheet_names = wb.sheetnames
+            n_sheets = len(sheet_names)
+
+            # Too many sheets
+            if n_sheets > 15:
+                issues.append(f"Fichier très complexe : {n_sheets} onglets détectés")
+                score -= 25
+            elif n_sheets > 8:
+                issues.append(f"{n_sheets} onglets détectés — seuls les 5 premiers seront analysés")
+                score -= 10
+
+            total_cells = 0
+            null_cells = 0
+            has_numeric = False
+            header_issues = 0
+            all_columns: list[str] = []
+
+            for sheet_name in sheet_names[:5]:
+                ws = wb[sheet_name]
+                rows = list(ws.iter_rows(values_only=True))
+                if not rows:
+                    continue
+
+                # Check null density
+                for row in rows[:200]:
+                    for cell in row:
+                        total_cells += 1
+                        if cell is None or str(cell).strip() == '':
+                            null_cells += 1
+                        elif isinstance(cell, (int, float)):
+                            has_numeric = True
+
+                # Check headers
+                if rows:
+                    first_row = [str(c) if c is not None else '' for c in rows[0]]
+                    unnamed = sum(1 for c in first_row if not c or c.startswith('Col_') or c.isdigit())
+                    if len(first_row) > 0 and unnamed / max(len(first_row), 1) > 0.6:
+                        header_issues += 1
+                    all_columns.extend([c for c in first_row if c])
+
+            null_ratio = null_cells / max(total_cells, 1)
+
+            if null_ratio > 0.75:
+                issues.append(f"Fichier très creux : {null_ratio:.0%} de cellules vides")
+                score -= 35
+            elif null_ratio > 0.55:
+                issues.append(f"Nombreuses cellules vides ({null_ratio:.0%})")
+                score -= 15
+
+            if not has_numeric:
+                issues.append("Aucune donnée numérique détectée — impossible d'analyser des chiffres")
+                score -= 40
+
+            if header_issues >= 2:
+                issues.append("En-têtes de colonnes manquants ou illisibles")
+                score -= 20
+
+            # Check for cryptic column names (mostly codes/numbers)
+            cryptic = sum(1 for c in all_columns if c and (c.isdigit() or len(c) <= 2))
+            if len(all_columns) > 3 and cryptic / max(len(all_columns), 1) > 0.5:
+                issues.append("Noms de colonnes cryptiques ou codifiés (non lisibles)")
+                score -= 15
+
+        elif ext == 'csv':
+            try:
+                df = pd.read_csv(io.BytesIO(file_bytes), nrows=100)
+            except Exception:
+                df = pd.read_csv(io.BytesIO(file_bytes), nrows=100, sep=';')
+
+            null_ratio = df.isna().sum().sum() / max(df.size, 1)
+            numeric_cols = df.select_dtypes(include=['number']).columns
+            if null_ratio > 0.7:
+                issues.append(f"Fichier CSV très creux ({null_ratio:.0%} de valeurs manquantes)")
+                score -= 30
+            if len(numeric_cols) == 0:
+                issues.append("Aucune colonne numérique détectée dans le CSV")
+                score -= 35
+
+        elif ext == 'pdf':
+            import pdfplumber
+            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                n_pages = len(pdf.pages)
+                text_total = sum(len(p.extract_text() or '') for p in pdf.pages[:5])
+                if n_pages > 30:
+                    issues.append(f"PDF très long ({n_pages} pages) — seules les 10 premières seront analysées")
+                    score -= 10
+                if text_total < 200:
+                    issues.append("PDF scanné ou illisible — le texte ne peut pas être extrait")
+                    score -= 50
+
+    except Exception as e:
+        logger.warning(f"[quality_check] Error: {e}")
+        return {"score": 50, "issues": [], "recommendation": "warn",
+                "user_message": "Impossible d'évaluer la qualité du fichier à l'avance."}
+
+    score = max(0, min(100, score))
+
+    if score >= 65:
+        recommendation = "ok"
+        user_message = None
+    elif score >= 35:
+        recommendation = "warn"
+        user_message = (
+            "⚠️ **Ce fichier présente des limitations qui pourraient affecter la qualité de l'analyse :**\n\n"
+            + "\n".join(f"• {issue}" for issue in issues)
+            + "\n\n💡 *Pour une analyse optimale, consultez notre [guide de préparation des données](/guide-donnees).*"
+        )
+    else:
+        recommendation = "block"
+        user_message = (
+            "❌ **Ce fichier est trop complexe ou trop incomplet pour être analysé correctement.**\n\n"
+            + "\n".join(f"• {issue}" for issue in issues)
+            + "\n\n**Que faire ?**\n"
+            + "• Nettoyez le fichier en supprimant les onglets inutiles et en ajoutant des en-têtes claires\n"
+            + "• Utilisez **Microsoft Copilot** ou **ChatGPT** pour une première passe de nettoyage\n"
+            + "• Consultez notre [guide de préparation des données](/guide-donnees)\n\n"
+            + "*Astuce : un fichier Excel propre avec 1-3 onglets structurés donne les meilleures analyses.*"
+        )
+
+    return {
+        "score": score,
+        "issues": issues,
+        "recommendation": recommendation,
+        "user_message": user_message,
+    }
+
+
 def _serialize_value(v: Any) -> Any:
     """Convert pandas values to JSON-serializable types."""
     try:

@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef, KeyboardEvent } from 'react';
 import { FileUploadZone } from './FileUploadZone';
+import { GuidedOnboarding } from './GuidedOnboarding';
 
 interface InputBarProps {
   onSendMessage: (text: string) => void;
@@ -17,6 +18,7 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileContext, setFileContext] = useState('');
   const [mode, setMode] = useState<'quick' | 'complete'>('complete');
+  const [showGuide, setShowGuide] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSendText = () => {
@@ -150,6 +152,30 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
         <p className="text-center text-xs text-[#5F6368]">
           1 analyse gratuite · sans CB
         </p>
+
+        {/* Guide de démarrage — discret, toujours accessible */}
+        <div className="mt-1">
+          <button
+            onClick={() => setShowGuide(v => !v)}
+            className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-[#1B73E8] hover:text-[#0D47A1] transition-colors"
+          >
+            <span>🧭</span>
+            <span className="font-medium">
+              {showGuide ? 'Fermer le guide' : 'Première fois ? Je vous guide pas à pas →'}
+            </span>
+          </button>
+
+          {showGuide && (
+            <div className="mt-2">
+              <GuidedOnboarding onClose={() => setShowGuide(false)} />
+            </div>
+          )}
+        </div>
+
+        <div className="px-2 py-2 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-800 leading-relaxed">
+          <span className="font-semibold">💡</span> Fichier propre = analyse précise.{' '}
+          <a href="/guide-donnees" className="underline hover:text-amber-900">Guide de préparation →</a>
+        </div>
       </div>
     );
   }

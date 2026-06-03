@@ -277,6 +277,7 @@ export function ChatContainer() {
           id: result.analyse_id || result.result.id || null,
           _questionsRestantes: MAX_CHAT_QUESTIONS_FREE,
           _memoryInsight: result.memory_insight || null,
+          _filename: file.name,
         });
         setMessages(prev => [...prev, analysisMsg]);
         setAnalysisReceived(true);

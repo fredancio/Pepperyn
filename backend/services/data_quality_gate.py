@@ -85,6 +85,94 @@ class QualityGateResult:
         lines.append("═══ FIN FIABILITÉ ═══")
         return "\n".join(lines)
 
+    def build_coaching_message(self, filename: str = "") -> str:
+        """
+        Génère un message de coaching actionnable basé sur les problèmes détectés.
+        Angle : service rendu à l'utilisateur, pas rejet technique.
+        """
+        fname = f" **{filename}**" if filename else ""
+
+        # ── En-tête : cadrage positif ──────────────────────────────────────────
+        lines = [
+            f"🔍 **Analyse préliminaire de votre fichier{fname}**\n",
+            "Avant de lancer l'analyse financière, Pepperyn a examiné la structure de vos données. "
+            "Voici ce que nous avons identifié — et comment vous aider à obtenir la meilleure analyse possible.\n",
+        ]
+
+        # ── Problèmes détectés (spécifiques) ──────────────────────────────────
+        if self.anomalies or self.blocking_reason:
+            lines.append("**Ce que nous avons trouvé dans votre fichier :**")
+            if self.anomalies:
+                for anomaly in self.anomalies[:5]:
+                    lines.append(f"• {anomaly}")
+            elif self.blocking_reason:
+                # Extraire juste la première phrase du blocking_reason
+                first_sentence = self.blocking_reason.split('\n')[0]
+                lines.append(f"• {first_sentence}")
+            lines.append("")
+
+        # ── Pourquoi c'est important ───────────────────────────────────────────
+        lines.append(
+            "**Pourquoi c'est important ?**\n"
+            "Pepperyn est conçu pour produire des analyses financières précises, "
+            "**sans hallucination**. Des données mal structurées génèrent des interprétations inexactes — "
+            "ce qui est contre-productif pour vos décisions stratégiques. "
+            "C'est pourquoi nous préférons vous aider à corriger la source plutôt que de vous livrer une analyse biaisée.\n"
+        )
+
+        # ── Prompt Copilot généré dynamiquement ───────────────────────────────
+        copilot_prompt = self._generate_copilot_prompt()
+        lines.append("**💡 Solution rapide — Prompt pour Microsoft Copilot ou ChatGPT :**")
+        lines.append(f"```\n{copilot_prompt}\n```\n")
+
+        # ── Actions concrètes ──────────────────────────────────────────────────
+        lines.append("**Que faire maintenant ?**")
+        lines.append("1. Copiez le prompt ci-dessus et collez-le dans Microsoft Copilot (Excel) ou ChatGPT avec votre fichier")
+        lines.append("2. Consultez notre **[Guide de préparation des données](/guide-donnees)** — 5 étapes pour un fichier optimal")
+        lines.append("3. Une fois le fichier restructuré, uploadez-le à nouveau pour une analyse complète et fiable")
+
+        if self.status == "warning" and self.can_analyze:
+            lines.append("\n_ℹ️ Pepperyn a quand même effectué une analyse partielle sur les données exploitables — "
+                        "les résultats ci-dessous sont à interpréter avec les réserves indiquées._")
+
+        return "\n".join(lines)
+
+    def _generate_copilot_prompt(self) -> str:
+        """Génère un prompt Copilot/ChatGPT personnalisé selon les problèmes détectés."""
+        issues_detected = []
+
+        if self.anomalies:
+            for a in self.anomalies[:3]:
+                if "vide" in a.lower():
+                    issues_detected.append("présence d'onglets ou de colonnes vides")
+                elif "numérique" in a.lower():
+                    issues_detected.append("absence de données numériques claires")
+                elif "étiqueté" in a.lower() or "etiqueté" in a.lower():
+                    issues_detected.append("colonnes sans en-têtes explicites")
+                elif "structure" in a.lower():
+                    issues_detected.append("structure non standard")
+
+        if not issues_detected:
+            issues_detected = ["structure non optimale pour l'analyse financière automatisée"]
+
+        issues_str = ", ".join(set(issues_detected))
+
+        sheets_context = ""
+        if self.sheets_detected:
+            sheets_context = f" Les onglets présents sont : {', '.join(self.sheets_detected[:5])}."
+
+        prompt = (
+            f"J'ai un fichier Excel de reporting financier avec les problèmes suivants : {issues_str}.{sheets_context}\n\n"
+            "Peux-tu le restructurer en respectant ces règles :\n"
+            "1. Ligne 1 = en-têtes de colonnes clairs et explicites (ex: CA, Charges, Marge brute, Janvier, Février…)\n"
+            "2. Colonne A = libellés des postes comptables en français compréhensible (pas de codes internes)\n"
+            "3. Supprimer les onglets vides ou inutiles, garder uniquement les données financières\n"
+            "4. Remplacer les cellules fusionnées par des cellules individuelles\n"
+            "5. Assurer que toutes les valeurs numériques sont en format nombre (pas de texte)\n"
+            "6. Résultat attendu : un tableau P&L ou budget structuré, lisible et analysable par un outil IA"
+        )
+        return prompt
+
     def to_report_section(self) -> dict:
         """Dictionnaire prêt pour injection dans PDF / Excel / PPTX."""
         return {
@@ -142,7 +230,13 @@ def _validate_structural(raw_sheets: dict) -> QualityGateResult:
             status="blocked",
             score_data=0,
             document_format="unknown",
-            blocking_reason="Le fichier Excel est vide ou illisible.",
+            blocking_reason=(
+                "Le fichier Excel est vide ou illisible.\n\n"
+                "💡 Suggestions :\n"
+                "• Vérifiez que le fichier s'ouvre correctement dans Excel\n"
+                "• Assurez-vous que les onglets contiennent bien des données\n"
+                "• Consultez notre guide de préparation : pepperyn.com/guide-donnees"
+            ),
         )
 
     total_numeric_values = 0
@@ -189,8 +283,15 @@ def _validate_structural(raw_sheets: dict) -> QualityGateResult:
             status="blocked",
             score_data=0,
             document_format="structural_pl",
-            blocking_reason="Aucune donnée numérique détectée dans le fichier. "
-                            "L'analyse financière est impossible sans chiffres.",
+            blocking_reason=(
+                "Aucune donnée numérique détectée dans ce fichier.\n\n"
+                "Une analyse financière nécessite des chiffres (CA, charges, marges…). "
+                "Le fichier uploadé semble ne contenir que du texte ou des cellules vides.\n\n"
+                "💡 Suggestions :\n"
+                "• Vérifiez que le bon onglet est actif et contient des valeurs numériques\n"
+                "• Utilisez Microsoft Copilot ou ChatGPT pour nettoyer et restructurer le fichier\n"
+                "• Consultez notre guide de préparation : pepperyn.com/guide-donnees"
+            ),
             sheets_detected=sheets,
         )
 
@@ -253,8 +354,12 @@ def _validate_erp(tables: dict, mapping: dict, quality_report) -> QualityGateRes
             anomalies=anomalies,
             assumptions=assumptions,
             blocking_reason=(
-                "Les données ERP sont insuffisantes ou trop incohérentes pour générer "
-                "un rapport financier fiable. Veuillez fournir un fichier complet."
+                "Les données sont insuffisantes ou trop incohérentes pour générer une analyse fiable.\n\n"
+                "💡 Suggestions :\n"
+                "• Vérifiez que le fichier contient des colonnes de montants bien renseignées\n"
+                "• Supprimez les onglets vides ou inutiles\n"
+                "• Utilisez Microsoft Copilot ou ChatGPT pour une première passe de nettoyage\n"
+                "• Consultez notre guide de préparation : pepperyn.com/guide-donnees"
             ),
         )
 
