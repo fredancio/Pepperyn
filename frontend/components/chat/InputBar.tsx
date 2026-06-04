@@ -160,14 +160,11 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
         <div>
           <button
             onClick={() => setShowGuide(v => !v)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#EFF6FF] border border-[#1B73E8]/30 rounded-xl text-sm text-[#1B73E8] font-medium hover:bg-[#1B73E8]/10 hover:border-[#1B73E8]/60 transition-all"
+            className="w-full flex items-center justify-center px-4 py-2.5 bg-[#EFF6FF] border border-[#1B73E8]/30 rounded-xl text-sm text-[#1B73E8] font-medium hover:bg-[#1B73E8]/10 hover:border-[#1B73E8]/60 transition-all"
           >
-            <span className="text-base">🧭</span>
-            <span>
-              {showGuide
-                ? 'Fermer le guide de démarrage'
-                : 'Fichiers complexes ou première analyse ? Je vous guide pas à pas →'}
-            </span>
+            {showGuide
+              ? 'Fermer le guide de démarrage'
+              : 'Fichiers complexes ou première analyse ? Je vous guide pas à pas →'}
           </button>
 
           {showGuide && (
@@ -180,13 +177,10 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
         {/* Bouton guide de préparation */}
         <a
           href="/guide-donnees"
-          className="w-full flex items-start gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl hover:bg-amber-100 hover:border-amber-300 transition-all group"
+          className="w-full flex flex-col px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl hover:bg-amber-100 hover:border-amber-300 transition-all group"
         >
-          <span className="text-base flex-shrink-0 mt-0.5">💡</span>
-          <span className="text-xs text-amber-800 leading-snug">
-            <span className="font-semibold block">Un fichier bien structuré, c'est une analyse fiable et exploitable.</span>
-            <span className="group-hover:underline">Consulter le guide de préparation des données →</span>
-          </span>
+          <span className="text-xs text-amber-800 font-semibold">Un fichier bien structuré, c&apos;est une analyse fiable et exploitable.</span>
+          <span className="text-xs text-amber-700 group-hover:underline mt-0.5">Consulter le guide de préparation des données →</span>
         </a>
       </div>
     );
