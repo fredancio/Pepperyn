@@ -160,7 +160,7 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
         <div>
           <button
             onClick={() => setShowGuide(v => !v)}
-            className="w-full flex items-center justify-center px-4 py-2.5 bg-[#EFF6FF] border border-[#1B73E8]/30 rounded-xl text-sm text-[#1B73E8] font-medium hover:bg-[#1B73E8]/10 hover:border-[#1B73E8]/60 transition-all"
+            className="w-full flex items-center justify-center px-4 py-2.5 bg-white border border-[#1B73E8]/40 rounded-xl text-sm text-[#1B73E8] font-medium hover:bg-[#EFF6FF] hover:border-[#1B73E8]/70 transition-all"
           >
             {showGuide
               ? 'Fermer le guide de démarrage'
