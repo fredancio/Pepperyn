@@ -39,9 +39,11 @@ export function MessageBubble({ message, questionsRestantes, plan = 'free' }: Me
     }
 
     // Fichier analysé avec limitations : coaching discret au-dessus de l'analyse
-    const hasWarningCoaching = meta.data_quality &&
+    const hasWarningCoaching = Boolean(
+      meta.data_quality &&
       (meta.data_quality as Record<string, unknown>).status === 'warning' &&
-      (meta.copilot_prompt || (meta.coaching_issues as string[])?.length > 0);
+      (meta.copilot_prompt || ((meta.coaching_issues as string[]) ?? []).length > 0)
+    );
 
     return (
       <div className="flex items-start gap-3 max-w-[92%] animate-slide-up">
