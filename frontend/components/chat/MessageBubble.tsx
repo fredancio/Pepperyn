@@ -38,13 +38,26 @@ export function MessageBubble({ message, questionsRestantes, plan = 'free' }: Me
       );
     }
 
+    // Fichier analysé avec limitations : coaching discret au-dessus de l'analyse
+    const hasWarningCoaching = meta.data_quality &&
+      (meta.data_quality as Record<string, unknown>).status === 'warning' &&
+      (meta.copilot_prompt || (meta.coaching_issues as string[])?.length > 0);
+
     return (
       <div className="flex items-start gap-3 max-w-[92%] animate-slide-up">
         {/* Bot avatar */}
         <div className="w-8 h-8 bg-[#1B73E8] rounded-full flex-shrink-0 flex items-center justify-center mt-1 shadow-sm">
           <span className="text-white text-xs font-bold">P</span>
         </div>
-        <div className="flex-1">
+        <div className="flex-1 space-y-3">
+          {hasWarningCoaching && (
+            <CoachingMessage
+              filename={meta._filename as string | undefined}
+              issues={(meta.coaching_issues as string[]) || []}
+              copilotPrompt={meta.copilot_prompt as string | undefined}
+              variant="warning"
+            />
+          )}
           <AnalysisResult data={meta} questionsRestantes={questionsRestantes} plan={plan} />
           <p className="text-xs text-[#5F6368] mt-1 ml-1">{formatTime(message.created_at)}</p>
         </div>

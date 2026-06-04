@@ -8,6 +8,7 @@ interface CoachingMessageProps {
   copilotPrompt?: string;
   canAnalyzePartially?: boolean;
   onAnalyzeAnyway?: () => void;
+  variant?: 'blocked' | 'warning'; // warning = analyse effectuée mais avec limitations
 }
 
 export function CoachingMessage({
@@ -16,8 +17,12 @@ export function CoachingMessage({
   copilotPrompt,
   canAnalyzePartially = false,
   onAnalyzeAnyway,
+  variant = 'blocked',
 }: CoachingMessageProps) {
   const [copied, setCopied] = useState(false);
+  const [collapsed, setCollapsed] = useState(variant === 'warning'); // warning = réduit par défaut
+
+  const isWarning = variant === 'warning';
 
   const handleCopy = async () => {
     if (!copilotPrompt) return;
@@ -27,33 +32,44 @@ export function CoachingMessage({
   };
 
   return (
-    <div className="rounded-2xl border border-amber-200 bg-amber-50 overflow-hidden max-w-2xl">
+    <div className={`rounded-2xl border overflow-hidden max-w-2xl ${isWarning ? 'border-blue-200 bg-blue-50' : 'border-amber-200 bg-amber-50'}`}>
 
-      {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-4 bg-amber-100 border-b border-amber-200">
-        <div className="w-9 h-9 bg-amber-400 rounded-xl flex items-center justify-center flex-shrink-0">
-          <span className="text-white text-base">🔍</span>
+      {/* Header — cliquable pour réduire/expand en mode warning */}
+      <div
+        className={`flex items-center gap-3 px-5 py-3.5 border-b ${isWarning ? 'bg-blue-100 border-blue-200 cursor-pointer hover:bg-blue-200/60 transition-colors' : 'bg-amber-100 border-amber-200'}`}
+        onClick={isWarning ? () => setCollapsed(v => !v) : undefined}
+      >
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${isWarning ? 'bg-[#1B73E8]' : 'bg-amber-400'}`}>
+          <span className="text-white text-sm">{isWarning ? '💬' : '🔍'}</span>
         </div>
-        <div>
-          <p className="font-bold text-amber-900 text-sm">Analyse préliminaire de votre fichier</p>
-          {filename && <p className="text-xs text-amber-700 mt-0.5 font-medium">{filename}</p>}
+        <div className="flex-1">
+          <p className={`font-bold text-sm ${isWarning ? 'text-[#1A1A2E]' : 'text-amber-900'}`}>
+            {isWarning ? 'Note sur la qualité de votre fichier' : 'Analyse préliminaire de votre fichier'}
+          </p>
+          {filename && <p className={`text-xs mt-0.5 font-medium ${isWarning ? 'text-[#5F6368]' : 'text-amber-700'}`}>{filename}</p>}
         </div>
+        {isWarning && (
+          <span className={`text-xs text-[#1B73E8] font-medium flex-shrink-0`}>
+            {collapsed ? 'Voir le conseil →' : '← Réduire'}
+          </span>
+        )}
       </div>
 
-      <div className="px-5 py-4 space-y-4">
+      {!collapsed && <div className="px-5 py-4 space-y-4">
 
-        {/* Bonne nouvelle : on a regardé pour vous */}
-        <p className="text-sm text-amber-900 leading-relaxed">
-          Avant de lancer l&apos;analyse, Pepperyn a examiné la structure de vos données.
-          Nous avons identifié quelques points à améliorer pour vous garantir une analyse
-          <strong> précise et sans approximations</strong>.
+        {/* Message d'intro */}
+        <p className={`text-sm leading-relaxed ${isWarning ? 'text-[#1A1A2E]' : 'text-amber-900'}`}>
+          {isWarning
+            ? <>J&apos;ai analysé votre fichier avec les données disponibles. Quelques éléments ont limité la précision sur certains points — <strong>c&apos;est courant et facilement corrigeable</strong> pour la prochaine analyse.</>
+            : <>J&apos;ai examiné la structure de votre fichier avant de lancer l&apos;analyse. Il comporte quelques lacunes — <strong>rien d&apos;insurmontable, c&apos;est très courant</strong> — que je préfère vous signaler plutôt que de produire un résultat approximatif.</>
+          }
         </p>
 
         {/* Problèmes détectés */}
         {issues.length > 0 && (
-          <div className="bg-white rounded-xl border border-amber-200 p-4">
-            <p className="text-xs font-bold text-amber-800 uppercase tracking-wide mb-2">
-              Ce que nous avons trouvé
+          <div className={`bg-white rounded-xl border p-4 ${isWarning ? 'border-blue-200' : 'border-amber-200'}`}>
+            <p className={`text-xs font-bold uppercase tracking-wide mb-2 ${isWarning ? 'text-[#1B73E8]' : 'text-amber-800'}`}>
+              Ce que j&apos;ai identifié
             </p>
             <ul className="space-y-1.5">
               {issues.map((issue, i) => (
@@ -66,16 +82,14 @@ export function CoachingMessage({
           </div>
         )}
 
-        {/* Pourquoi on vous dit ça */}
-        <div className="flex items-start gap-2.5">
-          <span className="text-base flex-shrink-0">💡</span>
-          <p className="text-sm text-amber-800 leading-relaxed">
-            <strong>Pourquoi c&apos;est important ?</strong> Pepperyn vise le zéro hallucination.
-            Des données mal structurées produisent des analyses inexactes —
-            ce qui serait contre-productif pour vos décisions. On préfère vous aider
-            à corriger la source plutôt que de vous livrer un résultat biaisé.
+        {/* Pourquoi — uniquement pour les fichiers bloqués */}
+        {!isWarning && (
+          <p className="text-sm text-amber-800 leading-relaxed bg-white rounded-xl border border-amber-100 px-4 py-3">
+            Plutôt que de vous livrer une analyse approximative qui pourrait induire en erreur vos décisions,
+            je préfère vous guider pour corriger la structure. Cela prend 2 minutes et transforme
+            la qualité de l&apos;analyse qui suivra.
           </p>
-        </div>
+        )}
 
         {/* Prompt Copilot — l'action principale */}
         {copilotPrompt && (
@@ -161,7 +175,7 @@ export function CoachingMessage({
           </div>
         )}
 
-      </div>
+      </div>}
     </div>
   );
 }

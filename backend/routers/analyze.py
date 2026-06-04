@@ -312,10 +312,10 @@ async def analyze_file(
     # Inject data quality context into LLM prompt
     quality_section = quality_gate.to_prompt_section()
 
-    # Si warning : préparer le message de coaching à injecter en préambule du résultat
+    # Si warning : préparer la note de coaching à afficher au-dessus de l'analyse
     quality_coaching_preamble = None
     if quality_gate.status == "warning":
-        quality_coaching_preamble = quality_gate.build_coaching_message(file.filename)
+        quality_coaching_preamble = quality_gate.build_warning_note(file.filename)
 
     # Track analysis_started event
     _usage_service.track_activity(company_id, "analysis_started", {
@@ -362,14 +362,10 @@ async def analyze_file(
         sheets_detected=quality_gate.sheets_detected,
     )
 
-    # Pour les fichiers en warning : injecter le coaching en préambule du résumé
+    # Pour les fichiers en warning : attacher la note coaching + prompt Copilot
     if quality_coaching_preamble and quality_gate.status == "warning":
-        analysis_result.resume_executif = (
-            quality_coaching_preamble
-            + "\n\n---\n\n"
-            + "## Analyse effectuée sur les données disponibles\n\n"
-            + (analysis_result.resume_executif or "")
-        )
+        analysis_result.copilot_prompt = quality_gate._generate_copilot_prompt()
+        analysis_result.coaching_issues = quality_gate.anomalies or []
 
     # Assign the analyse_id to the result object so the frontend can use it
     analyse_id = str(uuid.uuid4())

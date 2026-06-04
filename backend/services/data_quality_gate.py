@@ -87,55 +87,60 @@ class QualityGateResult:
 
     def build_coaching_message(self, filename: str = "") -> str:
         """
-        Génère un message de coaching actionnable basé sur les problèmes détectés.
-        Angle : service rendu à l'utilisateur, pas rejet technique.
+        Message coaching pour fichier bloqué.
+        Ton : coach bienveillant, jamais culpabilisant, toujours orienté solution.
         """
-        fname = f" **{filename}**" if filename else ""
+        fname = f" \"{filename}\"" if filename else ""
+        issues = self.anomalies[:4] if self.anomalies else []
+        if not issues and self.blocking_reason:
+            issues = [self.blocking_reason.split('\n')[0]]
+        issues_text = "\n".join(f"• {a}" for a in issues) if issues else "• Structure non standard détectée"
+        copilot_prompt = self._generate_copilot_prompt()
 
-        # ── En-tête : cadrage positif ──────────────────────────────────────────
-        lines = [
-            f"🔍 **Analyse préliminaire de votre fichier{fname}**\n",
-            "Avant de lancer l'analyse financière, Pepperyn a examiné la structure de vos données. "
-            "Voici ce que nous avons identifié — et comment vous aider à obtenir la meilleure analyse possible.\n",
-        ]
-
-        # ── Problèmes détectés (spécifiques) ──────────────────────────────────
-        if self.anomalies or self.blocking_reason:
-            lines.append("**Ce que nous avons trouvé dans votre fichier :**")
-            if self.anomalies:
-                for anomaly in self.anomalies[:5]:
-                    lines.append(f"• {anomaly}")
-            elif self.blocking_reason:
-                # Extraire juste la première phrase du blocking_reason
-                first_sentence = self.blocking_reason.split('\n')[0]
-                lines.append(f"• {first_sentence}")
-            lines.append("")
-
-        # ── Pourquoi c'est important ───────────────────────────────────────────
-        lines.append(
-            "**Pourquoi c'est important ?**\n"
-            "Pepperyn est conçu pour produire des analyses financières précises, "
-            "**sans hallucination**. Des données mal structurées génèrent des interprétations inexactes — "
-            "ce qui est contre-productif pour vos décisions stratégiques. "
-            "C'est pourquoi nous préférons vous aider à corriger la source plutôt que de vous livrer une analyse biaisée.\n"
+        return (
+            f"J'ai examiné votre fichier{fname} avant de lancer l'analyse.\n\n"
+            "Sa structure actuelle comporte quelques lacunes — **et c'est tout à fait courant**. "
+            "La grande majorité des exports comptables ou des fichiers ERP présentent ce type de particularités. "
+            "Rien qui ne soit corrigeable en 2 minutes.\n\n"
+            f"**Ce que j'ai identifié :**\n{issues_text}\n\n"
+            "**Pourquoi je préfère vous en parler plutôt que d'analyser quand même ?**\n"
+            "Mon objectif est de vous livrer une analyse sur laquelle vous pouvez réellement vous appuyer "
+            "pour décider. Avec ces lacunes, les résultats seraient trop approximatifs pour être utiles — "
+            "et je ne veux pas vous induire en erreur.\n\n"
+            "**La bonne nouvelle : c'est simple à corriger.**\n\n"
+            "Ouvrez votre fichier dans **Excel 365**, cliquez sur **Copilot ✨** en haut à droite du ruban, "
+            "et collez ce prompt :\n\n"
+            f"```\n{copilot_prompt}\n```\n\n"
+            "Pas de Copilot ? **ChatGPT** (chatgpt.com) avec le même prompt et votre fichier joint fait exactement la même chose.\n\n"
+            "**Ensuite :**\n"
+            "1. Sauvegardez le fichier restructuré\n"
+            "2. Re-uploadez-le ici — l'analyse sera complète et exploitable en 60 secondes\n\n"
+            "[📖 Guide de préparation des données étape par étape](/guide-donnees)"
         )
 
-        # ── Prompt Copilot généré dynamiquement ───────────────────────────────
+    def build_warning_note(self, filename: str = "") -> str:
+        """
+        Note coaching légère pour fichier analysé avec limitations (warning).
+        Apparaît AU-DESSUS de l'analyse, pas à la place.
+        Ton : informatif, encourageant, pas alarmant.
+        """
+        fname = f" \"{filename}\"" if filename else ""
+        issues = self.anomalies[:3] if self.anomalies else []
+        issues_text = "\n".join(f"• {a}" for a in issues) if issues else "• Structure partiellement non standard"
         copilot_prompt = self._generate_copilot_prompt()
-        lines.append("**💡 Solution rapide — Prompt pour Microsoft Copilot ou ChatGPT :**")
-        lines.append(f"```\n{copilot_prompt}\n```\n")
 
-        # ── Actions concrètes ──────────────────────────────────────────────────
-        lines.append("**Que faire maintenant ?**")
-        lines.append("1. Copiez le prompt ci-dessus et collez-le dans Microsoft Copilot (Excel) ou ChatGPT avec votre fichier")
-        lines.append("2. Consultez notre **[Guide de préparation des données](/guide-donnees)** — 5 étapes pour un fichier optimal")
-        lines.append("3. Une fois le fichier restructuré, uploadez-le à nouveau pour une analyse complète et fiable")
-
-        if self.status == "warning" and self.can_analyze:
-            lines.append("\n_ℹ️ Pepperyn a quand même effectué une analyse partielle sur les données exploitables — "
-                        "les résultats ci-dessous sont à interpréter avec les réserves indiquées._")
-
-        return "\n".join(lines)
+        return (
+            f"J'ai analysé votre fichier{fname} et les résultats sont ci-dessous.\n\n"
+            "Avant de les lire, une information utile : **votre fichier comporte quelques éléments "
+            "perfectibles** qui ont limité la précision sur certains points.\n\n"
+            f"{issues_text}\n\n"
+            "C'est tout à fait courant et cela explique les mentions *« Données insuffisantes »* "
+            "qui apparaissent dans certaines sections. L'analyse reste fiable sur les données "
+            "que j'ai pu exploiter — mais une version restructurée donnerait des résultats encore plus précis.\n\n"
+            "**Pour une prochaine analyse plus complète**, collez ce prompt dans Copilot (Excel 365) ou ChatGPT :\n\n"
+            f"```\n{copilot_prompt}\n```\n\n"
+            "[📖 Guide de préparation →](/guide-donnees)"
+        )
 
     def _generate_copilot_prompt(self) -> str:
         """Génère un prompt Copilot/ChatGPT personnalisé selon les problèmes détectés."""
@@ -297,7 +302,7 @@ def _validate_structural(raw_sheets: dict) -> QualityGateResult:
 
     score = max(0, 100 - penalty)
 
-    if score >= 80:
+    if score >= 85:
         status = "ok"
         can_analyze = True
     elif score >= 50:
