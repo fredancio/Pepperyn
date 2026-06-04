@@ -31,30 +31,32 @@ const STEPS: Step[] = [
   },
 ];
 
+const COPILOT_TIP = "✨ **Astuce Copilot** : Si votre fichier est complexe ou mal structuré, ouvrez-le dans Excel 365, cliquez sur le bouton **Copilot** (✨ en haut à droite du ruban), et demandez-lui : *\"Restructure ce tableau en compte de résultat mensuel clair avec des en-têtes explicites\"*. En 30 secondes, votre fichier sera propre et prêt pour Pepperyn. [En savoir plus](/guide-donnees)";
+
 const GUIDANCE: Record<string, Record<string, string>> = {
   pl: {
-    accountant: "Votre comptable vous a envoyé un compte de résultat — c'est parfait ! Assurez-vous qu'il est en format **.xlsx** (pas PDF). S'il est en PDF, demandez-lui la version Excel. Uploadez directement ce fichier dans Pepperyn.",
-    software: "Depuis votre logiciel, exportez le **Compte de résultat** ou **P&L** en Excel (.xlsx). Dans Exact Online : Rapports → Compte de résultat → Exporter. Dans Odoo : Comptabilité → Rapports → Bilan des revenus → Excel. Dans Sage : Analyse → P&L → Export.",
-    self: "Si vous avez créé votre P&L vous-même, assurez-vous que : **ligne 1** = en-têtes (Jan, Fév, Mar…), **colonne A** = noms des postes (CA, Charges, Résultat…), et que les cellules contiennent des chiffres. Consultez notre [guide](/guide-donnees) si besoin.",
-    none: "Pas de problème ! Téléchargez notre **template P&L** prêt à remplir — il suffit de renseigner vos chiffres dans les cellules indiquées. Aucune compétence Excel requise.",
+    accountant: "Votre comptable vous a envoyé un compte de résultat — c'est parfait ! Assurez-vous qu'il est en format **.xlsx** (pas PDF). S'il est en PDF, demandez-lui la version Excel. Uploadez directement ce fichier dans Pepperyn.\n\n" + COPILOT_TIP,
+    software: "Depuis votre logiciel, exportez le **Compte de résultat** ou **P&L** en Excel (.xlsx). Dans **Exact Online** : Rapports → Compte de résultat → Exporter. Dans **Odoo** : Comptabilité → Rapports → Bilan des revenus → Excel. Dans **Sage** : Analyse → P&L → Export.\n\n" + COPILOT_TIP,
+    self: "Si vous avez créé votre P&L vous-même, assurez-vous que : **ligne 1** = en-têtes (Jan, Fév, Mar…), **colonne A** = noms des postes (CA, Charges, Résultat…), et que les cellules contiennent des chiffres.\n\n" + COPILOT_TIP,
+    none: "Pas de problème ! Consultez notre [guide de préparation](/guide-donnees) — il vous explique étape par étape comment obtenir le bon fichier depuis votre comptable ou votre logiciel.\n\n" + COPILOT_TIP,
   },
   budget: {
-    accountant: "Demandez à votre comptable un export Excel de votre **budget vs réalisé** avec 3 colonnes : Poste | Budget | Réel. Pepperyn détectera automatiquement les écarts et les expliquera.",
-    software: "Exportez depuis votre logiciel le rapport **Budget vs Réel** ou **Prévisionnel vs Réalisé** en Excel. La plupart des logiciels ont cette fonction dans la section Rapports ou Analyses.",
-    self: "Pour un budget, structurez votre fichier en 3 colonnes minimum : **Poste de charge/produit** | **Budget prévu** | **Réalisé**. Ajoutez les mois en colonnes si vous avez un suivi mensuel.",
-    none: "Téléchargez notre **template Budget vs Réel** — remplissez simplement vos prévisions et vos chiffres réels. Pepperyn calculera les écarts et vous dira où agir en priorité.",
+    accountant: "Demandez à votre comptable un export Excel de votre **budget vs réalisé** avec 3 colonnes : Poste | Budget | Réel. Pepperyn détectera automatiquement les écarts et les expliquera.\n\n" + COPILOT_TIP,
+    software: "Exportez depuis votre logiciel le rapport **Budget vs Réel** ou **Prévisionnel vs Réalisé** en Excel. La plupart des logiciels ont cette fonction dans la section Rapports ou Analyses.\n\n" + COPILOT_TIP,
+    self: "Pour un budget, structurez votre fichier en 3 colonnes minimum : **Poste** | **Budget prévu** | **Réalisé**. Ajoutez les mois en colonnes si vous avez un suivi mensuel.\n\n" + COPILOT_TIP,
+    none: "Consultez notre [guide de préparation](/guide-donnees) pour savoir comment créer ou obtenir un fichier budget adapté.\n\n" + COPILOT_TIP,
   },
   cashflow: {
-    accountant: "Demandez à votre comptable un **tableau de flux de trésorerie** ou un relevé des entrées/sorties en Excel. Si vous n'en avez pas, un export de votre compte bancaire en CSV fonctionne aussi.",
-    software: "Exportez le **tableau de trésorerie** ou **cash flow statement** de votre logiciel. Dans la plupart des ERP, c'est dans Comptabilité → Rapports de trésorerie → Export Excel.",
-    self: "Pour la trésorerie, structurez votre fichier avec : **Date** | **Catégorie** | **Entrée** | **Sortie** | **Solde**. Chaque ligne = une transaction ou un flux. Pepperyn identifiera les tendances et les risques.",
-    none: "Exportez simplement votre **historique bancaire** en Excel ou CSV depuis votre banque en ligne. Pepperyn peut analyser directement un relevé bancaire structuré.",
+    accountant: "Demandez à votre comptable un **tableau de flux de trésorerie** en Excel. Si vous n'en avez pas, un export de votre compte bancaire en CSV fonctionne aussi.\n\n" + COPILOT_TIP,
+    software: "Exportez le **tableau de trésorerie** ou **cash flow** de votre logiciel. Dans la plupart des ERP : Comptabilité → Rapports de trésorerie → Export Excel.\n\n" + COPILOT_TIP,
+    self: "Structurez votre fichier avec : **Date** | **Catégorie** | **Entrée** | **Sortie** | **Solde**. Chaque ligne = un flux. Pepperyn identifiera les tendances et les risques.\n\n" + COPILOT_TIP,
+    none: "Exportez votre **historique bancaire** en Excel ou CSV depuis votre banque en ligne. Pepperyn peut analyser directement un relevé bancaire structuré.\n\n" + COPILOT_TIP,
   },
   unknown: {
-    accountant: "Pas de souci — uploadez le fichier que vous avez reçu et Pepperyn détectera automatiquement de quoi il s'agit. Si le fichier est en PDF, demandez la version Excel à votre comptable.",
-    software: "Exportez n'importe quel rapport financier de votre logiciel en Excel. Pepperyn reconnaît automatiquement le type de document et adapte son analyse.",
-    self: "Uploadez votre fichier tel quel. Pepperyn analysera sa structure et vous dira ce qu'il a trouvé. Si quelque chose ne va pas, il vous guidera pour l'améliorer.",
-    none: "Commencez par identifier quel type d'analyse vous souhaitez faire (P&L, budget, trésorerie) puis revenez ici. Notre [guide de préparation](/guide-donnees) vous explique exactement comment obtenir le bon fichier depuis votre comptable ou votre logiciel.",
+    accountant: "Uploadez le fichier reçu — Pepperyn détectera automatiquement de quoi il s'agit. Si le fichier est en PDF, demandez la version Excel à votre comptable.\n\n" + COPILOT_TIP,
+    software: "Exportez n'importe quel rapport financier de votre logiciel en Excel. Pepperyn reconnaît automatiquement le type de document et adapte son analyse.\n\n" + COPILOT_TIP,
+    self: "Uploadez votre fichier tel quel. Pepperyn analysera sa structure et vous guidera si quelque chose doit être amélioré.\n\n" + COPILOT_TIP,
+    none: "Consultez notre [guide de préparation](/guide-donnees) — il vous explique exactement comment obtenir le bon fichier depuis votre comptable ou votre logiciel.\n\n" + COPILOT_TIP,
   },
 };
 
