@@ -1,11 +1,12 @@
 """
 routers/contact.py — Pepperyn
 Endpoint pour recevoir les demandes de contact (plan SCALE).
-Stocke dans Supabase, visible dans le CRM admin.
+Stocke dans Supabase + envoie une notification email via Resend.
 """
 from __future__ import annotations
 
 import logging
+import os
 from typing import Optional, List
 
 from fastapi import APIRouter
@@ -26,13 +27,84 @@ class ContactRequest(BaseModel):
     souhaite_contact: bool = True
 
 
+def _send_notification(body: ContactRequest) -> None:
+    """Envoie un email de notification via Resend. Silencieux si non configuré."""
+    api_key = os.environ.get("RESEND_API_KEY")
+    notify_to = os.environ.get("NOTIFY_EMAIL", "fredanciaux@hotmail.com")
+    notify_from = os.environ.get("NOTIFY_FROM", "Pepperyn <noreply@pepperyn.fr>")
+
+    if not api_key:
+        logger.info("[CONTACT] RESEND_API_KEY non configuré — email ignoré")
+        return
+
+    try:
+        import resend
+        resend.api_key = api_key
+
+        defis_list = "".join(f"<li>{d}</li>" for d in (body.defis or []))
+        html = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #0A2540; padding: 24px; border-radius: 12px 12px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 20px;">🚀 Nouvelle demande SCALE</h1>
+            <p style="color: #94a3b8; margin: 4px 0 0; font-size: 14px;">Pepperyn — Plan SCALE sur-mesure</p>
+          </div>
+          <div style="background: white; padding: 24px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="padding: 8px 0; color: #64748b; font-size: 13px; width: 40%;">Contact</td>
+                <td style="padding: 8px 0; font-weight: bold; font-size: 14px;">{body.prenom_nom}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #64748b; font-size: 13px;">Email</td>
+                <td style="padding: 8px 0; font-size: 14px;"><a href="mailto:{body.email}" style="color: #1B73E8;">{body.email}</a></td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #64748b; font-size: 13px;">Entreprise</td>
+                <td style="padding: 8px 0; font-size: 14px;">{body.entreprise or '—'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #64748b; font-size: 13px;">Taille équipe</td>
+                <td style="padding: 8px 0; font-size: 14px;">{body.taille_equipe or '—'}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #64748b; font-size: 13px;">Utilise IA</td>
+                <td style="padding: 8px 0; font-size: 14px;">{body.utilise_ia or '—'}</td>
+              </tr>
+            </table>
+
+            {"<div style='margin-top:16px;'><p style='color:#64748b;font-size:13px;margin:0 0 6px;'>Défis identifiés</p><ul style='margin:0;padding-left:20px;font-size:14px;'>" + defis_list + "</ul></div>" if body.defis else ""}
+
+            {"<div style='margin-top:16px; padding:16px; background:#f8fafc; border-radius:8px;'><p style='color:#64748b;font-size:13px;margin:0 0 6px;'>Message</p><p style='font-size:14px;margin:0;'>" + body.message + "</p></div>" if body.message else ""}
+
+            <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+              <a href="mailto:{body.email}" style="display:inline-block; background:#1B73E8; color:white; padding:10px 20px; border-radius:8px; text-decoration:none; font-size:14px; font-weight:bold;">
+                Répondre à {body.prenom_nom} →
+              </a>
+            </div>
+          </div>
+        </div>
+        """
+
+        resend.Emails.send({
+            "from": notify_from,
+            "to": [notify_to],
+            "subject": f"🚀 Nouvelle demande SCALE — {body.prenom_nom} ({body.entreprise or body.email})",
+            "html": html,
+        })
+        logger.info(f"[CONTACT] Notification email envoyé à {notify_to}")
+
+    except Exception as e:
+        logger.error(f"[CONTACT] Erreur envoi email: {e}")
+
+
 @router.post("")
 async def submit_contact(body: ContactRequest):
     from main import get_supabase_service
     supabase = get_supabase_service()
 
     try:
-        result = supabase.from_("contact_requests").insert({
+        supabase.from_("contact_requests").insert({
             "prenom_nom": body.prenom_nom,
             "email": body.email,
             "entreprise": body.entreprise,
@@ -44,6 +116,10 @@ async def submit_contact(body: ContactRequest):
         }).execute()
 
         logger.info(f"[CONTACT] New request from {body.email}")
+
+        # Notification email (non-bloquant)
+        _send_notification(body)
+
         return {"success": True}
 
     except Exception as e:
@@ -54,9 +130,6 @@ async def submit_contact(body: ContactRequest):
 @router.get("/requests")
 async def list_contact_requests(authorization: str | None = None):
     """Pour le CRM admin — liste toutes les demandes."""
-    from fastapi import Header, HTTPException
-    import os
-
     from main import get_supabase_service
     supabase = get_supabase_service()
 
