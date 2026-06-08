@@ -135,7 +135,7 @@ function RegisterForm() {
                   ))}
                 </ol>
               </div>
-              <Button size="lg" className="w-full" onClick={() => window.location.href = '/login?redirect=/upgrade'}>
+              <Button size="lg" className="w-full" onClick={() => window.location.href = '/login?redirect=/checkout/pro'}>
                 Me connecter et passer à PRO →
               </Button>
             </>
