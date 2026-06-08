@@ -603,7 +603,7 @@ export function ChatContainer() {
               {!canAccess(plan, 'export_excel') && (
                 <div className="flex flex-col gap-1">
                   <p className="text-xs font-semibold text-[#5F6368] px-2 uppercase tracking-wide">
-                    Débloquer avec PRO / POWER
+                    Débloquer avec PRO
                   </p>
                   {([
                     { feature: 'memory_full' as Feature,   icon: '🧠', label: 'Mémoire persistante complète' },
