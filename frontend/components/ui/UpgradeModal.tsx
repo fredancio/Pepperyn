@@ -81,17 +81,17 @@ export function UpgradeModal({ feature, onClose }: UpgradeModalProps) {
           {/* CTAs */}
           <div className="flex flex-col gap-2">
             <Link
-              href="/#tarifs"
+              href="/upgrade"
               onClick={onClose}
               className={`w-full py-3 rounded-xl font-bold text-sm text-center transition-all ${colors.bg} ${colors.text} hover:opacity-90`}
             >
-              Voir les plans →
+              Voir les plans et tarifs →
             </Link>
             <button
               onClick={onClose}
               className="w-full py-2.5 rounded-xl text-sm text-[#5F6368] hover:bg-gray-50 transition-colors"
             >
-              Continuer avec le plan gratuit
+              Continuer avec mon plan actuel
             </button>
           </div>
         </div>

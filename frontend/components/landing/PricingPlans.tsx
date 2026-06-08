@@ -67,7 +67,7 @@ const plans: {
     extras: null,
     microcopy: 'Gérez plusieurs clients ou entités depuis un seul outil.',
     cta: 'Passer à PRO',
-    ctaHref: '/register',
+    ctaHref: '/register?plan=pro',
   },
   {
     name: 'SCALE',
