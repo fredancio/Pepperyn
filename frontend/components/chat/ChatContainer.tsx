@@ -432,7 +432,7 @@ export function ChatContainer() {
                   </p>
                   {!canAccess(plan, 'entities') && (
                     <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">
-                      POWER
+                      PRO
                     </span>
                   )}
                 </div>
