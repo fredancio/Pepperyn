@@ -42,7 +42,7 @@ function LoginForm() {
         <img src="/favicon.png?v=4" alt="Pepperyn" className="w-20 h-20 object-contain" />
         <div className="text-center">
           <h1 className="text-2xl font-bold text-[#1A1A2E]">Connexion à votre espace</h1>
-          {redirectTo === '/upgrade' ? (
+          {redirectTo === '/checkout/pro' ? (
             <p className="text-sm text-[#1B73E8] font-medium">Connectez-vous pour finaliser votre abonnement PRO</p>
           ) : (
             <p className="text-sm text-[#5F6368]">Accédez à vos analyses financières</p>
@@ -108,7 +108,7 @@ function LoginForm() {
           )}
 
           <Button type="submit" loading={loading} className="w-full" size="lg">
-            {loading ? 'Connexion...' : redirectTo === '/upgrade' ? 'Se connecter et passer à PRO →' : 'Se connecter →'}
+            {loading ? 'Connexion...' : redirectTo === '/checkout/pro' ? 'Se connecter et passer à PRO →' : 'Se connecter →'}
           </Button>
 
           <p className="text-center text-sm text-[#5F6368]">
