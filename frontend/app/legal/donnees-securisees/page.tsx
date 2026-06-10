@@ -49,7 +49,7 @@ export default function DonneesSécuriséesPage() {
             </p>
           </div>
 
-          <h2 className="text-xl font-bold mt-10 mb-5 text-[#1A1A2E]">Comment Pepperyn protège concrètement vos données</h2>
+          <h2 className="text-xl font-bold mt-10 mb-5 text-[#1A1A2E]">Comment Pepperyn protège vos données confidentielles</h2>
 
           <div className="flex flex-col gap-6">
 
@@ -88,6 +88,34 @@ export default function DonneesSécuriséesPage() {
               <p className="text-[#5F6368] leading-relaxed">
                 L&apos;objectif est que les modèles IA raisonnent sur des données financières anonymisées et non sur l&apos;identité des personnes ou des organisations concernées.
               </p>
+            </div>
+
+            <div className="border-t border-gray-100 pt-5">
+              <h3 className="text-base font-bold text-[#1A1A2E] mb-2">Un exemple concret</h3>
+              <p className="text-[#5F6368] leading-relaxed mb-2">
+                Concrètement, avant qu&apos;une analyse ne soit réalisée par l&apos;intelligence artificielle, les noms réels présents dans vos fichiers sont remplacés par des identifiants anonymes. Par exemple :
+              </p>
+              <ul className="list-disc list-inside text-[#5F6368] leading-relaxed space-y-1 mb-3">
+                <li>« Dupont SA » devient « CLIENT_001 » ;</li>
+                <li>« ABC Logistics » devient « FOURNISSEUR_001 ».</li>
+              </ul>
+              <p className="text-[#5F6368] leading-relaxed">
+                Une fois l&apos;analyse terminée, Pepperyn rétablit automatiquement les noms réels dans les résultats qui vous sont présentés. Vous obtenez ainsi des analyses précises et exploitables, tout en garantissant que l&apos;intelligence artificielle ne connaît jamais l&apos;identité réelle de vos clients, fournisseurs ou collaborateurs.
+              </p>
+            </div>
+
+            <div className="border-t border-gray-100 pt-5">
+              <h3 className="text-base font-bold text-[#1A1A2E] mb-2">Qui peut voir vos données réelles ?</h3>
+              <p className="text-[#5F6368] leading-relaxed mb-2">
+                Vous seul. La table de correspondance qui relie les identifiants anonymes à vos noms réels est stockée dans votre espace sécurisé et n&apos;est jamais transmise à l&apos;intelligence artificielle.
+              </p>
+              <p className="text-[#5F6368] leading-relaxed mb-2">Vos données nominatives ne sont accessibles :</p>
+              <ul className="list-disc list-inside text-[#5F6368] leading-relaxed space-y-1">
+                <li>ni aux autres utilisateurs ;</li>
+                <li>ni aux partenaires technologiques de Pepperyn ;</li>
+                <li>ni aux modèles d&apos;intelligence artificielle utilisés pour l&apos;analyse ;</li>
+                <li>ni même aux administrateurs de Pepperyn, qui n&apos;ont pas accès au contenu nominatif de vos données métier.</li>
+              </ul>
             </div>
 
             <div className="border-t border-gray-100 pt-5">
