@@ -20,6 +20,12 @@ from services.llm_service import run_full_pipeline, get_anthropic_client, call_c
 from services.excel_export import generate_excel_report
 from services.usage_service import UsageService
 from services.data_quality_gate import validate_excel_before_analysis
+from services.anonymization_service import (
+    CorrespondenceTable,
+    anonymize_parsed_data,
+    anonymize_text,
+    deanonymize_recursive,
+)
 try:
     from services.memory_service import MemoryService
     _memory_service = MemoryService()
@@ -41,6 +47,7 @@ _pdf_cache:    dict[str, bytes] = {}          # analyse_id → pdf bytes
 _pptx_cache:   dict[str, bytes] = {}          # analyse_id → pptx bytes
 _export_format_chosen: dict[str, str] = {}    # analyse_id → "excel"|"pdf"|"pptx"
 _analysis_result_cache: dict[str, dict] = {}  # analyse_id → result dict (pour PDF/PPTX à la demande)
+_anonymization_cache: dict[str, CorrespondenceTable] = {}  # analyse_id → table de correspondance (jamais envoyée à l'IA)
 
 
 async def _resolve_auth(
@@ -285,6 +292,13 @@ async def analyze_file(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur lecture fichier: {str(e)}")
 
+    # ── CONFIDENTIALITÉ : anonymisation avant tout traitement IA ─────────────
+    # Les noms de clients, fournisseurs, collaborateurs, emails, IBAN, n° TVA,
+    # etc. sont remplacés par des identifiants anonymes (CLIENT_001, ...)
+    # avant d'être transmis aux modèles d'IA. La table de correspondance reste
+    # côté serveur et sert à rétablir les noms réels dans les résultats.
+    anonymized_data, correspondence_table = anonymize_parsed_data(parsed_data)
+
     # Retrieve user profile for context
     industry = ""
     business_model = ""
@@ -324,10 +338,10 @@ async def analyze_file(
         "plan": plan,
     })
 
-    # Run LLM pipeline v3 (2 calls Claude)
+    # Run LLM pipeline v3 (2 calls Claude) — sur données anonymisées
     try:
         analysis_result, total_tokens, cost = await run_full_pipeline(
-            parsed_data, context,
+            anonymized_data, context,
             industry=industry,
             business_model=business_model,
             memory_section=memory_section,
@@ -338,6 +352,14 @@ async def analyze_file(
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur analyse IA: {str(e)}")
+
+    # ── CONFIDENTIALITÉ : ré-identification ──────────────────────────────────
+    # Les alias (CLIENT_001, FOURNISSEUR_001, ...) renvoyés par l'IA sont
+    # remplacés par les noms réels avant d'être présentés à l'utilisateur.
+    if not correspondence_table.is_empty:
+        analysis_result.__dict__.update(
+            deanonymize_recursive(dict(analysis_result.__dict__), correspondence_table)
+        )
 
     # Build memory insight (if previous analyses exist)
     memory_insight: Optional[str] = None
@@ -370,6 +392,11 @@ async def analyze_file(
     # Assign the analyse_id to the result object so the frontend can use it
     analyse_id = str(uuid.uuid4())
     analysis_result.id = analyse_id
+
+    # Conserver la table de correspondance (jamais envoyée à l'IA) pour le
+    # chat de suivi sur cette analyse.
+    if not correspondence_table.is_empty:
+        _anonymization_cache[analyse_id] = correspondence_table
 
     # Generate Excel export — all plans
     try:
@@ -599,15 +626,39 @@ async def chat_with_analysis(
     if not allowed:
         raise HTTPException(status_code=402, detail=reason)
 
+    # ── CONFIDENTIALITÉ : anonymisation du contexte de chat ──────────────────
+    # Si une table de correspondance existe pour cette analyse, le contexte,
+    # l'historique et le message de l'utilisateur sont anonymisés avant
+    # l'appel IA, et la réponse est ré-identifiée avant d'être renvoyée.
+    correspondence_table = (
+        _anonymization_cache.get(request.analysis_id) if request.analysis_id else None
+    )
+
+    chat_message = request.query
+    chat_context = request.analysis_context or ""
+    chat_history = request.history or []
+
+    if correspondence_table and not correspondence_table.is_empty:
+        chat_message = anonymize_text(chat_message, correspondence_table)
+        chat_context = anonymize_text(chat_context, correspondence_table)
+        chat_history = [
+            {**h, "content": anonymize_text(h.get("content", ""), correspondence_table)}
+            if isinstance(h, dict) and isinstance(h.get("content"), str) else h
+            for h in chat_history
+        ]
+
     try:
         response_text, model_used = await call_chat_intelligent(
-            message=request.query,
-            analysis_context=request.analysis_context or "",
-            history=request.history or [],
+            message=chat_message,
+            analysis_context=chat_context,
+            history=chat_history,
             model_tier=model_tier,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur IA: {str(e)}")
+
+    if correspondence_table and not correspondence_table.is_empty:
+        response_text = deanonymize_recursive(response_text, correspondence_table)
 
     # Increment chat count after successful response (per-analysis + monthly)
     _usage_service.increment_chat(request.analysis_id, company_id)
