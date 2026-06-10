@@ -110,12 +110,14 @@ export default function DonneesSécuriséesPage() {
                 Vous seul. La table de correspondance qui relie les identifiants anonymes à vos noms réels est stockée dans votre espace sécurisé et n&apos;est jamais transmise à l&apos;intelligence artificielle.
               </p>
               <p className="text-[#5F6368] leading-relaxed mb-2">Vos données nominatives ne sont accessibles :</p>
-              <ul className="list-disc list-inside text-[#5F6368] leading-relaxed space-y-1">
+              <ul className="list-disc list-inside text-[#5F6368] leading-relaxed space-y-1 mb-3">
                 <li>ni aux autres utilisateurs ;</li>
                 <li>ni aux partenaires technologiques de Pepperyn ;</li>
-                <li>ni aux modèles d&apos;intelligence artificielle utilisés pour l&apos;analyse ;</li>
-                <li>ni même aux administrateurs de Pepperyn, qui n&apos;ont pas accès au contenu nominatif de vos données métier.</li>
+                <li>ni aux modèles d&apos;intelligence artificielle utilisés pour l&apos;analyse.</li>
               </ul>
+              <p className="text-[#5F6368] leading-relaxed">
+                Les administrateurs de Pepperyn n&apos;ont pas accès au contenu de vos données dans le cadre de l&apos;utilisation normale du service et ne peuvent consulter vos informations nominatives sans procédure exceptionnelle strictement encadrée.
+              </p>
             </div>
 
             <div className="border-t border-gray-100 pt-5">
