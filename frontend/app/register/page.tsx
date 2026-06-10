@@ -78,12 +78,13 @@ function RegisterForm() {
     setLoading(true);
     setError('');
     try {
+      const emailRedirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(isPro ? '/checkout/pro' : '/app/chat')}`;
       await signUpAdmin(email, password, prenom, industry, businessModel, {
         nom,
         organisation,
         user_type: userType,
         usage_type: usageType,
-      });
+      }, emailRedirectTo);
       setStep('confirmation');
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'inscription");
@@ -119,7 +120,7 @@ function RegisterForm() {
                   <div>
                     <p className="text-sm font-medium text-amber-800">Vérifiez votre email</p>
                     <p className="text-xs text-amber-700 mt-0.5">
-                      Un lien de confirmation a été envoyé à <strong>{email}</strong>. Cliquez dessus pour activer votre compte, puis revenez ici pour finaliser votre abonnement PRO.
+                      Un lien de confirmation a été envoyé à <strong>{email}</strong>. Cliquez dessus pour activer votre compte — vous serez redirigé(e) automatiquement vers le paiement PRO.
                     </p>
                   </div>
                 </div>
@@ -127,7 +128,7 @@ function RegisterForm() {
               <div className="bg-[#EFF6FF] border border-blue-100 rounded-xl p-4 mb-6 text-left">
                 <p className="text-xs font-semibold text-[#1B73E8] mb-2 uppercase tracking-wide">Étapes suivantes</p>
                 <ol className="flex flex-col gap-1.5">
-                  {['Confirmez votre email (lien envoyé)', 'Connectez-vous à votre espace', 'Complétez le paiement PRO via Stripe'].map((step, i) => (
+                  {['Confirmez votre email (lien envoyé)', 'Complétez le paiement PRO via Stripe'].map((step, i) => (
                     <li key={i} className="flex items-center gap-2 text-xs text-[#5F6368]">
                       <span className="w-5 h-5 bg-[#1B73E8] text-white rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0">{i + 1}</span>
                       {step}
@@ -135,9 +136,12 @@ function RegisterForm() {
                   ))}
                 </ol>
               </div>
-              <Button size="lg" className="w-full" onClick={() => window.location.href = '/login?redirect=/checkout/pro'}>
-                Me connecter et passer à PRO →
+              <Button size="lg" className="w-full" onClick={() => window.location.href = '/checkout/pro'}>
+                Accéder au paiement →
               </Button>
+              <p className="text-center text-xs text-[#5F6368] mt-3 italic">
+                Le bouton ci-dessus fonctionne dès que votre email est confirmé.
+              </p>
             </>
           ) : (
             <>
