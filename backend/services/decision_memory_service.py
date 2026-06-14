@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from collections import Counter
+from datetime import datetime
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -247,6 +249,122 @@ class DecisionMemoryService:
         except Exception as e:
             logger.error(f"[DECISION MEMORY] upsert_feedback failed: {e}")
             return False
+
+    # ── Calcul des patterns comportementaux (Phase 2) ────────────────────────
+
+    # Score d'exécution par statut — 'planned'/'no_longer_relevant' sont
+    # exclus du calcul (intention pas encore tranchée / hors-sujet).
+    _EXECUTION_SCORES: dict[str, float] = {
+        "done": 1.0,
+        "partially_done": 0.5,
+        "not_done": 0.0,
+        "rejected": 0.0,
+    }
+
+    def _execution_rate(self, rows: list[dict[str, Any]]) -> Optional[float]:
+        scored = [self._EXECUTION_SCORES[r["status"]] for r in rows if r.get("status") in self._EXECUTION_SCORES]
+        if not scored:
+            return None
+        return round(sum(scored) / len(scored) * 100, 2)
+
+    def compute_user_patterns(self, company_id: str) -> Optional[dict[str, Any]]:
+        """
+        Calcule les patterns comportementaux de l'entreprise à partir de
+        l'historique `decision_feedback` et les enregistre dans
+        `user_patterns` (upsert sur company_id).
+
+        Purement SQL/Python — aucun appel à Claude (coûts variables maîtrisés).
+        Appelé après chaque feedback enregistré avec succès
+        (routers/decision_memory.py).
+        """
+        supabase = self._get_supabase()
+        if not supabase:
+            return None
+
+        try:
+            res = (
+                supabase.from_("decision_feedback")
+                .select("recommendation_text, status, comment, created_at, updated_at")
+                .eq("company_id", company_id)
+                .execute()
+            )
+            rows = res.data or []
+        except Exception as e:
+            logger.warning(f"[DECISION MEMORY] compute_user_patterns fetch failed: {e}")
+            return None
+
+        if not rows:
+            return None
+
+        global_rate = self._execution_rate(rows)
+
+        # Répartition par catégorie d'action (mots-clés, déjà utilisés en Phase 1)
+        by_category: dict[str, list[dict[str, Any]]] = {}
+        for r in rows:
+            cat = classify_action(r.get("recommendation_text") or "")
+            by_category.setdefault(cat, []).append(r)
+
+        pricing_rate = self._execution_rate(by_category.get("pricing", []))
+        cost_rate = self._execution_rate(by_category.get("cost_reduction", []))
+        revenue_rate = self._execution_rate(by_category.get("revenue_action", []))
+
+        pricing_resistance = round(100 - pricing_rate, 2) if pricing_rate is not None else None
+
+        # Délai moyen entre la recommandation et son passage à "done"
+        delays: list[float] = []
+        for r in rows:
+            if r.get("status") != "done":
+                continue
+            try:
+                created = datetime.fromisoformat(str(r["created_at"]).replace("Z", "+00:00"))
+                updated = datetime.fromisoformat(str(r["updated_at"]).replace("Z", "+00:00"))
+                delays.append((updated - created).total_seconds() / 86400)
+            except Exception:
+                continue
+        average_delay = round(sum(delays) / len(delays), 2) if delays else None
+
+        # Catégorie la plus souvent menée à "done"
+        preferred_action_type = None
+        best_done_count = 0
+        for cat, items in by_category.items():
+            done_count = sum(1 for r in items if r.get("status") == "done")
+            if done_count > best_done_count:
+                best_done_count = done_count
+                preferred_action_type = cat
+
+        # Blocages récurrents : commentaires les plus fréquents sur les
+        # recommandations "not_done"/"rejected" (max 5)
+        comments = [
+            (r.get("comment") or "").strip()
+            for r in rows
+            if r.get("status") in ("not_done", "rejected") and (r.get("comment") or "").strip()
+        ]
+        counter = Counter(c.lower() for c in comments)
+        first_seen: dict[str, str] = {}
+        for c in comments:
+            first_seen.setdefault(c.lower(), c)
+        recurring_blockers = [first_seen[key] for key, _ in counter.most_common(5)]
+
+        patterns: dict[str, Any] = {
+            "company_id": company_id,
+            "execution_rate": global_rate,
+            "pricing_execution_rate": pricing_rate,
+            "pricing_resistance_score": pricing_resistance,
+            "cost_reduction_execution_rate": cost_rate,
+            "revenue_action_execution_rate": revenue_rate,
+            "average_delay_to_execution_days": average_delay,
+            "recurring_blockers": recurring_blockers,
+            "preferred_action_type": preferred_action_type,
+            "total_feedback_count": len(rows),
+        }
+
+        try:
+            supabase.from_("user_patterns").upsert(patterns, on_conflict="company_id").execute()
+        except Exception as e:
+            logger.error(f"[DECISION MEMORY] compute_user_patterns upsert failed: {e}")
+            return None
+
+        return patterns
 
     # ── Construction du prompt ───────────────────────────────────────────────
 

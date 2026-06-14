@@ -90,4 +90,11 @@ async def submit_decision_feedback(
     if not ok:
         raise HTTPException(status_code=500, detail="Erreur lors de l'enregistrement du feedback")
 
+    # Recalcul des patterns comportementaux (Phase 2) — SQL/Python uniquement,
+    # aucun appel Claude. Best-effort : ne bloque pas la réponse si ça échoue.
+    try:
+        _decision_memory_service.compute_user_patterns(company_id)
+    except Exception as e:
+        logger.warning(f"[DECISION MEMORY] compute_user_patterns failed: {e}")
+
     return {"success": True}
