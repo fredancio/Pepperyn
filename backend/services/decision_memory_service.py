@@ -438,6 +438,12 @@ class DecisionMemoryService:
 
         if patterns_rows:
             p = patterns_rows[0]
+            category_labels = {
+                "pricing": "tarification",
+                "cost_reduction": "réduction de coûts",
+                "revenue_action": "actions commerciales / chiffre d'affaires",
+            }
+
             pattern_lines = []
             if p.get("execution_rate") is not None:
                 pattern_lines.append(f"  • Taux d'exécution global des recommandations : {p['execution_rate']}%")
@@ -445,21 +451,83 @@ class DecisionMemoryService:
                 pattern_lines.append(f"  • Résistance aux hausses tarifaires : {p['pricing_resistance_score']}/100")
             if p.get("cost_reduction_execution_rate") is not None:
                 pattern_lines.append(f"  • Taux d'exécution des actions de réduction de coûts : {p['cost_reduction_execution_rate']}%")
+            if p.get("revenue_action_execution_rate") is not None:
+                pattern_lines.append(f"  • Taux d'exécution des actions commerciales / CA : {p['revenue_action_execution_rate']}%")
+            if p.get("average_delay_to_execution_days") is not None:
+                pattern_lines.append(f"  • Délai moyen avant mise en œuvre d'une action : {p['average_delay_to_execution_days']:.0f} jour(s)")
             if p.get("preferred_action_type"):
                 pattern_lines.append(f"  • Type d'action le plus souvent mis en œuvre : {p['preferred_action_type']}")
             recurring = p.get("recurring_blockers") or []
             if recurring:
                 pattern_lines.append(f"  • Blocages récurrents évoqués : {', '.join(str(b) for b in recurring[:5])}")
 
-            if pattern_lines:
+            # ── Phase 3 : adaptation conditionnelle des recommandations ──────
+            # On ne déclenche ces règles qu'avec un minimum d'historique
+            # (3 retours) pour éviter de sur-adapter sur trop peu de données.
+            adapt_lines: list[str] = []
+            if (p.get("total_feedback_count") or 0) >= 3:
+                resistance = p.get("pricing_resistance_score")
+                if resistance is not None and resistance >= 60:
+                    adapt_lines.append(
+                        "  • L'utilisateur résiste fortement aux hausses de prix "
+                        "directes → NE propose PAS de hausse de prix générale. "
+                        "Privilégie des alternatives (mix produit, montée en gamme "
+                        "ciblée, réduction de coûts, optimisation du panier) ou, si "
+                        "une hausse est vraiment nécessaire, propose une version très "
+                        "progressive et limitée, justifiée par un argument concret."
+                    )
+
+                for cat, label in category_labels.items():
+                    rate = p.get(f"{cat}_execution_rate")
+                    if rate is not None and rate < 30:
+                        adapt_lines.append(
+                            f"  • Les recommandations de type \"{label}\" sont "
+                            f"rarement mises en œuvre ({rate}%) → pour ce type "
+                            "d'action, propose quelque chose de plus petit, plus "
+                            "concret, avec une première étape réalisable "
+                            "immédiatement (pas une refonte globale)."
+                        )
+
+                delay = p.get("average_delay_to_execution_days")
+                if delay is not None and delay > 30:
+                    adapt_lines.append(
+                        f"  • Les actions appliquées le sont en moyenne après "
+                        f"{delay:.0f} jours → privilégie des recommandations à "
+                        "horizon court, avec une première action réalisable cette "
+                        "semaine."
+                    )
+
+                if recurring:
+                    adapt_lines.append(
+                        "  • Tiens compte des obstacles déjà évoqués ci-dessus "
+                        "(« Blocages récurrents ») : propose des recommandations qui "
+                        "les anticipent ou les contournent explicitement, plutôt que "
+                        "de les ignorer."
+                    )
+
+                preferred = p.get("preferred_action_type")
+                preferred_rate = p.get(f"{preferred}_execution_rate") if preferred else None
+                if preferred in category_labels and (preferred_rate or 0) >= 50:
+                    adapt_lines.append(
+                        "  • L'utilisateur met le plus souvent en œuvre les actions "
+                        f"de type \"{category_labels[preferred]}\" → inclus si "
+                        "pertinent une recommandation « quick win » dans cette "
+                        "catégorie pour entretenir la dynamique."
+                    )
+
+            if pattern_lines or adapt_lines:
                 if not lines:
                     lines.append("═══ MÉMOIRE DÉCISIONNELLE (PRIORITÉ HAUTE) ═══")
                 lines.append("\n📊 PROFIL COMPORTEMENTAL DE L'UTILISATEUR :")
                 lines.extend(pattern_lines)
-                lines.append(
-                    "  → Adapte le ton et la nature des prochaines recommandations "
-                    "en fonction de ce profil."
-                )
+                if adapt_lines:
+                    lines.append("\n  → ADAPTATION DES RECOMMANDATIONS :")
+                    lines.extend(adapt_lines)
+                else:
+                    lines.append(
+                        "  → Adapte le ton et la nature des prochaines recommandations "
+                        "en fonction de ce profil."
+                    )
 
         if not lines:
             return ""
