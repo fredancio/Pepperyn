@@ -201,6 +201,7 @@ class AnalyzeResponse(BaseModel):
     tokens_used: int = 0
     cout_estime: float = 0.0
     memory_insight: Optional[str] = None
+    recommendations_tracking: Optional[List[dict]] = None
 
 
 class TextQueryRequest(BaseModel):

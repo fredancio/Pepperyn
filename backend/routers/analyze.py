@@ -32,6 +32,13 @@ try:
 except ImportError:
     _memory_service = None
 
+try:
+    from services.decision_memory_service import DecisionMemoryService, extract_recommendations
+    _decision_memory_service = DecisionMemoryService()
+except ImportError:
+    _decision_memory_service = None
+    extract_recommendations = None
+
 _usage_service = UsageService()
 
 router = APIRouter(prefix="/api", tags=["analyze"])
@@ -323,6 +330,13 @@ async def analyze_file(
         except Exception:
             pass
 
+    # Retrieve decision memory context (mémoire décisionnelle — feedback utilisateur)
+    if _decision_memory_service:
+        try:
+            actions_section = _decision_memory_service.build_decision_memory_prompt_section(company_id)
+        except Exception:
+            pass
+
     # Inject data quality context into LLM prompt
     quality_section = quality_gate.to_prompt_section()
 
@@ -397,6 +411,15 @@ async def analyze_file(
     # chat de suivi sur cette analyse.
     if not correspondence_table.is_empty:
         _anonymization_cache[analyse_id] = correspondence_table
+
+    # Extraire les recommandations pour le suivi décisionnel (mémoire
+    # décisionnelle) — annexe séparée, n'altère pas analysis_result/le rapport.
+    recommendations_tracking: Optional[list] = None
+    if extract_recommendations:
+        try:
+            recommendations_tracking = extract_recommendations(analysis_result.model_dump(), analyse_id)
+        except Exception:
+            recommendations_tracking = None
 
     # Generate Excel export — all plans
     try:
@@ -489,6 +512,7 @@ async def analyze_file(
         tokens_used=total_tokens,
         cout_estime=cost,
         memory_insight=memory_insight,
+        recommendations_tracking=recommendations_tracking,
     )
 
 

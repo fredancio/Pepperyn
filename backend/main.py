@@ -87,6 +87,7 @@ from routers.billing import router as billing_router
 from routers.entities import router as entities_router
 from routers.superadmin import router as superadmin_router
 from routers.contact import router as contact_router
+from routers.decision_memory import router as decision_memory_router
 
 app.include_router(auth_router)
 app.include_router(analyze_router)
@@ -96,6 +97,7 @@ app.include_router(billing_router)
 app.include_router(entities_router)
 app.include_router(superadmin_router)
 app.include_router(contact_router)
+app.include_router(decision_memory_router)
 
 
 # ── Admin endpoints ───────────────────────────────────────────

@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Message, Session } from '@/lib/types';
-import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, type BillingUsage, type Entity } from '@/lib/api';
+import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, fetchPreviousRecommendations, type BillingUsage, type Entity } from '@/lib/api';
 import { getCurrentAuthMode, signOutAdmin, clearGuestAuth, getGuestPlan } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { MessageBubble, TypingIndicator } from './MessageBubble';
@@ -250,14 +250,10 @@ export function ChatContainer() {
     }
   }, [sessionId, analysisReceived, plan, questionsPostAnalysis]);
 
-  const handleSendFile = useCallback(async (file: File, context: string, mode: 'quick' | 'complete') => {
-    // Check question limit for free plan
-    if (analysisReceived && plan === 'free' && questionsPostAnalysis >= MAX_CHAT_QUESTIONS_FREE) {
-      const limitMsg = makeLocalMessage('assistant', LIMIT_MESSAGE, 'text');
-      setMessages(prev => [...prev, limitMsg]);
-      return;
-    }
+  // Upload en attente d'un bilan pré-analyse (mémoire décisionnelle).
+  const pendingUploadRef = useRef<{ file: File; context: string; mode: 'quick' | 'complete' } | null>(null);
 
+  const proceedWithUpload = useCallback(async (file: File, context: string, mode: 'quick' | 'complete') => {
     const userMsg = makeLocalMessage('user', `📎 ${file.name}${context ? `\n\nContexte : ${context}` : ''}`, 'file');
     setMessages(prev => [...prev, userMsg]);
     setIsTyping(true);
@@ -272,9 +268,10 @@ export function ChatContainer() {
       }
 
       if (result.result) {
+        const analyseId = result.analyse_id || result.result.id || null;
         const analysisMsg = makeLocalMessage('assistant', '', 'analysis', {
           ...result.result,
-          id: result.analyse_id || result.result.id || null,
+          id: analyseId,
           _questionsRestantes: MAX_CHAT_QUESTIONS_FREE,
           _memoryInsight: result.memory_insight || null,
           _filename: file.name,
@@ -282,6 +279,17 @@ export function ChatContainer() {
         setMessages(prev => [...prev, analysisMsg]);
         setAnalysisReceived(true);
         setQuestionsPostAnalysis(0);
+
+        // Mémoire décisionnelle : carte de feedback léger sur les
+        // recommandations prioritaires du rapport ("Que comptez-vous faire ?")
+        if (analyseId && result.recommendations_tracking && result.recommendations_tracking.length > 0) {
+          const feedbackMsg = makeLocalMessage('assistant', '', 'feedback_request', {
+            report_id: analyseId,
+            recommendations: result.recommendations_tracking,
+          });
+          setMessages(prev => [...prev, feedbackMsg]);
+        }
+
         // Refresh sidebar history
         loadSessionHistory();
       } else {
@@ -294,7 +302,45 @@ export function ChatContainer() {
     } finally {
       setIsTyping(false);
     }
-  }, [sessionId, analysisReceived, plan, questionsPostAnalysis]);
+  }, [sessionId, selectedEntityId]);
+
+  const handleCheckInDone = useCallback(() => {
+    const pending = pendingUploadRef.current;
+    pendingUploadRef.current = null;
+    if (pending) {
+      void proceedWithUpload(pending.file, pending.context, pending.mode);
+    }
+  }, [proceedWithUpload]);
+
+  const handleSendFile = useCallback(async (file: File, context: string, mode: 'quick' | 'complete') => {
+    // Check question limit for free plan
+    if (analysisReceived && plan === 'free' && questionsPostAnalysis >= MAX_CHAT_QUESTIONS_FREE) {
+      const limitMsg = makeLocalMessage('assistant', LIMIT_MESSAGE, 'text');
+      setMessages(prev => [...prev, limitMsg]);
+      return;
+    }
+
+    // Mémoire décisionnelle : avant de relancer l'analyse, on fait le point
+    // sur les actions précédemment annoncées comme "je vais appliquer".
+    // Aucun appel à Claude ici — simple lecture Supabase.
+    try {
+      const previous = await fetchPreviousRecommendations();
+      const pendingItems = (previous.recommendations || []).filter(r => r.status === 'planned');
+      if (previous.has_previous && previous.report_id && pendingItems.length > 0) {
+        const checkinMsg = makeLocalMessage('assistant', '', 'recommendation_checkin', {
+          report_id: previous.report_id,
+          recommendations: previous.recommendations,
+        });
+        setMessages(prev => [...prev, checkinMsg]);
+        pendingUploadRef.current = { file, context, mode };
+        return;
+      }
+    } catch {
+      // en cas d'erreur, on ne bloque pas l'analyse
+    }
+
+    await proceedWithUpload(file, context, mode);
+  }, [analysisReceived, plan, questionsPostAnalysis, proceedWithUpload]);
 
   const handleSignOut = async () => {
     if (authMode === 'admin') {
@@ -783,6 +829,7 @@ export function ChatContainer() {
                       ? questionsRestantes
                       : null
                   }
+                  onCheckInDone={handleCheckInDone}
                 />
               ))}
               {isTyping && <TypingIndicator />}

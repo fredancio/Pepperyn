@@ -44,9 +44,40 @@ export interface Message {
   company_id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  content_type: 'text' | 'analysis' | 'file' | 'error';
+  content_type: 'text' | 'analysis' | 'file' | 'error' | 'feedback_request' | 'recommendation_checkin';
   metadata?: Record<string, unknown>;
   created_at: string;
+}
+
+// ─── Decision Memory (mémoire décisionnelle) ──────────────────────────────
+
+/** Statuts possibles pour le feedback sur une recommandation. */
+export type DecisionFeedbackStatus =
+  | 'planned'
+  | 'done'
+  | 'partially_done'
+  | 'not_done'
+  | 'rejected'
+  | 'no_longer_relevant';
+
+/** Une recommandation extraite d'un rapport, avec son feedback éventuel. */
+export interface RecommendationTracking {
+  id: string;
+  text: string;
+  source: string;
+  priority: 'haute' | 'moyenne' | 'basse';
+  index: number;
+  status?: DecisionFeedbackStatus | null;
+  comment?: string | null;
+}
+
+/** Réponse de GET /api/decision-feedback/previous */
+export interface PreviousRecommendations {
+  has_previous: boolean;
+  report_id: string | null;
+  fichier_nom?: string;
+  created_at?: string;
+  recommendations: RecommendationTracking[];
 }
 
 export interface AnalysisResult {
