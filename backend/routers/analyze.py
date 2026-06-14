@@ -3,6 +3,7 @@ Analysis routes for Pepperyn.
 POST /api/analyze      — Analyze an uploaded financial file
 POST /api/analyze/text — Text question (no file)
 """
+import asyncio
 import logging
 import os
 import time
@@ -12,6 +13,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Header
+from fastapi.responses import StreamingResponse
 from jose import jwt, JWTError
 
 from models.schemas import AnalyzeResponse, TextQueryRequest, TextQueryResponse, DataQualityInfo
@@ -291,6 +293,86 @@ async def analyze_file(
             cout_estime=0.0,
         )
 
+    # ── À partir d'ici, le traitement peut prendre 1-2 minutes (2 appels
+    # Claude + génération des exports). Pour éviter qu'un proxy/passerelle
+    # ne coupe la connexion par inactivité avant la fin (→ "NetworkError"
+    # côté client alors que le traitement a réussi côté serveur, données
+    # déjà sauvegardées), on répond en flux : quelques octets "heartbeat"
+    # sont envoyés pendant que l'analyse tourne, suivis du JSON final.
+    # Le frontend (api.ts) tolère cet espace de tête (JSON.parse l'ignore).
+    return StreamingResponse(
+        _stream_analysis_response(
+            file_bytes=file_bytes,
+            file=file,
+            context=context,
+            mode=mode,
+            session_id=session_id,
+            entity_id=entity_id,
+            company_id=company_id,
+            plan=plan,
+            auth_type=auth_type,
+            start_time=start_time,
+            ext=ext,
+            quality_gate=quality_gate,
+        ),
+        media_type="application/json",
+    )
+
+
+async def _stream_analysis_response(**kwargs):
+    """
+    Exécute `_run_analysis_pipeline` en tâche de fond et envoie un octet
+    "heartbeat" (espace) toutes les ~15s tant qu'elle n'est pas terminée,
+    afin de garder la connexion active pendant les analyses longues.
+
+    En cas d'erreur dans le pipeline, on encode une `AnalyzeResponse`
+    `success=False` plutôt que de lever une HTTPException (impossible une
+    fois le flux démarré avec un statut 200).
+
+    Note : `_run_analysis_pipeline` est `async def` mais effectue ses appels
+    Claude/Supabase de façon synchrone (bloquante). Si on l'exécutait via
+    `asyncio.create_task` sur la boucle principale, ces appels bloqueraient
+    aussi l'envoi des heartbeats — on l'exécute donc dans un thread séparé
+    (avec sa propre boucle asyncio) pour que la boucle principale reste
+    libre d'envoyer les heartbeats pendant ce temps.
+    """
+    loop = asyncio.get_event_loop()
+
+    def _run_sync() -> AnalyzeResponse:
+        return asyncio.run(_run_analysis_pipeline(**kwargs))
+
+    future = loop.run_in_executor(None, _run_sync)
+
+    while not future.done():
+        done, _ = await asyncio.wait({future}, timeout=15)
+        if not done:
+            yield b" "
+
+    try:
+        result = future.result()
+    except HTTPException as e:
+        result = AnalyzeResponse(success=False, message=str(e.detail))
+    except Exception as e:
+        logger.error(f"[ANALYZE STREAM] erreur pipeline: {e}")
+        result = AnalyzeResponse(success=False, message="Erreur lors de l'analyse")
+
+    yield result.model_dump_json().encode("utf-8")
+
+
+async def _run_analysis_pipeline(
+    file_bytes: bytes,
+    file: UploadFile,
+    context: str,
+    mode: str,
+    session_id: Optional[str],
+    entity_id: Optional[str],
+    company_id: str,
+    plan: str,
+    auth_type: str,
+    start_time: float,
+    ext: str,
+    quality_gate,
+) -> AnalyzeResponse:
     # Parse file (Step 1: pre-processing, 0 tokens)
     try:
         parsed_data = FileConnector(file_bytes, file.filename).fetch()

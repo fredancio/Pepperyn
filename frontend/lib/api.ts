@@ -58,11 +58,26 @@ export async function analyzeFile(
     headers,
     body: formData,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail || "Erreur lors de l'analyse");
+
+  // La réponse peut être précédée d'octets "heartbeat" (espaces) envoyés
+  // pendant le traitement des analyses longues, pour éviter qu'un proxy
+  // ne coupe la connexion par inactivité. JSON.parse ignore les espaces
+  // de tête, donc on parse le texte brut nous-mêmes.
+  const text = await res.text();
+  let data: unknown = {};
+  try {
+    data = text.trim() ? JSON.parse(text) : {};
+  } catch {
+    data = {};
   }
-  return res.json();
+
+  if (!res.ok) {
+    throw new Error((data as { detail?: string }).detail || "Erreur lors de l'analyse");
+  }
+  if ((data as { success?: boolean }).success === false) {
+    throw new Error((data as { message?: string }).message || "Erreur lors de l'analyse");
+  }
+  return data;
 }
 
 export async function analyzeText(
