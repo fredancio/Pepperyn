@@ -20,10 +20,10 @@ export function HeroSection() {
             </h1>
 
             {/* Subtitle */}
-            <p className="text-lg text-[#1A1A2E] font-medium leading-snug">
+            <p className="text-xl lg:text-2xl text-[#1A1A2E] font-bold leading-snug">
               Transformez vos données financières en décisions business
             </p>
-            <p className="text-lg text-[#1A1A2E] font-semibold leading-snug">
+            <p className="text-base text-[#5F6368] font-medium leading-snug">
               Analyse vos chiffres &amp; vous conseille. Apprend de vos décisions. S&apos;améliore avec votre entreprise.
             </p>
 

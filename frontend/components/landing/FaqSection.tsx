@@ -161,6 +161,61 @@ const firstAnswer = (
   </div>
 );
 
+const pinSystemAnswer = (
+  <div className="text-[#5F6368] leading-relaxed text-sm flex flex-col gap-4">
+    <p>
+      Le système de PIN permet de partager l&apos;accès à votre espace Pepperyn avec
+      les membres <span className="font-semibold text-[#1A1A2E]">internes</span> de
+      votre entreprise — direction financière, contrôle de gestion, direction générale,
+      ou encore les responsables de vos différentes filiales. Disponible dans les
+      plans PRO et SCALE ; en plan gratuit, l&apos;accès est individuel.
+    </p>
+
+    <div className="bg-[#EFF6FF] border border-[#1B73E8]/20 rounded-xl p-4">
+      <p className="font-semibold text-[#1A1A2E] mb-2">À qui s&apos;adresse ce partage d&apos;accès ?</p>
+      <p className="mb-2">Aux personnes qui font partie de votre organisation et qui pilotent ou suivent ses finances avec vous, par exemple :</p>
+      <ul className="flex flex-col gap-1.5 pl-4">
+        {[
+          'Le département financier (DAF, contrôle de gestion, comptabilité interne)',
+          'La direction générale ou les associés',
+          'Les directeurs ou responsables de vos filiales',
+        ].map(item => (
+          <li key={item} className="flex items-start gap-2">
+            <span className="text-[#1B73E8] font-bold flex-shrink-0">·</span>
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+
+    <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
+      <p className="font-semibold text-[#1A1A2E] mb-2">
+        Ce partage n&apos;est en revanche pas destiné à vos clients externes.
+      </p>
+      <p className="mb-2">
+        Si vous êtes expert-comptable, fractional CFO ou consultant et que vous
+        utilisez Pepperyn pour analyser les comptes de vos clients, ces clients
+        ne doivent pas recevoir d&apos;accès à votre espace Pepperyn (dashboard, chat,
+        rapports).
+      </p>
+      <p>
+        Dans ce cas de figure, Pepperyn est <span className="font-semibold text-[#1A1A2E]">votre</span> outil
+        de travail : un service à valeur ajoutée que <span className="font-semibold text-[#1A1A2E]">vous</span> proposez
+        à vos clients (analyses, recommandations, suivi dans le temps), pas un
+        accès qu&apos;ils utilisent eux-mêmes. Donner l&apos;accès direct à un client
+        viendrait concurrencer ce service supplémentaire que vous lui offrez —
+        et n&apos;est donc pas prévu par la fonctionnalité de PIN d&apos;équipe.
+      </p>
+    </div>
+
+    <p className="text-xs">
+      En résumé : le PIN d&apos;équipe sert à partager l&apos;accès <span className="font-semibold text-[#1A1A2E]">au sein</span> de
+      votre entreprise (équipe interne, filiales), jamais avec des tiers externes
+      tels que vos propres clients.
+    </p>
+  </div>
+);
+
 const accountDeletionAnswer = (
   <div className="text-[#5F6368] leading-relaxed text-sm flex flex-col gap-4">
     <p>
@@ -225,7 +280,7 @@ const faqs: FaqItem[] = [
   },
   {
     question: 'Comment fonctionne le système de PIN pour mon équipe ?',
-    answer: "Le partage d'accès équipe est disponible dans les plans PRO et SCALE. En plan gratuit, l'accès est individuel.",
+    answer: pinSystemAnswer,
   },
   {
     question: 'Comment supprimer mon compte et mes données ?',
