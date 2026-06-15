@@ -158,6 +158,7 @@ def _build_user_prompt_call1(
     memory_section: str,
     actions_section: str,
     quality_section: str = "",
+    relation_section: str = "",
 ) -> str:
     data_summary = json.dumps(parsed_data, ensure_ascii=False, indent=1)[:14000]
     prompt = f"""Voici des données financières extraites d'un fichier utilisateur :
@@ -175,6 +176,8 @@ DONNÉES ACTUELLES
         prompt += f"\n{memory_section}\n"
     if actions_section:
         prompt += f"\n{actions_section}\n"
+    if relation_section:
+        prompt += f"\n{relation_section}\n"
 
     prompt += """
 Analyse ces données.
@@ -748,6 +751,7 @@ async def call_analysis_v3(
     memory_section: str = "",
     actions_section: str = "",
     quality_section: str = "",
+    relation_section: str = "",
 ) -> tuple[str, int, int]:
     """
     Call 1 — Main analysis with claude-sonnet-4-6.
@@ -755,7 +759,7 @@ async def call_analysis_v3(
     """
     client = get_anthropic_client()
     user_prompt = _build_user_prompt_call1(
-        parsed_data, industry, business_model, memory_section, actions_section, quality_section
+        parsed_data, industry, business_model, memory_section, actions_section, quality_section, relation_section
     )
 
     message = client.messages.create(
@@ -795,6 +799,7 @@ async def run_full_pipeline(
     memory_section: str = "",
     actions_section: str = "",
     quality_section: str = "",
+    relation_section: str = "",
 ) -> tuple[AnalysisResult, int, float]:
     """
     Run the complete v3 analysis pipeline.
@@ -814,6 +819,7 @@ async def run_full_pipeline(
         memory_section=memory_section,
         actions_section=actions_section,
         quality_section=quality_section,
+        relation_section=relation_section,
     )
     total_tokens += in_tokens + out_tokens
 
@@ -834,6 +840,7 @@ async def run_full_pipeline(
             memory_section=memory_section,
             actions_section=actions_section,
             quality_section=quality_section,
+            relation_section=relation_section,
         )
         total_tokens += in2 + out2
         verified_text2 = await call_verification_v3(analysis_text2, parsed_data)

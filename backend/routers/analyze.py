@@ -59,6 +59,51 @@ _analysis_result_cache: dict[str, dict] = {}  # analyse_id → result dict (pour
 _anonymization_cache: dict[str, CorrespondenceTable] = {}  # analyse_id → table de correspondance (jamais envoyée à l'IA)
 
 
+def _build_relation_section(entity_name: str, is_primary: bool, relation_type: Optional[str]) -> str:
+    """
+    Construit une courte section de contexte relationnel à injecter dans le
+    prompt d'entrée (Call 1), selon que l'entité analysée est une filiale du
+    groupe ou un client suivi par l'utilisateur. N'a aucun effet sur la
+    structure du rapport (AnalysisResult / analyse_json) — uniquement sur le
+    cadrage du diagnostic et des recommandations.
+    """
+    if is_primary or not relation_type:
+        return ""
+
+    name = entity_name or "Cette entité"
+
+    if relation_type == "filiale":
+        return f"""CONTEXTE RELATIONNEL
+"{name}" est une FILIALE du groupe piloté par l'utilisateur (l'entité principale).
+Si cette filiale présente des signes de dégradation et/ou si les recommandations
+précédentes (voir mémoire décisionnelle ci-dessus) n'ont pas été suivies :
+- Situe explicitement le poids de cette filiale dans le résultat global du groupe
+  (ex : "représente X% du chiffre d'affaires/des pertes du groupe" si chiffrable,
+  sinon "poids significatif pour le groupe").
+- Formule la décision prioritaire comme une consigne que le groupe doit faire
+  appliquer à cette filiale, en précisant le risque encouru par le groupe en cas
+  d'inaction (ex : "si la situation persiste, le groupe risque...").
+- Si la situation est saine et les recommandations suivies, ne force rien : reste
+  factuel."""
+
+    if relation_type == "client":
+        return f"""CONTEXTE RELATIONNEL
+"{name}" est un CLIENT suivi par l'utilisateur (expert-comptable / fractional CFO
+/ consultant). Si ce client présente des signes de dégradation et/ou si les
+recommandations précédentes (voir mémoire décisionnelle ci-dessus) n'ont pas été
+suivies :
+- Aide l'utilisateur à évaluer la relation avec ce client : signale si ce client
+  devient un poids dans son portefeuille (temps passé, recommandations ignorées,
+  risque pour le client lui-même).
+- Formule la décision prioritaire comme une action que l'utilisateur doit porter
+  fermement auprès de ce client (ex : "à recadrer lors du prochain point" ou
+  "relation à réévaluer si la situation persiste").
+- Si la situation est saine et les recommandations suivies, ne force rien : reste
+  factuel."""
+
+    return ""
+
+
 async def _resolve_auth(
     authorization: Optional[str],
     x_auth_type: Optional[str],
@@ -401,6 +446,31 @@ async def _run_analysis_pipeline(
     except Exception:
         pass
 
+    # Contexte relationnel de l'entité (filiale du groupe / client suivi).
+    # Lecture Supabase uniquement — aucun appel Claude. N'influence que le
+    # prompt d'entrée (relation_section), jamais la structure du rapport.
+    relation_section = ""
+    if entity_id:
+        try:
+            from main import get_supabase_service as _get_supabase_rel
+            _sb_rel = _get_supabase_rel()
+            _ent_res = (
+                _sb_rel.from_("entities")
+                .select("name, is_primary, relation_type")
+                .eq("id", entity_id)
+                .limit(1)
+                .execute()
+            )
+            if _ent_res.data:
+                _ent = _ent_res.data[0]
+                relation_section = _build_relation_section(
+                    entity_name=_ent.get("name") or "",
+                    is_primary=bool(_ent.get("is_primary")),
+                    relation_type=_ent.get("relation_type"),
+                )
+        except Exception:
+            pass
+
     # Retrieve memory context
     memory_section = ""
     actions_section = ""
@@ -443,6 +513,7 @@ async def _run_analysis_pipeline(
             memory_section=memory_section,
             actions_section=actions_section,
             quality_section=quality_section,
+            relation_section=relation_section,
         )
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))

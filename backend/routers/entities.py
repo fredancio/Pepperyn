@@ -8,7 +8,7 @@ POST /api/entities          → crée une nouvelle entité (POWER+ seulement)
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
@@ -74,7 +74,7 @@ async def list_entities(
     try:
         result = (
             supabase.from_("entities")
-            .select("id, name, industry, business_model, is_primary, workspace_id, created_at")
+            .select("id, name, industry, business_model, is_primary, relation_type, workspace_id, created_at")
             .eq("company_id", company_id)
             .order("is_primary", desc=True)
             .order("created_at", desc=False)
@@ -94,6 +94,10 @@ class CreateEntityRequest(BaseModel):
     name: str
     industry: Optional[str] = None
     business_model: Optional[str] = None
+    # "filiale" = filiale du groupe (l'analyse situe son poids/risque au niveau
+    # de l'entité principale) ; "client" = client suivi par l'utilisateur
+    # (l'analyse aide à évaluer la relation) ; None = non renseigné.
+    relation_type: Optional[Literal["filiale", "client"]] = None
 
 
 @router.post("")
@@ -145,6 +149,7 @@ async def create_entity(
                 "industry": body.industry,
                 "business_model": body.business_model,
                 "is_primary": False,
+                "relation_type": body.relation_type,
             })
             .execute()
         )

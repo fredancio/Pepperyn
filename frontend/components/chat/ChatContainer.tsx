@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Message, Session } from '@/lib/types';
-import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, fetchPreviousRecommendations, type BillingUsage, type Entity } from '@/lib/api';
+import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, fetchPreviousRecommendations, type BillingUsage, type Entity, type EntityRelationType } from '@/lib/api';
 import { getCurrentAuthMode, signOutAdmin, clearGuestAuth, getGuestPlan } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { MessageBubble, TypingIndicator } from './MessageBubble';
@@ -73,6 +73,7 @@ export function ChatContainer() {
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [showAddEntity, setShowAddEntity] = useState(false);
   const [newEntityName, setNewEntityName] = useState('');
+  const [newEntityRelation, setNewEntityRelation] = useState<EntityRelationType | null>(null);
   const [addingEntity, setAddingEntity] = useState(false);
   const [confirmDeleteHistory, setConfirmDeleteHistory] = useState(false);
   const [deletingHistory, setDeletingHistory] = useState(false);
@@ -151,13 +152,14 @@ export function ChatContainer() {
   }, [selectedEntityId, authMode]);
 
   const handleAddEntity = async () => {
-    if (!newEntityName.trim()) return;
+    if (!newEntityName.trim() || !newEntityRelation) return;
     setAddingEntity(true);
     try {
-      await createEntity(newEntityName.trim());
+      await createEntity(newEntityName.trim(), newEntityRelation);
       const updated = await fetchEntities();
       setEntities(updated);
       setNewEntityName('');
+      setNewEntityRelation(null);
       setShowAddEntity(false);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Erreur lors de la création');
@@ -522,20 +524,47 @@ export function ChatContainer() {
                           type="text"
                           value={newEntityName}
                           onChange={e => setNewEntityName(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') handleAddEntity(); if (e.key === 'Escape') setShowAddEntity(false); }}
+                          onKeyDown={e => { if (e.key === 'Escape') setShowAddEntity(false); }}
                           placeholder="Nom de l'entité..."
                           className="w-full px-2.5 py-1.5 text-xs border border-[#1B73E8]/40 rounded-lg focus:outline-none focus:border-[#1B73E8]"
                         />
+                        <p className="text-[11px] text-[#5F6368] px-0.5">
+                          Cette entité est-elle une filiale de votre groupe, ou un client que vous accompagnez ?
+                        </p>
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setNewEntityRelation('filiale')}
+                            className={`flex-1 py-1 text-xs font-medium rounded-lg border transition-colors ${
+                              newEntityRelation === 'filiale'
+                                ? 'bg-[#1B73E8] border-[#1B73E8] text-white'
+                                : 'bg-white border-blue-100 text-[#1A1A2E] hover:border-[#1B73E8]/40'
+                            }`}
+                          >
+                            Filiale
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setNewEntityRelation('client')}
+                            className={`flex-1 py-1 text-xs font-medium rounded-lg border transition-colors ${
+                              newEntityRelation === 'client'
+                                ? 'bg-[#1B73E8] border-[#1B73E8] text-white'
+                                : 'bg-white border-blue-100 text-[#1A1A2E] hover:border-[#1B73E8]/40'
+                            }`}
+                          >
+                            Client suivi
+                          </button>
+                        </div>
                         <div className="flex gap-1.5">
                           <button
                             onClick={handleAddEntity}
-                            disabled={addingEntity || !newEntityName.trim()}
+                            disabled={addingEntity || !newEntityName.trim() || !newEntityRelation}
                             className="flex-1 py-1 text-xs font-semibold bg-[#1B73E8] text-white rounded-lg hover:bg-[#1557b0] disabled:opacity-50"
                           >
                             {addingEntity ? '...' : 'Créer'}
                           </button>
                           <button
-                            onClick={() => { setShowAddEntity(false); setNewEntityName(''); }}
+                            onClick={() => { setShowAddEntity(false); setNewEntityName(''); setNewEntityRelation(null); }}
                             className="flex-1 py-1 text-xs text-[#5F6368] bg-gray-100 rounded-lg hover:bg-gray-200"
                           >
                             Annuler
