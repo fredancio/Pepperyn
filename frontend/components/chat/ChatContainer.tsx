@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Message, Session } from '@/lib/types';
-import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, fetchPreviousRecommendations, type BillingUsage, type Entity, type EntityRelationType } from '@/lib/api';
+import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, type BillingUsage, type Entity } from '@/lib/api';
 import { getCurrentAuthMode, signOutAdmin, clearGuestAuth, getGuestPlan } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { MessageBubble, TypingIndicator } from './MessageBubble';
@@ -73,7 +73,6 @@ export function ChatContainer() {
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [showAddEntity, setShowAddEntity] = useState(false);
   const [newEntityName, setNewEntityName] = useState('');
-  const [newEntityRelation, setNewEntityRelation] = useState<EntityRelationType | null>(null);
   const [addingEntity, setAddingEntity] = useState(false);
   const [confirmDeleteHistory, setConfirmDeleteHistory] = useState(false);
   const [deletingHistory, setDeletingHistory] = useState(false);
@@ -152,14 +151,13 @@ export function ChatContainer() {
   }, [selectedEntityId, authMode]);
 
   const handleAddEntity = async () => {
-    if (!newEntityName.trim() || !newEntityRelation) return;
+    if (!newEntityName.trim()) return;
     setAddingEntity(true);
     try {
-      await createEntity(newEntityName.trim(), newEntityRelation);
+      await createEntity(newEntityName.trim());
       const updated = await fetchEntities();
       setEntities(updated);
       setNewEntityName('');
-      setNewEntityRelation(null);
       setShowAddEntity(false);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Erreur lors de la création');
@@ -252,10 +250,14 @@ export function ChatContainer() {
     }
   }, [sessionId, analysisReceived, plan, questionsPostAnalysis]);
 
-  // Upload en attente d'un bilan pré-analyse (mémoire décisionnelle).
-  const pendingUploadRef = useRef<{ file: File; context: string; mode: 'quick' | 'complete' } | null>(null);
+  const handleSendFile = useCallback(async (file: File, context: string, mode: 'quick' | 'complete') => {
+    // Check question limit for free plan
+    if (analysisReceived && plan === 'free' && questionsPostAnalysis >= MAX_CHAT_QUESTIONS_FREE) {
+      const limitMsg = makeLocalMessage('assistant', LIMIT_MESSAGE, 'text');
+      setMessages(prev => [...prev, limitMsg]);
+      return;
+    }
 
-  const proceedWithUpload = useCallback(async (file: File, context: string, mode: 'quick' | 'complete') => {
     const userMsg = makeLocalMessage('user', `📎 ${file.name}${context ? `\n\nContexte : ${context}` : ''}`, 'file');
     setMessages(prev => [...prev, userMsg]);
     setIsTyping(true);
@@ -270,10 +272,9 @@ export function ChatContainer() {
       }
 
       if (result.result) {
-        const analyseId = result.analyse_id || result.result.id || null;
         const analysisMsg = makeLocalMessage('assistant', '', 'analysis', {
           ...result.result,
-          id: analyseId,
+          id: result.analyse_id || result.result.id || null,
           _questionsRestantes: MAX_CHAT_QUESTIONS_FREE,
           _memoryInsight: result.memory_insight || null,
           _filename: file.name,
@@ -281,17 +282,6 @@ export function ChatContainer() {
         setMessages(prev => [...prev, analysisMsg]);
         setAnalysisReceived(true);
         setQuestionsPostAnalysis(0);
-
-        // Mémoire décisionnelle : carte de feedback léger sur les
-        // recommandations prioritaires du rapport ("Que comptez-vous faire ?")
-        if (analyseId && result.recommendations_tracking && result.recommendations_tracking.length > 0) {
-          const feedbackMsg = makeLocalMessage('assistant', '', 'feedback_request', {
-            report_id: analyseId,
-            recommendations: result.recommendations_tracking,
-          });
-          setMessages(prev => [...prev, feedbackMsg]);
-        }
-
         // Refresh sidebar history
         loadSessionHistory();
       } else {
@@ -304,45 +294,7 @@ export function ChatContainer() {
     } finally {
       setIsTyping(false);
     }
-  }, [sessionId, selectedEntityId]);
-
-  const handleCheckInDone = useCallback(() => {
-    const pending = pendingUploadRef.current;
-    pendingUploadRef.current = null;
-    if (pending) {
-      void proceedWithUpload(pending.file, pending.context, pending.mode);
-    }
-  }, [proceedWithUpload]);
-
-  const handleSendFile = useCallback(async (file: File, context: string, mode: 'quick' | 'complete') => {
-    // Check question limit for free plan
-    if (analysisReceived && plan === 'free' && questionsPostAnalysis >= MAX_CHAT_QUESTIONS_FREE) {
-      const limitMsg = makeLocalMessage('assistant', LIMIT_MESSAGE, 'text');
-      setMessages(prev => [...prev, limitMsg]);
-      return;
-    }
-
-    // Mémoire décisionnelle : avant de relancer l'analyse, on fait le point
-    // sur les actions précédemment annoncées comme "je vais appliquer".
-    // Aucun appel à Claude ici — simple lecture Supabase.
-    try {
-      const previous = await fetchPreviousRecommendations();
-      const pendingItems = (previous.recommendations || []).filter(r => r.status === 'planned');
-      if (previous.has_previous && previous.report_id && pendingItems.length > 0) {
-        const checkinMsg = makeLocalMessage('assistant', '', 'recommendation_checkin', {
-          report_id: previous.report_id,
-          recommendations: previous.recommendations,
-        });
-        setMessages(prev => [...prev, checkinMsg]);
-        pendingUploadRef.current = { file, context, mode };
-        return;
-      }
-    } catch {
-      // en cas d'erreur, on ne bloque pas l'analyse
-    }
-
-    await proceedWithUpload(file, context, mode);
-  }, [analysisReceived, plan, questionsPostAnalysis, proceedWithUpload]);
+  }, [sessionId, analysisReceived, plan, questionsPostAnalysis]);
 
   const handleSignOut = async () => {
     if (authMode === 'admin') {
@@ -480,7 +432,7 @@ export function ChatContainer() {
                   </p>
                   {!canAccess(plan, 'entities') && (
                     <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">
-                      PRO
+                      POWER
                     </span>
                   )}
                 </div>
@@ -524,47 +476,20 @@ export function ChatContainer() {
                           type="text"
                           value={newEntityName}
                           onChange={e => setNewEntityName(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Escape') setShowAddEntity(false); }}
+                          onKeyDown={e => { if (e.key === 'Enter') handleAddEntity(); if (e.key === 'Escape') setShowAddEntity(false); }}
                           placeholder="Nom de l'entité..."
                           className="w-full px-2.5 py-1.5 text-xs border border-[#1B73E8]/40 rounded-lg focus:outline-none focus:border-[#1B73E8]"
                         />
-                        <p className="text-[11px] text-[#5F6368] px-0.5">
-                          Cette entité est-elle une filiale de votre groupe, ou un client que vous accompagnez ?
-                        </p>
-                        <div className="flex gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => setNewEntityRelation('filiale')}
-                            className={`flex-1 py-1 text-xs font-medium rounded-lg border transition-colors ${
-                              newEntityRelation === 'filiale'
-                                ? 'bg-[#1B73E8] border-[#1B73E8] text-white'
-                                : 'bg-white border-blue-100 text-[#1A1A2E] hover:border-[#1B73E8]/40'
-                            }`}
-                          >
-                            Filiale
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setNewEntityRelation('client')}
-                            className={`flex-1 py-1 text-xs font-medium rounded-lg border transition-colors ${
-                              newEntityRelation === 'client'
-                                ? 'bg-[#1B73E8] border-[#1B73E8] text-white'
-                                : 'bg-white border-blue-100 text-[#1A1A2E] hover:border-[#1B73E8]/40'
-                            }`}
-                          >
-                            Client suivi
-                          </button>
-                        </div>
                         <div className="flex gap-1.5">
                           <button
                             onClick={handleAddEntity}
-                            disabled={addingEntity || !newEntityName.trim() || !newEntityRelation}
+                            disabled={addingEntity || !newEntityName.trim()}
                             className="flex-1 py-1 text-xs font-semibold bg-[#1B73E8] text-white rounded-lg hover:bg-[#1557b0] disabled:opacity-50"
                           >
                             {addingEntity ? '...' : 'Créer'}
                           </button>
                           <button
-                            onClick={() => { setShowAddEntity(false); setNewEntityName(''); setNewEntityRelation(null); }}
+                            onClick={() => { setShowAddEntity(false); setNewEntityName(''); }}
                             className="flex-1 py-1 text-xs text-[#5F6368] bg-gray-100 rounded-lg hover:bg-gray-200"
                           >
                             Annuler
@@ -678,7 +603,7 @@ export function ChatContainer() {
               {!canAccess(plan, 'export_excel') && (
                 <div className="flex flex-col gap-1">
                   <p className="text-xs font-semibold text-[#5F6368] px-2 uppercase tracking-wide">
-                    Débloquer avec PRO
+                    Débloquer avec PRO / POWER
                   </p>
                   {([
                     { feature: 'memory_full' as Feature,   icon: '🧠', label: 'Mémoire persistante complète' },
@@ -858,7 +783,6 @@ export function ChatContainer() {
                       ? questionsRestantes
                       : null
                   }
-                  onCheckInDone={handleCheckInDone}
                 />
               ))}
               {isTyping && <TypingIndicator />}

@@ -28,6 +28,7 @@ from services.anonymization_service import (
     anonymize_text,
     deanonymize_recursive,
 )
+from security_config import get_jwt_guest_secret
 try:
     from services.memory_service import MemoryService
     _memory_service = MemoryService()
@@ -45,7 +46,6 @@ _usage_service = UsageService()
 
 router = APIRouter(prefix="/api", tags=["analyze"])
 
-JWT_SECRET = os.getenv("JWT_GUEST_SECRET", "pepperyn_guest_secret_key_change_in_prod")
 JWT_ALGORITHM = "HS256"
 MAX_FILE_SIZE_MB = int(os.getenv("MAX_FILE_SIZE_MB", "5"))
 ALLOWED_EXTENSIONS = {'xlsx', 'xls', 'csv', 'pdf'}
@@ -57,6 +57,7 @@ _pptx_cache:   dict[str, bytes] = {}          # analyse_id → pptx bytes
 _export_format_chosen: dict[str, str] = {}    # analyse_id → "excel"|"pdf"|"pptx"
 _analysis_result_cache: dict[str, dict] = {}  # analyse_id → result dict (pour PDF/PPTX à la demande)
 _anonymization_cache: dict[str, CorrespondenceTable] = {}  # analyse_id → table de correspondance (jamais envoyée à l'IA)
+_analysis_owner: dict[str, str] = {}          # analyse_id → company_id (contrôle d'accès aux exports)
 
 
 def _build_relation_section(entity_name: str, is_primary: bool, relation_type: Optional[str]) -> str:
@@ -119,8 +120,8 @@ async def _resolve_auth(
 
     # Try guest JWT first (our own format)
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        logger.warning(f"[AUTH DEBUG] JWT decoded — type={payload.get('type')!r} | company_id={payload.get('company_id')!r} | plan={payload.get('plan')!r}")
+        payload = jwt.decode(token, get_jwt_guest_secret(), algorithms=[JWT_ALGORITHM])
+        logger.debug("[AUTH] Guest JWT décodé (type=%s)", payload.get("type"))
         if payload.get("type") == "guest":
             return payload["company_id"], payload.get("plan", "free"), "guest"
     except JWTError:
@@ -133,7 +134,7 @@ async def _resolve_auth(
         user_response = supabase.auth.get_user(token)
         if user_response and user_response.user:
             user_id = user_response.user.id
-            logger.warning(f"[AUTH DEBUG] Admin user_id={user_id!r}")
+            logger.debug("[AUTH] Admin authentifié")
 
             # Step 1: get company_id from profiles
             company_id = None
@@ -145,15 +146,13 @@ async def _resolve_auth(
                     .limit(1)
                     .execute()
                 )
-                logger.warning(f"[AUTH DEBUG] Profile data={profile_response.data!r}")
                 if profile_response.data:
                     company_id = profile_response.data[0].get("company_id")
             except Exception as e:
-                logger.warning(f"[AUTH DEBUG] Profile lookup failed: {e}")
+                logger.debug("[AUTH] Profile lookup failed: %s", e)
 
             # Step 2: fallback — lookup company directly by admin_user_id
             if not company_id:
-                logger.warning(f"[AUTH DEBUG] company_id is None from profile, trying companies table")
                 try:
                     company_response = (
                         supabase.from_("companies")
@@ -162,13 +161,12 @@ async def _resolve_auth(
                         .limit(1)
                         .execute()
                     )
-                    logger.warning(f"[AUTH DEBUG] Companies data={company_response.data!r}")
                     if company_response.data:
                         company_id = company_response.data[0]["id"]
                         plan = company_response.data[0].get("plan", "free")
                         return company_id, plan, "admin"
                 except Exception as e:
-                    logger.warning(f"[AUTH DEBUG] Companies lookup failed: {e}")
+                    logger.debug("[AUTH] Companies lookup failed: %s", e)
 
             if company_id:
                 # Get plan from companies
@@ -187,8 +185,7 @@ async def _resolve_auth(
                     pass
                 return company_id, plan, "admin"
     except Exception as e:
-        logger.warning(f"[AUTH DEBUG] Admin auth exception: {e}")
-        pass
+        logger.debug("[AUTH] Admin auth exception: %s", e)
 
     raise HTTPException(status_code=401, detail="Token invalide ou expiré")
 
@@ -254,7 +251,8 @@ async def delete_analyses_history(
 
         return {"success": True, "deleted": deleted_count}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur suppression historique: {str(e)}")
+        logger.error("[ANALYZE] Erreur suppression historique: %s", e)
+        raise HTTPException(status_code=500, detail="Erreur lors de la suppression de l'historique.")
 
 
 @router.post("/analyze", response_model=AnalyzeResponse)
@@ -424,7 +422,8 @@ async def _run_analysis_pipeline(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lecture fichier: {str(e)}")
+        logger.error("[ANALYZE] Erreur lecture fichier: %s", e)
+        raise HTTPException(status_code=500, detail="Impossible de lire le fichier.")
 
     # ── CONFIDENTIALITÉ : anonymisation avant tout traitement IA ─────────────
     # Les noms de clients, fournisseurs, collaborateurs, emails, IBAN, n° TVA,
@@ -516,9 +515,11 @@ async def _run_analysis_pipeline(
             relation_section=relation_section,
         )
     except ValueError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("[ANALYZE] Erreur pipeline IA (ValueError): %s", e)
+        raise HTTPException(status_code=500, detail="Erreur lors de l'analyse.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur analyse IA: {str(e)}")
+        logger.error("[ANALYZE] Erreur analyse IA: %s", e)
+        raise HTTPException(status_code=500, detail="Erreur lors de l'analyse.")
 
     # ── CONFIDENTIALITÉ : ré-identification ──────────────────────────────────
     # Les alias (CLIENT_001, FOURNISSEUR_001, ...) renvoyés par l'IA sont
@@ -559,6 +560,10 @@ async def _run_analysis_pipeline(
     # Assign the analyse_id to the result object so the frontend can use it
     analyse_id = str(uuid.uuid4())
     analysis_result.id = analyse_id
+
+    # Contrôle d'accès : mémoriser à quelle company appartient cette analyse,
+    # pour que seuls ses membres puissent télécharger les exports (anti-IDOR).
+    _analysis_owner[analyse_id] = company_id
 
     # Conserver la table de correspondance (jamais envoyée à l'IA) pour le
     # chat de suivi sur cette analyse.
@@ -603,8 +608,7 @@ async def _run_analysis_pipeline(
     duration_ms = int((time.time() - start_time) * 1000)
     try:
         from services.crm_service import log_analysis as crm_log
-        # Debug: log company_id before CRM call to diagnose None issue
-        logger.warning(f"[CRM DEBUG] company_id={company_id!r} | type={type(company_id).__name__} | plan={plan!r} | auth_type={auth_type!r}")
+        logger.debug("[CRM] log_analysis (plan=%s, auth_type=%s)", plan, auth_type)
         # Resolve user email from Supabase (optional — enrichit la fiche CRM)
         _user_email = ""
         try:
@@ -714,9 +718,8 @@ def _save_to_db(
         if entity_id is not None:
             insert_payload["entity_id"] = entity_id
 
-        logger.warning(f"[DB DEBUG] Attempting insert — analyse_id={analyse_id} | company_id={company_id} | filename={filename}")
+        logger.debug("[DB] Insert analyse %s", analyse_id)
         result = supabase.from_("analyses").insert(insert_payload).execute()
-        logger.warning(f"[DB DEBUG] Insert success — data={result.data}")
 
     except Exception as e:
         logger.error(f"[DB ERROR] _save_to_db failed — analyse_id={analyse_id} | error={type(e).__name__}: {e}")
@@ -764,7 +767,8 @@ Réponds toujours en français."""
         )
         response_text = message.content[0].text
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur IA: {str(e)}")
+        logger.error("[ANALYZE] Erreur IA (texte): %s", e)
+        raise HTTPException(status_code=500, detail="Erreur lors de la génération de la réponse.")
 
     return TextQueryResponse(
         success=True,
@@ -832,7 +836,8 @@ async def chat_with_analysis(
             model_tier=model_tier,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur IA: {str(e)}")
+        logger.error("[ANALYZE] Erreur IA (chat): %s", e)
+        raise HTTPException(status_code=500, detail="Erreur lors de la génération de la réponse.")
 
     if correspondence_table and not correspondence_table.is_empty:
         response_text = deanonymize_recursive(response_text, correspondence_table)
@@ -865,6 +870,41 @@ async def chat_with_analysis(
         response=response_text,
         model_used=model_used,
     )
+
+
+def _verify_export_access(analyse_id: str, company_id: str) -> None:
+    """
+    Vérifie que l'analyse demandée appartient bien à la company authentifiée
+    avant de servir un export (anti-IDOR / BOLA).
+    1) cache en mémoire `_analysis_owner` ;
+    2) repli base de données (après redémarrage) en filtrant sur company_id.
+    Lève 404 si l'analyse n'existe pas ou n'appartient pas à la company.
+    """
+    owner = _analysis_owner.get(analyse_id)
+    if owner is not None:
+        if owner != company_id:
+            raise HTTPException(status_code=404, detail="Analyse introuvable")
+        return
+
+    # Repli DB : l'analyse n'est plus en cache mémoire
+    try:
+        from main import get_supabase_service
+        supabase = get_supabase_service()
+        row = (
+            supabase.from_("analyses")
+            .select("id")
+            .eq("id", analyse_id)
+            .eq("company_id", company_id)
+            .limit(1)
+            .execute()
+        )
+        if row.data:
+            _analysis_owner[analyse_id] = company_id
+            return
+    except Exception:
+        pass
+
+    raise HTTPException(status_code=404, detail="Analyse introuvable")
 
 
 def _check_and_lock_format(analyse_id: str, requested_format: str) -> None:
@@ -904,6 +944,9 @@ async def download_excel(
 
     company_id, plan, auth_type = await _resolve_auth(authorization, x_auth_type)
 
+    # Contrôle d'accès : l'analyse doit appartenir à la company authentifiée
+    _verify_export_access(analyse_id, company_id)
+
     # Enforce one-format rule
     _check_and_lock_format(analyse_id, "excel")
 
@@ -941,6 +984,9 @@ async def download_pdf(
     from services.export_pdf_service import generate_pdf_report
 
     company_id, plan, auth_type = await _resolve_auth(authorization, x_auth_type)
+
+    # Contrôle d'accès : l'analyse doit appartenir à la company authentifiée
+    _verify_export_access(analyse_id, company_id)
 
     # Enforce one-format rule
     _check_and_lock_format(analyse_id, "pdf")
@@ -982,7 +1028,8 @@ async def download_pdf(
             pdf_bytes = generate_pdf_report(result_dict)
             _pdf_cache[analyse_id] = pdf_bytes
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Erreur génération PDF: {str(e)}")
+            logger.error("[ANALYZE] Erreur génération PDF: %s", e)
+            raise HTTPException(status_code=500, detail="Erreur lors de la génération du PDF.")
 
     return Response(
         content=pdf_bytes,
@@ -1005,6 +1052,9 @@ async def download_pptx(
     from services.export_pptx_service import generate_pptx_report
 
     company_id, plan, auth_type = await _resolve_auth(authorization, x_auth_type)
+
+    # Contrôle d'accès : l'analyse doit appartenir à la company authentifiée
+    _verify_export_access(analyse_id, company_id)
 
     # Enforce one-format rule
     _check_and_lock_format(analyse_id, "pptx")
@@ -1044,7 +1094,8 @@ async def download_pptx(
             pptx_bytes = generate_pptx_report(result_dict)
             _pptx_cache[analyse_id] = pptx_bytes
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Erreur génération PowerPoint: {str(e)}")
+            logger.error("[ANALYZE] Erreur génération PowerPoint: %s", e)
+            raise HTTPException(status_code=500, detail="Erreur lors de la génération du PowerPoint.")
 
     return Response(
         content=pptx_bytes,

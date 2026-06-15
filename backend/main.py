@@ -1,10 +1,13 @@
 """
 Pepperyn Backend — FastAPI main application v2.0
 """
+import logging
 import os
 from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Optional
+
+logger = logging.getLogger("pepperyn.main")
 
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -55,13 +58,18 @@ async def lifespan(app: FastAPI):
 
 # ── App ───────────────────────────────────────────────────────
 
+# Doc API (Swagger/ReDoc) exposée uniquement hors production pour éviter
+# de divulguer publiquement la surface d'API.
+_is_prod = os.getenv("ENVIRONMENT", "development").lower() == "production"
+
 app = FastAPI(
     title="Pepperyn API",
     description="API backend pour Pepperyn — Assistant IA Financier B2B",
     version="2.0.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=None if _is_prod else "/docs",
+    redoc_url=None if _is_prod else "/redoc",
+    openapi_url=None if _is_prod else "/openapi.json",
 )
 
 # CORS
@@ -142,7 +150,8 @@ async def update_pin(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
+        logger.error("[ADMIN] update_pin error: %s", e)
+        raise HTTPException(status_code=500, detail="Erreur serveur.")
 
 
 @app.get("/api/admin/company")
@@ -177,7 +186,8 @@ async def get_company_info(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+        logger.error("[ADMIN] get_company_info error: %s", e)
+        raise HTTPException(status_code=500, detail="Erreur serveur.")
 
 
 @app.get("/api/admin/analytics")
@@ -241,7 +251,8 @@ async def get_analytics(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur: {str(e)}")
+        logger.error("[ADMIN] get_analytics error: %s", e)
+        raise HTTPException(status_code=500, detail="Erreur serveur.")
 
 
 # ── Health / Root ──────────────────────────────────────────────

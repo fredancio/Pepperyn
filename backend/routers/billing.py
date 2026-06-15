@@ -52,13 +52,12 @@ async def _resolve_auth(authorization: Optional[str]) -> tuple[str, str]:
 
     token = authorization.split(" ", 1)[1]
 
-    import os
     from jose import jwt, JWTError
-    JWT_SECRET = os.getenv("JWT_GUEST_SECRET", "pepperyn_guest_secret_key_change_in_prod")
+    from security_config import get_jwt_guest_secret
     JWT_ALGORITHM = "HS256"
 
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, get_jwt_guest_secret(), algorithms=[JWT_ALGORITHM])
         if payload.get("type") == "guest":
             return payload["company_id"], payload.get("plan", "free")
     except JWTError:
@@ -306,7 +305,7 @@ async def stripe_webhook(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"[WEBHOOK] Erreur inattendue: {type(e).__name__}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Erreur webhook: {str(e)}")
+        raise HTTPException(status_code=500, detail="Erreur lors du traitement du webhook.")
 
     # Appliquer l'action résultante
     if result.get("action") == "update_plan":

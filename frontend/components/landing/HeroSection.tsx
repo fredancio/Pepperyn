@@ -16,15 +16,12 @@ export function HeroSection() {
           <div className="flex flex-col items-start gap-4">
             {/* Headline — all blue */}
             <h1 className="text-4xl lg:text-5xl xl:text-6xl font-extrabold text-[#1B73E8] leading-tight">
-              Le copilote financier IA de votre entreprise
+              Scanner financier pour entreprises
             </h1>
 
             {/* Subtitle */}
-            <p className="text-xl lg:text-2xl text-[#1A1A2E] font-bold leading-snug">
+            <p className="text-lg text-[#1A1A2E] font-medium leading-snug">
               Transformez vos données financières en décisions business
-            </p>
-            <p className="text-base text-[#5F6368] font-medium leading-snug">
-              Analyse vos chiffres &amp; vous conseille. Apprend de vos décisions. S&apos;améliore avec votre entreprise.
             </p>
 
             {/* Description */}
@@ -32,8 +29,6 @@ export function HeroSection() {
               En quelques secondes, identifiez ce qui fonctionne,
               ce qui vous coûte et les décisions à prioriser —
               revenus, coûts, marges, anomalies et recommandations activables.
-              Le premier assistant financier qui se souvient de votre entreprise
-              et apprend de vos décisions.
             </p>
 
             {/* Bullets — bulles rondes bleues */}
@@ -42,7 +37,6 @@ export function HeroSection() {
                 'les leviers de rentabilité',
                 'les dérives qui impactent vos marges',
                 'les actions prioritaires à forte valeur',
-                'Recommandations qui s’améliorent dans le temps',
               ].map((item) => (
                 <li key={item} className="flex items-center gap-2.5 text-sm text-[#1A1A2E]">
                   <span className="w-5 h-5 rounded-full bg-[#1B73E8] flex items-center justify-center flex-shrink-0">
@@ -59,15 +53,9 @@ export function HeroSection() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
                 </span>
-                <strong>Une mémoire persistante, une IA qui apprend de vos décisions et s&apos;améliore</strong>
+                <strong>et surtout une mémoire financière persistante</strong>
               </li>
             </ul>
-
-            {/* Mémoire & apprentissage — précision discrète */}
-            <p className="text-xs text-[#5F6368] italic leading-relaxed max-w-lg">
-              Pepperyn conserve l&apos;historique de vos analyses, suit les actions réellement
-              mises en œuvre et améliore progressivement ses recommandations.
-            </p>
 
             {/* Signature produit — surlignage bleu, sans trait */}
             <div className="py-0.5">
@@ -112,7 +100,7 @@ export function HeroSection() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                   </svg>
                 </span>
-                Données 100% sécurisées et anonymisées avant analyse
+                Données sécurisées
               </Link>
               <span className="w-1 h-1 rounded-full bg-gray-300 hidden sm:block" />
               <span className="flex items-center gap-1.5">
@@ -127,25 +115,6 @@ export function HeroSection() {
               <span className="flex items-center gap-1.5">
                 <span className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 text-[#1B73E8] font-bold text-xs">1</span>
                 analyse gratuite · sans CB
-              </span>
-              <span className="w-1 h-1 rounded-full bg-gray-300 hidden sm:block" />
-              <span className="flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-3 h-3 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5C21.27 7.61 17 4.5 12 4.5z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15a3 3 0 100-6 3 3 0 000 6z" />
-                  </svg>
-                </span>
-                Apprend de votre entreprise
-              </span>
-              <span className="w-1 h-1 rounded-full bg-gray-300 hidden sm:block" />
-              <span className="flex items-center gap-1.5">
-                <span className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-3 h-3 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                  </svg>
-                </span>
-                Recommandations qui s&apos;améliorent dans le temps
               </span>
             </div>
           </div>

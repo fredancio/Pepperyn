@@ -182,4 +182,4 @@ async def get_crm_stats(
         raise
     except Exception as e:
         logger.error(f"[SUPERADMIN] stats error: {e}")
-        raise HTTPException(status_code=500, detail=f"Erreur serveur: {str(e)}")
+        raise HTTPException(status_code=500, detail="Erreur serveur.")

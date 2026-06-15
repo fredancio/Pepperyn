@@ -161,102 +161,6 @@ const firstAnswer = (
   </div>
 );
 
-const pinSystemAnswer = (
-  <div className="text-[#5F6368] leading-relaxed text-sm flex flex-col gap-4">
-    <p>
-      Le système de PIN permet de partager l&apos;accès à votre espace Pepperyn avec
-      les membres <span className="font-semibold text-[#1A1A2E]">internes</span> de
-      votre entreprise — direction financière, contrôle de gestion, direction générale,
-      ou encore les responsables de vos différentes filiales. Disponible dans les
-      plans PRO et SCALE ; en plan gratuit, l&apos;accès est individuel.
-    </p>
-
-    <div className="bg-[#EFF6FF] border border-[#1B73E8]/20 rounded-xl p-4">
-      <p className="font-semibold text-[#1A1A2E] mb-2">À qui s&apos;adresse ce partage d&apos;accès ?</p>
-      <p className="mb-2">Aux personnes qui font partie de votre organisation et qui pilotent ou suivent ses finances avec vous, par exemple :</p>
-      <ul className="flex flex-col gap-1.5 pl-4">
-        {[
-          'Le département financier (DAF, contrôle de gestion, comptabilité interne)',
-          'La direction générale ou les associés',
-          'Les directeurs ou responsables de vos filiales',
-        ].map(item => (
-          <li key={item} className="flex items-start gap-2">
-            <span className="text-[#1B73E8] font-bold flex-shrink-0">·</span>
-            {item}
-          </li>
-        ))}
-      </ul>
-    </div>
-
-    <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-      <p className="font-semibold text-[#1A1A2E] mb-2">
-        Ce partage n&apos;est en revanche pas destiné à vos clients externes.
-      </p>
-      <p className="mb-2">
-        Si vous êtes expert-comptable, fractional CFO ou consultant et que vous
-        utilisez Pepperyn pour analyser les comptes de vos clients, ces clients
-        ne doivent pas recevoir d&apos;accès à votre espace Pepperyn (dashboard, chat,
-        rapports).
-      </p>
-      <p>
-        Dans ce cas de figure, Pepperyn est <span className="font-semibold text-[#1A1A2E]">votre</span> outil
-        de travail : un service à valeur ajoutée que <span className="font-semibold text-[#1A1A2E]">vous</span> proposez
-        à vos clients (analyses, recommandations, suivi dans le temps), pas un
-        accès qu&apos;ils utilisent eux-mêmes. Donner l&apos;accès direct à un client
-        viendrait concurrencer ce service supplémentaire que vous lui offrez —
-        et n&apos;est donc pas prévu par la fonctionnalité de PIN d&apos;équipe.
-      </p>
-    </div>
-
-    <p className="text-xs">
-      En résumé : le PIN d&apos;équipe sert à partager l&apos;accès <span className="font-semibold text-[#1A1A2E]">au sein</span> de
-      votre entreprise (équipe interne, filiales), jamais avec des tiers externes
-      tels que vos propres clients.
-    </p>
-  </div>
-);
-
-const accountDeletionAnswer = (
-  <div className="text-[#5F6368] leading-relaxed text-sm flex flex-col gap-4">
-    <p>
-      Vous pouvez, à tout moment et sans justification, demander la suppression
-      définitive de votre compte et de l&apos;ensemble de vos données, depuis votre
-      espace ou en nous écrivant à{' '}
-      <a href="mailto:info@finflate.com" className="text-[#1B73E8] font-medium">info@finflate.com</a>.
-    </p>
-
-    <div className="bg-[#EFF6FF] border border-[#1B73E8]/20 rounded-xl p-4">
-      <p className="font-semibold text-[#1A1A2E] mb-2">Cette suppression est totale, définitive et irréversible :</p>
-      <ul className="flex flex-col gap-1.5 pl-4">
-        {[
-          "Votre compte, votre adresse e-mail et toutes vos données d'inscription sont effacés définitivement.",
-          "Tous les fichiers que vous avez transmis (relevés, exports, tableaux...) ainsi que tous les rapports et analyses générés sont supprimés de nos serveurs.",
-          "Aucune de vos données — fichiers, rapports, échanges, mémoire décisionnelle — n'est conservée, y compris sous forme anonymisée.",
-          "Aucune de vos données n'est utilisée, ni conservée, pour entraîner un quelconque modèle d'IA — ni le nôtre, ni celui d'un tiers.",
-          "Aucune trace de votre activité ne subsiste chez les fournisseurs d'IA tiers utilisés pour les analyses : ces prestataires ne conservent pas les données transmises au-delà du traitement de la requête.",
-        ].map(item => (
-          <li key={item} className="flex items-start gap-2">
-            <span className="text-[#1B73E8] font-bold flex-shrink-0">·</span>
-            {item}
-          </li>
-        ))}
-      </ul>
-    </div>
-
-    <p className="font-semibold text-[#1A1A2E]">
-      Concrètement : après suppression, tout se passe comme si vous n&apos;aviez
-      jamais utilisé Pepperyn. Plus aucune information vous concernant n&apos;est
-      conservée, nulle part.
-    </p>
-
-    <p className="text-xs">
-      La suppression est effectuée dans les meilleurs délais et au plus tard dans
-      les 30 jours suivant votre demande, conformément au Règlement Général sur la
-      Protection des Données (RGPD).
-    </p>
-  </div>
-);
-
 const faqs: FaqItem[] = [
   {
     question: 'Quelles différences entre le plan gratuit et les plans payants ?',
@@ -280,11 +184,7 @@ const faqs: FaqItem[] = [
   },
   {
     question: 'Comment fonctionne le système de PIN pour mon équipe ?',
-    answer: pinSystemAnswer,
-  },
-  {
-    question: 'Comment supprimer mon compte et mes données ?',
-    answer: accountDeletionAnswer,
+    answer: "Le partage d'accès équipe est disponible dans les plans PRO et SCALE. En plan gratuit, l'accès est individuel.",
   },
 ];
 

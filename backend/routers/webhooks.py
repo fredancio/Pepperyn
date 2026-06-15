@@ -14,9 +14,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/webhooks", tags=["webhooks"])
 
-# Secret partagé entre Supabase et notre backend (à définir dans .env)
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "pepperyn_webhook_secret_change_me")
-
 
 @router.post("/new-user")
 async def on_new_user(
@@ -41,8 +38,17 @@ async def on_new_user(
       }
     }
     """
-    # Validate secret (prevent unauthorized calls)
-    if x_webhook_secret != WEBHOOK_SECRET:
+    # Validate secret (prevent unauthorized calls).
+    # Fail-closed : refuse si le secret n'est pas configuré (pas de défaut public).
+    from security_config import get_webhook_secret
+    try:
+        expected_secret = get_webhook_secret()
+    except RuntimeError:
+        logger.error("[Webhook] WEBHOOK_SECRET non configuré — appel rejeté")
+        raise HTTPException(status_code=503, detail="Webhook non configuré")
+
+    import hmac
+    if not x_webhook_secret or not hmac.compare_digest(x_webhook_secret, expected_secret):
         raise HTTPException(status_code=401, detail="Secret invalide")
 
     body: dict[str, Any] = await request.json()

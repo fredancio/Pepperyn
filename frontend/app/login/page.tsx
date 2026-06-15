@@ -1,16 +1,13 @@
 'use client';
-import { useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { signInAdmin } from '@/lib/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import Link from 'next/link';
 
-function LoginForm() {
+export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectTo = searchParams.get('redirect') || '/app/chat';
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -27,7 +24,7 @@ function LoginForm() {
     setError('');
     try {
       await signInAdmin(email, password);
-      router.replace(redirectTo);
+      router.replace('/app/chat');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Email ou mot de passe incorrect');
     } finally {
@@ -42,11 +39,7 @@ function LoginForm() {
         <img src="/favicon.png?v=4" alt="Pepperyn" className="w-20 h-20 object-contain" />
         <div className="text-center">
           <h1 className="text-2xl font-bold text-[#1A1A2E]">Connexion à votre espace</h1>
-          {redirectTo === '/checkout/pro' ? (
-            <p className="text-sm text-[#1B73E8] font-medium">Connectez-vous pour finaliser votre abonnement PRO</p>
-          ) : (
-            <p className="text-sm text-[#5F6368]">Accédez à vos analyses financières</p>
-          )}
+          <p className="text-sm text-[#5F6368]">Accédez à vos analyses financières</p>
         </div>
       </div>
 
@@ -108,7 +101,7 @@ function LoginForm() {
           )}
 
           <Button type="submit" loading={loading} className="w-full" size="lg">
-            {loading ? 'Connexion...' : redirectTo === '/checkout/pro' ? 'Se connecter et passer à PRO →' : 'Se connecter →'}
+            {loading ? 'Connexion...' : 'Se connecter →'}
           </Button>
 
           <p className="text-center text-sm text-[#5F6368]">
@@ -120,17 +113,5 @@ function LoginForm() {
         </form>
       </div>
     </div>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-[#EFF6FF] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#1B73E8] border-t-transparent rounded-full animate-spin" />
-      </div>
-    }>
-      <LoginForm />
-    </Suspense>
   );
 }

@@ -7,14 +7,15 @@ import os
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Request
 from jose import jwt
 
 from models.schemas import PinLoginRequest, PinLoginResponse
+from security_config import get_jwt_guest_secret
+from services.rate_limiter import pin_login_limiter, client_ip_from_request
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-JWT_SECRET = os.getenv("JWT_GUEST_SECRET", "pepperyn_guest_secret_key_change_in_prod")
 JWT_ALGORITHM = "HS256"
 GUEST_TOKEN_EXPIRE_HOURS = 8
 
@@ -28,29 +29,48 @@ def create_guest_jwt(company_id: str, plan: str) -> str:
         "type": "guest",
         "exp": expire,
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return jwt.encode(payload, get_jwt_guest_secret(), algorithm=JWT_ALGORITHM)
 
 
 @router.post("/pin", response_model=PinLoginResponse)
-async def login_with_pin(request: PinLoginRequest):
+async def login_with_pin(request: PinLoginRequest, http_request: Request):
     """
     Guest login with 4-digit PIN.
     Validates against Supabase companies table via RPC.
     Returns a JWT valid for 8 hours.
+
+    Protégé contre le brute-force : verrouillage temporaire par IP après
+    plusieurs échecs (rate limiter en mémoire, voir services/rate_limiter.py).
     """
     from main import get_supabase_service
+
+    # ── Anti-brute-force : vérifier le verrou avant toute validation ──────────
+    client_ip = client_ip_from_request(http_request)
+    allowed, retry_after = pin_login_limiter.check(client_ip)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Trop de tentatives. Réessayez plus tard.",
+            headers={"Retry-After": str(retry_after)},
+        )
 
     supabase = get_supabase_service()
     try:
         result = supabase.rpc('validate_pin', {'input_pin': request.pin}).execute()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur base de données: {str(e)}")
+        import logging
+        logging.getLogger(__name__).error(f"[AUTH] validate_pin error: {e}")
+        raise HTTPException(status_code=500, detail="Erreur serveur. Merci de réessayer.")
 
     if not result.data:
-        # Small delay to prevent brute-force
+        # Enregistrer l'échec (peut déclencher le verrou) + petit délai anti-bruteforce
+        pin_login_limiter.record_failure(client_ip)
         import asyncio
         await asyncio.sleep(0.5)
         raise HTTPException(status_code=401, detail="Code PIN incorrect")
+
+    # Succès : réinitialiser le compteur pour cette IP
+    pin_login_limiter.record_success(client_ip)
 
     company = result.data[0]
     guest_token = create_guest_jwt(
@@ -95,7 +115,9 @@ async def delete_account(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Impossible de vérifier le token: {str(e)}")
+        import logging
+        logging.getLogger(__name__).warning(f"[AUTH] token verify error: {e}")
+        raise HTTPException(status_code=401, detail="Token invalide ou expiré")
 
     # Récupérer company_id depuis profiles
     try:
@@ -106,7 +128,9 @@ async def delete_account(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lecture profil: {str(e)}")
+        import logging
+        logging.getLogger(__name__).error(f"[AUTH] profil read error: {e}")
+        raise HTTPException(status_code=500, detail="Erreur serveur.")
 
     errors = []
 

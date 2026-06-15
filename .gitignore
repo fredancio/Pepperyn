@@ -12,3 +12,8 @@ Ressources/
 Thumbs.db
 *.log
 .Claude/
+
+# Documents de sécurité internes (peuvent contenir des secrets / infos sensibles)
+RAPPORT_SECURITE.md
+CHECKLIST_DEPLOIEMENT_SECURITE.md
+GUIDE_PAS_A_PAS_DEPLOIEMENT.md

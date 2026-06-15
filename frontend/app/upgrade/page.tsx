@@ -1,35 +1,28 @@
 'use client';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { normalizePlan } from '@/lib/featureGate';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-const PLANS_DATA = [
+const plans = [
   {
     id: 'free', name: 'FREE', subtitle: 'Découvrez Pepperyn', price: '0€', period: '',
-    tagline: 'Idéal pour tester Pepperyn sur vos propres données.',
     color: 'green', highlighted: false, badge: null,
     features: ['1 analyse / mois', 'Export PDF', 'Mémoire légère', '3 interactions contextuelles incluses'],
-    microcopy: '"Parfait pour tester Pepperyn sur vos propres données."',
-    ctaHref: null, ctaAction: null,
+    cta: 'Plan actuel', ctaDisabled: true, ctaHref: null,
   },
   {
     id: 'pro', name: 'PRO', subtitle: 'CFO, CEO, CFO de transition, dirigeants PME & startups, experts-comptables…', price: '79€', period: '/mois',
-    tagline: 'Votre copilote financier complet.',
     color: 'blue', highlighted: true, badge: '⭐ LE PLUS POPULAIRE',
     features: ['15 analyses / mois', '75 interactions contextuelles / mois', 'Exports Excel, PDF et PowerPoint', 'Mémoire persistante complète', 'Multi-entités (clients, filiales, dossiers)', 'Simulateur de décisions financières', 'Analyse multi-périodes & comparaisons', 'Projections financières', 'Crédits supplémentaires disponibles à la demande'],
-    microcopy: '"Gérez plusieurs clients ou entités depuis un seul outil."',
-    ctaHref: null, ctaAction: 'stripe',
+    cta: 'Passer à PRO', ctaDisabled: false, ctaHref: null,
   },
   {
     id: 'scale', name: 'SCALE', subtitle: 'Pour départements financiers, cabinets & groupes multi-entités', price: '349€', period: '/mois',
-    tagline: 'Votre AI Financial Operating System sur-mesure.',
     color: 'purple', highlighted: false, badge: null,
     features: ['250 analyses / mois', '500 interactions contextuelles / mois', '✦ Tout le plan PRO inclus', 'Workspace multi-utilisateurs & rôles', 'Permissions & gouvernance des analyses', 'Architecture multi-filiales & consolidation', 'Intégrations ERP, CRM & logiciels comptables', 'Workflows financiers personnalisés', 'Reporting automatisé & tableaux de bord', 'Hébergement dédié / déploiement on-premise', 'LLM privé / open-source en option', 'Onboarding dédié & SLA support prioritaire'],
-    microcopy: '"Industrialisez votre pilotage financier à l\'échelle de votre organisation."',
-    ctaHref: '/contact', ctaAction: null,
+    cta: 'Nous contacter', ctaDisabled: false, ctaHref: '/contact',
   },
 ];
 
@@ -39,38 +32,15 @@ const addons = [
   { id: 'addon_scale',   name: 'Scale Pack',   desc: '+200 analyses', price: '199€' },
 ];
 
-const colorMap: Record<string, { ring: string; bg: string; ctaUpgrade: string; ctaCurrent: string }> = {
-  green:  { ring: 'border-green-200',  bg: 'bg-white',     ctaUpgrade: 'bg-green-600 text-white hover:bg-green-700', ctaCurrent: 'bg-gray-100 text-gray-400 cursor-default' },
-  blue:   { ring: 'border-[#1B73E8]',  bg: 'bg-[#0A2540]', ctaUpgrade: 'bg-white text-[#1B73E8] hover:bg-blue-50',  ctaCurrent: 'bg-white/20 text-white/70 cursor-default' },
-  purple: { ring: 'border-purple-200', bg: 'bg-white',     ctaUpgrade: 'bg-[#7C3AED] text-white hover:bg-[#6D28D9]', ctaCurrent: 'bg-gray-100 text-gray-400 cursor-default' },
+const colorMap: Record<string, { ring: string; bg: string; cta: string }> = {
+  green:  { ring: 'border-green-200',  bg: 'bg-white',     cta: 'bg-gray-100 text-gray-400 cursor-default' },
+  blue:   { ring: 'border-[#1B73E8]',  bg: 'bg-[#0A2540]', cta: 'bg-white text-[#1B73E8] hover:bg-blue-50' },
+  purple: { ring: 'border-purple-200', bg: 'bg-white',     cta: 'bg-[#7C3AED] text-white hover:bg-[#6D28D9]' },
 };
 
 export default function UpgradePage() {
-  const [currentPlan, setCurrentPlan] = useState<string>('free');
-  const [loadingPlan, setLoadingPlan] = useState(true);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    async function loadPlan() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { setLoadingPlan(false); return; }
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('company:companies(plan)')
-          .eq('id', user.id)
-          .single();
-        const companyData = (profile as { company?: { plan?: string } } | null)?.company;
-        if (companyData?.plan) setCurrentPlan(normalizePlan(companyData.plan));
-      } catch {
-        // ignore
-      } finally {
-        setLoadingPlan(false);
-      }
-    }
-    loadPlan();
-  }, []);
 
   const handleUpgrade = async (planId: string) => {
     setLoading(planId);
@@ -78,11 +48,7 @@ export default function UpgradePage() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!session) {
-        // Redirect to login with return URL
-        window.location.href = '/login?redirect=/upgrade';
-        return;
-      }
+      if (!session) throw new Error('Connectez-vous d\'abord.');
 
       const res = await fetch(`${API_URL}/api/billing/checkout`, {
         method: 'POST',
@@ -133,6 +99,7 @@ export default function UpgradePage() {
           </h1>
           <p className="text-[#5F6368]">Pepperyn ne se contente pas d'analyser. Il vous indique quoi faire.</p>
           <p className="text-sm text-[#5F6368] italic mt-1">Chaque mois d'inaction détruit de la valeur.</p>
+
         </div>
 
         {error && (
@@ -143,12 +110,9 @@ export default function UpgradePage() {
 
         {/* Plans grid */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 items-stretch mb-12">
-          {PLANS_DATA.map((plan) => {
+          {plans.map((plan) => {
             const c = colorMap[plan.color];
             const isHighlighted = plan.highlighted;
-            const isCurrent = !loadingPlan && currentPlan === plan.id;
-            const isUpgrade = !loadingPlan && plan.id !== 'free' && currentPlan !== plan.id && plan.id !== 'scale';
-
             return (
               <div
                 key={plan.id}
@@ -164,20 +128,12 @@ export default function UpgradePage() {
                 <div>
                   <p className={`text-xs font-bold uppercase tracking-widest mb-1 ${isHighlighted ? 'text-blue-300' : 'text-[#5F6368]'}`}>
                     {plan.name}
-                    {isCurrent && (
-                      <span className="ml-2 px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-[10px] font-semibold normal-case tracking-normal">
-                        Plan actuel
-                      </span>
-                    )}
                   </p>
                   <p className={`text-xs mb-2 ${isHighlighted ? 'text-slate-300' : 'text-[#5F6368]'}`}>{plan.subtitle}</p>
                   <div className="flex items-end gap-1">
                     <span className={`text-3xl font-extrabold ${isHighlighted ? 'text-white' : 'text-[#1A1A2E]'}`}>{plan.price}</span>
                     {plan.period && <span className={`text-sm mb-0.5 ${isHighlighted ? 'text-slate-300' : 'text-[#5F6368]'}`}>{plan.period}</span>}
                   </div>
-                  {plan.tagline && (
-                    <p className={`text-xs mt-1 font-medium ${isHighlighted ? 'text-blue-200' : 'text-[#1B73E8]'}`}>{plan.tagline}</p>
-                  )}
                 </div>
 
                 <div className={`h-px ${isHighlighted ? 'bg-white/15' : 'bg-gray-100'}`} />
@@ -193,31 +149,28 @@ export default function UpgradePage() {
                   ))}
                 </ul>
 
-                {plan.microcopy && (
-                  <p className={`text-xs italic ${isHighlighted ? 'text-slate-400' : 'text-[#5F6368]'}`}>{plan.microcopy}</p>
-                )}
-
-                {/* CTA */}
-                {isCurrent ? (
-                  <div className={`w-full py-2.5 rounded-xl font-bold text-sm text-center ${c.ctaCurrent}`}>
-                    ✓ Plan actuel
-                  </div>
-                ) : plan.ctaHref ? (
+                {!plan.ctaDisabled && plan.ctaHref && (
                   <Link
                     href={plan.ctaHref}
-                    className={`w-full py-2.5 rounded-xl font-bold text-sm text-center transition-all block ${c.ctaUpgrade}`}
+                    className={`w-full py-2.5 rounded-xl font-bold text-sm text-center transition-all block ${c.cta}`}
                   >
-                    Nous contacter
+                    {plan.cta}
                   </Link>
-                ) : plan.ctaAction === 'stripe' ? (
+                )}
+                {!plan.ctaDisabled && !plan.ctaHref && (
                   <button
                     onClick={() => handleUpgrade(plan.id)}
                     disabled={loading === plan.id}
-                    className={`w-full py-2.5 rounded-xl font-bold text-sm text-center transition-all block disabled:opacity-70 ${c.ctaUpgrade}`}
+                    className={`w-full py-2.5 rounded-xl font-bold text-sm text-center transition-all block disabled:opacity-70 ${c.cta}`}
                   >
-                    {loading === plan.id ? 'Redirection…' : 'Passer à PRO'}
+                    {loading === plan.id ? 'Redirection…' : plan.cta}
                   </button>
-                ) : null}
+                )}
+                {plan.ctaDisabled && (
+                  <div className={`w-full py-2.5 rounded-xl font-bold text-sm text-center ${c.cta}`}>
+                    {plan.cta}
+                  </div>
+                )}
               </div>
             );
           })}
