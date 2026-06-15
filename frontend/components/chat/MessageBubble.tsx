@@ -1,20 +1,60 @@
-import type { Message } from '@/lib/types';
+import type { Message, RecommendationTracking } from '@/lib/types';
 import { AnalysisResult } from './AnalysisResult';
 import { CoachingMessage } from './CoachingMessage';
+import { FeedbackCard } from './FeedbackCard';
+import { RecommendationCheckIn } from './RecommendationCheckIn';
 
 interface MessageBubbleProps {
   message: Message;
   questionsRestantes?: number | null;
   plan?: string;
+  /** Appelé quand l'utilisateur a terminé (ou passé) le bilan pré-analyse. */
+  onCheckInDone?: () => void;
 }
 
 function formatTime(dateStr: string): string {
   return new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
-export function MessageBubble({ message, questionsRestantes, plan = 'free' }: MessageBubbleProps) {
+export function MessageBubble({ message, questionsRestantes, plan = 'free', onCheckInDone }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
+
+  // Cartes de feedback post-rapport — "Que comptez-vous faire ?"
+  if (message.content_type === 'feedback_request' && message.metadata) {
+    const meta = message.metadata as { report_id: string; recommendations: RecommendationTracking[] };
+    return (
+      <div className="flex items-start gap-3 max-w-[92%] animate-slide-up">
+        <div className="w-8 h-8 bg-[#1B73E8] rounded-full flex-shrink-0 flex items-center justify-center mt-1 shadow-sm">
+          <span className="text-white text-xs font-bold">P</span>
+        </div>
+        <div className="flex-1">
+          <FeedbackCard reportId={meta.report_id} recommendations={meta.recommendations} />
+          <p className="text-xs text-[#5F6368] mt-1 ml-1">{formatTime(message.created_at)}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Bilan pré-analyse — "Avant de relancer l'analyse, faisons le point..."
+  if (message.content_type === 'recommendation_checkin' && message.metadata) {
+    const meta = message.metadata as { report_id: string; recommendations: RecommendationTracking[] };
+    return (
+      <div className="flex items-start gap-3 max-w-[92%] animate-slide-up">
+        <div className="w-8 h-8 bg-[#1B73E8] rounded-full flex-shrink-0 flex items-center justify-center mt-1 shadow-sm">
+          <span className="text-white text-xs font-bold">P</span>
+        </div>
+        <div className="flex-1">
+          <RecommendationCheckIn
+            reportId={meta.report_id}
+            recommendations={meta.recommendations}
+            onDone={onCheckInDone || (() => {})}
+          />
+          <p className="text-xs text-[#5F6368] mt-1 ml-1">{formatTime(message.created_at)}</p>
+        </div>
+      </div>
+    );
+  }
 
   if (message.content_type === 'analysis' && message.metadata) {
     const meta = message.metadata as Record<string, unknown>;

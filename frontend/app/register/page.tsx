@@ -1,5 +1,6 @@
 'use client';
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { signUpAdmin } from '@/lib/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -29,7 +30,11 @@ const USAGE_TYPES = [
   { value: 'plusieurs_filiales', label: 'Plusieurs filiales' },
 ];
 
-export default function RegisterPage() {
+function RegisterForm() {
+  const searchParams = useSearchParams();
+  const planParam = searchParams.get('plan') ?? 'free';
+  const isPro = planParam === 'pro';
+
   const [step, setStep] = useState<Step>('form');
   const [prenom, setPrenom] = useState('');
   const [nom, setNom] = useState('');
@@ -73,13 +78,13 @@ export default function RegisterPage() {
     setLoading(true);
     setError('');
     try {
-      // Pass extended metadata — signUpAdmin will store what it can
+      const emailRedirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(isPro ? '/checkout/pro' : '/app/chat')}`;
       await signUpAdmin(email, password, prenom, industry, businessModel, {
         nom,
         organisation,
         user_type: userType,
         usage_type: usageType,
-      });
+      }, emailRedirectTo);
       setStep('confirmation');
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors de l'inscription");
@@ -98,28 +103,72 @@ export default function RegisterPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-[#1A1A2E] mb-2">
-            ✅ Votre espace Pepperyn est créé !
-          </h2>
-          <p className="text-[#5F6368] mb-6">
-            Bienvenue, <strong>{prenom} {nom}</strong>. Votre espace est prêt.
-          </p>
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left">
-            <div className="flex items-start gap-2">
-              <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <div>
-                <p className="text-sm font-medium text-amber-800">Vérifiez votre email</p>
-                <p className="text-xs text-amber-700 mt-0.5">
-                  Un lien de confirmation a été envoyé à <strong>{email}</strong>. Cliquez dessus pour activer votre compte.
-                </p>
+
+          {isPro ? (
+            <>
+              <h2 className="text-2xl font-bold text-[#1A1A2E] mb-2">
+                🎉 Votre espace PRO est créé !
+              </h2>
+              <p className="text-[#5F6368] mb-4">
+                Bienvenue, <strong>{prenom} {nom}</strong>. Plus qu'une étape pour activer le plan PRO.
+              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 text-left">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">Vérifiez votre email</p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      Un lien de confirmation a été envoyé à <strong>{email}</strong>. Cliquez dessus pour activer votre compte — vous serez redirigé(e) automatiquement vers le paiement PRO.
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <Button size="lg" className="w-full" onClick={() => window.location.href = '/app/chat'}>
-            Accéder à Pepperyn →
-          </Button>
+              <div className="bg-[#EFF6FF] border border-blue-100 rounded-xl p-4 mb-6 text-left">
+                <p className="text-xs font-semibold text-[#1B73E8] mb-2 uppercase tracking-wide">Étapes suivantes</p>
+                <ol className="flex flex-col gap-1.5">
+                  {['Confirmez votre email (lien envoyé)', 'Complétez le paiement PRO via Stripe'].map((step, i) => (
+                    <li key={i} className="flex items-center gap-2 text-xs text-[#5F6368]">
+                      <span className="w-5 h-5 bg-[#1B73E8] text-white rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0">{i + 1}</span>
+                      {step}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              <Button size="lg" className="w-full" onClick={() => window.location.href = '/checkout/pro'}>
+                Accéder au paiement →
+              </Button>
+              <p className="text-center text-xs text-[#5F6368] mt-3 italic">
+                Le bouton ci-dessus fonctionne dès que votre email est confirmé.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-2xl font-bold text-[#1A1A2E] mb-2">
+                ✅ Votre espace Pepperyn est créé !
+              </h2>
+              <p className="text-[#5F6368] mb-6">
+                Bienvenue, <strong>{prenom} {nom}</strong>. Votre espace est prêt.
+              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-left">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">Vérifiez votre email</p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      Un lien de confirmation a été envoyé à <strong>{email}</strong>. Cliquez dessus pour activer votre compte.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <Button size="lg" className="w-full" onClick={() => window.location.href = '/app/chat'}>
+                Accéder à Pepperyn →
+              </Button>
+            </>
+          )}
         </div>
       </div>
     );
@@ -132,9 +181,24 @@ export default function RegisterPage() {
         <img src="/favicon.png?v=4" alt="Pepperyn" className="w-20 h-20 object-contain" />
         <div className="text-center">
           <h1 className="text-2xl font-bold text-[#1A1A2E]">Créer votre espace entreprise</h1>
-          <p className="text-sm text-[#5F6368]">Commencez gratuitement — sans carte bancaire</p>
+          {isPro ? (
+            <p className="text-sm text-[#1B73E8] font-medium">Plan PRO — 79€/mois · Sans engagement</p>
+          ) : (
+            <p className="text-sm text-[#5F6368]">Commencez gratuitement — sans carte bancaire</p>
+          )}
         </div>
       </div>
+
+      {/* PRO intent banner */}
+      {isPro && (
+        <div className="w-full max-w-md mb-4 bg-[#0A2540] rounded-2xl px-5 py-4 flex items-center gap-3">
+          <span className="text-2xl">⭐</span>
+          <div>
+            <p className="text-white font-bold text-sm">Vous activez le plan PRO</p>
+            <p className="text-slate-300 text-xs mt-0.5">15 analyses / mois · Exports Excel, PDF & PowerPoint · Mémoire persistante complète</p>
+          </div>
+        </div>
+      )}
 
       {/* Card */}
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
@@ -336,18 +400,32 @@ export default function RegisterPage() {
           )}
 
           {/* Plan info */}
-          <div className="bg-[#EFF6FF] border border-blue-100 rounded-xl p-4">
-            <div className="flex items-center gap-2 mb-1">
-              <svg className="w-4 h-4 text-[#1B73E8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="text-sm font-medium text-[#1B73E8]">Plan gratuit activé</span>
+          {isPro ? (
+            <div className="bg-[#0A2540] rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 bg-amber-400 text-white text-xs font-bold rounded-full">PRO</span>
+                <span className="text-sm font-medium text-white">79€/mois — sans engagement</span>
+              </div>
+              <p className="text-xs text-slate-300">Paiement sécurisé via Stripe après la création de votre espace</p>
             </div>
-            <p className="text-xs text-[#5F6368]">1 analyse / mois · Export PDF · Pas de carte bancaire</p>
-          </div>
+          ) : (
+            <div className="bg-[#EFF6FF] border border-blue-100 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <svg className="w-4 h-4 text-[#1B73E8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm font-medium text-[#1B73E8]">Plan gratuit activé</span>
+              </div>
+              <p className="text-xs text-[#5F6368]">1 analyse / mois · Export PDF · Pas de carte bancaire</p>
+            </div>
+          )}
 
           <Button type="submit" loading={loading} className="w-full" size="lg">
-            {loading ? 'Création de votre espace...' : 'Créer mon espace →'}
+            {loading
+              ? 'Création de votre espace...'
+              : isPro
+              ? 'Créer mon espace et passer à PRO →'
+              : 'Créer mon espace →'}
           </Button>
 
           <p className="text-center text-sm text-[#5F6368]">
@@ -359,5 +437,17 @@ export default function RegisterPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#EFF6FF] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-[#1B73E8] border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }

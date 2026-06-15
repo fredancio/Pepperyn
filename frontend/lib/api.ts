@@ -58,11 +58,27 @@ export async function analyzeFile(
     headers,
     body: formData,
   });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { detail?: string }).detail || "Erreur lors de l'analyse");
+
+  // La réponse peut être précédée d'octets "heartbeat" (espaces) envoyés
+  // pendant le traitement des analyses longues, pour éviter qu'un proxy
+  // ne coupe la connexion par inactivité. JSON.parse ignore les espaces
+  // de tête, donc on parse le texte brut nous-mêmes.
+  const text = await res.text();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let data: any = {};
+  try {
+    data = text.trim() ? JSON.parse(text) : {};
+  } catch {
+    data = {};
   }
-  return res.json();
+
+  if (!res.ok) {
+    throw new Error((data as { detail?: string }).detail || "Erreur lors de l'analyse");
+  }
+  if ((data as { success?: boolean }).success === false) {
+    throw new Error((data as { message?: string }).message || "Erreur lors de l'analyse");
+  }
+  return data;
 }
 
 export async function analyzeText(
@@ -157,22 +173,29 @@ export async function deleteAnalysesHistory(): Promise<{ success: boolean; delet
   return res.json();
 }
 
+// Relation de l'entité secondaire avec l'entité principale :
+// - "filiale" : filiale du groupe (l'analyse situe son poids/risque au niveau du groupe)
+// - "client"  : client suivi par l'utilisateur (l'analyse aide à évaluer la relation)
+// - undefined/null : non renseigné (entité principale, ou non précisé)
+export type EntityRelationType = 'filiale' | 'client';
+
 export interface Entity {
   id: string;
   name: string;
   industry?: string;
   business_model?: string;
   is_primary: boolean;
+  relation_type?: EntityRelationType | null;
   workspace_id: string;
   created_at: string;
 }
 
-export async function createEntity(name: string): Promise<Entity> {
+export async function createEntity(name: string, relationType?: EntityRelationType): Promise<Entity> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/api/entities`, {
     method: 'POST',
     headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, relation_type: relationType ?? null }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
@@ -212,4 +235,51 @@ export async function fetchBillingUsage(): Promise<BillingUsage | null> {
   } catch {
     return null;
   }
+}
+
+// ─── Decision Memory (mémoire décisionnelle) ──────────────────────────────
+
+import type { PreviousRecommendations, DecisionFeedbackStatus } from './types';
+
+/**
+ * Récupère les recommandations du dernier rapport complété, avec le statut/
+ * commentaire déjà enregistré pour chacune (ou null si pas encore de feedback).
+ * Utilisé pour l'écran de pré-analyse et les cartes de feedback post-rapport.
+ * Aucun appel à Claude — lecture Supabase uniquement.
+ */
+export async function fetchPreviousRecommendations(): Promise<PreviousRecommendations> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_URL}/api/decision-feedback/previous`, { headers });
+    if (!res.ok) return { has_previous: false, report_id: null, recommendations: [] };
+    return res.json();
+  } catch {
+    return { has_previous: false, report_id: null, recommendations: [] };
+  }
+}
+
+/**
+ * Enregistre (ou met à jour) le feedback de l'utilisateur sur une
+ * recommandation : intention (post-rapport) ou bilan (pré-analyse).
+ * Aucun appel à Claude — écriture Supabase uniquement.
+ */
+export async function submitDecisionFeedback(params: {
+  report_id: string;
+  recommendation_id: string;
+  recommendation_text: string;
+  recommendation_source?: string;
+  status: DecisionFeedbackStatus;
+  comment?: string;
+}): Promise<{ success: boolean }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/decision-feedback`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || "Erreur lors de l'enregistrement du feedback");
+  }
+  return res.json();
 }

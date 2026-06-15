@@ -24,7 +24,8 @@ export async function signUpAdmin(
     organisation?: string;
     user_type?: string;
     usage_type?: string;
-  }
+  },
+  emailRedirectTo?: string
 ) {
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -39,6 +40,7 @@ export async function signUpAdmin(
         user_type: extra?.user_type ?? '',
         usage_type: extra?.usage_type ?? '',
       },
+      ...(emailRedirectTo ? { emailRedirectTo } : {}),
     },
   });
   if (error) throw error;
