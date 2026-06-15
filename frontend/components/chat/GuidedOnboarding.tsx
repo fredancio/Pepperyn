@@ -14,6 +14,7 @@ const STEPS: Step[] = [
     question: 'Qu\'est-ce que vous souhaitez analyser ?',
     choices: [
       { label: 'Mon compte de résultat ou P&L', value: 'pl', emoji: '📊' },
+      { label: 'Mon bilan et une analyse financière complète', value: 'complete', emoji: '📈' },
       { label: 'Mon budget ou prévisionnel', value: 'budget', emoji: '🎯' },
       { label: 'Ma trésorerie ou cash flow', value: 'cashflow', emoji: '💰' },
       { label: 'Je ne sais pas encore', value: 'unknown', emoji: '🤔' },
@@ -39,6 +40,12 @@ const GUIDANCE: Record<string, Record<string, string>> = {
     software: "Depuis votre logiciel, exportez le **Compte de résultat** ou **P&L** en Excel (.xlsx). Dans **Exact Online** : Rapports → Compte de résultat → Exporter. Dans **Odoo** : Comptabilité → Rapports → Bilan des revenus → Excel. Dans **Sage** : Analyse → P&L → Export.\n\n" + COPILOT_TIP,
     self: "Si vous avez créé votre P&L vous-même, assurez-vous que : **ligne 1** = en-têtes (Jan, Fév, Mar…), **colonne A** = noms des postes (CA, Charges, Résultat…), et que les cellules contiennent des chiffres.\n\n" + COPILOT_TIP,
     none: "Pas de problème ! Consultez notre [guide de préparation](/guide-donnees) — il vous explique étape par étape comment obtenir le bon fichier depuis votre comptable ou votre logiciel.\n\n" + COPILOT_TIP,
+  },
+  complete: {
+    accountant: "Votre comptable peut vous transmettre à la fois votre **bilan** et votre **compte de résultat** (P&L) — demandez les deux en format **.xlsx** (pas PDF). Uploadez les deux fichiers dans Pepperyn pour une analyse financière complète : rentabilité, structure financière et équilibre du bilan.\n\n" + COPILOT_TIP,
+    software: "Exportez votre **bilan** et votre **compte de résultat** depuis votre logiciel en Excel (.xlsx). Dans **Exact Online** : Rapports → Bilan / Compte de résultat → Exporter. Dans **Odoo** : Comptabilité → Rapports → Bilan / Bilan des revenus → Excel. Dans **Sage** : Analyse → Bilan / P&L → Export.\n\n" + COPILOT_TIP,
+    self: "Pour une analyse complète, préparez deux fichiers (ou deux onglets) : un pour le **bilan** (actif / passif) et un pour le **compte de résultat** (charges / produits). Respectez le format : **ligne 1** = en-têtes (Jan, Fév, Mar…), **colonne A** = noms des postes, et des cellules au format nombre.\n\n" + COPILOT_TIP,
+    none: "Pas de problème ! Consultez notre [guide de préparation](/guide-donnees) — il vous explique comment obtenir votre bilan et votre compte de résultat auprès de votre comptable ou de votre logiciel, pour une analyse financière complète.\n\n" + COPILOT_TIP,
   },
   budget: {
     accountant: "Demandez à votre comptable un export Excel de votre **budget vs réalisé** avec 3 colonnes : Poste | Budget | Réel. Pepperyn détectera automatiquement les écarts et les expliquera.\n\n" + COPILOT_TIP,
