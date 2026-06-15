@@ -161,6 +161,47 @@ const firstAnswer = (
   </div>
 );
 
+const accountDeletionAnswer = (
+  <div className="text-[#5F6368] leading-relaxed text-sm flex flex-col gap-4">
+    <p>
+      Vous pouvez, à tout moment et sans justification, demander la suppression
+      définitive de votre compte et de l&apos;ensemble de vos données, depuis votre
+      espace ou en nous écrivant à{' '}
+      <a href="mailto:info@finflate.com" className="text-[#1B73E8] font-medium">info@finflate.com</a>.
+    </p>
+
+    <div className="bg-[#EFF6FF] border border-[#1B73E8]/20 rounded-xl p-4">
+      <p className="font-semibold text-[#1A1A2E] mb-2">Cette suppression est totale, définitive et irréversible :</p>
+      <ul className="flex flex-col gap-1.5 pl-4">
+        {[
+          "Votre compte, votre adresse e-mail et toutes vos données d'inscription sont effacés définitivement.",
+          "Tous les fichiers que vous avez transmis (relevés, exports, tableaux...) ainsi que tous les rapports et analyses générés sont supprimés de nos serveurs.",
+          "Aucune de vos données — fichiers, rapports, échanges, mémoire décisionnelle — n'est conservée, y compris sous forme anonymisée.",
+          "Aucune de vos données n'est utilisée, ni conservée, pour entraîner un quelconque modèle d'IA — ni le nôtre, ni celui d'un tiers.",
+          "Aucune trace de votre activité ne subsiste chez les fournisseurs d'IA tiers utilisés pour les analyses : ces prestataires ne conservent pas les données transmises au-delà du traitement de la requête.",
+        ].map(item => (
+          <li key={item} className="flex items-start gap-2">
+            <span className="text-[#1B73E8] font-bold flex-shrink-0">·</span>
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+
+    <p className="font-semibold text-[#1A1A2E]">
+      Concrètement : après suppression, tout se passe comme si vous n&apos;aviez
+      jamais utilisé Pepperyn. Plus aucune information vous concernant n&apos;est
+      conservée, nulle part.
+    </p>
+
+    <p className="text-xs">
+      La suppression est effectuée dans les meilleurs délais et au plus tard dans
+      les 30 jours suivant votre demande, conformément au Règlement Général sur la
+      Protection des Données (RGPD).
+    </p>
+  </div>
+);
+
 const faqs: FaqItem[] = [
   {
     question: 'Quelles différences entre le plan gratuit et les plans payants ?',
@@ -185,6 +226,10 @@ const faqs: FaqItem[] = [
   {
     question: 'Comment fonctionne le système de PIN pour mon équipe ?',
     answer: "Le partage d'accès équipe est disponible dans les plans PRO et SCALE. En plan gratuit, l'accès est individuel.",
+  },
+  {
+    question: 'Comment supprimer mon compte et mes données ?',
+    answer: accountDeletionAnswer,
   },
 ];
 
