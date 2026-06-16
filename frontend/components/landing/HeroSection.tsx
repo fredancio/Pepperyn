@@ -11,7 +11,7 @@ export function HeroSection() {
       <div className="absolute bottom-20 left-10 w-96 h-96 bg-indigo-200/20 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-24 lg:pt-32 lg:pb-36">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+        <div className="grid lg:grid-cols-2 gap-12 items-stretch">
           {/* Left column */}
           <div className="flex flex-col items-start gap-4">
             {/* Headline — all blue */}
@@ -77,7 +77,7 @@ export function HeroSection() {
             </div>
 
             {/* Formats acceptés — badges pills colorés */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 mt-auto">
               <span className="text-xs font-medium text-[#5F6368] mr-1">Compatible :</span>
               {[
                 { label: 'Excel',  bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: '📊' },
