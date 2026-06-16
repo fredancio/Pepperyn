@@ -24,7 +24,7 @@ export function HeroSection() {
               Transformez vos données financières en décisions business
             </p>
             <p className="text-base text-[#5F6368] font-medium leading-snug">
-              Analyse vos chiffres &amp; vous conseille. Apprend de vos décisions. S&apos;améliore avec votre entreprise.
+              Analyse vos chiffres &amp; vous conseille. Apprend de vos décisions. S&apos;améliore avec le temps.
             </p>
 
             {/* Description */}
