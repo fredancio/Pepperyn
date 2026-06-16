@@ -157,7 +157,7 @@ export function HeroSection() {
               <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-[#1B73E8] to-[#0D47A1] px-4 py-3 flex items-center gap-3">
-                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                  <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
                     <img src="/favicon.png?v=5" alt="Pepperyn" className="w-8 h-8 object-contain" />
                   </div>
                   <div>
@@ -272,6 +272,48 @@ export function HeroSection() {
                           <p className="text-[10px] font-bold text-green-700">✅ 6 mois</p>
                           <p className="text-[9px] text-green-600 leading-tight">Retour à l&apos;équilibre —<br/>budget 2026 atteignable</p>
                         </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Rapport complet — aperçu plan d'action avec sections tronquées */}
+                  <div className="flex items-start gap-2 max-w-[92%]">
+                    <div className="w-7 h-7 bg-[#1B73E8] rounded-full flex-shrink-0 flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">P</span>
+                    </div>
+                    <div className="bg-white rounded-2xl rounded-tl-none px-3 py-3 shadow-sm w-full">
+                      <div className="flex items-center justify-between mb-2.5">
+                        <p className="text-[10px] font-semibold text-[#5F6368] uppercase tracking-wide">Rapport détaillé généré</p>
+                        <span className="text-[9px] font-bold text-white bg-[#1B73E8] px-1.5 py-0.5 rounded-full">9 sections</span>
+                      </div>
+
+                      {/* Section header style rapport */}
+                      <div className="bg-[#1A1A2E] rounded-md px-2.5 py-1.5 mb-2">
+                        <p className="text-[9px] font-bold text-white uppercase tracking-wide">■ Plan d&apos;action prioritaire · 5 actions</p>
+                      </div>
+
+                      {/* Actions visibles */}
+                      <div className="flex flex-col gap-1 mb-2 px-0.5">
+                        {[
+                          { dot: 'bg-red-500', text: 'Réduire ETP support avant juillet → allège MS_PERS_SUPP durablement', faded: false },
+                          { dot: 'bg-amber-400', text: 'Augmenter TJM nouveaux contrats → améliore marge CA_REGIE_NET', faded: false },
+                          { dot: 'bg-green-500', text: 'Accélérer pipe SaaS B2B — seul levier de croissance récurrent...', faded: true },
+                        ].map((a, i) => (
+                          <div key={i} className={`flex items-start gap-2 ${a.faded ? 'opacity-35' : ''}`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${a.dot} flex-shrink-0 mt-1.5`} />
+                            <p className="text-[10px] text-[#1A1A2E] leading-snug">{a.text}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Ellipsis + autres sections */}
+                      <div className="border-t border-gray-100 pt-2 flex items-center gap-2">
+                        <div className="flex gap-0.5 flex-shrink-0">
+                          <span className="w-1 h-1 rounded-full bg-gray-300" />
+                          <span className="w-1 h-1 rounded-full bg-gray-300" />
+                          <span className="w-1 h-1 rounded-full bg-gray-300" />
+                        </div>
+                        <p className="text-[9px] text-[#5F6368] italic leading-snug">Simulateur de décision · Avant/Après · CE qui détruit votre rentabilité · Leviers de croissance...</p>
                       </div>
                     </div>
                   </div>
