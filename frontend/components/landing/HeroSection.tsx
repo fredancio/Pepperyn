@@ -374,7 +374,7 @@ export function HeroSection() {
                   </svg>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-[#1A1A2E]">Simulateur de décision</p>
+                  <p className="text-xs font-semibold text-[#1A1A2E]">Copilote de décision</p>
                   <p className="text-xs text-[#5F6368]">Impact chiffré par action</p>
                 </div>
               </div>
