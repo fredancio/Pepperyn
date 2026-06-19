@@ -181,6 +181,12 @@ async def delete_account(
     except Exception as e:
         errors.append(f"workspaces: {e}")
 
+    # 4c. Supprimer la mémoire décisionnelle
+    try:
+        supabase.from_("decision_memory").delete().eq("company_id", company_id).execute()
+    except Exception as e:
+        errors.append(f"decision_memory: {e}")
+
     # 5. Supprimer le profil
     try:
         supabase.from_("profiles").delete().eq("id", auth_user_id).execute()
