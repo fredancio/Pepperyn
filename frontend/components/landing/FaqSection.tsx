@@ -230,8 +230,8 @@ const accountDeletionAnswer = (
       <ul className="flex flex-col gap-1.5 pl-4">
         {[
           "Votre compte, votre adresse e-mail et toutes vos données d'inscription sont effacés définitivement.",
-          "Tous les fichiers que vous avez transmis (relevés, exports, tableaux...) ainsi que tous les rapports et analyses générés sont supprimés de nos serveurs.",
-          "Aucune de vos données — fichiers, rapports, échanges, mémoire décisionnelle — n'est conservée, y compris sous forme anonymisée.",
+          "Vos fichiers sources (relevés, exports, tableaux...) ne sont jamais stockés sur nos serveurs : ils sont traités en mémoire vive et supprimés immédiatement après analyse, avant même que votre résultat ne soit affiché.",
+          "Tous les résultats d'analyse, rapports, recommandations, échanges et mémoire décisionnelle conservés dans votre historique sont définitivement supprimés de nos serveurs.",
           "Aucune de vos données n'est utilisée, ni conservée, pour entraîner un quelconque modèle d'IA — ni le nôtre, ni celui d'un tiers.",
           "Aucune trace de votre activité ne subsiste chez les fournisseurs d'IA tiers utilisés pour les analyses : ces prestataires ne conservent pas les données transmises au-delà du traitement de la requête.",
         ].map(item => (
@@ -272,7 +272,7 @@ const faqs: FaqItem[] = [
   },
   {
     question: 'Mes données financières sont-elles sécurisées ?',
-    answer: "Oui. Les fichiers sont traités en temps réel et ne sont pas stockés de façon permanente. Vos analyses sont conservées dans votre espace sécurisé.",
+    answer: "Oui. Vos fichiers sources (Excel, CSV, PDF) ne sont jamais stockés sur nos serveurs : ils sont traités en mémoire et immédiatement supprimés après analyse. Vos résultats d'analyse sont conservés dans votre espace sécurisé pour alimenter votre historique, et définitivement effacés si vous supprimez votre compte.",
   },
   {
     question: "Combien d'analyses puis-je faire gratuitement ?",
