@@ -1,6 +1,10 @@
 import { HeroSection } from '@/components/landing/HeroSection';
-import { ForWhom } from '@/components/landing/ForWhom';
+import { ReportDemoSection } from '@/components/landing/ReportDemoSection';
+import { DetectionSection } from '@/components/landing/DetectionSection';
+import { ExecutiveReportSection } from '@/components/landing/ExecutiveReportSection';
+import { ROISection } from '@/components/landing/ROISection';
 import { CerveauIASection } from '@/components/landing/CerveauIASection';
+import { SecuritySection } from '@/components/landing/SecuritySection';
 import { PricingPlans } from '@/components/landing/PricingPlans';
 import { FaqSection } from '@/components/landing/FaqSection';
 import { Footer } from '@/components/landing/Footer';
@@ -23,8 +27,8 @@ export default function LandingPage() {
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-6">
-            <Link href="#pour-qui" className="text-sm text-[#5F6368] hover:text-[#1A1A2E] transition-colors">
-              Pour qui ?
+            <Link href="#securite" className="text-sm text-[#5F6368] hover:text-[#1A1A2E] transition-colors">
+              Sécurité
             </Link>
             <Link href="#tarifs" className="text-sm text-[#5F6368] hover:text-[#1A1A2E] transition-colors">
               Tarifs
@@ -58,8 +62,12 @@ export default function LandingPage() {
       {/* Page content */}
       <main>
         <HeroSection />
-        <ForWhom />
+        <ReportDemoSection />
+        <DetectionSection />
+        <ExecutiveReportSection />
+        <ROISection />
         <CerveauIASection />
+        <SecuritySection />
         <PricingPlans />
         <FaqSection />
 
@@ -67,7 +75,7 @@ export default function LandingPage() {
         <section className="py-20 bg-[#EFF6FF]">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center flex flex-col items-center gap-6">
             <h2 className="text-3xl lg:text-4xl font-extrabold text-[#1A1A2E]">
-              Prêt à gagner du temps sur vos analyses ?
+              Prêt à reprendre le contrôle de votre rentabilité ?
             </h2>
 
             <img src="/favicon.png?v=5" alt="Pepperyn" className="w-20 h-20 object-contain" />
@@ -76,7 +84,7 @@ export default function LandingPage() {
               href="/register"
               className="inline-flex items-center gap-2 px-8 py-4 bg-[#1B73E8] text-white rounded-xl font-bold text-base hover:bg-[#0D47A1] transition-all duration-200 shadow-lg"
             >
-              Analyser mes données
+              Obtenir mon diagnostic
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>

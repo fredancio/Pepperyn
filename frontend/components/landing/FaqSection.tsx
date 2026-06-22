@@ -300,7 +300,7 @@ export function FaqSection() {
             <span className="text-sm font-medium text-[#1B73E8]">Questions fréquentes</span>
           </div>
           <h2 className="text-3xl lg:text-4xl font-extrabold text-[#1A1A2E] mb-4">
-            Tout ce que vous voulez savoir
+            Ce que vous devez savoir avant de commencer
           </h2>
           <p className="text-lg text-[#5F6368]">
             Une question non couverte ici ? Contactez-nous.

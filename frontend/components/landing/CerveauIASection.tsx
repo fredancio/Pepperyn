@@ -6,15 +6,15 @@ export function CerveauIASection() {
         {/* Header */}
         <div className="text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#1B73E8]/10 border border-[#1B73E8]/20 rounded-full mb-5">
-            <span className="text-sm font-medium text-[#1B73E8]">Pourquoi Pepperyn</span>
+            <span className="text-sm font-medium text-[#1B73E8]">Comment Pepperyn fait la différence</span>
           </div>
           <h2 className="text-3xl lg:text-4xl font-extrabold text-[#1A1A2E] leading-tight mb-4">
-            Votre département financier mérite{' '}
-            <em className="not-italic text-[#1B73E8] italic">son propre cerveau IA</em>
+            Un copilote qui connaît vraiment{' '}
+            <em className="not-italic text-[#1B73E8] italic">votre entreprise</em>
           </h2>
           <p className="text-lg text-[#5F6368] max-w-2xl mx-auto">
-            Ce que font les CFO les plus avancés en 2026 —
-            et pourquoi la majorité de leurs concurrents ne le sait pas encore.
+            ChatGPT et les IA généralistes répondent à des questions.
+            Pepperyn, lui, suit votre rentabilité, mémorise vos décisions et mesure leurs résultats réels.
           </p>
         </div>
 

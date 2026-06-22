@@ -139,7 +139,7 @@ export function PricingPlans() {
             <span className="text-sm font-medium text-[#1B73E8]">Tarification transparente</span>
           </div>
           <h2 className="text-3xl lg:text-4xl font-extrabold text-[#1A1A2E] mb-4">
-            Votre copilote financier IA
+            Moins cher qu&apos;une décision manquée
           </h2>
           <p className="text-lg text-[#5F6368] max-w-2xl mx-auto mb-2">
             Pepperyn ne se contente pas d'analyser. Il vous indique quoi faire.
