@@ -16,7 +16,7 @@ const PLANS_DATA = [
     ctaHref: null, ctaAction: null,
   },
   {
-    id: 'pro', name: 'PRO', subtitle: 'CFO, CEO, CFO de transition, dirigeants PME & startups, experts-comptables…', price: '79€', period: '/mois',
+    id: 'pro', name: 'PRO', subtitle: 'CFO, CEO, CFO de transition, dirigeants PME & startups, experts-comptables…', price: '149€', period: '/mois',
     tagline: 'Votre copilote financier complet.',
     color: 'blue', highlighted: true, badge: '⭐ LE PLUS POPULAIRE',
     features: ['15 analyses / mois', '75 interactions contextuelles / mois', 'Exports Excel, PDF et PowerPoint', 'Mémoire persistante complète', 'Multi-entités (clients, filiales, dossiers)', 'Simulateur de décisions financières', 'Analyse multi-périodes & comparaisons', 'Projections financières', 'Crédits supplémentaires disponibles à la demande'],

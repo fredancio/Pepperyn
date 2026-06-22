@@ -47,7 +47,7 @@ const plans: {
   {
     name: 'PRO',
     subtitle: 'CFO, CEO, CFO de transition, dirigeants PME & startups, experts-comptables…',
-    price: '79€',
+    price: '149€',
     period: '/mois',
     tagline: 'Votre copilote financier complet.',
     highlighted: true,

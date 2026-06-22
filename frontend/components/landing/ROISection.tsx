@@ -60,7 +60,7 @@ export function ROISection() {
             près de <span className="text-[#1B73E8]">48 000 € par an</span> non détectés.
           </p>
           <p className="text-sm text-[#5F6368] mt-3">
-            Le plan PRO coûte 79€ par mois.
+            Le plan PRO coûte 149€ par mois.
           </p>
         </div>
       </div>

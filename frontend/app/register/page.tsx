@@ -182,7 +182,7 @@ function RegisterForm() {
         <div className="text-center">
           <h1 className="text-2xl font-bold text-[#1A1A2E]">Créer votre espace entreprise</h1>
           {isPro ? (
-            <p className="text-sm text-[#1B73E8] font-medium">Plan PRO — 79€/mois · Sans engagement</p>
+            <p className="text-sm text-[#1B73E8] font-medium">Plan PRO — 149€/mois · Sans engagement</p>
           ) : (
             <p className="text-sm text-[#5F6368]">Commencez gratuitement — sans carte bancaire</p>
           )}
@@ -404,7 +404,7 @@ function RegisterForm() {
             <div className="bg-[#0A2540] rounded-xl p-4">
               <div className="flex items-center gap-2 mb-1">
                 <span className="px-2 py-0.5 bg-amber-400 text-white text-xs font-bold rounded-full">PRO</span>
-                <span className="text-sm font-medium text-white">79€/mois — sans engagement</span>
+                <span className="text-sm font-medium text-white">149€/mois — sans engagement</span>
               </div>
               <p className="text-xs text-slate-300">Paiement sécurisé via Stripe après la création de votre espace</p>
             </div>

@@ -1,7 +1,6 @@
 import { HeroSection } from '@/components/landing/HeroSection';
 import { ReportDemoSection } from '@/components/landing/ReportDemoSection';
 import { DetectionSection } from '@/components/landing/DetectionSection';
-import { ExecutiveReportSection } from '@/components/landing/ExecutiveReportSection';
 import { ROISection } from '@/components/landing/ROISection';
 import { CerveauIASection } from '@/components/landing/CerveauIASection';
 import { SecuritySection } from '@/components/landing/SecuritySection';
@@ -64,7 +63,6 @@ export default function LandingPage() {
         <HeroSection />
         <ReportDemoSection />
         <DetectionSection />
-        <ExecutiveReportSection />
         <ROISection />
         <CerveauIASection />
         <SecuritySection />
