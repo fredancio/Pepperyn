@@ -912,6 +912,310 @@ def _en_resume_box(text: str, styles: dict) -> list:
     return [t, Spacer(1, 2)]
 
 
+# ─── V11 Block Builders — Executive Deliverables Manifesto ──────────────────
+
+def _build_macro_section_title(number: int, title: str, styles: dict) -> list:
+    """Grand séparateur visuel pour les 8 sections macro du manifeste (1. EXECUTIVE SUMMARY, etc.)."""
+    cell = Paragraph(
+        f'<font color="#FFFFFF"><b>{number}.</b></font>  '
+        f'<font color="#FFFFFF"><b>{_rl(title.upper())}</b></font>',
+        ParagraphStyle("macro_title", fontName="Helvetica-Bold", fontSize=13, leading=17)
+    )
+    t = Table([[cell]], colWidths=[CONTENT_W])
+    t.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), BLUE_DEEP),
+        ("TOPPADDING",    (0, 0), (-1, -1), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+        ("ROUNDEDCORNERS", [5, 5, 5, 5]),
+    ]))
+    return [Spacer(1, 10), t, Spacer(1, 8)]
+
+
+def _build_summary_scoreboard(score_global: int | None, niveau_urgence: str | None,
+                               creation_destruction: str | None, styles: dict) -> list:
+    """Bandeau compact : indice de santé global + niveau d'urgence + création/destruction de valeur."""
+    if score_global is None and not niveau_urgence and not creation_destruction:
+        return []
+
+    urgence_colors = {
+        "Critique":  ("#DC2626", "#FEF2F2"),
+        "Élevé":     ("#EA580C", "#FFF7ED"),
+        "Modéré":    ("#D97706", "#FFFBEB"),
+        "Maîtrisé":  ("#15803D", "#F0FDF4"),
+    }
+    color_hex, bg_hex = urgence_colors.get(niveau_urgence or "", ("#5F6368", "#F8FAFC"))
+
+    cells = []
+    if score_global is not None:
+        score_p = Paragraph(
+            f'<font color="{color_hex}"><b>{score_global}/10</b></font>',
+            ParagraphStyle("sgv", fontName="Helvetica-Bold", fontSize=22, alignment=TA_CENTER)
+        )
+        label_p = Paragraph("Indice de santé globale", styles["score_label"])
+        inner = Table([[score_p], [label_p]], colWidths=[48 * mm])
+        inner.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("BOX", (0, 0), (-1, -1), 1.5, colors.HexColor(color_hex)),
+            ("ROUNDEDCORNERS", [6, 6, 6, 6]),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(bg_hex)),
+        ]))
+        cells.append(inner)
+
+    if niveau_urgence:
+        urg_p = Paragraph(
+            f'<font color="{color_hex}"><b>{_rl(niveau_urgence.upper())}</b></font>',
+            ParagraphStyle("urgv", fontName="Helvetica-Bold", fontSize=16, alignment=TA_CENTER)
+        )
+        label_p = Paragraph("Niveau d'urgence", styles["score_label"])
+        inner = Table([[urg_p], [label_p]], colWidths=[48 * mm])
+        inner.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("BOX", (0, 0), (-1, -1), 1.5, colors.HexColor(color_hex)),
+            ("ROUNDEDCORNERS", [6, 6, 6, 6]),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(bg_hex)),
+        ]))
+        cells.append(inner)
+
+    rows = []
+    if cells:
+        col_w = CONTENT_W / len(cells)
+        t = Table([cells], colWidths=[col_w] * len(cells))
+        t.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        rows.append(t)
+        rows.append(Spacer(1, 6))
+
+    if creation_destruction:
+        is_destruction = "détruit" in creation_destruction.lower() or "destruction" in creation_destruction.lower()
+        c_color = RED if is_destruction else GREEN
+        c_bg = RED_LIGHT if is_destruction else GREEN_LIGHT
+        icon = "📉" if is_destruction else "📈"
+        cell = Paragraph(f'{icon}  <b>{_rl(creation_destruction)}</b>', styles["body"])
+        t2 = Table([[cell]], colWidths=[CONTENT_W])
+        t2.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), c_bg),
+            ("BOX", (0, 0), (-1, -1), 0.8, c_color),
+            ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ]))
+        rows.append(t2)
+        rows.append(Spacer(1, 6))
+
+    return rows
+
+
+def _build_ceo_dashboard(cards: list[dict], alertes: list[str], styles: dict) -> list:
+    """Grandes cartes KPI : Cash, EBITDA, Marge, Runway, Dette, Croissance."""
+    if not cards and not alertes:
+        return []
+
+    rows: list[Any] = []
+    rows.append(_section_header("📊  CEO DASHBOARD", BLUE_DARK, styles))
+    rows.append(Spacer(1, 6))
+
+    cells = []
+    for card in cards:
+        label = card.get("label", "") if isinstance(card, dict) else getattr(card, "label", "")
+        value = card.get("value", "") if isinstance(card, dict) else getattr(card, "value", "")
+        status = card.get("status") if isinstance(card, dict) else getattr(card, "status", None)
+        is_missing = status == "missing"
+        color_hex = "#9CA3AF" if is_missing else "#0D47A1"
+        bg_hex = "#F8FAFC" if is_missing else "#EFF6FF"
+        value_p = Paragraph(
+            f'<font color="{color_hex}"><b>{_rl(value)}</b></font>',
+            ParagraphStyle("dcv", fontName="Helvetica-Bold", fontSize=13, alignment=TA_CENTER, leading=16)
+        )
+        label_p = Paragraph(_rl(label), styles["score_label"])
+        inner = Table([[value_p], [label_p]], colWidths=[34 * mm])
+        inner.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("BOX", (0, 0), (-1, -1), 1, colors.HexColor(color_hex)),
+            ("ROUNDEDCORNERS", [6, 6, 6, 6]),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(bg_hex)),
+        ]))
+        cells.append(inner)
+
+    if cells:
+        # 3 cartes par ligne maximum pour rester lisible
+        for i in range(0, len(cells), 3):
+            chunk = cells[i:i + 3]
+            col_w = CONTENT_W / len(chunk)
+            t = Table([chunk], colWidths=[col_w] * len(chunk))
+            t.setStyle(TableStyle([
+                ("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            rows.append(t)
+            rows.append(Spacer(1, 4))
+
+    if alertes:
+        rows.append(Spacer(1, 4))
+        rows.append(Paragraph("<b>⚠️ Alertes</b>", styles["subsection"]))
+        rows.append(Spacer(1, 2))
+        rows.extend(_bullet_rows(alertes, "⚠️", AMBER, AMBER_LIGHT, styles))
+
+    rows.append(Spacer(1, 8))
+    return rows
+
+
+def _build_quick_wins(wins: list[dict], styles: dict) -> list:
+    """Tableau des opportunités immédiates : description | ROI | délai | difficulté."""
+    if not wins:
+        return []
+
+    rows: list[Any] = []
+    rows.append(_section_header("⚡  OPPORTUNITÉS IMMÉDIATES — QUICK WINS", GREEN, styles))
+    rows.append(Spacer(1, 5))
+
+    header = [
+        Paragraph("<b>Action</b>", styles["small"]),
+        Paragraph("<b>ROI estimé</b>", styles["small"]),
+        Paragraph("<b>Délai</b>", styles["small"]),
+        Paragraph("<b>Difficulté</b>", styles["small"]),
+    ]
+    table_rows = [header]
+    for w in wins:
+        desc = w.get("description", "") if isinstance(w, dict) else getattr(w, "description", "")
+        roi = w.get("roi_estime") if isinstance(w, dict) else getattr(w, "roi_estime", None)
+        temps = w.get("temps_mise_en_oeuvre") if isinstance(w, dict) else getattr(w, "temps_mise_en_oeuvre", None)
+        diff = w.get("difficulte") if isinstance(w, dict) else getattr(w, "difficulte", None)
+        table_rows.append([
+            Paragraph(_rl(desc), styles["body"]),
+            Paragraph(_rl(roi or "—"), styles["body"]),
+            Paragraph(_rl(temps or "—"), styles["body"]),
+            Paragraph(_rl((diff or "—").capitalize()), styles["body"]),
+        ])
+
+    col_w = [CONTENT_W * 0.46, CONTENT_W * 0.2, CONTENT_W * 0.17, CONTENT_W * 0.17]
+    t = Table(table_rows, colWidths=col_w)
+    t.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, 0), GREEN_LIGHT),
+        ("LINEBELOW",     (0, 0), (-1, 0), 0.5, GREEN),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, GRAY_BG]),
+        ("TOPPADDING",    (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 7),
+        ("BOX",           (0, 0), (-1, -1), 0.5, GRAY_BORDER),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    rows.append(t)
+    rows.append(Spacer(1, 8))
+    return rows
+
+
+def _build_plan_30_60_90(items: list[dict], styles: dict) -> list:
+    """Plan d'action en 3 bandes temporelles : 30 / 60 / 90 jours."""
+    if not items:
+        return []
+
+    rows: list[Any] = []
+    rows.append(_section_header("🗓️  PLAN D'ACTION — 30 / 60 / 90 JOURS", BLUE_MAIN, styles))
+    rows.append(Spacer(1, 5))
+
+    horizon_labels = {"30": "30 JOURS", "60": "60 JOURS", "90": "90 JOURS"}
+    horizon_colors = {
+        "30": (RED, RED_LIGHT, "#DC2626"),
+        "60": (AMBER, AMBER_LIGHT, "#D97706"),
+        "90": (GREEN, GREEN_LIGHT, "#15803D"),
+    }
+
+    for horizon in ["30", "60", "90"]:
+        bucket = [
+            it for it in items
+            if (it.get("horizon") if isinstance(it, dict) else getattr(it, "horizon", None)) == horizon
+        ]
+        if not bucket:
+            continue
+        color, bg, color_hex = horizon_colors[horizon]
+        rows.append(Paragraph(
+            f'<font color="{color_hex}"><b>{horizon_labels[horizon]}</b></font>',
+            styles["subsection"]
+        ))
+        rows.append(Spacer(1, 2))
+        for it in bucket:
+            action = it.get("action", "") if isinstance(it, dict) else getattr(it, "action", "")
+            resp = it.get("responsable") if isinstance(it, dict) else getattr(it, "responsable", None)
+            impact = it.get("impact_attendu") if isinstance(it, dict) else getattr(it, "impact_attendu", None)
+            detail = _rl(action)
+            if resp:
+                detail += f'  ·  <font color="#5F6368">Responsable : {_rl(resp)}</font>'
+            if impact:
+                detail += f'  ·  <font color="#5F6368">Impact : {_rl(impact)}</font>'
+            cell = Paragraph(detail, styles["body"])
+            t = Table([[cell]], colWidths=[CONTENT_W])
+            t.setStyle(TableStyle([
+                ("BACKGROUND",    (0, 0), (-1, -1), bg),
+                ("TOPPADDING",    (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 9),
+                ("BOX",           (0, 0), (-1, -1), 0.5, color),
+            ]))
+            rows.append(t)
+            rows.append(Spacer(1, 2))
+        rows.append(Spacer(1, 4))
+
+    rows.append(Spacer(1, 4))
+    return rows
+
+
+def _build_scenarios(scenarios: list[dict], styles: dict) -> list:
+    """Simulation Avant/Après — 3 scénarios nommés : meilleur cas / cas probable / pire cas."""
+    if not scenarios:
+        return []
+
+    rows: list[Any] = []
+    rows.append(_section_header("🎲  SIMULATION — MEILLEUR CAS / CAS PROBABLE / PIRE CAS", BLUE_DARK, styles))
+    rows.append(Spacer(1, 5))
+
+    style_map = {
+        "best_case":   ("🟢", GREEN, GREEN_LIGHT),
+        "most_likely": ("🔵", BLUE_MAIN, BLUE_LIGHT),
+        "worst_case":  ("🔴", RED, RED_LIGHT),
+    }
+
+    cells = []
+    for sc in scenarios:
+        nom = sc.get("nom", "") if isinstance(sc, dict) else getattr(sc, "nom", "")
+        label = sc.get("label", "") if isinstance(sc, dict) else getattr(sc, "label", "")
+        desc = sc.get("description", "") if isinstance(sc, dict) else getattr(sc, "description", "")
+        icon, color, bg = style_map.get(nom, ("⚪", GRAY_TEXT, GRAY_BG))
+
+        title_p = Paragraph(f'{icon}  <b>{_rl(label.upper())}</b>', ParagraphStyle(
+            "scn_title", fontName="Helvetica-Bold", fontSize=9.5, textColor=color, leading=13))
+        desc_p = Paragraph(_rl(desc), ParagraphStyle(
+            "scn_desc", fontName="Helvetica", fontSize=8.5, textColor=DARK, leading=12))
+        inner = Table([[title_p], [Spacer(1, 3)], [desc_p]], colWidths=[CONTENT_W / 3 - 4])
+        inner.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), bg),
+            ("BOX",           (0, 0), (-1, -1), 0.8, color),
+            ("TOPPADDING",    (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
+            ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ]))
+        cells.append(inner)
+
+    if cells:
+        col_w = CONTENT_W / len(cells)
+        t = Table([cells], colWidths=[col_w] * len(cells))
+        t.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2), ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        rows.append(t)
+
+    rows.append(Spacer(1, 8))
+    return rows
+
+
 def _build_separator_detailed(styles: dict) -> list:
     """Visual separator before the detailed analysis section."""
     story = []
@@ -953,7 +1257,8 @@ def generate_pdf_report(result: dict) -> bytes:
 
     story: list[Any] = []
 
-    # ── 0. FIABILITÉ DES DONNÉES ────────────────────────────────────────────
+    # ── BLOC : FIABILITÉ DES DONNÉES (réassemblé en ANNEXE — macro-section 8) ──
+    _idx_data_quality = len(story)
     dq = result.get("data_quality") or {}
     if dq:
         dq_score   = dq.get("score_data", 70) if isinstance(dq, dict) else getattr(dq, "score_data", 70)
@@ -1037,6 +1342,11 @@ def generate_pdf_report(result: dict) -> bytes:
 
         story.append(HRFlowable(width=CONTENT_W, thickness=0.5, color=GRAY_TEXT))
         story.append(Spacer(1, 10))
+    block_data_quality = story[_idx_data_quality:]
+    del story[_idx_data_quality:]
+
+    # ══════════════════ MACRO-SECTION 1 — EXECUTIVE SUMMARY ══════════════════
+    story.extend(_build_macro_section_title(1, "Executive Summary", styles))
 
     # ── 0.5. FINANCIAL HEADLINE — PERTE STRUCTURELLE (tout en haut) ─────────
     story.extend(_build_financial_headline(result.get("impact_financier_synthese"), styles))
@@ -1064,6 +1374,25 @@ def generate_pdf_report(result: dict) -> bytes:
         story.append(_score_table(scores, interpretations, styles))
         story.append(Spacer(1, 8))
 
+    # ── INDICE DE SANTÉ GLOBALE + NIVEAU D'URGENCE + CRÉATION/DESTRUCTION ──
+    story.extend(_build_summary_scoreboard(
+        result.get("score_global"), result.get("niveau_urgence"),
+        result.get("creation_destruction_valeur"), styles,
+    ))
+
+    # ── TOP DÉCISIONS (aperçu condensé — détail complet en macro-section 5) ──
+    top_decisions = (result.get("plan_action_haute") or result.get("plan_action") or [])[:5]
+    if top_decisions:
+        story.append(Paragraph("<b>👉 Top décisions</b>", styles["subsection"]))
+        story.append(Spacer(1, 2))
+        for d in top_decisions:
+            story.append(Paragraph(f"•  {_rl(d.lstrip(chr(0x1F3AF) + '-• ').strip())}", styles["body"]))
+        story.append(Spacer(1, 8))
+
+    # ══════════════════ MACRO-SECTION 2 — CEO DASHBOARD ══════════════════════
+    story.extend(_build_macro_section_title(2, "CEO Dashboard", styles))
+    story.extend(_build_ceo_dashboard(result.get("ceo_dashboard") or [], result.get("alertes") or [], styles))
+
     # ── 3b. MARGIN INTELLIGENCE ─────────────────────────────────────────────
     story.extend(_build_margin_intelligence(
         items=result.get("margin_intelligence") or [],
@@ -1081,47 +1410,66 @@ def generate_pdf_report(result: dict) -> bytes:
         styles=styles,
     ))
 
-    # ── 4. IMPACT FINANCIER ─────────────────────────────────────────────────
+    # ── BLOC : IMPACT FINANCIER (assemblé dans la macro-section 3) ──────────
+    _idx_impact = len(story)
     impact_synthese = result.get("impact_financier_synthese")
     impact = result.get("impact_financier") or []
     story.extend(_build_impact_financier(impact_synthese, impact, styles,
                                          en_resume=result.get("en_resume_impact")))
+    block_impact_financier = story[_idx_impact:]
+    del story[_idx_impact:]
 
-    # ── 5. AVANT / APRÈS ────────────────────────────────────────────────────
+    # ── BLOC : AVANT / APRÈS (assemblé dans la macro-section 6) ─────────────
+    _idx_avant_apres = len(story)
     actuel = result.get("avant_apres_actuel") or []
     apres  = result.get("avant_apres_apres") or []
     gain   = result.get("avant_apres_gain")
     gain_transf = result.get("avant_apres_gain_transformations") or []
     story.extend(_build_avant_apres(actuel, apres, gain, styles,
                                     gain_transformations=gain_transf))
+    block_avant_apres = story[_idx_avant_apres:]
+    del story[_idx_avant_apres:]
 
-    # ── 6. SIMULATEUR DE DÉCISION ───────────────────────────────────────────
+    # ── BLOC : SIMULATEUR DE DÉCISION (assemblé dans la macro-section 6) ───
+    _idx_simulateur = len(story)
     sim = result.get("simulateur_decision") or []
     story.extend(_build_simulateur(sim, styles))
+    block_simulateur = story[_idx_simulateur:]
+    del story[_idx_simulateur:]
 
-    # ── 7. PROJECTION TEMPORELLE ────────────────────────────────────────────
+    # ── BLOC : PROJECTION TEMPORELLE (assemblé dans la macro-section 6) ────
+    _idx_projection = len(story)
     p3 = result.get("projection_3mois") or []
     p6 = result.get("projection_6mois") or []
     story.extend(_build_projection(p3, p6, styles,
                                    en_resume=result.get("en_resume_projection")))
+    block_projection = story[_idx_projection:]
+    del story[_idx_projection:]
 
-    # ── 8. CE QUI DÉTRUIT VOTRE RENTABILITÉ ─────────────────────────────────
+    # ── BLOC : CE QUI DÉTRUIT VOTRE RENTABILITÉ (macro-section 3) ───────────
+    _idx_ce_qui_detruit = len(story)
     ce_qui_detruit = result.get("ce_qui_detruit") or []
     if ce_qui_detruit:
         story.append(_section_header("🔴  CE QUI DÉTRUIT VOTRE RENTABILITÉ", RED, styles))
         story.append(Spacer(1, 3))
         story.extend(_bullet_rows(ce_qui_detruit, "🔴", RED, RED_LIGHT, styles))
         story.append(Spacer(1, 8))
+    block_ce_qui_detruit = story[_idx_ce_qui_detruit:]
+    del story[_idx_ce_qui_detruit:]
 
-    # ── 9. LEVIERS DE CROISSANCE ────────────────────────────────────────────
+    # ── BLOC : LEVIERS DE CROISSANCE (macro-section 4) ──────────────────────
+    _idx_leviers = len(story)
     leviers = result.get("leviers_croissance") or []
     if leviers:
         story.append(_section_header("🟢  LEVIERS DE CROISSANCE", GREEN, styles))
         story.append(Spacer(1, 3))
         story.extend(_bullet_rows(leviers, "🟢", GREEN, GREEN_LIGHT, styles))
         story.append(Spacer(1, 8))
+    block_leviers_croissance = story[_idx_leviers:]
+    del story[_idx_leviers:]
 
-    # ── 10. PLAN D'ACTION (HAUTE / SECONDAIRE) ──────────────────────────────
+    # ── BLOC : PLAN D'ACTION HAUTE/SECONDAIRE (macro-section 5) ─────────────
+    _idx_plan_action = len(story)
     actions_haute = result.get("plan_action_haute") or []
     actions_sec   = result.get("plan_action_secondaire") or []
     # Fallback pour anciennes analyses ou format plat
@@ -1201,6 +1549,11 @@ def generate_pdf_report(result: dict) -> bytes:
         if en_resume_plan:
             story.extend(_en_resume_box(en_resume_plan, styles))
         story.append(Spacer(1, 8))
+    block_plan_action = story[_idx_plan_action:]
+    del story[_idx_plan_action:]
+
+    # ── BLOC : ANALYSE DÉTAILLÉE — sections techniques (macro-section 7) ────
+    _idx_analyse_detaillee = len(story)
 
     # ── 11. SI RIEN NE CHANGE ───────────────────────────────────────────────
     risque_inaction = result.get("risque_inaction", "")
@@ -1322,6 +1675,34 @@ def generate_pdf_report(result: dict) -> bytes:
             story.append(Spacer(1, 3))
             story.extend(_bullet_rows(opp_list, "🟢", GREEN, GREEN_LIGHT, styles))
             story.append(Spacer(1, 8))
+    block_analyse_detaillee = story[_idx_analyse_detaillee:]
+    del story[_idx_analyse_detaillee:]
+
+    # ═══════════════ ASSEMBLAGE FINAL — MACRO-SECTIONS 3 À 8 ════════════════
+    # (les macro-sections 1 et 2 sont déjà présentes dans `story` à ce stade)
+    story.extend(_build_macro_section_title(3, "Ce qui détruit la rentabilité", styles))
+    story.extend(block_ce_qui_detruit)
+    story.extend(block_impact_financier)
+
+    story.extend(_build_macro_section_title(4, "Opportunités immédiates", styles))
+    story.extend(_build_quick_wins(result.get("quick_wins") or [], styles))
+    story.extend(block_leviers_croissance)
+
+    story.extend(_build_macro_section_title(5, "Plan d'action — 30 / 60 / 90 jours", styles))
+    story.extend(_build_plan_30_60_90(result.get("plan_action_30_60_90") or [], styles))
+    story.extend(block_plan_action)
+
+    story.extend(_build_macro_section_title(6, "Simulation avant / après", styles))
+    story.extend(_build_scenarios(result.get("scenarios") or [], styles))
+    story.extend(block_avant_apres)
+    story.extend(block_simulateur)
+    story.extend(block_projection)
+
+    story.extend(_build_macro_section_title(7, "Analyse détaillée", styles))
+    story.extend(block_analyse_detaillee)
+
+    story.extend(_build_macro_section_title(8, "Annexe", styles))
+    story.extend(block_data_quality)
 
     doc.build(
         story,

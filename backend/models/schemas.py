@@ -101,6 +101,36 @@ class Recommandation(BaseModel):
     delai: Optional[str] = None
 
 
+class DashboardCard(BaseModel):
+    """Une carte du CEO Dashboard (Cash, EBITDA, Marge, Runway, Dette, Croissance...)."""
+    label: str
+    value: str
+    status: Optional[str] = None  # "missing" si donnée indisponible, sinon None
+
+
+class QuickWin(BaseModel):
+    """Une opportunité immédiate chiffrée (ROI, délai, difficulté)."""
+    description: str
+    roi_estime: Optional[str] = None
+    temps_mise_en_oeuvre: Optional[str] = None
+    difficulte: Optional[str] = None  # faible | moyenne | élevée
+
+
+class PlanActionItem(BaseModel):
+    """Une action du plan 30/60/90 jours."""
+    action: str
+    horizon: str  # "30" | "60" | "90"
+    responsable: Optional[str] = None
+    impact_attendu: Optional[str] = None
+
+
+class ScenarioCase(BaseModel):
+    """Un scénario de simulation (meilleur cas / cas probable / pire cas)."""
+    nom: str  # "best_case" | "most_likely" | "worst_case"
+    label: str
+    description: str
+
+
 class DataQualityInfo(BaseModel):
     """Section fiabilité des données injectée dans chaque rapport."""
     score_data: int = Field(default=70, ge=0, le=100)
@@ -179,6 +209,15 @@ class AnalysisResult(BaseModel):
     cash_forecast_confidence: Optional[int] = None
     en_resume_cash: Optional[str] = None
     bfr_indicators: List[str] = []
+
+    # V11 — Executive Deliverables Manifesto (CEO Dashboard, Quick Wins, Plan 30/60/90, Scénarios)
+    score_global: Optional[int] = None          # calculé en Python, jamais par le LLM
+    niveau_urgence: Optional[str] = None         # calculé en Python à partir de score_global
+    creation_destruction_valeur: Optional[str] = None
+    ceo_dashboard: List[DashboardCard] = []
+    quick_wins: List[QuickWin] = []
+    plan_action_30_60_90: List[PlanActionItem] = []
+    scenarios: List[ScenarioCase] = []
 
     # Champs legacy (ancien format JSON — backward compat)
     revenus: Optional[RevenusData] = None

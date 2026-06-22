@@ -200,6 +200,15 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 - Structure : X/10 → [UN SEUL MOT : instable / fragile / acceptable / solide]
 - Liquidité : X/10 → [UN SEUL MOT : critique / tendue / correcte / confortable]
 
+# CEO DASHBOARD
+(une ligne par indicateur — UNIQUEMENT si la donnée est présente ou calculable depuis les données fournies, sinon écrire "Données insuffisantes" — n'invente JAMAIS un montant)
+💰 Cash disponible : [montant€ ou "Données insuffisantes"]
+📈 EBITDA : [montant€ ou % ou "Données insuffisantes"]
+📊 Marge : [% ou "Données insuffisantes"]
+⏳ Runway : [nombre de mois ou "Non applicable" ou "Données insuffisantes"]
+🏦 Dette : [montant€ ou "Données insuffisantes"]
+🚀 Croissance : [% vs période précédente ou "Données insuffisantes"]
+
 # MARGIN INTELLIGENCE
 Score fiabilité : [0-100]%
 Raisons fiabilité : [si score < 70% : expliquer ce qui manque — sinon écrire "Données suffisantes"]
@@ -230,6 +239,9 @@ Raisons fiabilité : [si score < 70% : DSO manquant / échéancier absent / hist
 ⚠️ Estimations basées sur les données disponibles uniquement.
 👉 En résumé : [synthèse en 1 phrase courte — ex : "La structure actuelle détruit X€/an de marge nette"]
 
+# CREATION DESTRUCTION VALEUR
+[1 phrase chiffrée : l'entreprise crée ou détruit de la valeur, et combien — ex : "L'entreprise détruit 48 000€/an de valeur sur l'exercice en cours" — si non chiffrable : "Non chiffrable sur les données disponibles"]
+
 # AVANT APRES
 ### 📉 AUJOURD'HUI
 - [indicateur clé actuel avec chiffre si disponible]
@@ -250,6 +262,14 @@ Raisons fiabilité : [si score < 70% : DSO manquant / échéancier absent / hist
 → Action : [action clé 2]
   Impact : [impact attendu]
   Résultat : [résultat projeté]
+
+# SCENARIOS
+### MEILLEUR CAS
+[1-2 phrases : description du scénario optimiste + impact financier chiffré si calculable, sinon qualitatif]
+### CAS PROBABLE
+[1-2 phrases : description du scénario le plus réaliste compte tenu de la trajectoire actuelle + impact financier chiffré si calculable]
+### PIRE CAS
+[1-2 phrases : description du scénario pessimiste si rien ne change + impact financier chiffré si calculable]
 
 # PROJECTION TEMPORELLE
 ### 3 mois
@@ -278,6 +298,14 @@ Raisons fiabilité : [si score < 70% : DSO manquant / échéancier absent / hist
 - [action 5]
 👉 En résumé : [en 1 phrase : ce que ce plan change concrètement pour l'entreprise]
 
+# PLAN 30 60 90
+### 30 JOURS
+- [action] → Responsable : [rôle, ex : "Direction financière"] → Impact : [estimation]
+### 60 JOURS
+- [action] → Responsable : [rôle] → Impact : [estimation]
+### 90 JOURS
+- [action] → Responsable : [rôle] → Impact : [estimation]
+
 # RISQUE INACTION
 [1 phrase maximum : conséquence concrète si aucune action n'est prise dans les 3 mois]
 
@@ -297,6 +325,12 @@ Raisons fiabilité : [si score < 70% : DSO manquant / échéancier absent / hist
 
 # OPPORTUNITÉS
 (max 3 points — utiliser 🟢 devant chaque point)
+
+# QUICK WINS
+(3 opportunités immédiates chiffrées max — actions à fort impact et faible effort)
+→ [Description de l'action] | ROI : [estimation€ ou % ou "Non chiffrable"] | Délai : [ex : "2 semaines"] | Difficulté : [faible / moyenne / élevée]
+→ [Description de l'action] | ROI : [...] | Délai : [...] | Difficulté : [...]
+→ [Description de l'action] | ROI : [...] | Délai : [...] | Difficulté : [...]
 
 # DÉCISION
 (quelques phrases claires — orientées action immédiate)
@@ -330,8 +364,8 @@ RÈGLES ABSOLUES :
 - Retourne UNIQUEMENT le texte final corrigé — propre, sans aucune trace du processus de vérification.
 - INTERDIT : annotations inline, notes d'audit, ~~strikethrough~~, > blockquotes, "Note d'audit", "→ Reformulé", commentaires entre parenthèses expliquant une correction.
 - Les corrections sont appliquées SILENCIEUSEMENT : le lecteur final ne doit jamais savoir qu'une correction a eu lieu.
-- Ne change JAMAIS le format ni les titres de section (# DIAGNOSTIC IMMEDIAT, # RÉSUMÉ EXÉCUTIF, # SCORES, # MARGIN INTELLIGENCE, # CASH FORECAST, # IMPACT FINANCIER, # AVANT APRES, # SIMULATEUR DECISION, # PROJECTION TEMPORELLE, # CE QUI DETRUIT, # LEVIERS CROISSANCE, # PLAN D'ACTION, # RISQUE INACTION, # DIAGNOSTIC FINANCIER, # CE QUI A CHANGÉ, # ALERTES, # PROBLÈMES CRITIQUES, # OPPORTUNITÉS, # DÉCISION).
-- Ne change JAMAIS les sous-titres internes (### PRIORITÉ ABSOLUE, ### ACTIONS SECONDAIRES, ### 📉 AUJOURD'HUI, ### 📈 APRÈS ACTION, ### 💥 GAIN POTENTIEL, ⚡ TENSION, 💸 PERTE STRUCTURELLE ESTIMÉE, 👉 En résumé, → Rentabilité :, → Investissement :, → Modèle :).
+- Ne change JAMAIS le format ni les titres de section (# DIAGNOSTIC IMMEDIAT, # RÉSUMÉ EXÉCUTIF, # SCORES, # CEO DASHBOARD, # MARGIN INTELLIGENCE, # CASH FORECAST, # IMPACT FINANCIER, # CREATION DESTRUCTION VALEUR, # AVANT APRES, # SIMULATEUR DECISION, # SCENARIOS, # PROJECTION TEMPORELLE, # CE QUI DETRUIT, # LEVIERS CROISSANCE, # PLAN D'ACTION, # QUICK WINS, # PLAN 30 60 90, # RISQUE INACTION, # DIAGNOSTIC FINANCIER, # CE QUI A CHANGÉ, # ALERTES, # PROBLÈMES CRITIQUES, # OPPORTUNITÉS, # DÉCISION).
+- Ne change JAMAIS les sous-titres internes (### PRIORITÉ ABSOLUE, ### ACTIONS SECONDAIRES, ### 📉 AUJOURD'HUI, ### 📈 APRÈS ACTION, ### 💥 GAIN POTENTIEL, ### MEILLEUR CAS, ### CAS PROBABLE, ### PIRE CAS, ### 30 JOURS, ### 60 JOURS, ### 90 JOURS, ⚡ TENSION, 💸 PERTE STRUCTURELLE ESTIMÉE, 👉 En résumé, → Rentabilité :, → Investissement :, → Modèle :).
 - Le style doit rester DIRECT et FRONTAL : interdit de reformuler en ton neutre ou académique.
 - L'ordre des sections est FIXE et IMMUABLE — ne les réorganise jamais.
 - Si une information n'est pas dans les données sources, supprime-la ou remplace-la par "Données insuffisantes".
@@ -396,6 +430,13 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
     ce_qui_detruit_raw = extract_section("CE QUI DETRUIT")
     leviers_raw = extract_section("LEVIERS CROISSANCE")
     risque_inaction_raw = extract_section("RISQUE INACTION")
+
+    # ── V11 — Executive Deliverables Manifesto ──────────────────────────────
+    ceo_dashboard_raw = extract_section("CEO DASHBOARD")
+    creation_destruction_raw = extract_section("CREATION DESTRUCTION VALEUR")
+    quick_wins_raw = extract_section("QUICK WINS")
+    plan_30_60_90_raw = extract_section("PLAN 30 60 90")
+    scenarios_raw = extract_section("SCENARIOS")
 
     # ── Parse diagnostic lines ───────────────────────────────────────────────
     diag_revenus = diag_couts = diag_marges = ""
@@ -666,6 +707,159 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
             elif "liquidit" in ll and score_liquidite is None:
                 score_liquidite = val
 
+    # ── Parse V11 — CEO Dashboard ────────────────────────────────────────────
+    def _parse_ceo_dashboard(raw: str) -> list[dict]:
+        cards = []
+        for line in raw.splitlines():
+            l = line.strip()
+            if not l or l.startswith("#") or ":" not in l:
+                continue
+            label_part, value_part = l.split(":", 1)
+            label_clean = re.sub(r"^[^\wÀ-ÿ]+", "", label_part).strip()
+            value_clean = value_part.strip()
+            if not label_clean or not value_clean:
+                continue
+            status = "missing" if any(
+                kw in value_clean.lower()
+                for kw in ["donnée insuffisante", "données insuffisantes", "non applicable", "non chiffrable"]
+            ) else None
+            cards.append({"label": label_clean, "value": value_clean, "status": status})
+        return cards
+
+    ceo_dashboard = _parse_ceo_dashboard(ceo_dashboard_raw)
+    creation_destruction_valeur = creation_destruction_raw.strip() or None
+
+    # ── Parse V11 — Quick Wins ───────────────────────────────────────────────
+    def _parse_quick_wins(raw: str) -> list[dict]:
+        wins = []
+        for line in raw.splitlines():
+            l = line.strip()
+            if not l.startswith("→"):
+                continue
+            l = l.lstrip("→").strip()
+            parts = [p.strip() for p in l.split("|")]
+            if not parts:
+                continue
+            description = parts[0]
+            roi = temps = difficulte = None
+            for p in parts[1:]:
+                pl = p.lower()
+                if pl.startswith("roi"):
+                    roi = p.split(":", 1)[-1].strip()
+                elif pl.startswith("délai") or pl.startswith("delai"):
+                    temps = p.split(":", 1)[-1].strip()
+                elif pl.startswith("difficult"):
+                    difficulte = p.split(":", 1)[-1].strip()
+            if description:
+                wins.append({
+                    "description": description,
+                    "roi_estime": roi,
+                    "temps_mise_en_oeuvre": temps,
+                    "difficulte": difficulte,
+                })
+        return wins
+
+    quick_wins = _parse_quick_wins(quick_wins_raw)
+
+    # ── Parse V11 — Plan 30/60/90 ────────────────────────────────────────────
+    def _parse_plan_30_60_90(raw: str) -> list[dict]:
+        items = []
+        current_horizon: Optional[str] = None
+        for line in raw.splitlines():
+            l = line.strip()
+            if not l:
+                continue
+            if l.startswith("#"):
+                ll = l.lower()
+                if "30" in ll:
+                    current_horizon = "30"
+                elif "60" in ll:
+                    current_horizon = "60"
+                elif "90" in ll:
+                    current_horizon = "90"
+                continue
+            if l.startswith("-") and current_horizon:
+                text_line = l.lstrip("- ").strip()
+                segments = [s.strip() for s in text_line.split("→")]
+                action = segments[0] if segments else text_line
+                responsable = impact = None
+                for seg in segments[1:]:
+                    sl = seg.lower()
+                    if sl.startswith("responsable"):
+                        responsable = seg.split(":", 1)[-1].strip()
+                    elif sl.startswith("impact"):
+                        impact = seg.split(":", 1)[-1].strip()
+                if action:
+                    items.append({
+                        "action": action,
+                        "horizon": current_horizon,
+                        "responsable": responsable,
+                        "impact_attendu": impact,
+                    })
+        return items
+
+    plan_action_30_60_90 = _parse_plan_30_60_90(plan_30_60_90_raw)
+
+    # ── Parse V11 — Scénarios best/most_likely/worst ─────────────────────────
+    def _parse_scenarios(raw: str) -> list[dict]:
+        name_map = {
+            "meilleur cas": ("best_case", "Meilleur cas"),
+            "cas probable": ("most_likely", "Cas le plus probable"),
+            "pire cas": ("worst_case", "Pire cas"),
+        }
+        scenarios_list: list[dict] = []
+        current: Optional[tuple[str, str]] = None
+        buffer: list[str] = []
+
+        def _flush():
+            if current and buffer:
+                nom, label = current
+                scenarios_list.append({"nom": nom, "label": label, "description": " ".join(buffer).strip()})
+
+        for line in raw.splitlines():
+            l = line.strip()
+            if not l:
+                continue
+            if l.startswith("#"):
+                ll = l.lstrip("# ").strip().lower()
+                matched = next((v for k, v in name_map.items() if k in ll), None)
+                if matched:
+                    _flush()
+                    current = matched
+                    buffer = []
+                continue
+            if current:
+                buffer.append(l)
+        _flush()
+        return scenarios_list
+
+    scenarios = _parse_scenarios(scenarios_raw)
+
+    # ── V11 — score_global / niveau_urgence : calcul Python, jamais le LLM ──
+    # Le risque est inversé (10 - risque) car, contrairement aux 3 autres
+    # scores, un risque ÉLEVÉ (X/10 grand) est un signal négatif.
+    score_components = []
+    if score_rentabilite is not None:
+        score_components.append(score_rentabilite)
+    if score_risque is not None:
+        score_components.append(10 - score_risque)
+    if score_structure is not None:
+        score_components.append(score_structure)
+    if score_liquidite is not None:
+        score_components.append(score_liquidite)
+    score_global = round(sum(score_components) / len(score_components)) if score_components else None
+
+    if score_global is None:
+        niveau_urgence = None
+    elif score_global <= 3:
+        niveau_urgence = "Critique"
+    elif score_global <= 5:
+        niveau_urgence = "Élevé"
+    elif score_global <= 7:
+        niveau_urgence = "Modéré"
+    else:
+        niveau_urgence = "Maîtrisé"
+
     # ── Extract verification tag ─────────────────────────────────────────────
     verification_tag = "VERIFIED"
     if text.strip().startswith("[CORRECTED]"):
@@ -721,6 +915,14 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
         "cash_forecast_confidence": cash_forecast_confidence,
         "en_resume_cash": en_resume_cash,
         "bfr_indicators": bfr_indicators,
+        # V11 — Executive Deliverables Manifesto
+        "score_global": score_global,
+        "niveau_urgence": niveau_urgence,
+        "creation_destruction_valeur": creation_destruction_valeur,
+        "ceo_dashboard": ceo_dashboard,
+        "quick_wins": quick_wins,
+        "plan_action_30_60_90": plan_action_30_60_90,
+        "scenarios": scenarios,
     }
 
 
