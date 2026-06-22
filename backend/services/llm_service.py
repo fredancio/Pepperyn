@@ -202,6 +202,7 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 
 # CEO DASHBOARD
 (une ligne par indicateur — UNIQUEMENT si la donnée est présente ou calculable depuis les données fournies, sinon écrire "Données insuffisantes" — n'invente JAMAIS un montant)
+💵 Chiffre d'affaires total : [montant€ ou "Données insuffisantes"]
 💰 Cash disponible : [montant€ ou "Données insuffisantes"]
 📈 EBITDA : [montant€ ou % ou "Données insuffisantes"]
 📊 Marge : [% ou "Données insuffisantes"]
@@ -279,9 +280,10 @@ Raisons fiabilité : [si score < 70% : DSO manquant / échéancier absent / hist
 👉 En résumé : [trajectoire en 1 phrase — si actions engagées = X / si inaction = Y]
 
 # CE QUI DETRUIT
-🔴 [Problème 1 qui détruit la rentabilité + impact financier si chiffrable]
-🔴 [Problème 2 + impact]
-🔴 [Problème 3 + impact]
+(max 5 lignes, triées par impact décroissant — format strict, un nom court puis le détail après "|")
+🔴 [Nom court du problème] | Impact annuel : [montant€ ou "Non chiffrable"] | Tendance : [hausse/baisse/stable/non applicable] | Commentaire : [1 phrase]
+🔴 [Nom court du problème 2] | Impact annuel : [...] | Tendance : [...] | Commentaire : [...]
+🔴 [Nom court du problème 3] | Impact annuel : [...] | Tendance : [...] | Commentaire : [...]
 
 # LEVIERS CROISSANCE
 🟢 [Levier 1 actionnable immédiatement]
@@ -335,6 +337,12 @@ Raisons fiabilité : [si score < 70% : DSO manquant / échéancier absent / hist
 # DÉCISION
 (quelques phrases claires — orientées action immédiate)
 
+# CONFIDENTIAL COPILOT NOTE
+(Réponds à UNE seule question : "Si j'étais votre Directeur Financier lundi matin, quelles
+seraient mes trois premières décisions ?". Ton direct, humain, professionnel, niveau CFO.
+Maximum 200 mots, tient sur une page. AUCUN langage marketing, AUCUNE formule de vente.
+Termine OBLIGATOIREMENT par la signature exacte : "Pepperyn IA — Votre copilote financier".)
+
 RÈGLES ABSOLUES :
 - Zéro hallucination : aucun chiffre inventé, aucune donnée absente du document
 - Si un montant manque pour estimer : écrire explicitement "Données insuffisantes"
@@ -364,7 +372,9 @@ RÈGLES ABSOLUES :
 - Retourne UNIQUEMENT le texte final corrigé — propre, sans aucune trace du processus de vérification.
 - INTERDIT : annotations inline, notes d'audit, ~~strikethrough~~, > blockquotes, "Note d'audit", "→ Reformulé", commentaires entre parenthèses expliquant une correction.
 - Les corrections sont appliquées SILENCIEUSEMENT : le lecteur final ne doit jamais savoir qu'une correction a eu lieu.
-- Ne change JAMAIS le format ni les titres de section (# DIAGNOSTIC IMMEDIAT, # RÉSUMÉ EXÉCUTIF, # SCORES, # CEO DASHBOARD, # MARGIN INTELLIGENCE, # CASH FORECAST, # IMPACT FINANCIER, # CREATION DESTRUCTION VALEUR, # AVANT APRES, # SIMULATEUR DECISION, # SCENARIOS, # PROJECTION TEMPORELLE, # CE QUI DETRUIT, # LEVIERS CROISSANCE, # PLAN D'ACTION, # QUICK WINS, # PLAN 30 60 90, # RISQUE INACTION, # DIAGNOSTIC FINANCIER, # CE QUI A CHANGÉ, # ALERTES, # PROBLÈMES CRITIQUES, # OPPORTUNITÉS, # DÉCISION).
+- Ne change JAMAIS le format ni les titres de section (# DIAGNOSTIC IMMEDIAT, # RÉSUMÉ EXÉCUTIF, # SCORES, # CEO DASHBOARD, # MARGIN INTELLIGENCE, # CASH FORECAST, # IMPACT FINANCIER, # CREATION DESTRUCTION VALEUR, # AVANT APRES, # SIMULATEUR DECISION, # SCENARIOS, # PROJECTION TEMPORELLE, # CE QUI DETRUIT, # LEVIERS CROISSANCE, # PLAN D'ACTION, # QUICK WINS, # PLAN 30 60 90, # RISQUE INACTION, # DIAGNOSTIC FINANCIER, # CE QUI A CHANGÉ, # ALERTES, # PROBLÈMES CRITIQUES, # OPPORTUNITÉS, # DÉCISION, # CONFIDENTIAL COPILOT NOTE).
+- Dans # CE QUI DETRUIT, conserve impérativement le format "[Nom] | Impact annuel : ... | Tendance : ... | Commentaire : ..." sur chaque ligne — ne fusionne jamais ces champs en une phrase libre.
+- Dans # CONFIDENTIAL COPILOT NOTE, conserve le ton direct/humain/professionnel et la signature exacte "Pepperyn IA — Votre copilote financier" — ne reformule jamais cette section en ton neutre ou commercial.
 - Ne change JAMAIS les sous-titres internes (### PRIORITÉ ABSOLUE, ### ACTIONS SECONDAIRES, ### 📉 AUJOURD'HUI, ### 📈 APRÈS ACTION, ### 💥 GAIN POTENTIEL, ### MEILLEUR CAS, ### CAS PROBABLE, ### PIRE CAS, ### 30 JOURS, ### 60 JOURS, ### 90 JOURS, ⚡ TENSION, 💸 PERTE STRUCTURELLE ESTIMÉE, 👉 En résumé, → Rentabilité :, → Investissement :, → Modèle :).
 - Le style doit rester DIRECT et FRONTAL : interdit de reformuler en ton neutre ou académique.
 - L'ordre des sections est FIXE et IMMUABLE — ne les réorganise jamais.
@@ -418,6 +428,7 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
     plan_raw = extract_section("PLAN D'ACTION")
     scores_raw = extract_section("SCORES")
     decision = extract_section("DÉCISION")
+    confidential_copilot_note_raw = extract_section("CONFIDENTIAL COPILOT NOTE")
 
     # ── V5 new sections ──────────────────────────────────────────────────────
     diagnostic_immediat_raw = extract_section("DIAGNOSTIC IMMEDIAT")
@@ -649,9 +660,48 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
             elif current_proj == "6":
                 projection_6mois.append(l)
 
-    # ── Parse V5 — ce qui détruit / leviers ─────────────────────────────────
-    ce_qui_detruit = _parse_list(ce_qui_detruit_raw, "🔴")
+    # ── Parse V5 — leviers (texte libre, inchangé) ──────────────────────────
     leviers_croissance = _parse_list(leviers_raw, "🟢")
+
+    # ── Parse V12 — CE QUI DETRUIT (structuré : Nom | Impact annuel | Tendance | Commentaire) ──
+    def _parse_value_destroyers(raw: str) -> list[dict]:
+        items = []
+        for line in raw.splitlines():
+            l = line.strip()
+            if not l.startswith("🔴"):
+                continue
+            l = l.lstrip("🔴").strip()
+            parts = [p.strip() for p in l.split("|")]
+            if not parts:
+                continue
+            name = parts[0]
+            impact = trend = comment = None
+            for p in parts[1:]:
+                pl = p.lower()
+                if pl.startswith("impact"):
+                    impact = p.split(":", 1)[-1].strip()
+                elif pl.startswith("tendance"):
+                    trend = p.split(":", 1)[-1].strip()
+                elif pl.startswith("commentaire"):
+                    comment = p.split(":", 1)[-1].strip()
+            if name:
+                items.append({
+                    "name": name,
+                    "impact_annuel": impact,
+                    "tendance": trend,
+                    "commentaire": comment,
+                })
+        return items
+
+    value_destroyers = _parse_value_destroyers(ce_qui_detruit_raw)
+    # Compatibilité ascendante : export_pdf_service.py consomme aujourd'hui
+    # "ce_qui_detruit" comme une simple liste de chaînes (_bullet_rows). On la
+    # reconstruit à partir du nouveau format structuré, sans toucher à
+    # export_pdf_service.py (hors scope Étape A/B).
+    ce_qui_detruit = [
+        f"{d['name']} ({d['impact_annuel']})" if d.get("impact_annuel") else d["name"]
+        for d in value_destroyers
+    ] or _parse_list(ce_qui_detruit_raw, "🔴")  # filet de sécurité si le LLM ne respecte pas le nouveau format
     risque_inaction = risque_inaction_raw.strip()
 
     # ── Parse scores ─────────────────────────────────────────────────────────
@@ -923,6 +973,9 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
         "quick_wins": quick_wins,
         "plan_action_30_60_90": plan_action_30_60_90,
         "scenarios": scenarios,
+        # V12 — Executive Narrative (alimente l'Executive Decision Model)
+        "value_destroyers": value_destroyers,
+        "note_copilote": confidential_copilot_note_raw.strip() or None,
     }
 
 
