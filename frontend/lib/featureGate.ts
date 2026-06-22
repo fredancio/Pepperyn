@@ -93,10 +93,10 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
 
   // ── PRO ─────────────────────────────────────────────────────────────────────
   export_excel: {
-    label: 'Export Excel',
-    description: 'Exportez votre analyse complète dans un fichier Excel structuré et réutilisable.',
+    label: 'Executive Financial Model',
+    description: 'Exportez votre analyse complète dans un modèle financier Excel structuré, à formules vivantes.',
     requiredPlan: 'PRO',
-    requiredPlanPrice: '59€/mois',
+    requiredPlanPrice: '149€/mois',
     benefits: [
       '15 analyses / mois',
       'Exports Excel, PDF et PowerPoint',
@@ -107,10 +107,10 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     emoji: '📊',
   },
   export_pptx: {
-    label: 'Export PowerPoint',
-    description: 'Générez un deck de présentation prêt à l\'emploi pour vos réunions de direction.',
+    label: 'Executive Board Deck',
+    description: 'Générez une présentation prête à l\'emploi pour votre comité de direction ou vos investisseurs.',
     requiredPlan: 'PRO',
-    requiredPlanPrice: '59€/mois',
+    requiredPlanPrice: '149€/mois',
     benefits: [
       '15 analyses / mois',
       'Exports Excel, PDF et PowerPoint',
@@ -124,7 +124,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     label: 'Usage conversationnel étendu',
     description: 'Posez autant de questions de suivi que nécessaire sur chaque analyse, sans limite de session.',
     requiredPlan: 'PRO',
-    requiredPlanPrice: '59€/mois',
+    requiredPlanPrice: '149€/mois',
     benefits: [
       'Usage conversationnel inclus (illimité)',
       '15 analyses / mois',
@@ -137,7 +137,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     label: 'Mémoire persistante complète',
     description: 'Pepperyn mémorise l\'historique complet de vos analyses et détecte automatiquement les tendances dans le temps.',
     requiredPlan: 'PRO',
-    requiredPlanPrice: '59€/mois',
+    requiredPlanPrice: '149€/mois',
     benefits: [
       'Mémoire persistante complète',
       'Suivi des tendances financières',
@@ -150,7 +150,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     label: 'Analyse multi-périodes',
     description: 'Comparez N-1, YTD et projections sur plusieurs exercices fiscaux.',
     requiredPlan: 'PRO',
-    requiredPlanPrice: '59€/mois',
+    requiredPlanPrice: '149€/mois',
     benefits: [
       'Analyse multi-périodes',
       'Comparaison de périodes',
@@ -163,7 +163,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     label: 'Projections financières',
     description: 'Modélisez vos scénarios financiers à 3, 6 et 12 mois avec des hypothèses personnalisées.',
     requiredPlan: 'PRO',
-    requiredPlanPrice: '59€/mois',
+    requiredPlanPrice: '149€/mois',
     benefits: [
       'Projections simples',
       'Priorisation intelligente',
@@ -178,7 +178,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     label: 'Multi-entités',
     description: 'Gérez plusieurs sociétés, filiales ou portefeuilles clients avec une mémoire et un historique distincts par entité.',
     requiredPlan: 'PRO',
-    requiredPlanPrice: '59€/mois',
+    requiredPlanPrice: '149€/mois',
     benefits: [
       '15 analyses / mois',
       'Multi-entités avec mémoire persistante par entité',
@@ -193,7 +193,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     label: 'Simulateur de décisions',
     description: 'Simulez l\'impact financier de chaque décision avant de l\'exécuter — recrutement, investissement, restructuration.',
     requiredPlan: 'PRO',
-    requiredPlanPrice: '59€/mois',
+    requiredPlanPrice: '149€/mois',
     benefits: [
       'Simulateur de décisions',
       '15 analyses / mois',

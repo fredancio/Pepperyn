@@ -554,65 +554,65 @@ export function AnalysisResult({ data, questionsRestantes, plan = 'free' }: Anal
               )}
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {/* Excel — actif PRO+, grisé FREE */}
-                {canAccess(plan, 'export_excel') ? (
-                  <button
-                    onClick={() => handleDownload('excel')}
-                    disabled={!!downloading}
-                    className="py-3 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 transition-colors bg-[#1B73E8] text-white hover:bg-[#0D47A1] disabled:opacity-60"
-                  >
-                    <span className="text-lg">📊</span>
-                    <span className="text-xs">
-                      {downloading === 'excel' ? 'Génération...' : 'Excel (.xlsx)'}
-                    </span>
-                  </button>
-                ) : (
-                  <div className="py-3 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed opacity-60">
-                    <span className="text-lg grayscale">📊</span>
-                    <span className="text-xs flex items-center gap-1">
-                      Excel (.xlsx)
-                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                    </span>
-                    <span className="text-xs font-semibold">PRO</span>
-                  </div>
-                )}
-
-                {/* PDF — toujours disponible */}
+                {/* PDF — Executive Report, toujours disponible */}
                 <button
                   onClick={() => handleDownload('pdf')}
                   disabled={!!downloading}
-                  className="py-3 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 transition-colors bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+                  className="py-3 px-2 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 transition-colors bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
                 >
                   <span className="text-lg">📄</span>
-                  <span className="text-xs">
-                    {downloading === 'pdf' ? 'Génération...' : 'PDF (.pdf)'}
+                  <span className="text-[11px] font-semibold tracking-wide text-center leading-tight">
+                    {downloading === 'pdf' ? 'Génération...' : 'EXECUTIVE REPORT'}
                   </span>
                 </button>
 
-                {/* PowerPoint — actif PRO+, grisé FREE */}
+                {/* PowerPoint — Executive Board Deck, actif PRO+, grisé FREE */}
                 {canAccess(plan, 'export_pptx') ? (
                   <button
                     onClick={() => handleDownload('pptx')}
                     disabled={!!downloading}
-                    className="py-3 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 transition-colors bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60"
+                    className="py-3 px-2 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 transition-colors bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-60"
                   >
                     <span className="text-lg">📑</span>
-                    <span className="text-xs">
-                      {downloading === 'pptx' ? 'Génération...' : 'PowerPoint'}
+                    <span className="text-[11px] font-semibold tracking-wide text-center leading-tight">
+                      {downloading === 'pptx' ? 'Génération...' : 'EXECUTIVE BOARD DECK'}
                     </span>
                   </button>
                 ) : (
-                  <div className="py-3 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed opacity-60">
+                  <div className="py-3 px-2 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed opacity-60">
                     <span className="text-lg grayscale">📑</span>
-                    <span className="text-xs flex items-center gap-1">
-                      PowerPoint
+                    <span className="text-[11px] font-semibold tracking-wide text-center leading-tight">EXECUTIVE BOARD DECK</span>
+                    <span className="flex items-center gap-1 text-xs font-semibold">
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
+                      PRO
                     </span>
-                    <span className="text-xs font-semibold">PRO</span>
+                  </div>
+                )}
+
+                {/* Excel — Executive Financial Model, actif PRO+, grisé FREE */}
+                {canAccess(plan, 'export_excel') ? (
+                  <button
+                    onClick={() => handleDownload('excel')}
+                    disabled={!!downloading}
+                    className="py-3 px-2 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 transition-colors bg-[#1B73E8] text-white hover:bg-[#0D47A1] disabled:opacity-60"
+                  >
+                    <span className="text-lg">📊</span>
+                    <span className="text-[11px] font-semibold tracking-wide text-center leading-tight">
+                      {downloading === 'excel' ? 'Génération...' : 'EXECUTIVE FINANCIAL MODEL'}
+                    </span>
+                  </button>
+                ) : (
+                  <div className="py-3 px-2 rounded-xl text-sm font-medium flex flex-col items-center justify-center gap-1 bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed opacity-60">
+                    <span className="text-lg grayscale">📊</span>
+                    <span className="text-[11px] font-semibold tracking-wide text-center leading-tight">EXECUTIVE FINANCIAL MODEL</span>
+                    <span className="flex items-center gap-1 text-xs font-semibold">
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      PRO
+                    </span>
                   </div>
                 )}
               </div>
