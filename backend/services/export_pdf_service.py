@@ -15,10 +15,15 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    HRFlowable, KeepTogether,
+    HRFlowable, KeepTogether, PageBreak,
 )
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.charts.linecharts import HorizontalLineChart
 import re as _re
+
+from models.executive_decision_model import ExecutiveDecisionModel
+from services.executive_decision_model import build_executive_decision_model
 
 
 # ─── Text sanitisation ───────────────────────────────────────────────────────
@@ -55,6 +60,14 @@ GRAY_BG     = colors.HexColor("#F8FAFC")
 GRAY_BORDER = colors.HexColor("#CBD5E1")
 DARK        = colors.HexColor("#1A1A2E")
 WHITE       = colors.white
+
+# Chaînes hex jumelles (pour <font color="..."> inline — éviter Color.hexval(), fragile)
+RED_HEX        = "#DC2626"
+AMBER_HEX      = "#D97706"
+GREEN_HEX      = "#15803D"
+BLUE_DARK_HEX  = "#0D47A1"
+BLUE_MAIN_HEX  = "#1B73E8"
+GRAY_HEX       = "#5F6368"
 
 PAGE_W, PAGE_H = A4
 MARGIN    = 18 * mm
@@ -292,21 +305,21 @@ def _draw_header(canvas, doc, result: dict):
 
     canvas.setFillColor(WHITE)
     canvas.setFont("Helvetica-Bold", 18)
-    canvas.drawString(MARGIN, PAGE_H - 22 * mm, "Rapport d'analyse financière")
+    canvas.drawString(MARGIN, PAGE_H - 22 * mm, "Rapport exécutif")
 
     canvas.setFont("Helvetica", 9)
     canvas.setFillColor(colors.HexColor("#90CAF9"))
     doc_type = result.get("type_document", "Document financier")
     conf = result.get("score_confiance", 0)
     date_str = datetime.now().strftime("%d/%m/%Y")
-    canvas.drawString(MARGIN, PAGE_H - 30 * mm, f"{doc_type}  ·  Confiance : {conf}%  ·  {date_str}")
+    canvas.drawString(MARGIN, PAGE_H - 30 * mm, f"{doc_type}  ·  Niveau de confiance : {conf}%  ·  {date_str}")
 
     canvas.setFillColor(WHITE)
     canvas.setFont("Helvetica-Bold", 11)
     canvas.drawRightString(PAGE_W - MARGIN, PAGE_H - 22 * mm, "Pepperyn")
     canvas.setFont("Helvetica", 8)
     canvas.setFillColor(colors.HexColor("#90CAF9"))
-    canvas.drawRightString(PAGE_W - MARGIN, PAGE_H - 29 * mm, "Analyse IA · Niveau expert")
+    canvas.drawRightString(PAGE_W - MARGIN, PAGE_H - 29 * mm, "Copilote financier · Niveau expert")
 
     canvas.setFillColor(GRAY_TEXT)
     canvas.setFont("Helvetica", 7)
@@ -356,8 +369,13 @@ def _build_financial_headline(synthese: str | None, styles: dict) -> list:
     return [t, Spacer(1, 8)]
 
 
-def _build_diagnostic_immediat(diag: str, tension: str | None, styles: dict) -> list:
-    """Hero block — dark slate with diagnostic + decision + tension."""
+def _build_diagnostic_immediat(diag: str, tension: str | None, styles: dict,
+                                show_decision: bool = True) -> list:
+    """
+    Hero block — dark slate with diagnostic + (optionnellement) décision + tension.
+    `show_decision=False` : utilisé dans l'Executive Summary depuis l'Étape C, car la
+    décision prioritaire est désormais présentée seule en page 1 (Executive Decision).
+    """
     if not diag:
         return []
     story = []
@@ -384,7 +402,7 @@ def _build_diagnostic_immediat(diag: str, tension: str | None, styles: dict) -> 
     )])
     if main_line:
         rows.append([Paragraph(_rl(main_line), styles["hero_main"])])
-    if decision_line:
+    if decision_line and show_decision:
         rows.append([Paragraph(f"👉  DÉCISION PRIORITAIRE : {_rl(decision_line)}", styles["hero_decision"])])
 
     if not rows:
@@ -1009,9 +1027,10 @@ def _build_summary_scoreboard(score_global: int | None, niveau_urgence: str | No
     return rows
 
 
-def _build_ceo_dashboard(cards: list[dict], alertes: list[str], styles: dict) -> list:
-    """Grandes cartes KPI : Cash, EBITDA, Marge, Runway, Dette, Croissance."""
-    if not cards and not alertes:
+def _build_ceo_dashboard(cards: list[dict], alertes: list[str], styles: dict,
+                          confidence: int | None = None) -> list:
+    """Grandes cartes KPI : CA, Cash, EBITDA, Marge, Runway, Dette, Croissance + Niveau de confiance."""
+    if not cards and not alertes and confidence is None:
         return []
 
     rows: list[Any] = []
@@ -1019,6 +1038,23 @@ def _build_ceo_dashboard(cards: list[dict], alertes: list[str], styles: dict) ->
     rows.append(Spacer(1, 6))
 
     cells = []
+    if confidence is not None:
+        color_hex = "#15803D" if confidence >= 75 else "#D97706" if confidence >= 50 else "#DC2626"
+        bg_hex = "#F0FDF4" if confidence >= 75 else "#FFFBEB" if confidence >= 50 else "#FEF2F2"
+        value_p = Paragraph(
+            f'<font color="{color_hex}"><b>{confidence}%</b></font>',
+            ParagraphStyle("dcv_conf", fontName="Helvetica-Bold", fontSize=13, alignment=TA_CENTER, leading=16)
+        )
+        label_p = Paragraph("Niveau de confiance", styles["score_label"])
+        inner = Table([[value_p], [label_p]], colWidths=[34 * mm])
+        inner.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("BOX", (0, 0), (-1, -1), 1, colors.HexColor(color_hex)),
+            ("ROUNDEDCORNERS", [6, 6, 6, 6]),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(bg_hex)),
+        ]))
+        cells.append(inner)
     for card in cards:
         label = card.get("label", "") if isinstance(card, dict) else getattr(card, "label", "")
         value = card.get("value", "") if isinstance(card, dict) else getattr(card, "value", "")
@@ -1235,14 +1271,459 @@ def _build_separator_detailed(styles: dict) -> list:
     return story
 
 
+# ─── V12 Block Builders — Executive Narrative (Étape C) ──────────────────────
+# Ces builders lisent UNIQUEMENT l'ExecutiveDecisionModel (aucun calcul ici,
+# toute la logique métier vit dans services/executive_decision_model.py).
+# Vocabulaire interne (EDM) en anglais -> affichage client en français.
+
+_PRIORITY_FR = {"High": "Élevée", "Medium": "Moyenne", "Low": "Faible", "Not evaluated": "Non évaluée"}
+_STATUS_FR = {"To launch": "À lancer"}
+_TREND_FR = {"up": "↑ En hausse", "down": "↓ En baisse", "stable": "→ Stable", None: "—"}
+
+
+def _fmt_eur(value: float | None, show_sign: bool = False) -> str:
+    """Formate un montant en euros, style français (espace milliers, virgule décimale)."""
+    if value is None:
+        return "—"
+    sign = ""
+    if show_sign and value > 0:
+        sign = "+"
+    elif value < 0:
+        sign = "-"
+    v = abs(value)
+    if v >= 1_000_000:
+        return f"{sign}{v / 1_000_000:.1f}".replace(".", ",") + " M€"
+    return f"{sign}{v:,.0f}".replace(",", " ") + " €"
+
+
+def _stat_card(label: str, value: str, border_color, hex_str: str, styles: dict, width=None) -> Table:
+    """Petite carte KPI carrée — réutilisée par les sections Executive Decision / Coût de l'inaction."""
+    value_p = Paragraph(
+        f'<font color="{hex_str}"><b>{_rl(value)}</b></font>',
+        ParagraphStyle("stat_v", fontName="Helvetica-Bold", fontSize=13, alignment=TA_CENTER, leading=16),
+    )
+    label_p = Paragraph(_rl(label), styles["score_label"])
+    inner = Table([[value_p], [label_p]], colWidths=[width or (CONTENT_W / 3 - 6)])
+    inner.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("BOX", (0, 0), (-1, -1), 1, border_color),
+        ("ROUNDEDCORNERS", [6, 6, 6, 6]),
+    ]))
+    return inner
+
+
+def _build_executive_decision_page(edm: ExecutiveDecisionModel, decision_context: str | None, styles: dict) -> list:
+    """
+    Section 1 — Executive Decision.
+    LA décision la plus importante, seule, présentée de façon très visuelle.
+    Le dirigeant doit la comprendre en moins de 10 secondes.
+    """
+    ed = edm.executive_decision
+    if not ed:
+        return []
+
+    story: list[Any] = [Spacer(1, 26)]
+
+    rows = [
+        [Paragraph(
+            '<font color="#94A3B8"><b>DÉCISION PRIORITAIRE</b></font>',
+            ParagraphStyle("ed_label", fontName="Helvetica-Bold", fontSize=10, leading=14),
+        )],
+        [Paragraph(
+            f'<font color="#FFFFFF"><b>{_rl(ed.decision)}</b></font>',
+            ParagraphStyle("ed_title", fontName="Helvetica-Bold", fontSize=19, leading=25),
+        )],
+    ]
+    if ed.annual_impact is not None:
+        rows.append([Paragraph(
+            f'<font color="#FCD34D"><b>Impact estimé : {_fmt_eur(ed.annual_impact, show_sign=True)} / an</b></font>',
+            ParagraphStyle("ed_impact", fontName="Helvetica-Bold", fontSize=15, leading=20),
+        )])
+    if decision_context:
+        rows.append([Paragraph(
+            _rl(decision_context),
+            ParagraphStyle("ed_context", fontName="Helvetica", fontSize=10,
+                           textColor=colors.HexColor("#CBD5E1"), leading=15),
+        )])
+
+    t = Table(rows, colWidths=[CONTENT_W])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), BLUE_DEEP),
+        ("TOPPADDING", (0, 0), (-1, -1), 16),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 16),
+        ("LEFTPADDING", (0, 0), (-1, -1), 20),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 20),
+        ("ROUNDEDCORNERS", [8, 8, 8, 8]),
+    ]))
+    story.append(t)
+    story.append(Spacer(1, 16))
+
+    # Stats de soutien : priorité + coût de l'inaction (mois / jour)
+    cells = []
+    priority_fr = _PRIORITY_FR.get(ed.priority, ed.priority)
+    p_color, p_hex = {"Élevée": (RED, RED_HEX), "Moyenne": (AMBER, AMBER_HEX), "Faible": (GREEN, GREEN_HEX)}.get(
+        priority_fr, (GRAY_BORDER, GRAY_HEX)
+    )
+    cells.append(_stat_card("Priorité", priority_fr, p_color, p_hex, styles))
+    coi = edm.cost_of_inaction_summary
+    if coi and coi.per_month is not None:
+        cells.append(_stat_card("Coût de l'inaction / mois", _fmt_eur(coi.per_month), RED, RED_HEX, styles))
+    if coi and coi.per_day is not None:
+        cells.append(_stat_card("Coût de l'inaction / jour", _fmt_eur(coi.per_day), RED, RED_HEX, styles))
+    if cells:
+        col_w = CONTENT_W / len(cells)
+        t2 = Table([cells], colWidths=[col_w] * len(cells))
+        t2.setStyle(TableStyle([("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+        story.append(t2)
+        story.append(Spacer(1, 16))
+
+    cta = Paragraph(
+        "👉  <b>Agissez cette semaine.</b>",
+        ParagraphStyle("ed_cta", fontName="Helvetica-Bold", fontSize=12,
+                       textColor=BLUE_DARK, leading=17, alignment=TA_CENTER),
+    )
+    t3 = Table([[cta]], colWidths=[CONTENT_W])
+    t3.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), BLUE_LIGHT),
+        ("TOPPADDING", (0, 0), (-1, -1), 10), ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("BOX", (0, 0), (-1, -1), 1, BLUE_MAIN),
+    ]))
+    story.append(t3)
+    story.append(PageBreak())
+    return story
+
+
+def _build_value_destroyers_section(edm: ExecutiveDecisionModel, styles: dict) -> list:
+    """Section 4 — Ce qui détruit la rentabilité (tableau structuré, Top 5)."""
+    destroyers = edm.value_destroyers[:5]
+    if not destroyers:
+        return []
+    rows: list[Any] = [_section_header("CE QUI DÉTRUIT VOTRE RENTABILITÉ", RED, styles), Spacer(1, 5)]
+
+    header = [Paragraph(f"<b>{h}</b>", styles["small"]) for h in
+              ["Destructeur de valeur", "Impact annuel", "Impact mensuel", "Tendance"]]
+    table_rows = [header]
+    for d in destroyers:
+        table_rows.append([
+            Paragraph(_rl(d.name), styles["body"]),
+            Paragraph(_fmt_eur(d.annual_impact), styles["body"]),
+            Paragraph(_fmt_eur(d.monthly_impact), styles["body"]),
+            Paragraph(_TREND_FR.get(d.trend, "—"), styles["body"]),
+        ])
+    col_w = [CONTENT_W * 0.4, CONTENT_W * 0.22, CONTENT_W * 0.22, CONTENT_W * 0.16]
+    t = Table(table_rows, colWidths=col_w)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), RED_LIGHT),
+        ("LINEBELOW", (0, 0), (-1, 0), 0.5, RED),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, GRAY_BG]),
+        ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+        ("BOX", (0, 0), (-1, -1), 0.5, GRAY_BORDER),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    rows.append(t)
+
+    comments = [d.comment for d in destroyers if d.comment]
+    if comments:
+        rows.append(Spacer(1, 4))
+        for c in comments[:3]:
+            rows.append(Paragraph(f"·  {_rl(c)}", styles["body_gray"]))
+
+    rows.append(Spacer(1, 8))
+    rows.append(PageBreak())
+    return rows
+
+
+def _build_cost_of_inaction_page(edm: ExecutiveDecisionModel, risque_text: str | None, styles: dict) -> list:
+    """Section 5 — Coût de l'inaction (page dédiée, 100% calculé en Python)."""
+    coi = edm.cost_of_inaction
+    if not coi:
+        return []
+    story: list[Any] = [_section_header("COMBIEN VOUS COÛTE L'INACTION", SLATE, styles), Spacer(1, 10)]
+
+    periods = [
+        ("Par an", coi.per_year), ("Par mois", coi.per_month), ("Par semaine", coi.per_week),
+        ("Par jour", coi.per_day), ("Par heure", coi.per_hour),
+    ]
+    cells = [_stat_card(label, _fmt_eur(val), RED, RED_HEX, styles) for label, val in periods if val is not None]
+    for i in range(0, len(cells), 3):
+        chunk = cells[i:i + 3]
+        col_w = CONTENT_W / len(chunk)
+        t = Table([chunk], colWidths=[col_w] * len(chunk))
+        t.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(t)
+        story.append(Spacer(1, 6))
+
+    if risque_text:
+        story.append(Spacer(1, 4))
+        cell = Paragraph(f"⚠️  <b>Si rien ne change :</b>  {_rl(risque_text)}", styles["risque_inaction"])
+        t2 = Table([[cell]], colWidths=[CONTENT_W])
+        t2.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), RED_LIGHT),
+            ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 12),
+            ("BOX", (0, 0), (-1, -1), 1.5, RED), ("ROUNDEDCORNERS", [4, 4, 4, 4]),
+        ]))
+        story.append(t2)
+
+    story.append(Spacer(1, 8))
+    story.append(PageBreak())
+    return story
+
+
+def _build_executive_decisions_section(edm: ExecutiveDecisionModel, styles: dict) -> list:
+    """Section 6 — Executive Decisions / Priorités d'action (tableau trié par impact)."""
+    decisions = edm.executive_decisions
+    if not decisions:
+        return []
+    rows: list[Any] = [_section_header("PRIORITÉS D'ACTION", GREEN, styles), Spacer(1, 4)]
+    rows.append(Paragraph(f"<b>Score de priorisation global :</b> {edm.executive_decisions_score}/10", styles["body"]))
+    rows.append(Spacer(1, 5))
+
+    header = [Paragraph(f"<b>{h}</b>", styles["small"]) for h in
+              ["Décision", "Impact annuel", "Délai", "Difficulté", "Priorité"]]
+    table_rows = [header]
+    for d in decisions:
+        table_rows.append([
+            Paragraph(_rl(d.decision), styles["body"]),
+            Paragraph(_fmt_eur(d.annual_impact, show_sign=True), styles["body"]),
+            Paragraph(_rl(d.timeline or "—"), styles["body"]),
+            Paragraph(_rl((d.difficulty or "—").capitalize()), styles["body"]),
+            Paragraph(_PRIORITY_FR.get(d.priority, d.priority), styles["body"]),
+        ])
+    col_w = [CONTENT_W * 0.36, CONTENT_W * 0.18, CONTENT_W * 0.14, CONTENT_W * 0.16, CONTENT_W * 0.16]
+    t = Table(table_rows, colWidths=col_w)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), GREEN_LIGHT), ("LINEBELOW", (0, 0), (-1, 0), 0.5, GREEN),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, GRAY_BG]),
+        ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6), ("BOX", (0, 0), (-1, -1), 0.5, GRAY_BORDER),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    rows.append(t)
+    rows.append(Spacer(1, 8))
+    rows.append(PageBreak())
+    return rows
+
+
+def _build_simulation_section(edm: ExecutiveDecisionModel, styles: dict) -> list:
+    """Section 7 — Simulation Avant/Après : courbe Action (verte) vs Inaction (rouge)."""
+    if not edm.action_series or not edm.do_nothing_series:
+        return []
+    story: list[Any] = [_section_header("SIMULATION — AGIR OU NE RIEN FAIRE", BLUE_DARK, styles), Spacer(1, 8)]
+
+    d = Drawing(CONTENT_W, 46 * mm)
+    chart = HorizontalLineChart()
+    chart.x = 10
+    chart.y = 8 * mm
+    chart.width = CONTENT_W - 20
+    chart.height = 36 * mm
+    chart.data = [edm.action_series, edm.do_nothing_series]
+    chart.categoryAxis.categoryNames = [f"M{i + 1}" for i in range(len(edm.action_series))]
+    chart.categoryAxis.labels.fontSize = 6
+    chart.categoryAxis.labels.fillColor = GRAY_TEXT
+    chart.valueAxis.labels.fontSize = 6
+    chart.valueAxis.labels.fillColor = GRAY_TEXT
+    chart.valueAxis.labelTextFormat = lambda v: _fmt_eur(v)
+    all_vals = edm.action_series + edm.do_nothing_series
+    vmax = max(abs(v) for v in all_vals) * 1.15 if all_vals else 1
+    chart.valueAxis.valueMin = -vmax
+    chart.valueAxis.valueMax = vmax
+    chart.lines[0].strokeColor = GREEN
+    chart.lines[0].strokeWidth = 2
+    chart.lines[1].strokeColor = RED
+    chart.lines[1].strokeWidth = 2
+    chart.joinedLines = 1
+    d.add(chart)
+    story.append(d)
+
+    legend_row = [
+        Paragraph('<font color="#15803D">━━</font>  Avec action', ParagraphStyle(
+            "leg1", fontName="Helvetica", fontSize=8, alignment=TA_CENTER, leading=11)),
+        Paragraph('<font color="#DC2626">━━</font>  Sans action', ParagraphStyle(
+            "leg2", fontName="Helvetica", fontSize=8, alignment=TA_CENTER, leading=11)),
+    ]
+    t_legend = Table([legend_row], colWidths=[CONTENT_W / 2, CONTENT_W / 2])
+    story.append(t_legend)
+    story.append(Spacer(1, 6))
+
+    style_map = {
+        "best_case": ("🟢", GREEN, GREEN_LIGHT),
+        "most_likely": ("🔵", BLUE_MAIN, BLUE_LIGHT),
+        "worst_case": ("🔴", RED, RED_LIGHT),
+    }
+    cells = []
+    for sc in edm.scenarios:
+        icon, color, bg = style_map.get(sc.nom, ("⚪", GRAY_TEXT, GRAY_BG))
+        title_p = Paragraph(f'{icon}  <b>{_rl(sc.label.upper())}</b>', ParagraphStyle(
+            "scn_t", fontName="Helvetica-Bold", fontSize=9, textColor=color, leading=12))
+        desc_p = Paragraph(_rl(sc.description), ParagraphStyle(
+            "scn_d", fontName="Helvetica", fontSize=8, textColor=DARK, leading=11))
+        inner = Table([[title_p], [desc_p]], colWidths=[CONTENT_W / 3 - 4])
+        inner.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), bg), ("BOX", (0, 0), (-1, -1), 0.8, color),
+            ("TOPPADDING", (0, 0), (-1, -1), 7), ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ("LEFTPADDING", (0, 0), (-1, -1), 7), ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+        cells.append(inner)
+    if cells:
+        col_w = CONTENT_W / len(cells)
+        t2 = Table([cells], colWidths=[col_w] * len(cells))
+        t2.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+        story.append(t2)
+
+    story.append(Spacer(1, 8))
+    story.append(PageBreak())
+    return story
+
+
+def _build_projection_section(edm: ExecutiveDecisionModel, styles: dict) -> list:
+    """Section 8 — Projection et trajectoire (courbe simple, 12 mois)."""
+    if not edm.monthly_projection:
+        return []
+    story: list[Any] = [_section_header("PROJECTION ET TRAJECTOIRE", BLUE_DARK, styles), Spacer(1, 8)]
+
+    d = Drawing(CONTENT_W, 46 * mm)
+    chart = HorizontalLineChart()
+    chart.x = 10
+    chart.y = 8 * mm
+    chart.width = CONTENT_W - 20
+    chart.height = 36 * mm
+    chart.data = [edm.monthly_projection]
+    chart.categoryAxis.categoryNames = [f"M{i + 1}" for i in range(len(edm.monthly_projection))]
+    chart.categoryAxis.labels.fontSize = 6
+    chart.valueAxis.labels.fontSize = 6
+    chart.valueAxis.labelTextFormat = lambda v: _fmt_eur(v)
+    vmax = max(edm.monthly_projection) * 1.15 if edm.monthly_projection else 1
+    chart.valueAxis.valueMin = 0
+    chart.valueAxis.valueMax = vmax if vmax > 0 else 1
+    chart.lines[0].strokeColor = BLUE_MAIN
+    chart.lines[0].strokeWidth = 2.2
+    chart.joinedLines = 1
+    d.add(chart)
+    story.append(d)
+    story.append(Spacer(1, 4))
+    story.append(Paragraph(
+        "Trajectoire estimée sur 12 mois si les décisions prioritaires sont engagées dès maintenant.",
+        styles["body_gray"],
+    ))
+    story.append(Spacer(1, 8))
+    story.append(PageBreak())
+    return story
+
+
+def _build_execution_log_section(edm: ExecutiveDecisionModel, styles: dict) -> list:
+    """Section 9 — Carnet d'exécution (remplace l'ancienne 'Analyse détaillée')."""
+    items = edm.execution_log
+    if not items:
+        return []
+    rows: list[Any] = [_section_header("CARNET D'EXÉCUTION", BLUE_MAIN, styles), Spacer(1, 5)]
+
+    header = [Paragraph(f"<b>{h}</b>", styles["small"]) for h in
+              ["Décision", "Responsable", "Impact", "Échéance", "Statut"]]
+    table_rows = [header]
+    for it in items:
+        table_rows.append([
+            Paragraph(_rl(it.decision), styles["body"]),
+            Paragraph(_rl(it.owner or "—"), styles["body"]),
+            Paragraph(_fmt_eur(it.impact, show_sign=True), styles["body"]),
+            Paragraph(_rl(it.due_date or "—"), styles["body"]),
+            Paragraph(_STATUS_FR.get(it.status, it.status), styles["body"]),
+        ])
+    col_w = [CONTENT_W * 0.36, CONTENT_W * 0.16, CONTENT_W * 0.18, CONTENT_W * 0.16, CONTENT_W * 0.14]
+    t = Table(table_rows, colWidths=col_w)
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), BLUE_LIGHT), ("LINEBELOW", (0, 0), (-1, 0), 0.5, BLUE_MAIN),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, GRAY_BG]),
+        ("TOPPADDING", (0, 0), (-1, -1), 5), ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6), ("BOX", (0, 0), (-1, -1), 0.5, GRAY_BORDER),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    rows.append(t)
+    rows.append(Spacer(1, 8))
+    rows.append(PageBreak())
+    return rows
+
+
+def _build_copilot_note_section(edm: ExecutiveDecisionModel, styles: dict) -> list:
+    """Section 10 — Note confidentielle du copilote financier."""
+    note = edm.copilot_note
+    if not note:
+        return []
+    story: list[Any] = [_section_header("NOTE CONFIDENTIELLE DU COPILOTE FINANCIER", BLUE_DEEP, styles), Spacer(1, 10)]
+
+    # Découpage en paragraphes réels (ligne vide = nouveau paragraphe) ; les
+    # retours à la ligne simples ne sont que des sauts de mise en forme dans
+    # le texte source et doivent être recollés en une seule phrase continue.
+    paragraphs = [
+        " ".join(p.split())
+        for p in _re.split(r"\n\s*\n", note)
+        if p.strip()
+    ]
+    note_rows = [[Paragraph(_rl(p), ParagraphStyle(
+        "note_p", fontName="Helvetica", fontSize=10, textColor=DARK, leading=16))] for p in paragraphs]
+    t = Table(note_rows, colWidths=[CONTENT_W])
+    t.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FAFAFA")),
+        ("BOX", (0, 0), (-1, -1), 0.5, GRAY_BORDER),
+        ("TOPPADDING", (0, 0), (-1, -1), 14), ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+        ("LEFTPADDING", (0, 0), (-1, -1), 18), ("RIGHTPADDING", (0, 0), (-1, -1), 18),
+    ]))
+    story.append(t)
+    story.append(Spacer(1, 10))
+    story.append(PageBreak())
+    return story
+
+
+def _build_follow_up_section(edm: ExecutiveDecisionModel, memory_insight: str | None, styles: dict) -> list:
+    """Section 11 — Comment Pepperyn continuera à vous accompagner (non commerciale)."""
+    fu = edm.follow_up
+    if not fu:
+        return []
+    story: list[Any] = [
+        _section_header("COMMENT PEPPERYN CONTINUERA À VOUS ACCOMPAGNER", BLUE_DARK, styles),
+        Spacer(1, 6),
+    ]
+    if memory_insight:
+        story.append(Paragraph(f"<b>Depuis votre dernière analyse :</b> {_rl(memory_insight)}", styles["body"]))
+        story.append(Spacer(1, 6))
+    for commitment in fu.commitments:
+        cell = Paragraph(f"✓  {_rl(commitment)}", styles["body"])
+        t = Table([[cell]], colWidths=[CONTENT_W])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), BLUE_LIGHT),
+            ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING", (0, 0), (-1, -1), 10), ("BOX", (0, 0), (-1, -1), 0.3, GRAY_BORDER),
+        ]))
+        story.append(t)
+        story.append(Spacer(1, 2))
+    if fu.next_analysis_recommended:
+        story.append(Spacer(1, 4))
+        story.append(Paragraph(
+            f"<b>Prochaine analyse recommandée :</b> {_rl(fu.next_analysis_recommended)}", styles["body"]
+        ))
+    story.append(Spacer(1, 8))
+    return story
+
+
 # ─── Main generate function ───────────────────────────────────────────────────
 def generate_pdf_report(result: dict) -> bytes:
     """
-    Generate a V5 Premium Decision Engine PDF report.
+    Generate the Pepperyn Executive Report (PDF) — Executive Narrative, 12 sections.
+    Lit exclusivement l'Executive Decision Model pour tout contenu calculé
+    (impact, priorité, ROI, coût de l'inaction, séries, statut) ; le texte
+    libre (LLM) est lu directement sur `result` pour les sections qui n'ont
+    pas (encore) d'équivalent dans l'EDM (Résumé exécutif, contexte).
     Returns PDF bytes.
     """
     buf = io.BytesIO()
     styles = _build_styles()
+    edm = build_executive_decision_model(result)
 
     doc = SimpleDocTemplate(
         buf,
@@ -1251,13 +1732,13 @@ def generate_pdf_report(result: dict) -> bytes:
         rightMargin=MARGIN,
         topMargin=58 * mm,
         bottomMargin=20 * mm,
-        title="Rapport Pepperyn V5",
-        author="Pepperyn IA",
+        title="Rapport exécutif Pepperyn",
+        author="Pepperyn",
     )
 
     story: list[Any] = []
 
-    # ── BLOC : FIABILITÉ DES DONNÉES (réassemblé en ANNEXE — macro-section 8) ──
+    # ── BLOC : FIABILITÉ DES DONNÉES (réassemblé en ANNEXE — section 12) ───────
     _idx_data_quality = len(story)
     dq = result.get("data_quality") or {}
     if dq:
@@ -1280,9 +1761,9 @@ def generate_pdf_report(result: dict) -> bytes:
             [Paragraph("<b>Score fiabilité données source</b>", styles["body"]),
              Paragraph(f"<b>{dq_score}/100</b>", styles["body"]),
              Paragraph(f"<b>{status_label}</b>", styles["body"])],
-            [Paragraph("<b>Confiance analyse IA</b>", styles["body"]),
+            [Paragraph("<b>Niveau de confiance</b>", styles["body"]),
              Paragraph(f"<b>{score_ia}%</b>", styles["body"]),
-             Paragraph("Qualité du raisonnement IA", styles["small"])],
+             Paragraph("Qualité de l'analyse", styles["small"])],
         ]
         col_w = [CONTENT_W * 0.45, CONTENT_W * 0.2, CONTENT_W * 0.35]
         t_scores = Table(rows_dq, colWidths=col_w)
@@ -1345,55 +1826,17 @@ def generate_pdf_report(result: dict) -> bytes:
     block_data_quality = story[_idx_data_quality:]
     del story[_idx_data_quality:]
 
-    # ══════════════════ MACRO-SECTION 1 — EXECUTIVE SUMMARY ══════════════════
-    story.extend(_build_macro_section_title(1, "Executive Summary", styles))
+    # ── BLOC : COMPLÉMENTS D'ANALYSE (réassemblé en ANNEXE — section 12) ───────
+    # Contenu technique conservé (aucune perte d'information) mais retiré de la
+    # narration principale pour respecter le principe « une page = une idée » et
+    # la réduction de la surcharge visuelle demandées à l'Étape C.
+    _idx_complements = len(story)
 
-    # ── 0.5. FINANCIAL HEADLINE — PERTE STRUCTURELLE (tout en haut) ─────────
-    story.extend(_build_financial_headline(result.get("impact_financier_synthese"), styles))
+    impact_synthese = result.get("impact_financier_synthese")
+    impact = result.get("impact_financier") or []
+    story.extend(_build_impact_financier(impact_synthese, impact, styles,
+                                         en_resume=result.get("en_resume_impact")))
 
-    # ── 1. DIAGNOSTIC IMMÉDIAT (hero block) ─────────────────────────────────
-    diag_imm = result.get("diagnostic_immediat", "")
-    tension = result.get("phrase_tension", "")
-    story.extend(_build_diagnostic_immediat(diag_imm, tension, styles))
-
-    # ── 2. RÉSUMÉ EXÉCUTIF ──────────────────────────────────────────────────
-    resume = result.get("resume_executif") or result.get("synthese", "")
-    story.extend(_build_resume_executif(resume, styles))
-
-    # ── 3. SCORES /10 (4 scores) ────────────────────────────────────────────
-    scores = {
-        "rentabilite": result.get("score_rentabilite"),
-        "risque":      result.get("score_risque"),
-        "structure":   result.get("score_structure"),
-        "liquidite":   result.get("score_liquidite"),
-    }
-    interpretations = result.get("score_interpretations") or {}
-    if isinstance(interpretations, dict) and any(v is not None for v in scores.values()):
-        story.append(_section_header("📈  SCORES /10", BLUE_DARK, styles))
-        story.append(Spacer(1, 6))
-        story.append(_score_table(scores, interpretations, styles))
-        story.append(Spacer(1, 8))
-
-    # ── INDICE DE SANTÉ GLOBALE + NIVEAU D'URGENCE + CRÉATION/DESTRUCTION ──
-    story.extend(_build_summary_scoreboard(
-        result.get("score_global"), result.get("niveau_urgence"),
-        result.get("creation_destruction_valeur"), styles,
-    ))
-
-    # ── TOP DÉCISIONS (aperçu condensé — détail complet en macro-section 5) ──
-    top_decisions = (result.get("plan_action_haute") or result.get("plan_action") or [])[:5]
-    if top_decisions:
-        story.append(Paragraph("<b>👉 Top décisions</b>", styles["subsection"]))
-        story.append(Spacer(1, 2))
-        for d in top_decisions:
-            story.append(Paragraph(f"•  {_rl(d.lstrip(chr(0x1F3AF) + '-• ').strip())}", styles["body"]))
-        story.append(Spacer(1, 8))
-
-    # ══════════════════ MACRO-SECTION 2 — CEO DASHBOARD ══════════════════════
-    story.extend(_build_macro_section_title(2, "CEO Dashboard", styles))
-    story.extend(_build_ceo_dashboard(result.get("ceo_dashboard") or [], result.get("alertes") or [], styles))
-
-    # ── 3b. MARGIN INTELLIGENCE ─────────────────────────────────────────────
     story.extend(_build_margin_intelligence(
         items=result.get("margin_intelligence") or [],
         confidence=result.get("margin_confidence"),
@@ -1401,7 +1844,6 @@ def generate_pdf_report(result: dict) -> bytes:
         styles=styles,
     ))
 
-    # ── 3c. CASH FORECAST & LIQUIDITY RISK ──────────────────────────────────
     story.extend(_build_cash_forecast(
         items=result.get("cash_forecast") or [],
         bfr=result.get("bfr_indicators") or [],
@@ -1410,217 +1852,6 @@ def generate_pdf_report(result: dict) -> bytes:
         styles=styles,
     ))
 
-    # ── BLOC : IMPACT FINANCIER (assemblé dans la macro-section 3) ──────────
-    _idx_impact = len(story)
-    impact_synthese = result.get("impact_financier_synthese")
-    impact = result.get("impact_financier") or []
-    story.extend(_build_impact_financier(impact_synthese, impact, styles,
-                                         en_resume=result.get("en_resume_impact")))
-    block_impact_financier = story[_idx_impact:]
-    del story[_idx_impact:]
-
-    # ── BLOC : AVANT / APRÈS (assemblé dans la macro-section 6) ─────────────
-    _idx_avant_apres = len(story)
-    actuel = result.get("avant_apres_actuel") or []
-    apres  = result.get("avant_apres_apres") or []
-    gain   = result.get("avant_apres_gain")
-    gain_transf = result.get("avant_apres_gain_transformations") or []
-    story.extend(_build_avant_apres(actuel, apres, gain, styles,
-                                    gain_transformations=gain_transf))
-    block_avant_apres = story[_idx_avant_apres:]
-    del story[_idx_avant_apres:]
-
-    # ── BLOC : SIMULATEUR DE DÉCISION (assemblé dans la macro-section 6) ───
-    _idx_simulateur = len(story)
-    sim = result.get("simulateur_decision") or []
-    story.extend(_build_simulateur(sim, styles))
-    block_simulateur = story[_idx_simulateur:]
-    del story[_idx_simulateur:]
-
-    # ── BLOC : PROJECTION TEMPORELLE (assemblé dans la macro-section 6) ────
-    _idx_projection = len(story)
-    p3 = result.get("projection_3mois") or []
-    p6 = result.get("projection_6mois") or []
-    story.extend(_build_projection(p3, p6, styles,
-                                   en_resume=result.get("en_resume_projection")))
-    block_projection = story[_idx_projection:]
-    del story[_idx_projection:]
-
-    # ── BLOC : CE QUI DÉTRUIT VOTRE RENTABILITÉ (macro-section 3) ───────────
-    _idx_ce_qui_detruit = len(story)
-    ce_qui_detruit = result.get("ce_qui_detruit") or []
-    if ce_qui_detruit:
-        story.append(_section_header("🔴  CE QUI DÉTRUIT VOTRE RENTABILITÉ", RED, styles))
-        story.append(Spacer(1, 3))
-        story.extend(_bullet_rows(ce_qui_detruit, "🔴", RED, RED_LIGHT, styles))
-        story.append(Spacer(1, 8))
-    block_ce_qui_detruit = story[_idx_ce_qui_detruit:]
-    del story[_idx_ce_qui_detruit:]
-
-    # ── BLOC : LEVIERS DE CROISSANCE (macro-section 4) ──────────────────────
-    _idx_leviers = len(story)
-    leviers = result.get("leviers_croissance") or []
-    if leviers:
-        story.append(_section_header("🟢  LEVIERS DE CROISSANCE", GREEN, styles))
-        story.append(Spacer(1, 3))
-        story.extend(_bullet_rows(leviers, "🟢", GREEN, GREEN_LIGHT, styles))
-        story.append(Spacer(1, 8))
-    block_leviers_croissance = story[_idx_leviers:]
-    del story[_idx_leviers:]
-
-    # ── BLOC : PLAN D'ACTION HAUTE/SECONDAIRE (macro-section 5) ─────────────
-    _idx_plan_action = len(story)
-    actions_haute = result.get("plan_action_haute") or []
-    actions_sec   = result.get("plan_action_secondaire") or []
-    # Fallback pour anciennes analyses ou format plat
-    if not actions_haute and not actions_sec:
-        all_actions = result.get("plan_action") or []
-        if not all_actions:
-            recs = result.get("recommandations", [])
-            all_actions = [f"{r.get('action', '')}" for r in recs if isinstance(r, dict)]
-        for a in all_actions:
-            al = a.lower()
-            if "haute" in al or "haute" in al:
-                actions_haute.append(a)
-            else:
-                actions_sec.append(a)
-        # If still no split, put all in haute (max 3) + sec
-        if not actions_haute:
-            actions_haute = all_actions[:3]
-            actions_sec   = all_actions[3:]
-
-    total_actions = len(actions_haute) + len(actions_sec)
-    if total_actions > 0:
-        story.append(_section_header(f"🎯  PLAN D'ACTION ({total_actions} actions)", BLUE_MAIN, styles))
-        story.append(Spacer(1, 4))
-
-        # PRIORITÉ HAUTE — proéminent
-        if actions_haute:
-            ph_label = Paragraph(
-                '<font color="#DC2626"><b>🔴  PRIORITÉ ABSOLUE — FAITES CES 3 CHOSES EN PREMIER</b></font>',
-                styles["subsection"]
-            )
-            story.append(ph_label)
-            story.append(Spacer(1, 3))
-            for action in actions_haute[:3]:
-                clean = action.lstrip("🎯-• ").strip()
-                cell = Paragraph(
-                    f'<font color="#DC2626"><b>→</b></font>  {_rl(clean)}',
-                    ParagraphStyle("ph_action", fontName="Helvetica-Bold", fontSize=9,
-                                   textColor=DARK, leading=14)
-                )
-                t = Table([[cell]], colWidths=[CONTENT_W])
-                t.setStyle(TableStyle([
-                    ("BACKGROUND",    (0, 0), (-1, -1), RED_LIGHT),
-                    ("TOPPADDING",    (0, 0), (-1, -1), 6),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-                    ("LEFTPADDING",   (0, 0), (-1, -1), 10),
-                    ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
-                    ("BOX",           (0, 0), (-1, -1), 1, RED),
-                ]))
-                story.append(t)
-                story.append(Spacer(1, 3))
-
-        # PRIORITÉ SECONDAIRE — discret
-        if actions_sec:
-            story.append(Spacer(1, 3))
-            ps_label = Paragraph(
-                '<font color="#5F6368"><b>ACTIONS SECONDAIRES</b></font>',
-                styles["body_gray"]
-            )
-            story.append(ps_label)
-            story.append(Spacer(1, 3))
-            for action in actions_sec:
-                clean = action.lstrip("🎯-• ").strip()
-                cell = Paragraph(f"·  {_rl(clean)}", styles["body_gray"])
-                t = Table([[cell]], colWidths=[CONTENT_W])
-                t.setStyle(TableStyle([
-                    ("BACKGROUND",    (0, 0), (-1, -1), GRAY_BG),
-                    ("TOPPADDING",    (0, 0), (-1, -1), 4),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                    ("LEFTPADDING",   (0, 0), (-1, -1), 10),
-                    ("BOX",           (0, 0), (-1, -1), 0.3, GRAY_BORDER),
-                ]))
-                story.append(t)
-                story.append(Spacer(1, 2))
-
-        # V9 — En résumé plan d'action
-        en_resume_plan = result.get("en_resume_plan")
-        if en_resume_plan:
-            story.extend(_en_resume_box(en_resume_plan, styles))
-        story.append(Spacer(1, 8))
-    block_plan_action = story[_idx_plan_action:]
-    del story[_idx_plan_action:]
-
-    # ── BLOC : ANALYSE DÉTAILLÉE — sections techniques (macro-section 7) ────
-    _idx_analyse_detaillee = len(story)
-
-    # ── 11. SI RIEN NE CHANGE ───────────────────────────────────────────────
-    risque_inaction = result.get("risque_inaction", "")
-    story.extend(_build_risque_inaction(risque_inaction, styles))
-
-    # ── 12. DÉCISION + TRIGGER FINAL ────────────────────────────────────────
-    decision = result.get("decision", "")
-    if decision:
-        story.append(_section_header("⚡  DÉCISION", BLUE_MAIN, styles))
-        story.append(Spacer(1, 3))
-        cell = Paragraph(_rl(decision), styles["decision"])
-        t = Table([[cell]], colWidths=[CONTENT_W])
-        t.setStyle(TableStyle([
-            ("BACKGROUND",    (0, 0), (-1, -1), BLUE_LIGHT),
-            ("TOPPADDING",    (0, 0), (-1, -1), 8),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-            ("LEFTPADDING",   (0, 0), (-1, -1), 12),
-            ("RIGHTPADDING",  (0, 0), (-1, -1), 12),
-            ("BOX",           (0, 0), (-1, -1), 1.5, BLUE_MAIN),
-        ]))
-        story.append(t)
-        story.append(Spacer(1, 4))
-
-    # TRIGGER FINAL — toujours affiché (CTA fixe)
-    trigger_cell = Paragraph(
-        '👉  <b>RECOMMANDATION :</b>  Mettre en œuvre les actions prioritaires '
-        'dans les <b>30 prochains jours</b>.',
-        ParagraphStyle("trigger_final", fontName="Helvetica-Bold", fontSize=10,
-                       textColor=BLUE_DARK, leading=15)
-    )
-    t_trigger = Table([[trigger_cell]], colWidths=[CONTENT_W])
-    t_trigger.setStyle(TableStyle([
-        ("BACKGROUND",    (0, 0), (-1, -1), BLUE_LIGHT),
-        ("TOPPADDING",    (0, 0), (-1, -1), 10),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
-        ("LEFTPADDING",   (0, 0), (-1, -1), 14),
-        ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
-        ("BOX",           (0, 0), (-1, -1), 2, BLUE_DARK),
-        ("ROUNDEDCORNERS", [4, 4, 4, 4]),
-    ]))
-    story.append(t_trigger)
-    story.append(Spacer(1, 10))
-
-    # ── 13. ÉVOLUTION VS ANALYSE PRÉCÉDENTE ─────────────────────────────────
-    memory_insight = result.get("memory_insight", "")
-    if memory_insight:
-        story.append(_section_header("🔥  ÉVOLUTION VS ANALYSE PRÉCÉDENTE", AMBER, styles))
-        story.append(Spacer(1, 3))
-        story.append(Paragraph(_rl(memory_insight), styles["body"]))
-        story.append(Spacer(1, 8))
-
-    # ══════════════════════════════════════════════════════════════════════════
-    # ANALYSE DÉTAILLÉE (sections techniques complètes)
-    # ══════════════════════════════════════════════════════════════════════════
-    has_detailed = any([
-        result.get("diagnostic_revenus"),
-        result.get("diagnostic_couts"),
-        result.get("diagnostic_marges"),
-        result.get("ce_qui_a_change"),
-        result.get("alertes"),
-        result.get("problemes_critiques"),
-        result.get("opportunites_v3") or result.get("opportunites"),
-    ])
-    if has_detailed:
-        story.extend(_build_separator_detailed(styles))
-
-    # ── 14. DIAGNOSTIC FINANCIER ────────────────────────────────────────────
     diag_rev  = result.get("diagnostic_revenus", "")
     diag_cout = result.get("diagnostic_couts", "")
     diag_marge= result.get("diagnostic_marges", "")
@@ -1637,7 +1868,6 @@ def generate_pdf_report(result: dict) -> bytes:
             story.append(Paragraph(f"<b>Marges :</b> {_rl(diag_marge)}", styles["body"]))
         story.append(Spacer(1, 8))
 
-    # ── 15. CE QUI A CHANGÉ ─────────────────────────────────────────────────
     changements = result.get("ce_qui_a_change", [])
     if changements:
         story.append(_section_header("🔄  CE QUI A CHANGÉ", AMBER, styles))
@@ -1645,15 +1875,6 @@ def generate_pdf_report(result: dict) -> bytes:
         story.extend(_bullet_rows(changements, "🔄", AMBER, AMBER_LIGHT, styles))
         story.append(Spacer(1, 8))
 
-    # ── 16. ALERTES ─────────────────────────────────────────────────────────
-    alertes = result.get("alertes", [])
-    if alertes:
-        story.append(_section_header(f"⚠️  ALERTES ({len(alertes)})", ORANGE, styles))
-        story.append(Spacer(1, 3))
-        story.extend(_bullet_rows(alertes, "⚠️", ORANGE, ORANGE_LIGHT, styles))
-        story.append(Spacer(1, 8))
-
-    # ── 17. PROBLÈMES CRITIQUES ─────────────────────────────────────────────
     problemes = result.get("problemes_critiques", [])
     if problemes:
         story.append(_section_header(f"🔴  PROBLÈMES CRITIQUES ({len(problemes)})", RED, styles))
@@ -1661,7 +1882,6 @@ def generate_pdf_report(result: dict) -> bytes:
         story.extend(_bullet_rows(problemes, "🔴", RED, RED_LIGHT, styles))
         story.append(Spacer(1, 8))
 
-    # ── 18. OPPORTUNITÉS ────────────────────────────────────────────────────
     opportunites = result.get("opportunites_v3") or result.get("opportunites", [])
     if opportunites:
         opp_list: list[str] = []
@@ -1675,34 +1895,85 @@ def generate_pdf_report(result: dict) -> bytes:
             story.append(Spacer(1, 3))
             story.extend(_bullet_rows(opp_list, "🟢", GREEN, GREEN_LIGHT, styles))
             story.append(Spacer(1, 8))
-    block_analyse_detaillee = story[_idx_analyse_detaillee:]
-    del story[_idx_analyse_detaillee:]
 
-    # ═══════════════ ASSEMBLAGE FINAL — MACRO-SECTIONS 3 À 8 ════════════════
-    # (les macro-sections 1 et 2 sont déjà présentes dans `story` à ce stade)
-    story.extend(_build_macro_section_title(3, "Ce qui détruit la rentabilité", styles))
-    story.extend(block_ce_qui_detruit)
-    story.extend(block_impact_financier)
+    block_complements = story[_idx_complements:]
+    del story[_idx_complements:]
 
-    story.extend(_build_macro_section_title(4, "Opportunités immédiates", styles))
-    story.extend(_build_quick_wins(result.get("quick_wins") or [], styles))
-    story.extend(block_leviers_croissance)
+    # ═══════════════════════════════════════════════════════════════════════
+    # EXECUTIVE NARRATIVE — assemblage dans l'ordre canonique (12 sections)
+    # Une page = une idée principale. Chaque section démarre sur une page
+    # neuve (PageBreak) ; tout le contenu calculé vient de l'EDM, jamais
+    # recalculé ici.
+    # ═══════════════════════════════════════════════════════════════════════
 
-    story.extend(_build_macro_section_title(5, "Plan d'action — 30 / 60 / 90 jours", styles))
-    story.extend(_build_plan_30_60_90(result.get("plan_action_30_60_90") or [], styles))
-    story.extend(block_plan_action)
+    # 1. EXECUTIVE DECISION — page de tête, décision unique, ultra-visuelle
+    story.extend(_build_executive_decision_page(edm, result.get("decision"), styles))
 
-    story.extend(_build_macro_section_title(6, "Simulation avant / après", styles))
-    story.extend(_build_scenarios(result.get("scenarios") or [], styles))
-    story.extend(block_avant_apres)
-    story.extend(block_simulateur)
-    story.extend(block_projection)
+    # 2. EXECUTIVE SUMMARY
+    story.extend(_build_macro_section_title(2, "Résumé exécutif", styles))
+    story.extend(_build_financial_headline(result.get("impact_financier_synthese"), styles))
+    diag_imm = result.get("diagnostic_immediat", "")
+    tension = result.get("phrase_tension", "")
+    story.extend(_build_diagnostic_immediat(diag_imm, tension, styles, show_decision=False))
+    resume = result.get("resume_executif") or result.get("synthese", "")
+    story.extend(_build_resume_executif(resume, styles))
+    scores = {
+        "rentabilite": result.get("score_rentabilite"),
+        "risque":      result.get("score_risque"),
+        "structure":   result.get("score_structure"),
+        "liquidite":   result.get("score_liquidite"),
+    }
+    interpretations = result.get("score_interpretations") or {}
+    if isinstance(interpretations, dict) and any(v is not None for v in scores.values()):
+        story.append(_section_header("📈  SCORES /10", BLUE_DARK, styles))
+        story.append(Spacer(1, 6))
+        story.append(_score_table(scores, interpretations, styles))
+        story.append(Spacer(1, 8))
+    story.extend(_build_summary_scoreboard(
+        result.get("score_global"), result.get("niveau_urgence"),
+        result.get("creation_destruction_valeur"), styles,
+    ))
+    story.append(PageBreak())
 
-    story.extend(_build_macro_section_title(7, "Analyse détaillée", styles))
-    story.extend(block_analyse_detaillee)
+    # 3. CEO DASHBOARD
+    story.extend(_build_macro_section_title(3, "CEO Dashboard", styles))
+    story.extend(_build_ceo_dashboard(
+        result.get("ceo_dashboard") or [], result.get("alertes") or [], styles,
+        confidence=edm.executive_confidence,
+    ))
+    story.append(PageBreak())
 
-    story.extend(_build_macro_section_title(8, "Annexe", styles))
+    # 4. CE QUI DÉTRUIT LA RENTABILITÉ
+    story.extend(_build_value_destroyers_section(edm, styles))
+
+    # 5. COÛT DE L'INACTION
+    story.extend(_build_cost_of_inaction_page(edm, result.get("risque_inaction"), styles))
+
+    # 6. EXECUTIVE DECISIONS / PRIORITÉS D'ACTION
+    story.extend(_build_executive_decisions_section(edm, styles))
+
+    # 7. SIMULATION AVANT / APRÈS
+    story.extend(_build_simulation_section(edm, styles))
+
+    # 8. PROJECTION ET TRAJECTOIRE
+    story.extend(_build_projection_section(edm, styles))
+
+    # 9. CARNET D'EXÉCUTION
+    story.extend(_build_execution_log_section(edm, styles))
+
+    # 10. NOTE CONFIDENTIELLE DU COPILOTE FINANCIER
+    story.extend(_build_copilot_note_section(edm, styles))
+
+    # 11. COMMENT PEPPERYN CONTINUERA À VOUS ACCOMPAGNER
+    story.extend(_build_follow_up_section(edm, result.get("memory_insight"), styles))
+    story.append(PageBreak())
+
+    # 12. ANNEXES & MÉTHODOLOGIE
+    story.extend(_build_macro_section_title(12, "Annexes et méthodologie", styles))
     story.extend(block_data_quality)
+    if block_complements:
+        story.extend(_build_separator_detailed(styles))
+        story.extend(block_complements)
 
     doc.build(
         story,
