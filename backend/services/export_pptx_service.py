@@ -1015,10 +1015,10 @@ def _appendix(prs, edm) -> None:
     y2 = y + Inches(0.38)
     if dq:
         items_dq = [
-            ("Données manquantes", f"{dq.missing_fields or 0}"),
-            ("Couverture", f"{dq.coverage_pct or '—'}%"),
-            ("Niveau de confiance", f"{dq.confidence_label or '—'}"),
-            ("Note d'audit", dq.audit_note or "—"),
+            ("Score qualité", f"{dq.score_data or 0} / 100"),
+            ("Statut", dq.status or "—"),
+            ("Format détecté", dq.document_format or "—"),
+            ("Anomalies", str(len(dq.anomalies or [])) if dq.anomalies is not None else "0"),
         ]
         for label, val in items_dq:
             _txt(slide, MARGIN_L, y2, col_w / 2, Inches(0.3),
