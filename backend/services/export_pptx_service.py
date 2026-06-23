@@ -309,7 +309,7 @@ def _waterfall(
         else:
             lbl_y = y_lo + Inches(0.03)
         _txt(slide, bar_left - Inches(0.1), lbl_y, bar_w + Inches(0.2), Inches(0.24),
-             val_str, size=7.5, bold=True,
+             val_str, size=9, bold=True,
              color=C_RED if (item['type'] == 'delta' and item['value'] < 0) else C_DARK,
              align=PP_ALIGN.CENTER)
 
@@ -320,7 +320,7 @@ def _waterfall(
              bar_w + Inches(0.24),
              label_zone - Inches(0.08),
              item['label'],
-             size=6.5, color=C_GRAY, align=PP_ALIGN.CENTER, wrap=True)
+             size=8, color=C_GRAY, align=PP_ALIGN.CENTER, wrap=True)
 
         if item['type'] == 'delta':
             cumul += item['value']
@@ -374,7 +374,7 @@ def _gantt(slide, phases, left: int, top: int, width: int, height: int):
         bg = C_LIGHT_BLUE if h_key == '30' else C_LIGHT
         _rect(slide, bx, top, bw - Emu(8000), hdr_h, bg)
         _txt(slide, bx + Inches(0.06), top, bw - Inches(0.1), hdr_h,
-             cfg['label'], size=6.5, bold=True,
+             cfg['label'], size=8, bold=True,
              color=C_NAVY if h_key == '30' else C_GRAY,
              align=PP_ALIGN.CENTER)
 
@@ -383,7 +383,7 @@ def _gantt(slide, phases, left: int, top: int, width: int, height: int):
         x = int(chart_l + day / 90 * chart_w)
         _rect(slide, x, top, Emu(8000), height, C_LINE)
         _txt(slide, x - Inches(0.18), top - Inches(0.22), Inches(0.36), Inches(0.20),
-             lbl, size=6.5, color=C_SLATE, align=PP_ALIGN.CENTER)
+             lbl, size=8, color=C_SLATE, align=PP_ALIGN.CENTER)
 
     # Lignes d'action
     for i, row in enumerate(rows):
@@ -398,7 +398,7 @@ def _gantt(slide, phases, left: int, top: int, width: int, height: int):
         # Label action
         _txt(slide, left + Inches(0.08), ry + Inches(0.03),
              label_w - Inches(0.2), row_h - Inches(0.06),
-             row['label'], size=7.5, color=C_DARK, wrap=True)
+             row['label'], size=9, color=C_DARK, wrap=True)
 
         # Barre Gantt
         bx = int(chart_l + row['start'] / 90 * chart_w)
@@ -408,7 +408,7 @@ def _gantt(slide, phases, left: int, top: int, width: int, height: int):
         # Responsable dans la barre
         if row['owner']:
             _txt(slide, bx + Inches(0.08), bar_top, bw - Inches(0.08), bar_h_px,
-                 row['owner'], size=6, color=C_WHITE)
+                 row['owner'], size=7.5, color=C_WHITE)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -432,13 +432,13 @@ def _matrix(slide, decisions, left: int, top: int, width: int, height: int):
 
     # Labels quadrants
     _txt(slide, left + Inches(0.12), top + Inches(0.08), Inches(2.8), Inches(0.28),
-         'QUICK WINS ★', size=8.5, bold=True, color=C_GREEN)
+         'QUICK WINS ★', size=10, bold=True, color=C_GREEN)
     _txt(slide, mid_x + Inches(0.12), top + Inches(0.08), Inches(2.8), Inches(0.28),
-         'INVESTIR', size=8.5, bold=True, color=C_BLUE)
+         'INVESTIR', size=10, bold=True, color=C_BLUE)
     _txt(slide, left + Inches(0.12), mid_y + Inches(0.08), Inches(2.8), Inches(0.28),
-         'DÉLÉGUER', size=8.5, bold=True, color=C_GRAY)
+         'DÉLÉGUER', size=10, bold=True, color=C_GRAY)
     _txt(slide, mid_x + Inches(0.12), mid_y + Inches(0.08), Inches(2.8), Inches(0.28),
-         'ÉVITER', size=8.5, bold=True, color=C_AMBER)
+         'ÉVITER', size=10, bold=True, color=C_AMBER)
 
     # Lignes de séparation
     _rect(slide, mid_x - Emu(5000), top, Emu(10000), int(chart_h), C_WHITE)
@@ -447,7 +447,7 @@ def _matrix(slide, decisions, left: int, top: int, width: int, height: int):
     # Axe X label
     _txt(slide, left, top + chart_h + Inches(0.05), int(chart_w), ax_lbl_h,
          '◄  EFFORT FAIBLE                                    EFFORT ÉLEVÉ  ►',
-         size=7, color=C_SLATE, align=PP_ALIGN.CENTER)
+         size=9, color=C_SLATE, align=PP_ALIGN.CENTER)
 
     # Points décisions
     max_impact = max((abs(d.annual_impact or 0) for d in decisions), default=1) or 1
@@ -469,7 +469,7 @@ def _matrix(slide, decisions, left: int, top: int, width: int, height: int):
         _rect(slide, dot_cx - ds // 2, dot_cy - ds // 2, ds, ds, C_NAVY,
               border_color=C_WHITE, border_pt=2.0)
         _txt(slide, dot_cx - ds // 2, dot_cy - ds // 2, ds, ds,
-             str(i + 1), size=10, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER)
+             str(i + 1), size=11, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -559,7 +559,7 @@ def _s02_urgency(prs, edm, date_str: str):
 
         _txt(slide, MARGIN_L + Inches(0.18), y,
              Inches(3.5), Inches(0.26),
-             label, size=7, bold=True, color=C_SLATE)
+             label, size=9, bold=True, color=C_SLATE)
         _txt(slide, MARGIN_L + Inches(0.18), y + Inches(0.22),
              CONTENT_W - Inches(0.20), row_h - Inches(0.22),
              _fmt(value), size=float(font_sz), bold=True,
@@ -659,12 +659,12 @@ def _s04_decisions(prs, edm, date_str: str):
               Inches(0.36), Inches(0.36), acc)
         _txt(slide, int(cx + Inches(0.22)), int(card_top + Inches(0.16)),
              Inches(0.36), Inches(0.36), str(i + 1),
-             size=11, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER)
+             size=12, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER)
 
         # Titre décision
         _txt(slide, int(cx + Inches(0.22)), int(card_top + Inches(0.62)),
              int(card_w - Inches(0.44)), Inches(1.10),
-             _trunc(dec.decision, 92), size=12, bold=True, color=C_DARK, wrap=True)
+             _trunc(dec.decision, 92), size=13, bold=True, color=C_DARK, wrap=True)
 
         # Séparateur
         _rect(slide, int(cx + Inches(0.22)), int(card_top + Inches(1.80)),
@@ -690,9 +690,9 @@ def _s04_decisions(prs, edm, date_str: str):
             my  = int(card_top + Inches(1.94) + row * row_h_m)
             mw  = int((card_w - Inches(0.50)) / 2)
 
-            _txt(slide, mx, my, mw, Inches(0.22), lbl, size=6.5, color=C_SLATE)
+            _txt(slide, mx, my, mw, Inches(0.22), lbl, size=8, color=C_SLATE)
             _txt(slide, mx, my + Inches(0.22), mw, Inches(0.32),
-                 val, size=10, bold=val_bold, color=val_color, wrap=True)
+                 val, size=12, bold=val_bold, color=val_color, wrap=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -723,20 +723,20 @@ def _s05_matrix(prs, edm, date_str: str):
     # Légende droite
     _txt(slide, int(legend_x), int(HDR_TOP + Inches(0.10)),
          int(legend_w), Inches(0.26),
-         'DÉCISIONS ANALYSÉES', size=7, bold=True, color=C_SLATE)
+         'DÉCISIONS ANALYSÉES', size=9, bold=True, color=C_SLATE)
 
     for i, dec in enumerate(decisions):
         ly = int(HDR_TOP + Inches(0.44) + i * Inches(0.70))
         _rect(slide, int(legend_x), ly + Inches(0.02), Inches(0.28), Inches(0.28), C_NAVY)
         _txt(slide, int(legend_x), ly + Inches(0.02), Inches(0.28), Inches(0.28),
-             str(i + 1), size=8, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER)
+             str(i + 1), size=9, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER)
         _txt(slide, int(legend_x + Inches(0.36)), ly,
              int(legend_w - Inches(0.36)), Inches(0.30),
-             _trunc(dec.decision, 44), size=8.5, bold=True, color=C_DARK, wrap=True)
+             _trunc(dec.decision, 44), size=10, bold=True, color=C_DARK, wrap=True)
         _txt(slide, int(legend_x + Inches(0.36)), ly + Inches(0.30),
              int(legend_w - Inches(0.36)), Inches(0.24),
              f'Impact : {_fmt(dec.annual_impact)}  ·  {_difficulty_fr(dec.difficulty)}',
-             size=7.5, color=C_GRAY)
+             size=9, color=C_GRAY)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -772,7 +772,7 @@ def _s06_bridge(prs, edm, date_str: str):
     # Annotation gain total
     _txt(slide, MARGIN_L, SLIDE_H - Inches(0.70), CONTENT_W, Inches(0.28),
          f'Gain total projeté : {_fmt(total_impact, sign=True)}',
-         size=10, bold=True,
+         size=12, bold=True,
          color=C_GREEN if total_impact >= 0 else C_RED,
          align=PP_ALIGN.RIGHT)
 
@@ -829,7 +829,7 @@ def _s07_before_after(prs, edm, date_str: str):
         _rect(slide, int(cx), int(col_top), int(col_w), Inches(0.44), bg)
         _txt(slide, int(cx + Inches(0.12)), int(col_top + Inches(0.08)),
              int(col_w - Inches(0.24)), Inches(0.32),
-             lbl, size=10, bold=True, color=fc, align=PP_ALIGN.CENTER)
+             lbl, size=12, bold=True, color=fc, align=PP_ALIGN.CENTER)
 
     # Séparateur central
     mid_x = int(MARGIN_L + col_w + Inches(0.20))
@@ -844,7 +844,7 @@ def _s07_before_after(prs, edm, date_str: str):
                   int(col_w - Inches(0.12)), int(kpi_h - Inches(0.07)), C_LIGHT)
             _txt(slide, int(cx + Inches(0.18)), ky + Inches(0.04),
                  int(col_w - Inches(0.36)), Inches(0.22),
-                 name, size=7, color=C_SLATE)
+                 name, size=9, color=C_SLATE)
             v_color = (C_GREEN if improved else C_RED) if is_after else C_DARK
             _txt(slide, int(cx + Inches(0.18)), ky + Inches(0.24),
                  int(col_w - Inches(0.36)), kpi_h - Inches(0.32),
@@ -919,7 +919,7 @@ def _s08_scenarios(prs, edm, date_str: str):
 
         _txt(slide, int(cx + Inches(0.20)), int(card_top + Inches(0.18)),
              int(card_w - Inches(0.40)), Inches(0.44),
-             sc['title'], size=10, bold=True, color=sc['accent'])
+             sc['title'], size=12, bold=True, color=sc['accent'])
 
         _rect(slide, int(cx + Inches(0.20)), int(card_top + Inches(0.72)),
               int(card_w - Inches(0.40)), Emu(14000), sc['accent'])
@@ -934,7 +934,7 @@ def _s08_scenarios(prs, edm, date_str: str):
             fy = int(card_top + Inches(0.86) + j * Inches(1.26))
             _txt(slide, int(cx + Inches(0.20)), fy,
                  int(card_w - Inches(0.40)), Inches(0.22),
-                 lbl, size=7, color=C_GRAY)
+                 lbl, size=9, color=C_GRAY)
             v_color = sc['risk_c'] if lbl == 'Risque' else (sc['accent'] if j == 0 else C_DARK)
             _txt(slide, int(cx + Inches(0.20)), fy + Inches(0.22),
                  int(card_w - Inches(0.40)), Inches(0.60),
@@ -996,11 +996,11 @@ def _s10_vote(prs, edm, date_str: str):
              size=9, bold=True, color=C_NAVY)
         _txt(slide, int(cx + Inches(0.20)), int(card_top + Inches(0.58)),
              int(card_w - Inches(0.40)), Inches(1.10),
-             _trunc(dec.decision, 90), size=12, bold=True, color=C_DARK, wrap=True)
+             _trunc(dec.decision, 90), size=13, bold=True, color=C_DARK, wrap=True)
         _txt(slide, int(cx + Inches(0.20)), int(card_top + Inches(1.76)),
              int(card_w - Inches(0.40)), Inches(0.28),
              f'Impact : {_fmt(dec.annual_impact)}',
-             size=10, bold=True, color=C_GREEN if (dec.annual_impact or 0) > 0 else C_RED)
+             size=12, bold=True, color=C_GREEN if (dec.annual_impact or 0) > 0 else C_RED)
 
         _rect(slide, int(cx + Inches(0.20)), int(card_top + Inches(2.14)),
               int(card_w - Inches(0.40)), Emu(14000), C_LINE)
@@ -1017,11 +1017,11 @@ def _s10_vote(prs, edm, date_str: str):
                   C_WHITE, border_color=color, border_pt=1.5)
             _txt(slide, int(cx + Inches(0.38)), vy + Inches(0.18),
                  int(card_w - Inches(0.60)), Inches(0.36),
-                 option, size=12, bold=True, color=color)
+                 option, size=13, bold=True, color=color)
 
     _txt(slide, MARGIN_L, SLIDE_H - Inches(0.72), CONTENT_W, Inches(0.28),
          'Cocher une case par décision — vote du Conseil d\'Administration.',
-         size=9, italic=True, color=C_SLATE, align=PP_ALIGN.CENTER)
+         size=11, italic=True, color=C_SLATE, align=PP_ALIGN.CENTER)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1069,7 +1069,7 @@ def _s11_kpis(prs, edm, date_str: str):
 
         _txt(slide, int(kx + Inches(0.18)), int(ky + Inches(0.22)),
              int(kpi_w - Inches(0.36)), Inches(0.26),
-             kpi['label'], size=8, bold=True, color=C_SLATE)
+             kpi['label'], size=10, bold=True, color=C_SLATE)
 
         _txt(slide, int(kx + Inches(0.18)), int(ky + Inches(0.54)),
              int(kpi_w - Inches(0.36)), Inches(1.30),
@@ -1080,21 +1080,21 @@ def _s11_kpis(prs, edm, date_str: str):
 
         _txt(slide, int(kx + Inches(0.18)), int(ky + Inches(2.06)),
              int(kpi_w - Inches(0.36)), Inches(0.24),
-             'OBJECTIF', size=6.5, color=C_SLATE)
+             'OBJECTIF', size=8, color=C_SLATE)
         _txt(slide, int(kx + Inches(0.18)), int(ky + Inches(2.30)),
              int(kpi_w - Inches(0.36)), Inches(0.60),
              kpi['target'], size=18, bold=True, color=C_GREEN)
 
         _txt(slide, int(kx + Inches(0.18)), int(ky + Inches(2.98)),
              int(kpi_w - Inches(0.36)), Inches(0.24),
-             'SUIVI MENSUEL', size=6.5, color=C_SLATE)
+             'SUIVI MENSUEL', size=8, color=C_SLATE)
 
         # Barre de statut en bas de carte
         _rect(slide, int(kx), int(ky + kpi_h - Inches(0.26)),
               int(kpi_w), Inches(0.26), kpi['color'])
         _txt(slide, int(kx + Inches(0.10)), int(ky + kpi_h - Inches(0.24)),
              int(kpi_w - Inches(0.20)), Inches(0.22),
-             'À SURVEILLER', size=6.5, bold=True, color=C_WHITE,
+             'À SURVEILLER', size=8, bold=True, color=C_WHITE,
              align=PP_ALIGN.CENTER)
 
 
@@ -1110,7 +1110,7 @@ def _s12_copilot(prs, date_str: str):
     # Tagline
     _txt(slide, MARGIN_L, HDR_TOP + Inches(0.06), CONTENT_W, Inches(0.32),
          'Pepperyn ne produit pas un rapport. Pepperyn accompagne les décisions dans le temps.',
-         size=12, color=C_GRAY, align=PP_ALIGN.CENTER)
+         size=13, color=C_GRAY, align=PP_ALIGN.CENTER)
 
     # Deux colonnes de flux
     steps_left = [
@@ -1144,18 +1144,18 @@ def _s12_copilot(prs, date_str: str):
             # Pastille numéro
             _rect(slide, cx, int(sy), Inches(0.38), Inches(0.44), color)
             _txt(slide, cx, int(sy), Inches(0.38), Inches(0.44),
-                 num, size=8, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER)
+                 num, size=10, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER)
             # Texte
             _txt(slide, cx + Inches(0.46), int(sy + Inches(0.08)),
                  col_w - Inches(0.52), Inches(0.30),
-                 label, size=10, bold=True, color=C_DARK)
+                 label, size=12, bold=True, color=C_DARK)
 
             # Flèche vers le bas
             if i < len(side_steps) - 1:
                 ax = int(cx + col_w / 2 - Inches(0.08))
                 ay = int(sy + Inches(0.44))
                 _txt(slide, ax, ay, Inches(0.16), Inches(0.12),
-                     '↓', size=9, color=C_SLATE, align=PP_ALIGN.CENTER)
+                     '↓', size=10, color=C_SLATE, align=PP_ALIGN.CENTER)
 
     # Pont entre colonnes (bas) et label loop
     loop_base = start_y + len(steps_left) * step_h + Inches(0.06)
@@ -1164,7 +1164,7 @@ def _s12_copilot(prs, date_str: str):
     _txt(slide, col_l + Inches(0.20), int(loop_base + Inches(0.02)),
          bridge_w - Inches(0.40), Inches(0.22),
          '→   Alimentent automatiquement   →',
-         size=7.5, italic=True, color=C_GREEN, align=PP_ALIGN.CENTER)
+         size=9, italic=True, color=C_GREEN, align=PP_ALIGN.CENTER)
 
     # Symbole boucle au centre
     center_x = col_l + col_w + Inches(0.10)
@@ -1174,7 +1174,7 @@ def _s12_copilot(prs, date_str: str):
          '⟳', size=60, bold=True, color=C_LINE, align=PP_ALIGN.CENTER)
     _txt(slide, int(center_x), int(start_y + Inches(2.00)),
          int(center_w), Inches(0.55),
-         'Boucle\ncontinue', size=8, color=C_SLATE, align=PP_ALIGN.CENTER)
+         'Boucle\ncontinue', size=10, color=C_SLATE, align=PP_ALIGN.CENTER)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
