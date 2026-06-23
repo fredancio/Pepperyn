@@ -103,10 +103,18 @@ def _fmt(v: Optional[float], unit: str = '€', sign: bool = False) -> str:
     return f"{pfx}{abs_v:.0f} {unit}"
 
 
+def _strip_md(text: Optional[str]) -> str:
+    """Supprime les marqueurs Markdown (**bold**, *italic*) du texte brut."""
+    if not text:
+        return ''
+    return re.sub(r'\*+', '', str(text)).strip()
+
+
 def _trunc(text: Optional[str], n: int) -> str:
     if not text:
         return '—'
-    return text[:n] + '…' if len(text) > n else text
+    clean = _strip_md(text)
+    return clean[:n] + '…' if len(clean) > n else clean
 
 
 def _effort_score(difficulty: Optional[str]) -> float:
@@ -471,70 +479,46 @@ def _matrix(slide, decisions, left: int, top: int, width: int, height: int):
 def _s01_cover(prs, edm, company: str, date_str: str):
     slide = _blank(prs)
 
-    # Barre navy top
-    _rect(slide, 0, 0, SLIDE_W, Inches(0.08), C_NAVY)
+    # ── Fond sombre McKinsey ──────────────────────────────────────
+    bg = slide.background.fill
+    bg.solid()
+    bg.fore_color.rgb = C_NAVY   # #0A2540
 
-    # Labels de cadre
-    _txt(slide, MARGIN_L, Inches(0.14), Inches(5), Inches(0.22),
-         'EXECUTIVE DECISION', size=7, bold=True, color=C_SLATE)
-    _txt(slide, SLIDE_W - Inches(2.6), Inches(0.14), Inches(2.4), Inches(0.22),
-         'PEPPERYN · CONFIDENTIEL', size=6.5, color=C_SLATE, align=PP_ALIGN.RIGHT)
+    # Accent stripe gauche (bleu Pepperyn)
+    _rect(slide, 0, 0, Inches(0.10), SLIDE_H, C_BLUE)
 
-    # Nom société
-    _txt(slide, MARGIN_L, Inches(0.44), Inches(10), Inches(0.52),
-         company or '—', size=18, bold=True, color=C_DARK)
+    # Labels de cadre (haut de slide)
+    _txt(slide, Inches(0.24), Inches(0.18), Inches(6), Inches(0.30),
+         'EXECUTIVE DECISION', size=7.5, bold=True, color=C_SLATE)
+    _txt(slide, SLIDE_W - Inches(2.8), Inches(0.18), Inches(2.6), Inches(0.30),
+         'PEPPERYN · CONFIDENTIEL', size=7, color=C_SLATE, align=PP_ALIGN.RIGHT)
 
-    # Séparateur fin
-    _rect(slide, MARGIN_L, Inches(1.06), CONTENT_W, Emu(18000), C_LINE)
+    # Nom société — grand, blanc, bold
+    _txt(slide, Inches(0.24), Inches(0.60), SLIDE_W - Inches(0.48), Inches(1.30),
+         company or '—', size=52, bold=True, color=C_WHITE)
 
-    # Calcul valeur totale récupérable
+    # Séparateur bleu horizontal
+    _rect(slide, Inches(0.24), Inches(2.08), SLIDE_W - Inches(0.34), Emu(45000), C_BLUE)
+
+    # Date + CONFIDENTIEL
+    _txt(slide, Inches(0.24), Inches(2.22), SLIDE_W - Inches(0.48), Inches(0.36),
+         f'{date_str} · CONFIDENTIEL', size=10, color=C_SLATE)
+
+    # Citation décision principale — italique, blanc
     decisions = (edm.executive_decisions or [])[:3]
-    total = sum(abs(d.annual_impact or 0) for d in decisions if (d.annual_impact or 0) > 0)
-    n_dec = len(decisions)
+    top_quote = _strip_md(decisions[0].decision) if decisions else ''
+    if top_quote:
+        _txt(slide, Inches(0.24), Inches(2.75), SLIDE_W - Inches(0.48), Inches(3.00),
+             f'« {top_quote} »',
+             size=30, italic=True, color=C_WHITE, wrap=True)
 
-    headline = (
-        f"{n_dec} décision{'s' if n_dec != 1 else ''} permettront "
-        f"de récupérer {_fmt(total)} de résultat annuel."
-        if total > 0
-        else f"{n_dec} décision{'s' if n_dec != 1 else ''} identifiées par l'analyse financière."
-    )
-    _txt(slide, MARGIN_L, Inches(1.18), CONTENT_W, Inches(0.50),
-         headline, size=16, color=C_GRAY)
-
-    # GRANDE valeur centrale
-    _txt(slide, MARGIN_L, Inches(1.75), CONTENT_W, Inches(2.20),
-         _fmt(total) if total > 0 else '—',
-         size=88, bold=True, color=C_NAVY, align=PP_ALIGN.CENTER)
-
-    _txt(slide, MARGIN_L, Inches(3.82), CONTENT_W, Inches(0.32),
-         'récupérables en résultat annuel', size=13, color=C_SLATE,
-         align=PP_ALIGN.CENTER)
-
-    # Séparateur avant décisions
-    _rect(slide, MARGIN_L, Inches(4.30), CONTENT_W, Emu(18000), C_LINE)
-
-    # Décisions
-    dec_h = Inches(0.58)
-    for i, dec in enumerate(decisions):
-        y = Inches(4.40) + i * dec_h
-        _rect(slide, MARGIN_L, y + Inches(0.10), Inches(0.30), Inches(0.30), C_NAVY)
-        _txt(slide, MARGIN_L, y + Inches(0.10), Inches(0.30), Inches(0.30),
-             str(i + 1), size=9, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER)
-        _txt(slide, MARGIN_L + Inches(0.42), y + Inches(0.06),
-             CONTENT_W - Inches(2.8), dec_h,
-             _trunc(dec.decision, 82), size=11, color=C_DARK, wrap=True)
-        impact_color = C_GREEN if (dec.annual_impact or 0) > 0 else C_RED
-        _txt(slide, SLIDE_W - MARGIN_R - Inches(2.5), y + Inches(0.08),
-             Inches(2.5), dec_h,
-             _fmt(dec.annual_impact), size=14, bold=True,
-             color=impact_color, align=PP_ALIGN.RIGHT)
-
-    # Footer
-    _rect(slide, 0, SLIDE_H - Inches(0.32), SLIDE_W, Inches(0.32), C_LIGHT)
-    _txt(slide, MARGIN_L, SLIDE_H - Inches(0.30), Inches(8), Inches(0.28),
-         f'Pepperyn · {date_str}', size=6.5, color=C_SLATE)
-    _txt(slide, SLIDE_W - Inches(1.8), SLIDE_H - Inches(0.30),
-         Inches(1.6), Inches(0.28),
+    # Footer dark
+    _rect(slide, 0, SLIDE_H - Inches(0.52), SLIDE_W, Inches(0.52), C_NAVY_LIGHT)
+    _txt(slide, Inches(0.24), SLIDE_H - Inches(0.48), SLIDE_W - Inches(0.48), Inches(0.44),
+         'Pepperyn · Copilote Financier Exécutif',
+         size=10, color=C_SLATE, align=PP_ALIGN.CENTER)
+    _txt(slide, SLIDE_W - Inches(1.8), SLIDE_H - Inches(0.48),
+         Inches(1.6), Inches(0.44),
          '01 / 12', size=6.5, bold=True, color=C_SLATE, align=PP_ALIGN.RIGHT)
 
 
