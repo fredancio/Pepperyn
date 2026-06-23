@@ -4,6 +4,97 @@ import { CoachingMessage } from './CoachingMessage';
 import { FeedbackCard } from './FeedbackCard';
 import { RecommendationCheckIn } from './RecommendationCheckIn';
 
+// ─── Renderer Markdown léger ────────────────────────────────────────────────
+// Interprète ##, **bold**, - list items, ✓ checkmarks
+// Sans dépendance externe.
+
+function renderInline(text: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  const re = /\*\*(.+?)\*\*/g;
+  let last = 0, m;
+  let key = 0;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    parts.push(<strong key={key++} className="font-semibold text-[#1A1A2E]">{m[1]}</strong>);
+    last = re.lastIndex;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
+function MarkdownContent({ text }: { text: string }) {
+  const lines = text.split('\n');
+  const nodes: React.ReactNode[] = [];
+  let listItems: string[] = [];
+  let idx = 0;
+
+  const flushList = () => {
+    if (listItems.length === 0) return;
+    nodes.push(
+      <ul key={`ul-${idx++}`} className="mt-1 mb-1 space-y-0.5 pl-1">
+        {listItems.map((item, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm text-[#1A1A2E] leading-snug">
+            <span className="mt-[3px] flex-shrink-0 w-1.5 h-1.5 rounded-full bg-[#1B73E8] opacity-70" />
+            <span>{renderInline(item)}</span>
+          </li>
+        ))}
+      </ul>
+    );
+    listItems = [];
+  };
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+
+    // H1 : # Titre
+    if (/^#\s+/.test(line)) {
+      flushList();
+      const title = line.replace(/^#+\s+/, '');
+      nodes.push(
+        <p key={idx++} className="text-sm font-bold text-[#1A1A2E] mt-1 mb-0.5">
+          {renderInline(title)}
+        </p>
+      );
+      continue;
+    }
+
+    // H2 : ## Titre
+    if (/^##\s+/.test(line)) {
+      flushList();
+      const title = line.replace(/^#+\s+/, '');
+      nodes.push(
+        <p key={idx++} className="text-xs font-bold text-[#1B73E8] uppercase tracking-wide mt-3 mb-0.5">
+          {renderInline(title)}
+        </p>
+      );
+      continue;
+    }
+
+    // Liste : "- item" ou "✓ item"
+    if (/^[-•✓✔]\s+/.test(line)) {
+      listItems.push(line.replace(/^[-•✓✔]\s+/, ''));
+      continue;
+    }
+
+    // Ligne vide
+    if (line.trim() === '') {
+      flushList();
+      continue;
+    }
+
+    // Paragraphe normal
+    flushList();
+    nodes.push(
+      <p key={idx++} className="text-sm text-[#1A1A2E] leading-relaxed">
+        {renderInline(line)}
+      </p>
+    );
+  }
+  flushList();
+
+  return <div className="space-y-0.5">{nodes}</div>;
+}
+
 interface MessageBubbleProps {
   message: Message;
   questionsRestantes?: number | null;
@@ -129,7 +220,7 @@ export function MessageBubble({ message, questionsRestantes, plan = 'free', onCh
         </div>
         <div>
           <div className="bg-white rounded-2xl rounded-tl-none px-4 py-3 shadow-sm border border-gray-100">
-            <p className="text-sm text-[#1A1A2E] leading-relaxed whitespace-pre-wrap">{message.content}</p>
+            <MarkdownContent text={message.content} />
           </div>
           <p className="text-xs text-[#5F6368] mt-1 ml-1">{formatTime(message.created_at)}</p>
         </div>
