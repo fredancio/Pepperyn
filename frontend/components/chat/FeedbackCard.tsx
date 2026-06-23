@@ -21,6 +21,11 @@ const INTENTION_OPTIONS: { choice: IntentionChoice; label: string; status: Decis
 // surcharger la page de chat.
 const MAX_DISPLAYED = 3;
 
+/** Supprime les marqueurs Markdown **bold** du texte brut. */
+function stripMarkdown(text: string): string {
+  return text.replace(/\*\*/g, '');
+}
+
 export function FeedbackCard({ reportId, recommendations }: FeedbackCardProps) {
   const items = recommendations
     .filter(r => r.priority === 'haute')
@@ -87,7 +92,7 @@ export function FeedbackCard({ reportId, recommendations }: FeedbackCardProps) {
 
           return (
             <div key={rec.id} className="bg-white rounded-xl border border-blue-100 p-4">
-              <p className="text-sm text-[#1A1A2E] leading-relaxed mb-3">{rec.text}</p>
+              <p className="text-sm text-[#1A1A2E] leading-relaxed mb-3">{stripMarkdown(rec.text)}</p>
 
               {!isSaved && (
                 <div className="flex flex-wrap gap-2">

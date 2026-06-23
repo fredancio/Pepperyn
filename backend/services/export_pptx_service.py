@@ -1200,18 +1200,27 @@ def _s12_copilot(prs, date_str: str):
 def generate_pptx_report(result: Any, company_name: Optional[str] = None) -> bytes:
     """
     Génère l'Executive Board Deck V5 depuis l'EDM.
-    `result` doit posséder un attribut `edm` (ExecutiveDecisionModel).
+    `result` peut être :
+      - un objet avec attribut `edm` (ExecutiveDecisionModel)
+      - un dict (result_dict depuis le cache Supabase/mémoire)
+    Si l'EDM est absent, il est construit à la volée depuis le dict.
     Retourne les bytes du fichier .pptx.
     """
     # Extraction EDM
     edm = getattr(result, 'edm', None)
     if edm is None and isinstance(result, dict):
         edm = result.get('edm')
+
+    # Fallback : construire l'EDM depuis le dict d'analyse
     if edm is None:
-        raise ValueError(
-            "L'ExecutiveDecisionModel (EDM) est absent du résultat d'analyse. "
-            "Vérifiez que build_executive_decision_model() a bien été exécuté."
-        )
+        try:
+            from services.executive_decision_model import build_executive_decision_model
+            result_dict = result if isinstance(result, dict) else result.__dict__
+            edm = build_executive_decision_model(result_dict)
+        except Exception as exc:
+            raise ValueError(
+                f"Impossible de construire l'EDM pour le Board Deck : {exc}"
+            ) from exc
 
     company  = company_name or 'Votre Entreprise'
     date_str = datetime.now().strftime('%d %B %Y')
