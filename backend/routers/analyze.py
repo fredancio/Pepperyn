@@ -1073,6 +1073,20 @@ async def download_pptx(
     # Enforce one-format rule
     _check_and_lock_format(analyse_id, "pptx")
 
+    # Nom de la société — pour personnaliser la couverture du Board Deck
+    # (simple lecture, aucune logique métier).
+    company_name = None
+    try:
+        from main import get_supabase_service
+        supabase = get_supabase_service()
+        company_row = (
+            supabase.from_("companies").select("name").eq("id", company_id).single().execute()
+        )
+        if company_row.data:
+            company_name = company_row.data.get("name")
+    except Exception:
+        pass
+
     # Track export event (Supabase + Airtable)
     _usage_service.track_activity(company_id, "export_generated", {
         "analyse_id": analyse_id,
@@ -1105,7 +1119,7 @@ async def download_pptx(
             )
 
         try:
-            pptx_bytes = generate_pptx_report(result_dict)
+            pptx_bytes = generate_pptx_report(result_dict, company_name=company_name)
             _pptx_cache[analyse_id] = pptx_bytes
         except Exception as e:
             logger.error("[ANALYZE] Erreur génération PowerPoint: %s", e)
