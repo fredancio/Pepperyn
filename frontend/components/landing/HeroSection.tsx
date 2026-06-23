@@ -8,7 +8,8 @@ export function HeroSection() {
       <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-white to-indigo-50 pointer-events-none" />
       <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[640px] h-[320px] bg-[#1B73E8]/5 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-16 lg:pt-28 lg:pb-20 flex flex-col items-center text-center gap-7">
+      {/* ── Text content — max-w-4xl ── */}
+      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-10 lg:pt-28 flex flex-col items-center text-center gap-7">
 
         {/* Badge — UNCHANGED */}
         <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#1B73E8]/10 border border-[#1B73E8]/20 rounded-full">
@@ -52,20 +53,23 @@ export function HeroSection() {
             Découvrir un rapport exécutif
           </Link>
         </div>
+      </div>
 
-        {/* ── Hero visual ── */}
+      {/* ── Hero visual — conteneur élargi max-w-6xl ── */}
+      <div className="relative w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-14">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/hero-workflow.png"
           alt="Pepperyn — De vos données à vos décisions exécutives"
-          className="w-full h-auto mt-9"
+          className="w-full h-auto"
         />
 
-        {/* Trust line — UNCHANGED */}
-        <p className="text-xs text-[#5F6368] mt-2">
+        {/* Trust line */}
+        <p className="text-xs text-[#5F6368] text-center mt-6">
           Sans carte bancaire · Résultats en quelques minutes · Données anonymisées avant analyse
         </p>
       </div>
+
     </section>
   );
 }
