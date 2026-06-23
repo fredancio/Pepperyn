@@ -1,27 +1,27 @@
 """
-LLM service — Pepperyn v3 pipeline using Anthropic Claude.
+LLM service — Pepperyn v4 pipeline using Anthropic Claude.
 
-Architecture v3 :
+Architecture v4 :
   Step 1: Pre-processing (Python/pandas — 0 tokens)
-  Step 2: Classification   (claude-haiku-4-5 — ~200 tokens)
-  Step 3: Analyse Call 1   (claude-opus-4-6  — ~1200 tokens, temp 0.2)
-  Step 4: Vérification Call 2 (claude-sonnet-4-6 — ~1200 tokens, temp 0.2)
-  Step 5: Scoring automatique (claude-haiku-4-5 — ~100 tokens, régénération si score < 8)
-  Step 6: Export Excel       (openpyxl — 0 tokens)
+  Step 2: Classification     (Haiku   — ~200 tokens, toujours)
+  Step 3: Analyse Call 1     (Sonnet  — défaut │ Opus en escalade)
+  Step 4: Vérification Call 2 (même modèle que Call 1)
+  Step 5: Scoring             (Haiku  — ~100 tokens, escalade Opus si score < 8)
+  Step 6: Exports             (Python — 0 tokens)
 
-Routing modèle :
-  Analyse fichier  → claude-opus-4-6    ($15/M input, $75/M output)  ~0.30€/analyse
-  Vérification     → claude-sonnet-4-6  ($3/M input,  $15/M output)
-  Chat (ALL plans) → claude-haiku-4-5   ($0.25/M input, $1.25/M output) ~0.001€/message
-  Classification / Scoring → claude-haiku-4-5
+Model Router :
+  Haiku   → classification, scoring                         ($0.25/$1.25 /M)
+  Sonnet  → analyse par défaut (FREE / PRO / POWER)         ($3/$15 /M)
+  Opus    → escalade SCALE ou volume élevé (>10k chars)
+            ou qualité < 8 sur premier essai                 ($15/$75 /M)
 
-Décision de routing chat :
-  Tout le chat conversationnel est forcé sur Haiku, sans exception.
-  Opus et Sonnet sont RÉSERVÉS au pipeline d'analyse fichier uniquement.
-  Raison : un utilisateur POWER avec 2 000 messages Opus coûte 252€ pour un plan à 129€.
-  Haiku est largement suffisant pour les questions de suivi sur une analyse déjà produite.
+Chat :
+  Sonnet  → toujours, max 500 tokens
+  Haiku et Opus ne sont jamais utilisés pour le chat.
 
-Estimated cost: ~0.30€ per analysis (Opus) + ~0.001€ per chat message (Haiku)
+Coût estimé :
+  Sonnet path : ~0.05€/analyse · ~0.002€/message
+  Opus   path : ~0.30€/analyse (plan SCALE ou escalade qualité)
 """
 import json
 import os
@@ -74,18 +74,18 @@ DONNÉES :
 
 Tu respectes STRICTEMENT le format demandé."""
 
-CHAT_SYSTEM = """Tu es Pepperyn, un expert en finance d'entreprise opérationnelle et stratégique. Tu interviens sur :
-1. Comptabilité générale et analytique
-2. Contrôle de gestion
-3. Trésorerie
-4. FP&A (Financial Planning & Analysis)
-5. Stratégie financière
-6. Opérations financières
+CHAT_SYSTEM = """Tu es Pepperyn, directeur financier en mission conseil de haut niveau.
 
-Tu réponds de manière précise, concise et orientée action.
-Tu travailles uniquement à partir des données fournies dans l'analyse.
-Tu n'inventes jamais d'informations. Si une donnée est manquante, tu le dis.
-Réponds toujours en français."""
+Règles de communication :
+- Réponses courtes et directes. 3 à 6 phrases maximum, sauf si une analyse structurée est explicitement demandée.
+- Pas d'émojis, pas de titres, pas de mise en gras, pas de listes à puces systématiques.
+- Tu vas droit au fait. Si la réponse tient en deux phrases, elle tient en deux phrases.
+- Ton niveau : CFO ou associé senior en cabinet de conseil stratégique.
+- Jamais d'introduction ("Bien sûr", "Voici", "En tant que..."). Tu commences par la réponse.
+
+Tu travailles uniquement à partir des données de l'analyse fournie.
+Si une information est absente des données, tu le dis en une phrase, sans développement.
+Tu réponds exclusivement en français."""
 
 SCORING_SYSTEM = """Tu es un évaluateur d'analyses financières. Score l'analyse sur 4 critères de 0 à 10 :
 1. Clarté : est-ce compréhensible en 10 secondes ?
@@ -97,19 +97,41 @@ Retourne UNIQUEMENT un JSON : {"scores": [X, X, X, X], "moyenne": X.X}
 Ne donne aucune explication."""
 
 
-# ─── LLM params v3 ───────────────────────────────────────────────────────────
+# ─── Modèles disponibles ─────────────────────────────────────────────────────
 
-CALL_1_PARAMS = {
-    "model": "claude-opus-4-6",
-    "temperature": 0.2,
-    "max_tokens": 5500,
-}
+MODEL_HAIKU  = "claude-haiku-4-5-20251001"
+MODEL_SONNET = "claude-sonnet-4-6"
+MODEL_OPUS   = "claude-opus-4-6"
 
-CALL_2_PARAMS = {
-    "model": "claude-sonnet-4-6",
-    "temperature": 0.2,
-    "max_tokens": 4000,
-}
+# Plans qui reçoivent systématiquement Opus (quelle que soit la taille des données)
+_OPUS_PLANS = {"scale"}
+
+# Seuil de volume de données déclenchant l'escalade Opus (caractères JSON)
+_OPUS_DATA_THRESHOLD = 10_000
+
+# Tarifs tokens ($/M) — pour le calcul de coût
+_PRICE_IN  = {MODEL_HAIKU: 0.25,  MODEL_SONNET: 3.0,  MODEL_OPUS: 15.0}
+_PRICE_OUT = {MODEL_HAIKU: 1.25,  MODEL_SONNET: 15.0, MODEL_OPUS: 75.0}
+
+# ─── LLM params v4 ───────────────────────────────────────────────────────────
+
+# Paramètres fixes (modèle injecté dynamiquement)
+CALL_1_BASE = {"temperature": 0.2, "max_tokens": 5500}
+CALL_2_BASE = {"temperature": 0.2, "max_tokens": 4000}
+
+
+def _select_analysis_model(plan_tier: str, parsed_data: dict) -> str:
+    """
+    Sélectionne le modèle d'analyse :
+      - Opus  si plan SCALE ou volume données > 10 000 chars
+      - Sonnet sinon (défaut)
+    L'escalade qualité (score < 8) est gérée dans run_full_pipeline.
+    """
+    if (plan_tier or "").strip().lower() in _OPUS_PLANS:
+        return MODEL_OPUS
+    if len(json.dumps(parsed_data, ensure_ascii=False)) > _OPUS_DATA_THRESHOLD:
+        return MODEL_OPUS
+    return MODEL_SONNET
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -1007,20 +1029,23 @@ async def call_analysis_v3(
     actions_section: str = "",
     quality_section: str = "",
     relation_section: str = "",
+    model: str = MODEL_SONNET,
 ) -> tuple[str, int, int]:
     """
-    Call 1 — Main analysis with claude-sonnet-4-6.
+    Call 1 — Analyse principale.
+    model = MODEL_SONNET par défaut, MODEL_OPUS sur escalade.
     Returns (analysis_text, input_tokens, output_tokens)
     """
     client = get_anthropic_client()
     user_prompt = _build_user_prompt_call1(
-        parsed_data, industry, business_model, memory_section, actions_section, quality_section, relation_section
+        parsed_data, industry, business_model,
+        memory_section, actions_section, quality_section, relation_section,
     )
-
     message = client.messages.create(
+        model=model,
         system=ANALYSIS_SYSTEM_V3,
         messages=[{"role": "user", "content": user_prompt}],
-        **CALL_1_PARAMS,
+        **CALL_1_BASE,
     )
     text = message.content[0].text.strip()
     return text, message.usage.input_tokens, message.usage.output_tokens
@@ -1029,18 +1054,19 @@ async def call_analysis_v3(
 async def call_verification_v3(
     analysis_call1: str,
     parsed_data: dict[str, Any],
+    model: str = MODEL_SONNET,
 ) -> str:
     """
-    Call 2 — Verification with claude-sonnet-4-6.
+    Call 2 — Vérification (même modèle que Call 1).
     Returns verified/corrected analysis text.
     """
     client = get_anthropic_client()
     user_prompt = _build_user_prompt_call2(analysis_call1, parsed_data)
-
     message = client.messages.create(
+        model=model,
         system=ANALYSIS_SYSTEM_V3,
         messages=[{"role": "user", "content": user_prompt}],
-        **CALL_2_PARAMS,
+        **CALL_2_BASE,
     )
     return message.content[0].text.strip()
 
@@ -1055,18 +1081,23 @@ async def run_full_pipeline(
     actions_section: str = "",
     quality_section: str = "",
     relation_section: str = "",
+    plan_tier: str = "free",
 ) -> tuple[AnalysisResult, int, float]:
     """
-    Run the complete v3 analysis pipeline.
+    Pipeline v4 — model router intégré.
+    Sonnet par défaut ; Opus sur SCALE, volume élevé ou échec qualité.
     Returns (AnalysisResult, total_tokens, estimated_cost_euros)
     """
     total_tokens = 0
 
-    # Step 1: Classify document
+    # Step 1: Classification — Haiku toujours
     doc_type, confidence = await classify_document(parsed_data)
     total_tokens += 300
 
-    # Step 2: Call 1 — Main analysis
+    # Step 2: Sélection du modèle d'analyse
+    selected_model = _select_analysis_model(plan_tier, parsed_data)
+
+    # Step 3: Call 1 — Analyse principale
     analysis_text, in_tokens, out_tokens = await call_analysis_v3(
         parsed_data,
         industry=industry or context,
@@ -1075,19 +1106,21 @@ async def run_full_pipeline(
         actions_section=actions_section,
         quality_section=quality_section,
         relation_section=relation_section,
+        model=selected_model,
     )
     total_tokens += in_tokens + out_tokens
 
-    # Step 3: Call 2 — Verification (always, both modes)
-    verified_text = await call_verification_v3(analysis_text, parsed_data)
+    # Step 4: Call 2 — Vérification (même modèle que Call 1)
+    verified_text = await call_verification_v3(analysis_text, parsed_data, model=selected_model)
     total_tokens += 800  # approx
 
-    # Step 4: Scoring + optional retry
+    # Step 5: Scoring — Haiku toujours
     score = await _score_analysis(verified_text)
     total_tokens += 150
 
+    # Retry en escalade Opus si score < 8
     if score < 8:
-        # Retry once
+        escalated_model = MODEL_OPUS   # toujours Opus sur échec qualité
         analysis_text2, in2, out2 = await call_analysis_v3(
             parsed_data,
             industry=industry or context,
@@ -1096,30 +1129,29 @@ async def run_full_pipeline(
             actions_section=actions_section,
             quality_section=quality_section,
             relation_section=relation_section,
+            model=escalated_model,
         )
         total_tokens += in2 + out2
-        verified_text2 = await call_verification_v3(analysis_text2, parsed_data)
+        verified_text2 = await call_verification_v3(analysis_text2, parsed_data, model=escalated_model)
         total_tokens += 800
         score2 = await _score_analysis(verified_text2)
         total_tokens += 150
         if score2 >= score:
             verified_text = verified_text2
+            selected_model = escalated_model   # pour le calcul de coût
+            in_tokens, out_tokens = in2, out2
 
-    # Step 5: Clean audit artefacts, then parse
+    # Step 6: Nettoyage et parsing
     verified_text = _clean_verified_text(verified_text)
     analysis_dict = _parse_v3_text(verified_text, doc_type, confidence)
 
-    # Cost estimate (USD, converted to EUR ≈ ×0.92):
-    # claude-opus-4-6:   $15/M input, $75/M output  (Call 1)
-    # claude-sonnet-4-6: $3/M input,  $15/M output  (Call 2)
-    # claude-haiku-4-5:  $0.25/M input, $1.25/M output (classification + scoring)
-    haiku_tokens = 600
-    sonnet_call2_tokens = 800
+    # Calcul de coût réel (USD → EUR ×0.92) basé sur le modèle effectivement utilisé
+    haiku_tokens_total = 600   # classification + scoring
     cost_usd = (
-        haiku_tokens * 0.25 / 1_000_000
-        + in_tokens * 15 / 1_000_000
-        + out_tokens * 75 / 1_000_000
-        + sonnet_call2_tokens * 3 / 1_000_000
+        haiku_tokens_total * _PRICE_IN[MODEL_HAIKU] / 1_000_000
+        + in_tokens  * _PRICE_IN[selected_model]  / 1_000_000
+        + out_tokens * _PRICE_OUT[selected_model] / 1_000_000
+        + 800 * _PRICE_IN[selected_model] / 1_000_000   # Call 2 approx
     )
     cost = cost_usd * 0.92  # USD → EUR
 
@@ -1160,12 +1192,13 @@ def _fallback_parse(content: str, doc_type: str) -> dict[str, Any]:
 
 # ─── Chat intelligence ───────────────────────────────────────────────────────
 
-# Chat model — TOUJOURS Haiku, sans exception.
-# Opus et Sonnet sont réservés au pipeline d'analyse fichier (run_full_pipeline).
-# Décision financière : Haiku = ~0.001€/message vs Opus = ~0.10€/message.
-# Sur 2 000 messages POWER : 2€ (Haiku) vs 200€ (Opus). Pas négociable.
-CHAT_MODEL = "claude-haiku-4-5-20251001"
-CHAT_MAX_TOKENS = 800
+# Chat — Sonnet, réponses courtes (500 tokens max).
+# Sonnet offre la qualité de raisonnement d'un consultant senior.
+# Haiku reste réservé à classification et scoring.
+# Coût estimé : ~0.002€/message vs ~0.001€ sur Haiku — delta négligeable
+# face au gain de qualité perçue sur les plans PRO/POWER/SCALE.
+CHAT_MODEL = MODEL_SONNET
+CHAT_MAX_TOKENS = 500
 
 
 async def call_chat_intelligent(

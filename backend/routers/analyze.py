@@ -513,6 +513,7 @@ async def _run_analysis_pipeline(
             actions_section=actions_section,
             quality_section=quality_section,
             relation_section=relation_section,
+            plan_tier=plan,
         )
     except ValueError as e:
         logger.error("[ANALYZE] Erreur pipeline IA (ValueError): %s", e)
