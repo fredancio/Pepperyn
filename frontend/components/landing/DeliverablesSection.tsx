@@ -33,7 +33,7 @@ export function DeliverablesSection() {
           </h2>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {deliverables.map((d) => (
             <div key={d.name} className="flex flex-col gap-5 bg-white border border-gray-100 rounded-2xl shadow-sm p-7">
               <h3 className="text-lg font-bold text-[#1A1A2E] leading-snug">{d.name}</h3>

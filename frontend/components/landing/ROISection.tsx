@@ -28,7 +28,7 @@ export function ROISection() {
               className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white border border-gray-100 rounded-2xl shadow-sm px-7 py-6"
             >
               <p className="text-base text-[#1A1A2E] font-medium">{ex.trigger}</p>
-              <div className="text-right">
+              <div className="text-left sm:text-right">
                 <p className="text-2xl font-extrabold text-[#1B73E8]">{ex.value}</p>
                 {ex.note && <p className="text-xs text-[#5F6368]">{ex.note}</p>}
               </div>

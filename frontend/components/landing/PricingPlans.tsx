@@ -163,14 +163,14 @@ export function PricingPlans() {
             {costComparison.map((c, i) => (
               <div
                 key={c.label}
-                className={`flex items-center justify-between px-6 sm:px-8 py-5 ${
+                className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-4 px-6 sm:px-8 py-4 sm:py-5 ${
                   i < costComparison.length - 1 ? 'border-b border-gray-100' : ''
                 } ${c.tone === 'highlight' ? 'bg-[#EFF6FF]' : ''}`}
               >
-                <p className={`text-sm sm:text-base ${c.tone === 'highlight' ? 'font-bold text-[#1A1A2E]' : 'text-[#5F6368]'}`}>
+                <p className={`text-sm ${c.tone === 'highlight' ? 'font-bold text-[#1A1A2E]' : 'text-[#5F6368]'}`}>
                   {c.label}
                 </p>
-                <p className={`text-sm sm:text-base font-bold ${c.tone === 'highlight' ? 'text-[#1B73E8]' : 'text-[#1A1A2E]'}`}>
+                <p className={`text-sm font-bold flex-shrink-0 ${c.tone === 'highlight' ? 'text-[#1B73E8]' : 'text-[#1A1A2E]'}`}>
                   {c.value}
                 </p>
               </div>

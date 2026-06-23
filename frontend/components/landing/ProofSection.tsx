@@ -16,11 +16,11 @@ export function ProofSection() {
           </h2>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-gray-100 rounded-2xl overflow-hidden shadow-sm mb-10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-gray-100 rounded-2xl overflow-hidden shadow-sm mb-10">
           {results.map((r) => (
-            <div key={r.label} className="bg-white px-6 py-9 flex flex-col items-center text-center gap-2">
+            <div key={r.label} className="bg-white px-6 py-10 flex flex-col items-center text-center gap-2">
               <span className="text-4xl font-extrabold text-[#1B73E8] tracking-tight">{r.value}</span>
-              <span className="text-xs text-[#5F6368] leading-snug max-w-[160px]">{r.label}</span>
+              <span className="text-xs text-[#5F6368] leading-snug max-w-[180px]">{r.label}</span>
             </div>
           ))}
         </div>
