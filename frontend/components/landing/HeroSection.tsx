@@ -55,13 +55,14 @@ export function HeroSection() {
         </div>
       </div>
 
-      {/* ── Hero visual — conteneur élargi max-w-6xl ── */}
-      <div className="relative w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-14">
+      {/* ── Hero visual — pleine largeur, fond dissous dans le gradient ── */}
+      <div className="relative w-full max-w-[1440px] mx-auto px-2 sm:px-4 pb-14">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/hero-workflow.png"
           alt="Pepperyn — De vos données à vos décisions exécutives"
           className="w-full h-auto"
+          style={{ mixBlendMode: 'multiply' }}
         />
 
         {/* Trust line */}
