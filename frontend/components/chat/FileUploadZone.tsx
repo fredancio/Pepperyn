@@ -14,7 +14,7 @@ const DEFAULT_ACCEPT = {
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
   'application/vnd.ms-excel': ['.xls'],
   'text/csv': ['.csv'],
-  'application/pdf': ['.pdf'],
+
 };
 
 export function FileUploadZone({
@@ -86,7 +86,7 @@ export function FileUploadZone({
         </div>
 
         <div className="flex gap-2 flex-wrap justify-center">
-          {['Excel', 'CSV', 'PDF'].map(fmt => (
+          {['Excel (.xlsx)', 'CSV', 'Export ERP'].map(fmt => (
             <span key={fmt} className="px-2 py-0.5 bg-gray-100 text-[#5F6368] text-xs rounded-full font-medium">
               {fmt}
             </span>

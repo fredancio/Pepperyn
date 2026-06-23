@@ -78,7 +78,7 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
               {/* Formats + examples */}
               <div className="px-4 pb-4 flex flex-col gap-2">
                 <div className="flex flex-wrap gap-1.5 justify-center">
-                  {['Excel (.xlsx)', 'CSV', 'PDF', 'Export ERP'].map(f => (
+                  {['Excel (.xlsx)', 'CSV', 'Export ERP'].map(f => (
                     <span key={f} className="text-xs px-2.5 py-1 bg-gray-50 border border-gray-200 rounded-full text-[#5F6368]">{f}</span>
                   ))}
                 </div>

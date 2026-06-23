@@ -268,7 +268,7 @@ const faqs: FaqItem[] = [
   },
   {
     question: 'Quels formats de fichiers sont acceptés ?',
-    answer: "Excel (.xlsx), CSV, PDF et exports ERP. Envoyez simplement votre fichier — Pepperyn s'occupe du reste.",
+    answer: "Excel (.xlsx), CSV et exports ERP. Envoyez simplement votre fichier — Pepperyn s'occupe du reste.",
   },
   {
     question: 'Mes données financières sont-elles sécurisées ?',

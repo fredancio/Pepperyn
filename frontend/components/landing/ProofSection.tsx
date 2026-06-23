@@ -1,7 +1,7 @@
 const results = [
   { value: '3', label: 'décisions priorisées en moyenne par analyse' },
   { value: '~30h', label: 'gagnées par semaine pour une équipe financière de 4 personnes' },
-  { value: '< 3 mois', label: 'pour un retour sur investissement positif' },
+  { value: '< 1 mois', label: 'pour un retour sur investissement positif' },
   { value: '100%', label: 'des comités de direction préparés sans retravail' },
 ];
 
