@@ -1,8 +1,11 @@
 import { HeroSection } from '@/components/landing/HeroSection';
-import { ReportDemoSection } from '@/components/landing/ReportDemoSection';
-import { DetectionSection } from '@/components/landing/DetectionSection';
+import { StorytellingSection } from '@/components/landing/StorytellingSection';
+import { WhyBadDecisionsSection } from '@/components/landing/WhyBadDecisionsSection';
 import { ROISection } from '@/components/landing/ROISection';
-import { CerveauIASection } from '@/components/landing/CerveauIASection';
+import { DeliverablesSection } from '@/components/landing/DeliverablesSection';
+import { CopilotSection } from '@/components/landing/CopilotSection';
+import { PositioningSection } from '@/components/landing/PositioningSection';
+import { ProofSection } from '@/components/landing/ProofSection';
 import { SecuritySection } from '@/components/landing/SecuritySection';
 import { PricingPlans } from '@/components/landing/PricingPlans';
 import { FaqSection } from '@/components/landing/FaqSection';
@@ -19,13 +22,16 @@ export default function LandingPage() {
           <Link href="/" className="flex items-center gap-2.5">
             <img src="/favicon.png?v=5" alt="Pepperyn" className="w-10 h-10 object-contain" />
             <div>
-              <span className="text-base font-bold text-[#1A1A2E] block leading-none">Pepperyn IA</span>
-              <span className="text-xs text-[#5F6368] block">Financial Control Center</span>
+              <span className="text-base font-bold text-[#1A1A2E] block leading-none">Pepperyn</span>
+              <span className="text-xs text-[#5F6368] block">Financial Operating System</span>
             </div>
           </Link>
 
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-6">
+            <Link href="#livrables" className="text-sm text-[#5F6368] hover:text-[#1A1A2E] transition-colors">
+              Livrables
+            </Link>
             <Link href="#securite" className="text-sm text-[#5F6368] hover:text-[#1A1A2E] transition-colors">
               Sécurité
             </Link>
@@ -58,13 +64,16 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Page content */}
+      {/* Page content — narration : coût de l'inaction -> diagnostic -> ROI -> livrables -> accompagnement -> positionnement -> preuves -> tarifs */}
       <main>
         <HeroSection />
-        <ReportDemoSection />
-        <DetectionSection />
+        <StorytellingSection />
+        <WhyBadDecisionsSection />
         <ROISection />
-        <CerveauIASection />
+        <DeliverablesSection />
+        <CopilotSection />
+        <PositioningSection />
+        <ProofSection />
         <SecuritySection />
         <PricingPlans />
         <FaqSection />
@@ -72,8 +81,8 @@ export default function LandingPage() {
         {/* CTA section */}
         <section className="py-20 bg-[#EFF6FF]">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center flex flex-col items-center gap-6">
-            <h2 className="text-3xl lg:text-4xl font-extrabold text-[#1A1A2E]">
-              Prêt à reprendre le contrôle de votre rentabilité ?
+            <h2 className="text-3xl lg:text-4xl font-extrabold text-[#1A1A2E] max-w-xl">
+              Prêt à prendre de meilleures décisions financières ?
             </h2>
 
             <img src="/favicon.png?v=5" alt="Pepperyn" className="w-20 h-20 object-contain" />

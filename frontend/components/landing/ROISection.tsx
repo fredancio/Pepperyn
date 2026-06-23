@@ -1,68 +1,58 @@
+const examples = [
+  { trigger: 'Une amélioration de marge de 1 %', value: '120 000 €' },
+  { trigger: 'Une renégociation fournisseur', value: '80 000 €' },
+  {
+    trigger: 'Une décision retardée',
+    value: 'Plusieurs centaines de milliers d’euros',
+    note: 'potentiellement perdus',
+  },
+];
+
 export function ROISection() {
   return (
     <section className="py-20 lg:py-28 bg-[#F8FAFF] border-t border-[#1B73E8]/10">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Header */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#1B73E8]/10 border border-[#1B73E8]/20 rounded-full mb-4">
-            <span className="text-sm font-medium text-[#1B73E8]">Retour sur investissement</span>
-          </div>
-          <h2 className="text-3xl lg:text-4xl font-extrabold text-[#1A1A2E] leading-tight">
-            Une décision qui se rembourse dès la première analyse.
+        <div className="text-center mb-14">
+          <h2 className="text-3xl lg:text-4xl font-extrabold text-[#1A1A2E] leading-tight max-w-2xl mx-auto">
+            Chaque semaine d&apos;attente détruit de la valeur.
           </h2>
         </div>
 
-        {/* Avant / Après */}
-        <div className="grid md:grid-cols-2 gap-6 mb-10">
-          <div className="bg-white border border-gray-100 rounded-2xl p-7 shadow-sm flex flex-col gap-4">
-            <p className="text-xs font-bold uppercase tracking-widest text-red-500">Sans diagnostic</p>
-            <ul className="flex flex-col gap-3">
-              {[
-                'Des dérives de marge qui passent inaperçues pendant des mois',
-                'Des décisions prises à l’instinct, sans estimation d’impact',
-                'Un reporting manuel qui consomme des heures chaque mois',
-              ].map((t) => (
-                <li key={t} className="flex items-start gap-2.5 text-sm text-[#1A1A2E]">
-                  <svg className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                  {t}
-                </li>
-              ))}
-            </ul>
-          </div>
+        {/* Exemples */}
+        <div className="flex flex-col gap-4 mb-14">
+          {examples.map((ex) => (
+            <div
+              key={ex.trigger}
+              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white border border-gray-100 rounded-2xl shadow-sm px-7 py-6"
+            >
+              <p className="text-base text-[#1A1A2E] font-medium">{ex.trigger}</p>
+              <div className="text-right">
+                <p className="text-2xl font-extrabold text-[#1B73E8]">{ex.value}</p>
+                {ex.note && <p className="text-xs text-[#5F6368]">{ex.note}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
 
-          <div className="bg-[#0A2540] rounded-2xl p-7 shadow-sm flex flex-col gap-4">
-            <p className="text-xs font-bold uppercase tracking-widest text-blue-300">Avec Pepperyn</p>
-            <ul className="flex flex-col gap-3">
-              {[
-                'Un diagnostic complet de votre rentabilité en moins de 2 minutes',
-                'Des actions priorisées par impact chiffré, pas par intuition',
-                'Le suivi de l’effet réel de chaque décision prise',
-              ].map((t) => (
-                <li key={t} className="flex items-start gap-2.5 text-sm text-white">
-                  <svg className="w-4 h-4 text-[#60A5FA] flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
-                  {t}
-                </li>
-              ))}
-            </ul>
+        {/* Comparaison abonnement */}
+        <div className="bg-[#0A2540] rounded-2xl px-8 py-10 text-center">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-6 sm:gap-12">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-blue-300 mb-2">Abonnement Pepperyn</p>
+              <p className="text-3xl font-extrabold text-white">Quelques centaines d&apos;euros</p>
+              <p className="text-sm text-blue-200 mt-1">par mois</p>
+            </div>
+            <div className="hidden sm:block w-px h-16 bg-white/10" />
+            <p className="text-sm text-blue-200 max-w-xs text-left sm:text-left">
+              Face à des décisions dont l&apos;impact se compte en dizaines voire centaines de
+              milliers d&apos;euros, la question n&apos;est plus &laquo;&nbsp;combien ça coûte&nbsp;&raquo;
+              mais &laquo;&nbsp;combien coûte de ne pas l&apos;avoir&nbsp;&raquo;.
+            </p>
           </div>
         </div>
 
-        {/* Exemple chiffré */}
-        <div className="bg-white border border-[#1B73E8]/20 rounded-2xl p-7 sm:p-8 text-center">
-          <p className="text-sm font-semibold text-[#1B73E8] mb-2">Exemple réel</p>
-          <p className="text-lg sm:text-xl text-[#1A1A2E] font-bold leading-snug max-w-2xl mx-auto">
-            Une dérive de marge de 2 points sur 2,4M€ de chiffre d&apos;affaires représente
-            près de <span className="text-[#1B73E8]">48 000 € par an</span> non détectés.
-          </p>
-          <p className="text-sm text-[#5F6368] mt-3">
-            Le plan PRO coûte 149€ par mois.
-          </p>
-        </div>
       </div>
     </section>
   );

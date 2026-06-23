@@ -128,6 +128,13 @@ const colorMap: Record<string, { ring: string; badge: string; bg: string; text: 
   purple: { ring: 'border-purple-200', badge: 'bg-purple-100 text-purple-700', bg: 'bg-white',     text: 'text-[#1A1A2E]', cta: 'bg-[#7C3AED] text-white hover:bg-[#6D28D9]', ctaText: 'text-white' },
 };
 
+const costComparison = [
+  { label: 'Recruter un CFO senior', value: '90 000 € – 150 000 € / an', tone: 'default' as const },
+  { label: 'Cabinet de conseil', value: '1 500 € – 3 000 € / jour', tone: 'default' as const },
+  { label: 'Mission ponctuelle', value: '15 000 € – 50 000 €', tone: 'default' as const },
+  { label: 'Pepperyn', value: 'À partir de 0 €, puis 149 € / mois', tone: 'highlight' as const },
+];
+
 export function PricingPlans() {
   return (
     <section className="py-20 lg:py-28 bg-[#EFF6FF]" id="tarifs">
@@ -145,6 +152,30 @@ export function PricingPlans() {
             Pepperyn ne se contente pas d'analyser. Il vous indique quoi faire.
           </p>
           <p className="text-sm text-[#5F6368] italic">Chaque mois d'inaction détruit de la valeur.</p>
+        </div>
+
+        {/* Combien coûte réellement une mauvaise décision ? */}
+        <div className="max-w-3xl mx-auto mb-16">
+          <p className="text-center text-sm font-bold uppercase tracking-widest text-[#5F6368] mb-6">
+            Combien coûte réellement une mauvaise décision ?
+          </p>
+          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+            {costComparison.map((c, i) => (
+              <div
+                key={c.label}
+                className={`flex items-center justify-between px-6 sm:px-8 py-5 ${
+                  i < costComparison.length - 1 ? 'border-b border-gray-100' : ''
+                } ${c.tone === 'highlight' ? 'bg-[#EFF6FF]' : ''}`}
+              >
+                <p className={`text-sm sm:text-base ${c.tone === 'highlight' ? 'font-bold text-[#1A1A2E]' : 'text-[#5F6368]'}`}>
+                  {c.label}
+                </p>
+                <p className={`text-sm sm:text-base font-bold ${c.tone === 'highlight' ? 'text-[#1B73E8]' : 'text-[#1A1A2E]'}`}>
+                  {c.value}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Plans grid */}
