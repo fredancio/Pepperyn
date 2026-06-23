@@ -34,7 +34,7 @@ function makeLocalMessage(role: 'user' | 'assistant', content: string, content_t
 
 const WELCOME_MESSAGE: Message = makeLocalMessage(
   'assistant',
-  "Bonjour ! Je suis Pepperyn, votre scanner financier IA.\n\nImportez un fichier Excel, CSV ou PDF pour obtenir une analyse structurée en quelques secondes, ou posez-moi directement une question sur vos finances.",
+  "Déposez votre fichier financier pour démarrer l'analyse.",
   'text'
 );
 
@@ -257,7 +257,12 @@ export function ChatContainer() {
 
   const proceedWithUpload = useCallback(async (file: File, context: string, mode: 'quick' | 'complete') => {
     const userMsg = makeLocalMessage('user', `📎 ${file.name}${context ? `\n\nContexte : ${context}` : ''}`, 'file');
-    setMessages(prev => [...prev, userMsg]);
+    // Remplacer le message d'accueil par "Analyse en cours." pendant le traitement
+    setMessages(prev => prev.map((m, i) =>
+      i === 0 && m.content_type === 'text' && m.role === 'assistant'
+        ? { ...m, content: 'Analyse en cours.' }
+        : m
+    ).concat(userMsg));
     setIsTyping(true);
 
     try {

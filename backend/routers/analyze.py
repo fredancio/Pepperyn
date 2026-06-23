@@ -908,18 +908,24 @@ def _verify_export_access(analyse_id: str, company_id: str) -> None:
     raise HTTPException(status_code=404, detail="Analyse introuvable")
 
 
-def _check_and_lock_format(analyse_id: str, requested_format: str) -> None:
+_MULTI_EXPORT_PLANS = {"pro", "power", "scale"}
+
+
+def _check_and_lock_format(analyse_id: str, requested_format: str, plan: str = "free") -> None:
     """
-    Enforce "one export format per analysis" rule.
-    Raises HTTPException 409 if a different format was already chosen.
-    Sets the chosen format on first call.
-    Also persists to DB (non-blocking).
+    Enforce "one export format per analysis" rule — FREE plans only.
+    PRO / POWER / SCALE : tous les formats sont disponibles sans restriction.
+    Raises HTTPException 409 uniquement si plan FREE et format déjà choisi.
     """
+    if (plan or "").strip().lower() in _MULTI_EXPORT_PLANS:
+        # Aucune restriction sur les plans payants
+        return
+
     existing = _export_format_chosen.get(analyse_id)
     if existing and existing != requested_format:
         raise HTTPException(
             status_code=409,
-            detail=f"Ce rapport a déjà été exporté en {existing.upper()}. Un seul format d'export est possible par analyse."
+            detail=f"Ce rapport a déjà été exporté en {existing.upper()}. Un seul format d'export est possible par analyse (plan gratuit)."
         )
     if not existing:
         _export_format_chosen[analyse_id] = requested_format
@@ -948,8 +954,8 @@ async def download_excel(
     # Contrôle d'accès : l'analyse doit appartenir à la company authentifiée
     _verify_export_access(analyse_id, company_id)
 
-    # Enforce one-format rule
-    _check_and_lock_format(analyse_id, "excel")
+    # Enforce one-format rule (bypassé pour PRO / POWER / SCALE)
+    _check_and_lock_format(analyse_id, "excel", plan)
 
     # Track export event
     _usage_service.track_activity(company_id, "export_generated", {
@@ -989,8 +995,8 @@ async def download_pdf(
     # Contrôle d'accès : l'analyse doit appartenir à la company authentifiée
     _verify_export_access(analyse_id, company_id)
 
-    # Enforce one-format rule
-    _check_and_lock_format(analyse_id, "pdf")
+    # Enforce one-format rule (bypassé pour PRO / POWER / SCALE)
+    _check_and_lock_format(analyse_id, "pdf", plan)
 
     # Nom de la société, pour personnaliser la page de couverture du rapport
     # (page de garde) — simple lecture, aucune nouvelle logique métier.
@@ -1071,8 +1077,8 @@ async def download_pptx(
     # Contrôle d'accès : l'analyse doit appartenir à la company authentifiée
     _verify_export_access(analyse_id, company_id)
 
-    # Enforce one-format rule
-    _check_and_lock_format(analyse_id, "pptx")
+    # Enforce one-format rule (bypassé pour PRO / POWER / SCALE)
+    _check_and_lock_format(analyse_id, "pptx", plan)
 
     # Nom de la société — pour personnaliser la couverture du Board Deck
     # (simple lecture, aucune logique métier).
