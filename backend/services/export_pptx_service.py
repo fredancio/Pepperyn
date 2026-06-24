@@ -1,1153 +1,998 @@
 """
-export_pptx_service.py — Executive Board Deck V6
-Pepperyn Executive Board Design Specification v0.9 — Founding Partners Edition
-Pepperyn — Copilote Financier Exécutif
+export_pptx_service.py — Board Deck Pepperyn
+Master de référence officiel : "Ancienne version du Powerpoint.pptx"
 
-Document de DÉCISION pour Conseil d'Administration, Comité de Direction,
-comité d'investissement, banquier.
+Structure IMMUABLE — 16 slides exactes :
+  S1   EXECUTIVE DECISION (couverture)
+  S2   EXECUTIVE SUMMARY (3 décisions top)
+  S3   DIAGNOSTIC (Pourquoi en sommes-nous arrivés là ?)
+  S4   GOUVERNANCE / CEO Dashboard (6 KPIs)
+  S5   IMPACT FINANCIER (destructeurs de valeur)
+  S6   DÉCISION (le coût de l'inaction)
+  S7   DÉCISIONS PRIORITAIRES (table)
+  S8   EXÉCUTION (roadmap 30/60/90)
+  S9   SIMULATION (action vs inaction)
+  S10  PROJECTION (trajectoire financière 12 mois)
+  S11  RISQUES (risques majeurs)
+  S12  PRIORITÉS (matrice impact/effort)
+  S13  SUIVI / Carnet d'exécution (table)
+  S14  PILOTAGE / Tableau de bord (table)
+  S15  LUNDI MATIN (3 décisions clés)
+  S16  ANNEXE (qualité données + méthodologie + engagements)
 
-RÈGLES ABSOLUES :
-  - Minimum 20pt sur tout texte de contenu (exception : metadata décorative 8pt)
-  - Titres de slides : 32pt
-  - 10 slides exactement
-  - Aucun élément décoratif, aucun tableau, aucun remplissage
-
-Structure narrative :
- 01. EXECUTIVE DECISION         — Constat
- 02. LE COÛT DE L'INACTION     — Urgence
- 03. ORIGINE DU PROBLÈME       — Waterfall P&L
- 04. LES TROIS DÉCISIONS       — Décisions
- 05. POURQUOI CES DÉCISIONS    — Matrice Impact / Effort
- 06. EBITDA BRIDGE             — Bridge
- 07. AVANT / APRÈS             — Impact comparé
- 08. PLAN D'EXÉCUTION          — 30 / 60 / 90 jours
- 09. DÉCISION DU CONSEIL       — Vote
- 10. RECOMMANDATION            — Copilote Financier
+RÈGLE ABSOLUE : seules les données changent. La structure est figée.
+Si une donnée est absente → "Données insuffisantes".
 """
 from __future__ import annotations
 
 import io
 import re
-from datetime import datetime
-from typing import Any, List, Optional
+from datetime import datetime, timedelta
+from typing import Any, Optional, List
 
 from pptx import Presentation
+from pptx.util import Inches, Pt, Emu, Cm
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
-from pptx.util import Emu, Inches, Pt
 
-# ─────────────────────────────────────────────────────────────────────────────
-# PALETTE — figée par la spec
-# ─────────────────────────────────────────────────────────────────────────────
-C_WHITE       = RGBColor(0xFF, 0xFF, 0xFF)
-C_NAVY        = RGBColor(0x0A, 0x25, 0x40)
-C_BLUE        = RGBColor(0x1B, 0x73, 0xE8)
-C_DARK        = RGBColor(0x1A, 0x1A, 0x2E)
-C_GRAY        = RGBColor(0x5F, 0x63, 0x68)
-C_SLATE       = RGBColor(0x94, 0xA3, 0xB8)
-C_LINE        = RGBColor(0xE2, 0xE8, 0xF0)
-C_LIGHT       = RGBColor(0xF8, 0xFA, 0xFF)
-C_GREEN       = RGBColor(0x05, 0x96, 0x69)
-C_RED         = RGBColor(0xDC, 0x26, 0x26)
-C_AMBER       = RGBColor(0xD9, 0x77, 0x06)
-C_LIGHT_GREEN = RGBColor(0xD1, 0xFA, 0xE5)
-C_LIGHT_RED   = RGBColor(0xFE, 0xE2, 0xE2)
-C_LIGHT_AMBER = RGBColor(0xFE, 0xF3, 0xC7)
-C_LIGHT_BLUE  = RGBColor(0xDB, 0xEA, 0xFE)
-C_NAVY_LIGHT  = RGBColor(0x1E, 0x3A, 0x5F)
+from services.executive_decision_model import build_executive_decision_model
 
-# ─────────────────────────────────────────────────────────────────────────────
-# DIMENSIONS SLIDE 16:9
-# ─────────────────────────────────────────────────────────────────────────────
-SLIDE_W   = Inches(13.333)
-SLIDE_H   = Inches(7.5)
-MARGIN_L  = Inches(0.80)
-MARGIN_R  = Inches(0.80)
-CONTENT_W = SLIDE_W - MARGIN_L - MARGIN_R   # ≈ 11.73"
-HDR_TOP   = Inches(1.42)                     # sous le titre 32pt
-FTR_H     = Inches(0.38)
-CONTENT_H = SLIDE_H - HDR_TOP - FTR_H - Inches(0.12)   # ≈ 5.58"
+# ─── PALETTE ─────────────────────────────────────────────────────────────────
+def _rgb(hex_str: str) -> RGBColor:
+    h = hex_str.lstrip("#")
+    return RGBColor(int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
 
-# ─────────────────────────────────────────────────────────────────────────────
-# TYPOGRAPHIE — minimum 20pt pour tout texte de contenu
-# ─────────────────────────────────────────────────────────────────────────────
-T_META    = 8    # exception : metadata purement décorative (footer, section label)
-T_TITLE   = 32   # titre de slide
-T_HERO_XL = 56   # chiffre héros maximal (coût annuel inaction, couverture)
-T_HERO_L  = 44   # chiffre héros grand (coût mensuel)
-T_HERO_M  = 34   # chiffre héros moyen (impact décision, KPI before/after)
-T_HERO_S  = 26   # chiffre héros secondaire (coût quotidien/horaire)
-T_ACCENT  = 24   # sous-titres, en-têtes de blocs, badges
-T_BODY    = 22   # corps de texte standard (minimum recommandé)
-T_LABEL   = 20   # labels, annotations, textes secondaires (minimum absolu)
+NAVY  = _rgb("0A2540")
+BLUE  = _rgb("1B73E8")
+RED   = _rgb("C0392B")
+AMBER = _rgb("B8763A")
+GREEN = _rgb("2C7A4B")
+GRAY  = _rgb("8A9BB0")
+LGRAY = _rgb("D5DCE5")
+WHITE = _rgb("FFFFFF")
+DARK  = _rgb("1A1A2E")
+LBGRAY = _rgb("F5F7FA")
+
+# ─── DIMENSIONS SLIDE 16:9 (33.87 cm × 19.05 cm) ────────────────────────────
+SW = Inches(13.33)
+SH = Inches(7.5)
+ML = Inches(0.5)    # left margin
+MR = Inches(0.5)    # right margin
+MT = Inches(1.1)    # top (below header band)
+MB = Inches(0.45)   # bottom (above footer)
+CW = SW - ML - MR   # content width  ~12.33"
+CH = SH - MT - MB   # content height ~5.95"
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# UTILITAIRES
-# ─────────────────────────────────────────────────────────────────────────────
+# ─── HELPERS NUMÉRIQUES ───────────────────────────────────────────────────────
 
-def _parse_amount(s: Optional[str]) -> float:
-    """Parse '2,4M €' → 2_400_000 ; '350 K€' → 350_000 ; None → 0."""
-    if not s:
-        return 0.0
-    text = str(s).replace('\xa0', '').replace(' ', '').replace(',', '.')
-    m = re.search(r'(-?[\d.]+)\s*([MKk]?)\s*[€$£]?', text)
-    if not m:
-        return 0.0
-    try:
-        val = float(m.group(1))
-        mult = m.group(2).upper()
-        if mult == 'M':
-            val *= 1_000_000
-        elif mult == 'K':
-            val *= 1_000
-        return val
-    except (ValueError, AttributeError):
-        return 0.0
-
-
-def _fmt(v: Optional[float], unit: str = '€', sign: bool = False) -> str:
-    """Format compact : 2 400 000 → '2,4 M€'."""
+def _fmt_eur(v: Optional[float]) -> str:
     if v is None:
-        return '—'
+        return "Données insuffisantes"
     abs_v = abs(v)
-    pfx = ('+' if v >= 0 else '-') if sign else ('-' if v < 0 else '')
-    if abs_v >= 1_000_000:
-        s = f"{abs_v / 1_000_000:.1f}".rstrip('0').rstrip('.')
-        return f"{pfx}{s} M{unit}"
-    if abs_v >= 1_000:
-        return f"{pfx}{abs_v / 1_000:.0f} K{unit}"
-    return f"{pfx}{abs_v:.0f} {unit}"
+    prefix = "-" if v < 0 else ""
+    s = f"{abs_v:,.0f}".replace(",", " ")
+    return f"{prefix}{s} €"
 
 
-def _strip_md(text: Optional[str]) -> str:
-    """Supprime les marqueurs Markdown (**bold**, *italic*) du texte brut."""
-    if not text:
-        return ''
-    return re.sub(r'\*+', '', str(text)).strip()
+def _fmt_auto(v: Optional[float], sign: bool = False) -> str:
+    if v is None:
+        return "Données insuffisantes"
+    abs_v = abs(v)
+    prefix = "-" if v < 0 else ("+" if sign and v > 0 else "")
+    if abs_v >= 950_000:
+        m = abs_v / 1_000_000
+        if m >= 10:
+            return f"{prefix}{m:.0f} M€"
+        return f"{prefix}{m:.1f} M€".replace(".", ",")
+    return _fmt_eur(v)
 
 
-def _trunc(text: Optional[str], n: int) -> str:
-    if not text:
-        return '—'
-    clean = _strip_md(text)
-    return clean[:n] + '…' if len(clean) > n else clean
+def _safe(v, fallback: str = "Données insuffisantes") -> str:
+    if v is None or v == "" or (isinstance(v, (int, float)) and v == 0):
+        return fallback
+    return str(v)
 
 
-def _effort_score(difficulty: Optional[str]) -> float:
-    """1 = facile, 2 = moyen, 3 = difficile."""
-    if not difficulty:
-        return 2.0
-    d = difficulty.lower()
-    if any(k in d for k in ('facil', 'low', 'easy', 'simple')):
-        return 1.0
-    if any(k in d for k in ('diffic', 'hard', 'high', 'élevé', 'complex')):
-        return 3.0
-    return 2.0
+# ─── UTILITAIRES PYTHON-PPTX ─────────────────────────────────────────────────
 
-
-def _difficulty_fr(difficulty: Optional[str]) -> str:
-    if not difficulty:
-        return '—'
-    score = _effort_score(difficulty)
-    if score <= 1.0:
-        return 'Facile'
-    if score >= 3.0:
-        return 'Difficile'
-    return 'Moyen'
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PRIMITIVES DE DESSIN
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _blank(prs: Presentation):
-    """Ajoute une slide vierge (layout 6)."""
-    return prs.slides.add_slide(prs.slide_layouts[6])
-
-
-def _rect(
-    slide, left: int, top: int, width: int, height: int,
-    fill: RGBColor,
-    *,
-    border_color: Optional[RGBColor] = None,
-    border_pt: float = 0.75,
-) -> Any:
-    """Rectangle plein."""
-    s = slide.shapes.add_shape(
-        1, left, top, max(int(width), 1), max(int(height), 1)
-    )
-    s.fill.solid()
-    s.fill.fore_color.rgb = fill
-    if border_color:
-        s.line.color.rgb = border_color
-        s.line.width = Pt(border_pt)
-    else:
-        s.line.fill.background()
-    return s
-
-
-def _txt(
-    slide, left: int, top: int, width: int, height: int,
-    text: str,
-    *,
-    size: float,
-    bold: bool = False,
-    italic: bool = False,
-    color: RGBColor = None,
-    align: PP_ALIGN = PP_ALIGN.LEFT,
-    wrap: bool = True,
-) -> Any:
-    """Boîte de texte Calibri."""
-    color = color or C_DARK
-    txb = slide.shapes.add_textbox(left, top, max(int(width), 1), max(int(height), 1))
-    tf = txb.text_frame
-    tf.word_wrap = wrap
-    p = tf.paragraphs[0]
-    p.alignment = align
-    run = p.add_run()
-    run.text = str(text) if text is not None else '—'
+def _set_para(para, text: str, size: int, bold: bool = False,
+              color: RGBColor = None, align=PP_ALIGN.LEFT,
+              italic: bool = False):
+    para.text = ""
+    run = para.add_run()
+    run.text = text
     run.font.size = Pt(size)
     run.font.bold = bold
     run.font.italic = italic
-    run.font.color.rgb = color
-    run.font.name = 'Calibri'
-    return txb
+    run.font.name = "Calibri"
+    if color:
+        run.font.color.rgb = color
+    para.alignment = align
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# HEADER & FOOTER COMMUNS
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _header(slide, label: str, title: str):
-    """Barre navy + label section (T_META) + titre 32pt (T_TITLE)."""
-    _rect(slide, 0, 0, SLIDE_W, Inches(0.06), C_NAVY)
-    # Metadata décorative (exception réglementaire : T_META = 8pt)
-    _txt(slide, MARGIN_L, Inches(0.10), Inches(7), Inches(0.22),
-         label.upper(), size=T_META, bold=True, color=C_SLATE)
-    _txt(slide, SLIDE_W - Inches(2.6), Inches(0.10), Inches(2.4), Inches(0.22),
-         'PEPPERYN · CONFIDENTIEL', size=T_META, color=C_SLATE, align=PP_ALIGN.RIGHT)
-    # Titre principal — jamais moins de T_TITLE (32pt)
-    _txt(slide, MARGIN_L, Inches(0.32), CONTENT_W, Inches(0.90),
-         title, size=T_TITLE, bold=True, color=C_NAVY)
-    # Séparateur navy sous le titre
-    _rect(slide, MARGIN_L, Inches(1.28), CONTENT_W, Emu(28000), C_NAVY)
+def _text(slide, txt: str, l, t, w, h,
+          size: int = 22, bold: bool = False,
+          color: RGBColor = None, align=PP_ALIGN.LEFT,
+          italic: bool = False):
+    if color is None:
+        color = DARK
+    tb = slide.shapes.add_textbox(l, t, w, h)
+    tf = tb.text_frame
+    tf.word_wrap = True
+    para = tf.paragraphs[0]
+    _set_para(para, str(txt), size, bold=bold, color=color, align=align, italic=italic)
+    return tb
 
 
-def _footer(slide, num: int, date_str: str = ''):
-    """Footer discret — T_META uniquement."""
-    _rect(slide, 0, SLIDE_H - FTR_H, SLIDE_W, FTR_H, C_LIGHT)
-    _txt(slide, MARGIN_L, SLIDE_H - FTR_H + Inches(0.06),
-         Inches(7), FTR_H - Inches(0.08),
-         f'Pepperyn · Document confidentiel · {date_str}',
-         size=T_META, color=C_SLATE)
-    _txt(slide, SLIDE_W - Inches(1.8), SLIDE_H - FTR_H + Inches(0.06),
-         Inches(1.6), FTR_H - Inches(0.08),
-         f'{num:02d} / 10', size=T_META, bold=True, color=C_SLATE, align=PP_ALIGN.RIGHT)
+def _rect(slide, l, t, w, h, fill_color: RGBColor = None, line_color: RGBColor = None):
+    shape = slide.shapes.add_shape(1, l, t, w, h)
+    if fill_color:
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = fill_color
+    else:
+        shape.fill.background()
+    if line_color:
+        shape.line.color.rgb = line_color
+        shape.line.width = Pt(0.5)
+    else:
+        shape.line.fill.background()
+    return shape
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# WATERFALL / BRIDGE  (20pt labels, 22pt values)
-# ─────────────────────────────────────────────────────────────────────────────
+def _header_band(slide, label: str, company: str = ""):
+    _rect(slide, 0, 0, SW, Inches(0.75), fill_color=NAVY)
+    _text(slide, label.upper(), ML, Inches(0.12), Inches(7), Inches(0.5),
+          size=12, bold=True, color=AMBER, align=PP_ALIGN.LEFT)
+    _text(slide, "PEPPERYN", SW - Inches(2), Inches(0.12), Inches(1.5), Inches(0.5),
+          size=11, bold=True, color=WHITE, align=PP_ALIGN.RIGHT)
+    _rect(slide, 0, Inches(0.75), SW, Pt(1), fill_color=BLUE)
 
-def _waterfall(
-    slide,
-    items: List[dict],
-    left: int, top: int, width: int, height: int,
-):
-    """
-    Waterfall McKinsey. Labels ≥ 20pt, valeurs ≥ 22pt.
-    items : [{'label', 'value', 'type': 'start'|'delta'|'end'}]
-    """
-    if not items:
+
+def _footer_band(slide, page_num: int, company: str = ""):
+    fy = SH - Inches(0.4)
+    _rect(slide, 0, fy, SW, Inches(0.4), fill_color=_rgb("F0F3F7"))
+    _text(slide, "Document confidentiel — usage interne réservé à la direction",
+          ML, fy + Pt(4), Inches(9), Inches(0.3),
+          size=9, color=GRAY, align=PP_ALIGN.LEFT)
+    _text(slide, str(page_num),
+          SW - Inches(1), fy + Pt(4), Inches(0.5), Inches(0.3),
+          size=9, bold=True, color=GRAY, align=PP_ALIGN.RIGHT)
+
+
+def _slide_title(slide, title: str, subtitle: str = ""):
+    _text(slide, title, ML, MT - Inches(0.25), CW, Inches(0.55),
+          size=36, bold=True, color=NAVY, align=PP_ALIGN.LEFT)
+    if subtitle:
+        _text(slide, subtitle, ML, MT + Inches(0.35), CW, Inches(0.3),
+              size=14, color=GRAY, align=PP_ALIGN.LEFT)
+
+
+# ─── SLIDE 1 : COUVERTURE ─────────────────────────────────────────────────────
+
+def _slide_cover(prs, edm, result: dict, company: str, date_str: str, page: int):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _rect(slide, 0, 0, SW, SH, fill_color=NAVY)
+    _rect(slide, 0, 0, Inches(0.18), SH, fill_color=AMBER)
+    _text(slide, "EXECUTIVE DECISION", Inches(0.4), Inches(0.3), Inches(10), Inches(0.4),
+          size=13, bold=True, color=AMBER, align=PP_ALIGN.LEFT)
+    _text(slide, company or "—", Inches(0.4), Inches(1.1), Inches(12), Inches(0.8),
+          size=40, bold=True, color=WHITE, align=PP_ALIGN.LEFT)
+    _text(slide, date_str, Inches(0.4), Inches(1.95), Inches(6), Inches(0.4),
+          size=18, color=GRAY, align=PP_ALIGN.LEFT)
+    _rect(slide, Inches(0.4), Inches(2.55), Inches(4), Pt(1.5), fill_color=AMBER)
+
+    dec = edm.executive_decisions[0] if edm.executive_decisions else None
+    dec_txt = dec.decision if dec else "Décision prioritaire non disponible"
+    impact_str = (_fmt_auto(dec.annual_impact) + " / an" if dec and dec.annual_impact
+                  else "Non chiffrable avec les données disponibles")
+
+    _text(slide, "DÉCISION PRIORITAIRE", Inches(0.4), Inches(2.85), Inches(12), Inches(0.4),
+          size=12, bold=True, color=BLUE, align=PP_ALIGN.LEFT)
+    _text(slide, dec_txt[:180], Inches(0.4), Inches(3.3), Inches(12.4), Inches(1.6),
+          size=28, bold=True, color=WHITE, align=PP_ALIGN.LEFT)
+    _text(slide, impact_str, Inches(0.4), Inches(5.0), Inches(8), Inches(0.7),
+          size=34, bold=True, color=AMBER, align=PP_ALIGN.LEFT)
+    _text(slide, "RAPPORT CONFIDENTIEL — USAGE INTERNE",
+          Inches(0.4), SH - Inches(0.55), Inches(10), Inches(0.35),
+          size=10, color=_rgb("4A5A6A"), align=PP_ALIGN.LEFT)
+    _text(slide, str(page), SW - Inches(1), SH - Inches(0.55), Inches(0.5), Inches(0.35),
+          size=10, color=GRAY, align=PP_ALIGN.RIGHT)
+
+
+# ─── SLIDE 2 : EXECUTIVE SUMMARY ─────────────────────────────────────────────
+
+def _slide_exec_summary(prs, edm, result: dict, company: str, date_str: str, page: int):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _header_band(slide, "EXECUTIVE SUMMARY", company)
+    _footer_band(slide, page, company)
+    _slide_title(slide, "Synthèse des décisions prioritaires")
+
+    decisions = edm.executive_decisions[:3]
+    if not decisions:
+        _text(slide, "Données insuffisantes", ML, MT + Inches(0.5), CW, Inches(1), size=22, color=GRAY)
         return
-    n = len(items)
 
-    # Calcul des positions (from_v, to_v) pour chaque barre
-    cumul = 0.0
-    positions: List[tuple] = []
-    for item in items:
-        if item['type'] == 'start':
-            positions.append((0.0, item['value']))
-            cumul = item['value']
-        elif item['type'] == 'end':
-            positions.append((0.0, item['value']))
-        else:
-            positions.append((cumul, cumul + item['value']))
-            cumul += item['value']
+    row_h = (CH - Inches(0.6)) / 3
+    row_top = MT + Inches(0.55)
 
-    all_v = [v for p in positions for v in p]
-    max_v = max(all_v) * 1.06
-    min_v = min(0.0, min(all_v)) * 1.06 if min(all_v) < 0 else 0.0
-    v_range = max(max_v - min_v, 1.0)
-
-    label_zone = Inches(0.95)           # 20pt sur 2 lignes max
-    val_zone   = Inches(0.40)           # espace pour valeur au-dessus de la barre
-    chart_h    = height - label_zone - val_zone
-    chart_top  = top + val_zone
-    chart_bottom = chart_top + chart_h
-
-    col_w = width / n
-    bar_w = int(col_w * 0.56)
-
-    def vy(v: float) -> int:
-        frac = (v - min_v) / v_range
-        return int(chart_bottom - frac * chart_h)
-
-    # Axe zéro
-    zero_y = vy(0)
-    _rect(slide, left, zero_y, width, Emu(14000), C_LINE)
-
-    cumul = 0.0
-    for i, item in enumerate(items):
-        fv, tv = positions[i]
-        bar_left = int(left + i * col_w + (col_w - bar_w) / 2)
-        y_hi = min(vy(fv), vy(tv))
-        y_lo = max(vy(fv), vy(tv))
-        bar_h = max(y_lo - y_hi, Emu(22000))
-
-        if item['type'] in ('start', 'end'):
-            color = C_NAVY if item['value'] <= 0 else C_BLUE
-        else:
-            color = C_RED if item['value'] < 0 else C_GREEN
-
-        _rect(slide, bar_left, y_hi, bar_w, bar_h, color)
-
-        # Connecteur vers la barre suivante
-        if i < n - 1 and item['type'] != 'end':
-            next_bar_left = int(left + (i + 1) * col_w + (col_w - bar_w) / 2)
-            conn_y = vy(tv)
-            _rect(slide, bar_left + bar_w, conn_y - Emu(6000),
-                  next_bar_left - bar_left - bar_w, Emu(12000), C_SLATE)
-
-        # Valeur au-dessus/en-dessous (T_BODY = 22pt)
-        # Pour les deltas négatifs : sous la barre seulement si la barre est
-        # assez éloignée de la label_zone ; sinon, au-dessus (évite chevauchement).
-        val_str = _fmt(item['value'], sign=(item['type'] == 'delta'))
-        is_neg_delta = (item['type'] == 'delta' and item['value'] < 0)
-        if is_neg_delta and y_lo < chart_bottom - Inches(0.54):
-            lbl_y = y_lo + Inches(0.05)
-        else:
-            lbl_y = y_hi - Inches(0.40)
-        _txt(slide, bar_left - Inches(0.15), int(lbl_y),
-             bar_w + Inches(0.30), Inches(0.38),
-             val_str, size=T_BODY, bold=True,
-             color=C_RED if is_neg_delta else C_DARK,
-             align=PP_ALIGN.CENTER)
-
-        # Label catégorie en bas (T_LABEL = 20pt)
-        _txt(slide,
-             bar_left - Inches(0.18),
-             int(chart_bottom + Inches(0.08)),
-             bar_w + Inches(0.36),
-             label_zone - Inches(0.08),
-             item['label'],
-             size=T_LABEL, color=C_GRAY, align=PP_ALIGN.CENTER, wrap=True)
-
-        if item['type'] == 'delta':
-            cumul += item['value']
-        elif item['type'] == 'start':
-            cumul = item['value']
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PLAN 90 JOURS — 3 colonnes (remplace le Gantt)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _plan_columns(slide, phases, left: int, top: int, width: int, height: int):
-    """
-    3 colonnes STABILISER / OPTIMISER / ACCÉLÉRER.
-    Max 2 actions par colonne. Textes ≥ 20pt.
-    """
-    PHASE_CFG = {
-        '30': {'label': 'STABILISER', 'sublabel': 'J0 — J30',  'color': C_BLUE,  'bg': C_LIGHT_BLUE},
-        '60': {'label': 'OPTIMISER',  'sublabel': 'J30 — J60', 'color': C_NAVY,  'bg': C_LIGHT},
-        '90': {'label': 'ACCÉLÉRER',  'sublabel': 'J60 — J90', 'color': C_GREEN, 'bg': C_LIGHT_GREEN},
-    }
-
-    col_gap   = Inches(0.28)
-    col_w     = (width - col_gap * 2) / 3
-    hdr_h     = Inches(0.72)
-    sub_h     = Inches(0.34)
-    card_h    = Inches(1.90)
-    card_gap  = Inches(0.18)
-    card_top  = top + hdr_h + sub_h + Inches(0.22)
-
-    for ci, (horizon, cfg) in enumerate(PHASE_CFG.items()):
-        cx = left + ci * (col_w + col_gap)
-
-        # En-tête colonne
-        _rect(slide, int(cx), int(top), int(col_w), int(hdr_h), cfg['color'])
-        _txt(slide, int(cx + Inches(0.16)), int(top + Inches(0.14)),
-             int(col_w - Inches(0.32)), int(hdr_h - Inches(0.14)),
-             cfg['label'], size=T_ACCENT, bold=True, color=C_WHITE,
-             align=PP_ALIGN.CENTER)
-
-        # Sous-label période
-        _txt(slide, int(cx), int(top + hdr_h + Inches(0.06)),
-             int(col_w), int(sub_h),
-             cfg['sublabel'], size=T_LABEL, color=C_GRAY, align=PP_ALIGN.CENTER)
-
-        # Récupération actions de la phase correspondante
-        phase_actions: list = []
-        for phase in phases:
-            if str(phase.horizon) == horizon:
-                phase_actions = (phase.actions or [])[:2]
-                break
-
-        if not phase_actions:
-            # Placeholder vide
-            _rect(slide, int(cx), int(card_top),
-                  int(col_w), int(card_h), cfg['bg'],
-                  border_color=cfg['color'], border_pt=1.0)
-            _txt(slide, int(cx + Inches(0.16)), int(card_top + Inches(0.70)),
-                 int(col_w - Inches(0.32)), Inches(0.50),
-                 'Aucune action définie.', size=T_LABEL, color=C_SLATE,
-                 align=PP_ALIGN.CENTER)
-            continue
-
-        for ai, act in enumerate(phase_actions):
-            cy = int(card_top + ai * (card_h + card_gap))
-
-            _rect(slide, int(cx), cy, int(col_w), int(card_h),
-                  cfg['bg'], border_color=cfg['color'], border_pt=1.2)
-            _rect(slide, int(cx), cy, Inches(0.08), int(card_h), cfg['color'])
-
-            # Action label (T_BODY)
-            _txt(slide, int(cx + Inches(0.22)), cy + Inches(0.14),
-                 int(col_w - Inches(0.30)), Inches(0.80),
-                 _trunc(act.decision, 55), size=T_BODY, bold=True, color=C_DARK,
-                 wrap=True)
-
-            # Responsable (T_LABEL)
-            if act.owner:
-                _txt(slide, int(cx + Inches(0.22)), cy + Inches(1.00),
-                     int(col_w - Inches(0.30)), Inches(0.34),
-                     f'Resp. : {act.owner}', size=T_LABEL, color=C_GRAY)
-
-            # Impact (T_BODY)
-            if act.impact:
-                _txt(slide, int(cx + Inches(0.22)), cy + Inches(1.40),
-                     int(col_w - Inches(0.30)), Inches(0.36),
-                     _fmt(act.impact, sign=True), size=T_BODY, bold=True,
-                     color=C_GREEN if (act.impact or 0) > 0 else C_RED)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# MATRICE IMPACT / EFFORT  (20pt minimum)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _matrix(slide, decisions, left: int, top: int, width: int, height: int):
-    """Matrice Impact / Effort avec quadrants colorés. Labels ≥ 20pt."""
-    mid_x = left + width // 2
-    mid_y = top  + height // 2
-    ax_lbl_h = Inches(0.36)
-    chart_h  = height - ax_lbl_h
-
-    quadrants = [
-        (left,  top,       'QUICK WINS ★', C_GREEN,  C_LIGHT_GREEN),
-        (mid_x, top,       'INVESTIR',     C_BLUE,   C_LIGHT_BLUE),
-        (left,  mid_y,     'DÉLÉGUER',     C_GRAY,   C_LIGHT),
-        (mid_x, mid_y,     'ÉVITER',       C_AMBER,  C_LIGHT_AMBER),
-    ]
-
-    q_w = width // 2
-    q_h = chart_h // 2
-
-    for qx, qy, qlabel, qcolor, qbg in quadrants:
-        _rect(slide, qx, qy, q_w, q_h, qbg, border_color=qcolor, border_pt=0.5)
-        _txt(slide, qx + Inches(0.14), qy + Inches(0.10), q_w - Inches(0.20), Inches(0.36),
-             qlabel, size=T_LABEL, bold=True, color=qcolor)
-
-    # Séparateurs centraux
-    _rect(slide, mid_x - Emu(8000), top, Emu(16000), chart_h, C_LINE)
-    _rect(slide, left, mid_y - Emu(8000), width, Emu(16000), C_LINE)
-
-    # Axe X — label (T_LABEL = 20pt)
-    _txt(slide, left, top + chart_h + Inches(0.04), width, ax_lbl_h,
-         '◄  EFFORT FAIBLE                                    EFFORT ÉLEVÉ  ►',
-         size=T_LABEL, color=C_SLATE, align=PP_ALIGN.CENTER)
-
-    # Points décisions
-    ds = Inches(0.46)
     for i, dec in enumerate(decisions):
-        impact = abs(dec.annual_impact or 1)
-        effort = _effort_score(dec.difficulty)
-        norm_x = (effort - 1) / 2      # 0→1
-        norm_y = 1.0 - min(impact / max(abs(d.annual_impact or 1) for d in decisions), 1.0)
-
-        dot_cx = int(left + norm_x * width)
-        dot_cy = int(top  + norm_y * chart_h)
-
-        _rect(slide, dot_cx - ds // 2, dot_cy - ds // 2, ds, ds, C_NAVY,
-              border_color=C_WHITE, border_pt=2.0)
-        _txt(slide, dot_cx - ds // 2, dot_cy - ds // 2, ds, ds,
-             str(i + 1), size=T_LABEL, bold=True, color=C_WHITE,
-             align=PP_ALIGN.CENTER)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SLIDE 01 — EXECUTIVE DECISION (couverture)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _s01_cover(prs, edm, company: str, date_str: str):
-    slide = _blank(prs)
-
-    # Fond sombre McKinsey
-    bg = slide.background.fill
-    bg.solid()
-    bg.fore_color.rgb = C_NAVY
-
-    # Bande accent gauche
-    _rect(slide, 0, 0, Inches(0.12), SLIDE_H, C_BLUE)
-
-    # Labels cadre (metadata — T_META)
-    _txt(slide, Inches(0.28), Inches(0.18), Inches(6), Inches(0.32),
-         'EXECUTIVE DECISION', size=T_META + 2, bold=True, color=C_SLATE)
-    _txt(slide, SLIDE_W - Inches(3.0), Inches(0.18), Inches(2.8), Inches(0.32),
-         'PEPPERYN · CONFIDENTIEL', size=T_META + 1, color=C_SLATE, align=PP_ALIGN.RIGHT)
-
-    # Nom société — T_HERO_XL (56pt)
-    _txt(slide, Inches(0.28), Inches(0.56), SLIDE_W - Inches(0.56), Inches(1.40),
-         company or '—', size=T_HERO_XL, bold=True, color=C_WHITE)
-
-    # Séparateur bleu
-    _rect(slide, Inches(0.28), Inches(2.10), SLIDE_W - Inches(0.40), Emu(45000), C_BLUE)
-
-    # Date + gain potentiel
-    decisions = (edm.executive_decisions or [])
-    total_gain = sum(d.annual_impact or 0 for d in decisions if (d.annual_impact or 0) > 0)
-    gain_str = _fmt(total_gain) if total_gain > 0 else '—'
-
-    _txt(slide, Inches(0.28), Inches(2.28), Inches(5.5), Inches(0.38),
-         f'{date_str} · CONFIDENTIEL', size=T_LABEL, color=C_SLATE)
-    _txt(slide, SLIDE_W - Inches(4.5), Inches(2.28), Inches(4.2), Inches(0.38),
-         f'Gain identifié : {gain_str} / an', size=T_LABEL, bold=True,
-         color=C_GREEN, align=PP_ALIGN.RIGHT)
-
-    # Décision prioritaire — grand italique blanc (T_HERO_S = 26pt)
-    top_decision = _strip_md(decisions[0].decision) if decisions else ''
-    if top_decision:
-        _txt(slide, Inches(0.28), Inches(2.88), SLIDE_W - Inches(0.56), Inches(3.20),
-             f'« {top_decision} »',
-             size=T_HERO_S + 4, italic=True, color=C_WHITE, wrap=True)
-
-    # Footer
-    _rect(slide, 0, SLIDE_H - Inches(0.55), SLIDE_W, Inches(0.55), C_NAVY_LIGHT)
-    _txt(slide, Inches(0.28), SLIDE_H - Inches(0.50), SLIDE_W - Inches(0.56), Inches(0.44),
-         'Pepperyn · Copilote Financier Exécutif',
-         size=T_LABEL, color=C_SLATE, align=PP_ALIGN.CENTER)
-    _txt(slide, SLIDE_W - Inches(2.0), SLIDE_H - Inches(0.50),
-         Inches(1.80), Inches(0.44),
-         '01 / 10', size=T_META + 2, bold=True, color=C_SLATE, align=PP_ALIGN.RIGHT)
+        y = row_top + i * row_h
+        _rect(slide, ML, y, CW, row_h - Pt(4), fill_color=_rgb("F0F4FA"), line_color=LGRAY)
+        _text(slide, f"#{i + 1}", ML + Inches(0.1), y + Inches(0.08), Inches(0.4), row_h,
+              size=14, bold=True, color=BLUE)
+        _text(slide, dec.decision[:130], ML + Inches(0.55), y + Inches(0.08),
+              Inches(5.8), row_h - Inches(0.15), size=14, color=DARK)
+        impact_str = _fmt_auto(dec.annual_impact, sign=True) if dec.annual_impact else "—"
+        _text(slide, impact_str, ML + Inches(6.5), y + Inches(0.08), Inches(1.9), Inches(0.45),
+              size=16, bold=True, color=RED, align=PP_ALIGN.RIGHT)
+        _text(slide, "IMPACT / AN", ML + Inches(6.5), y + Inches(0.52), Inches(1.9), Inches(0.3),
+              size=9, color=GRAY, align=PP_ALIGN.RIGHT)
+        roi = f"{dec.roi_score:.1f}/10" if dec.roi_score else "—"
+        _text(slide, roi, ML + Inches(8.55), y + Inches(0.08), Inches(1.2), Inches(0.45),
+              size=16, bold=True, color=NAVY, align=PP_ALIGN.CENTER)
+        _text(slide, "SCORE ROI", ML + Inches(8.55), y + Inches(0.52), Inches(1.2), Inches(0.3),
+              size=9, color=GRAY, align=PP_ALIGN.CENTER)
+        horizon = dec.timeline or "—"
+        _text(slide, horizon, ML + Inches(9.9), y + Inches(0.08), Inches(1.2), Inches(0.45),
+              size=14, color=AMBER, align=PP_ALIGN.CENTER)
+        _text(slide, "HORIZON", ML + Inches(9.9), y + Inches(0.52), Inches(1.2), Inches(0.3),
+              size=9, color=GRAY, align=PP_ALIGN.CENTER)
+        status = dec.status or "À lancer"
+        _text(slide, status, ML + Inches(11.2), y + Inches(0.08), Inches(1.1), Inches(0.45),
+              size=12, color=GREEN, align=PP_ALIGN.CENTER)
+        _text(slide, "STATUT", ML + Inches(11.2), y + Inches(0.52), Inches(1.1), Inches(0.3),
+              size=9, color=GRAY, align=PP_ALIGN.CENTER)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SLIDE 02 — LE COÛT DE L'INACTION
-# ─────────────────────────────────────────────────────────────────────────────
+# ─── SLIDE 3 : DIAGNOSTIC ─────────────────────────────────────────────────────
 
-def _s02_inaction(prs, edm, date_str: str):
-    slide = _blank(prs)
-    _header(slide, '02 — URGENCE', 'Le coût de l\'inaction.')
-    _footer(slide, 2, date_str)
+def _slide_diagnostic(prs, edm, result: dict, company: str, date_str: str, page: int):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _header_band(slide, "DIAGNOSTIC", company)
+    _footer_band(slide, page, company)
+    _slide_title(slide, "Pourquoi en sommes-nous arrivés là ?")
+
+    diag = (result.get("diagnostic_immediat") or result.get("resume_executif")
+            or result.get("synthese") or "Données insuffisantes")
+    _text(slide, diag.strip()[:320], ML, MT + Inches(0.55), CW, Inches(1.6), size=22, color=DARK)
+
+    destroyers = edm.value_destroyers[:3]
+    if destroyers:
+        _text(slide, "TOP 3 DESTRUCTEURS DE VALEUR", ML, MT + Inches(2.35),
+              CW, Inches(0.4), size=12, bold=True, color=AMBER)
+        card_w = CW / 3 - Inches(0.1)
+        for i, d in enumerate(destroyers):
+            lx = ML + i * (card_w + Inches(0.15))
+            ly = MT + Inches(2.8)
+            _rect(slide, lx, ly, card_w, Inches(1.8), fill_color=_rgb("FBF0EE"), line_color=_rgb("E8B0A8"))
+            ann_str = _fmt_auto(d.annual_impact) if d.annual_impact else "Non chiffrable"
+            _text(slide, ann_str, lx + Inches(0.1), ly + Inches(0.08),
+                  card_w - Inches(0.2), Inches(0.65), size=22, bold=True, color=RED)
+            _text(slide, d.name[:80], lx + Inches(0.1), ly + Inches(0.75),
+                  card_w - Inches(0.2), Inches(1.0), size=13, color=DARK)
+
+
+# ─── SLIDE 4 : GOUVERNANCE / CEO DASHBOARD ────────────────────────────────────
+
+def _slide_dashboard(prs, edm, result: dict, company: str, date_str: str, page: int):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _header_band(slide, "GOUVERNANCE", company)
+    _footer_band(slide, page, company)
+    _slide_title(slide, "CEO Dashboard", "Indicateurs stratégiques clés")
+
+    dashboard = result.get("ceo_dashboard") or []
+    items = []
+    for card in dashboard[:6]:
+        if isinstance(card, dict):
+            items.append(card)
+        else:
+            items.append({"label": getattr(card, "label", ""),
+                          "value": getattr(card, "value", ""),
+                          "status": getattr(card, "status", None)})
+    while len(items) < 6:
+        items.append({"label": "—", "value": "Données insuffisantes", "status": "missing"})
+
+    card_w = CW / 3 - Inches(0.12)
+    card_h = Inches(1.95)
+    card_top_1 = MT + Inches(0.65)
+    card_top_2 = card_top_1 + card_h + Inches(0.18)
+
+    for idx, item in enumerate(items[:6]):
+        row = idx // 3
+        col = idx % 3
+        lx = ML + col * (card_w + Inches(0.18))
+        ly = card_top_1 if row == 0 else card_top_2
+        is_missing = (item.get("status") == "missing" or
+                      "données insuf" in str(item.get("value", "")).lower())
+        border_c = LGRAY if is_missing else BLUE
+        val_c = GRAY if is_missing else RED
+        val = str(item.get("value", "—"))[:40]
+        lbl = str(item.get("label", ""))[:40]
+        _rect(slide, lx, ly, card_w, card_h, fill_color=_rgb("F5F8FF"), line_color=border_c)
+        _text(slide, val, lx + Inches(0.12), ly + Inches(0.25),
+              card_w - Inches(0.24), Inches(0.85),
+              size=24, bold=True, color=val_c, align=PP_ALIGN.CENTER)
+        _text(slide, lbl.upper(), lx + Inches(0.1), ly + Inches(1.2),
+              card_w - Inches(0.2), Inches(0.5),
+              size=11, bold=True, color=GRAY, align=PP_ALIGN.CENTER)
+
+
+# ─── SLIDE 5 : IMPACT FINANCIER ───────────────────────────────────────────────
+
+def _slide_impact_financier(prs, edm, result: dict, company: str, date_str: str, page: int):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _header_band(slide, "IMPACT FINANCIER", company)
+    _footer_band(slide, page, company)
+    _slide_title(slide, "Où la valeur est détruite", "Analyse des destructeurs de valeur")
+
+    destroyers = edm.value_destroyers[:8]
+    rows = []
+    for d in destroyers:
+        rows.append([
+            d.name[:80],
+            _fmt_auto(d.annual_impact) if d.annual_impact else "Non chiffrable",
+            _fmt_eur(d.monthly_impact) if d.monthly_impact else "—",
+            d.trend or "—",
+        ])
+    if not rows:
+        rows = [["Données insuffisantes", "—", "—", "—"]]
+
+    tbl_top = MT + Inches(0.55)
+    tbl_h = CH - Inches(0.6)
+    tbl = slide.shapes.add_table(len(rows) + 1, 4, ML, tbl_top, CW, tbl_h).table
+
+    col_pct = [0.48, 0.22, 0.18, 0.12]
+    for i, pct in enumerate(col_pct):
+        tbl.columns[i].width = int(CW * pct)
+
+    for ci, hdr in enumerate(["Destructeur de valeur", "Impact annuel", "Impact mensuel", "Tendance"]):
+        cell = tbl.cell(0, ci)
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = NAVY
+        _set_para(cell.text_frame.paragraphs[0], hdr, 11, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
+        cell.margin_top = Pt(4)
+        cell.margin_bottom = Pt(4)
+
+    for ri, row in enumerate(rows):
+        for ci, val in enumerate(row):
+            cell = tbl.cell(ri + 1, ci)
+            if ri % 2 == 1:
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = _rgb("F5F8FF")
+            else:
+                cell.fill.background()
+            fc = RED if ci == 1 else DARK
+            _set_para(cell.text_frame.paragraphs[0], val, 12,
+                      bold=(ci == 1), color=fc,
+                      align=PP_ALIGN.LEFT if ci == 0 else PP_ALIGN.CENTER)
+
+
+# ─── SLIDE 6 : DÉCISION — COÛT DE L'INACTION ─────────────────────────────────
+
+def _slide_cout_inaction(prs, edm, result: dict, company: str, date_str: str, page: int):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _header_band(slide, "DÉCISION", company)
+    _footer_band(slide, page, company)
+    _slide_title(slide, "Le coût de l'inaction", "Si rien ne change maintenant")
 
     coi = edm.cost_of_inaction
-    if not coi:
-        _txt(slide, MARGIN_L, HDR_TOP, CONTENT_W, CONTENT_H,
-             'Données de coût d\'inaction non disponibles.', size=T_LABEL, color=C_GRAY)
-        return
+    hero_str = (_fmt_eur(abs(coi.per_month)) if coi and coi.per_month
+                else "Données insuffisantes")
+    _text(slide, hero_str, ML, MT + Inches(0.5), Inches(8), Inches(1.15),
+          size=52, bold=True, color=RED, align=PP_ALIGN.LEFT)
+    _text(slide, "COÛT DE L'INACTION — PAR MOIS", ML, MT + Inches(1.7),
+          Inches(8), Inches(0.35), size=13, bold=True, color=RED)
+    _rect(slide, ML, MT + Inches(2.15), Inches(8), Pt(2), fill_color=RED)
 
-    # Hiérarchie des tailles calibrée pour tenir dans CONTENT_H sans chevauchement
-    # Les tailles sont ajustées pour que label (20pt) + valeur + gap rentrent par ligne
-    ALL_PERIODS = [
-        ('PAR AN',      coi.per_year,  44),
-        ('PAR MOIS',    coi.per_month, 34),
-        ('PAR SEMAINE', coi.per_week,  26),
-        ('PAR JOUR',    coi.per_day,   22),
-        ('PAR HEURE',   coi.per_hour,  20),
+    sub_vals = [
+        (_fmt_eur(abs(coi.per_week)) if coi and coi.per_week else "—", "PAR SEMAINE"),
+        (_fmt_eur(abs(coi.per_day))  if coi and coi.per_day  else "—", "PAR JOUR"),
+        (_fmt_eur(abs(coi.per_hour)) if coi and coi.per_hour else "—", "PAR HEURE"),
     ]
-    periods = [(lbl, v, sz) for lbl, v, sz in ALL_PERIODS if v is not None]
-    if not periods:
-        return
+    sub_w = Inches(3.5)
+    for i, (val, lbl) in enumerate(sub_vals):
+        lx = ML + i * (sub_w + Inches(0.5))
+        _text(slide, val, lx, MT + Inches(2.4), sub_w, Inches(0.65), size=24, bold=True, color=DARK)
+        _text(slide, lbl, lx, MT + Inches(3.0), sub_w, Inches(0.35), size=11, color=GRAY)
 
-    # Positionnement dynamique : chaque item occupe exactement label_h + value_h + gap
-    LABEL_H  = Inches(0.28)    # 20pt sur 1 ligne
-    GAP_H    = Inches(0.10)    # espace entre items
-    PHRASE_H = Inches(0.84)    # boîte conclusion en bas
-    PHRASE_M = Inches(0.22)    # marge avant la conclusion
-
-    cur_y = HDR_TOP + Inches(0.12)
-
-    for idx, (label, value, font_sz) in enumerate(periods):
-        value_h = Inches(font_sz / 72.0 * 1.35)   # hauteur de la valeur en inches
-
-        # Barre accent rouge pour PAR AN
-        if idx == 0:
-            _rect(slide, MARGIN_L, int(cur_y),
-                  Inches(0.08), int(LABEL_H + value_h), C_RED)
-
-        # Label période (T_LABEL = 20pt)
-        _txt(slide, MARGIN_L + Inches(0.22), int(cur_y),
-             Inches(4.0), LABEL_H,
-             label, size=T_LABEL, bold=True, color=C_SLATE)
-
-        # Valeur (taille dégressive)
-        _txt(slide, MARGIN_L + Inches(0.22), int(cur_y + LABEL_H),
-             CONTENT_W - Inches(0.28), int(value_h),
-             _fmt(value), size=float(font_sz), bold=True,
-             color=C_RED if idx == 0 else (C_DARK if idx < 2 else C_GRAY))
-
-        cur_y += LABEL_H + value_h + GAP_H
-
-    # Phrase choc (T_ACCENT = 24pt) — en bas, calée sur l'espace restant
-    phrase_y = SLIDE_H - FTR_H - PHRASE_H - Inches(0.10)
-    _rect(slide, MARGIN_L, int(phrase_y),
-          CONTENT_W, int(PHRASE_H), C_LIGHT)
-    _txt(slide, MARGIN_L + Inches(0.18), int(phrase_y + Inches(0.18)),
-         CONTENT_W - Inches(0.36), int(PHRASE_H - Inches(0.20)),
-         'Chaque heure sans décision détruit de la valeur.',
-         size=T_ACCENT, bold=True, color=C_NAVY, align=PP_ALIGN.CENTER)
+    risque = result.get("risque_inaction") or ""
+    if risque:
+        _rect(slide, ML, MT + Inches(3.6), CW, Inches(1.2), fill_color=_rgb("F5F8FF"), line_color=LGRAY)
+        _text(slide, risque[:250], ML + Inches(0.15), MT + Inches(3.7),
+              CW - Inches(0.3), Inches(1.0), size=14, color=DARK, italic=True)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SLIDE 03 — ORIGINE DU PROBLÈME (Waterfall P&L)
-# ─────────────────────────────────────────────────────────────────────────────
+# ─── SLIDE 7 : DÉCISIONS PRIORITAIRES ────────────────────────────────────────
 
-def _s03_waterfall(prs, edm, date_str: str):
-    slide = _blank(prs)
-    _header(slide, '03 — ORIGINE', 'D\'où vient le problème ?')
-    _footer(slide, 3, date_str)
+def _slide_decisions_prioritaires(prs, edm, result: dict, company: str, date_str: str, page: int):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _header_band(slide, "DÉCISIONS PRIORITAIRES", company)
+    _footer_band(slide, page, company)
+    _slide_title(slide, "Plan d'action prioritaire")
 
-    ebitda_val  = _parse_amount(edm.ebitda)
-    destroyers  = edm.value_destroyers or []
+    decisions = edm.executive_decisions[:8]
+    rows = []
+    for d in decisions:
+        rows.append([
+            d.decision[:80],
+            _fmt_auto(d.annual_impact, sign=True) if d.annual_impact else "Non chiffrable",
+            f"{d.roi_score:.1f}/10",
+            d.priority or "—",
+            d.owner or "Direction",
+            d.timeline or "—",
+            d.status or "À lancer",
+        ])
+    if not rows:
+        rows = [["Données insuffisantes"] + ["—"] * 6]
 
-    total_destr = sum(abs(d.annual_impact or 0) for d in destroyers if (d.annual_impact or 0) < 0)
-    if total_destr == 0:
-        total_destr = sum(abs(d.annual_impact or 0) for d in destroyers)
-    revenue = ebitda_val + total_destr if total_destr > 0 else max(abs(ebitda_val) * 4, 1_000_000)
+    col_pct = [0.26, 0.14, 0.07, 0.10, 0.13, 0.14, 0.16]
+    tbl_top = MT + Inches(0.55)
+    tbl_h = CH - Inches(0.6)
+    tbl = slide.shapes.add_table(len(rows) + 1, 7, ML, tbl_top, CW, tbl_h).table
+    for i, pct in enumerate(col_pct):
+        tbl.columns[i].width = int(CW * pct)
 
-    items: List[dict] = [{'label': "CA", 'value': revenue, 'type': 'start'}]
+    for ci, hdr in enumerate(["Décision", "Impact annuel", "ROI", "Priorité", "Responsable", "Horizon", "Statut"]):
+        cell = tbl.cell(0, ci)
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = NAVY
+        _set_para(cell.text_frame.paragraphs[0], hdr, 10, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
 
-    if destroyers:
-        shown_sum = 0.0
-        for d in destroyers[:5]:
-            impact_v = -(abs(d.annual_impact or 0))
-            items.append({'label': _trunc(d.name, 12), 'value': impact_v, 'type': 'delta'})
-            shown_sum += abs(impact_v)
-        residual = total_destr - shown_sum
-        if residual > 10_000:
-            items.append({'label': 'Autres', 'value': -residual, 'type': 'delta'})
-    else:
-        for lbl, pct in [('Salaires', 0.38), ('Sous-trt.', 0.18),
-                          ('Loyers', 0.10), ('Autres', 0.14)]:
-            items.append({'label': lbl, 'value': -(revenue * pct), 'type': 'delta'})
-
-    items.append({'label': 'EBITDA', 'value': ebitda_val, 'type': 'end'})
-
-    _waterfall(slide, items,
-               left=MARGIN_L,
-               top=HDR_TOP + Inches(0.12),
-               width=CONTENT_W,
-               height=CONTENT_H - Inches(0.12))
+    for ri, row in enumerate(rows):
+        for ci, val in enumerate(row):
+            cell = tbl.cell(ri + 1, ci)
+            if ri % 2 == 1:
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = _rgb("F5F8FF")
+            else:
+                cell.fill.background()
+            fc = RED if ci == 1 else (AMBER if ci == 3 else DARK)
+            _set_para(cell.text_frame.paragraphs[0], val, 10, color=fc,
+                      align=PP_ALIGN.LEFT if ci == 0 else PP_ALIGN.CENTER)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SLIDE 04 — LES TROIS DÉCISIONS
-# ─────────────────────────────────────────────────────────────────────────────
+# ─── SLIDE 8 : EXÉCUTION (ROADMAP 30/60/90) ──────────────────────────────────
 
-def _s04_decisions(prs, edm, date_str: str):
-    slide = _blank(prs)
-    _header(slide, '04 — DÉCISIONS', 'Les trois décisions.')
-    _footer(slide, 4, date_str)
+def _slide_execution(prs, edm, result: dict, company: str, date_str: str, page: int):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _header_band(slide, "EXÉCUTION", company)
+    _footer_band(slide, page, company)
+    _slide_title(slide, "Roadmap d'exécution — 30 / 60 / 90 jours")
 
-    decisions = (edm.executive_decisions or [])[:3]
-    if not decisions:
-        _txt(slide, MARGIN_L, HDR_TOP, CONTENT_W, CONTENT_H,
-             'Aucune décision identifiée dans l\'analyse.', size=T_LABEL, color=C_GRAY)
-        return
+    phases_edm = edm.roadmap_90_days or []
+    plan_items = result.get("plan_action_30_60_90") or []
 
-    n        = len(decisions)
-    card_gap = Inches(0.26)
-    card_w   = (CONTENT_W - card_gap * (n - 1)) / n
-    card_top = HDR_TOP + Inches(0.10)
-    card_h   = CONTENT_H - Inches(0.10)
+    def _phase_items(horizon: str) -> List[str]:
+        for phase in phases_edm:
+            if str(phase.horizon) == horizon:
+                return [a.decision[:80] for a in phase.actions[:5]]
+        if plan_items:
+            items = []
+            for p in plan_items:
+                h = str(getattr(p, "horizon", None) or (p.get("horizon", "") if isinstance(p, dict) else ""))
+                if h == horizon:
+                    act = (getattr(p, "action", None) or p.get("action", "")) if isinstance(p, dict) else getattr(p, "action", "")
+                    if act:
+                        items.append(str(act)[:80])
+            return items[:5]
+        return []
 
-    ACCENT_COLORS = [C_BLUE, C_NAVY, C_SLATE]
+    cols = [("30 JOURS", "30", BLUE), ("60 JOURS", "60", AMBER), ("90 JOURS", "90", GREEN)]
+    col_w = CW / 3 - Inches(0.1)
+    cy = MT + Inches(0.55)
 
-    for i, dec in enumerate(decisions):
-        cx  = MARGIN_L + i * (card_w + card_gap)
-        acc = ACCENT_COLORS[i % len(ACCENT_COLORS)]
+    for i, (label, horizon, c) in enumerate(cols):
+        lx = ML + i * (col_w + Inches(0.15))
+        _rect(slide, lx, cy, col_w, Inches(0.45), fill_color=c)
+        _text(slide, label, lx, cy + Pt(4), col_w, Inches(0.4),
+              size=16, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
+        items = _phase_items(horizon) or ["Données insuffisantes"]
+        item_y = cy + Inches(0.55)
+        for txt in items:
+            item_h = Inches(0.65)
+            _rect(slide, lx, item_y, col_w, item_h - Pt(2), fill_color=_rgb("F5F8FF"), line_color=LGRAY)
+            _rect(slide, lx + Inches(0.12), item_y + Inches(0.22), Inches(0.08), Inches(0.08), fill_color=c)
+            _text(slide, txt, lx + Inches(0.28), item_y + Pt(4),
+                  col_w - Inches(0.38), item_h - Pt(8), size=12, color=DARK)
+            item_y += item_h + Pt(3)
+            if item_y > SH - Inches(0.65):
+                break
 
-        # Fond carte
-        _rect(slide, int(cx), int(card_top), int(card_w), int(card_h),
-              C_LIGHT, border_color=C_LINE, border_pt=1.0)
-        # Barre couleur en haut
-        _rect(slide, int(cx), int(card_top), int(card_w), Inches(0.08), acc)
 
-        # Badge numéro — T_ACCENT (24pt)
-        badge_s = Inches(0.50)
-        _rect(slide, int(cx + Inches(0.18)), int(card_top + Inches(0.16)),
-              int(badge_s), int(badge_s), acc)
-        _txt(slide, int(cx + Inches(0.18)), int(card_top + Inches(0.16)),
-             int(badge_s), int(badge_s), str(i + 1),
-             size=T_ACCENT, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER)
+# ─── SLIDE 9 : SIMULATION (Action vs Inaction) ────────────────────────────────
 
-        # Décision texte — T_BODY (22pt bold), max 2 lignes
-        _txt(slide, int(cx + Inches(0.18)), int(card_top + Inches(0.80)),
-             int(card_w - Inches(0.36)), Inches(1.00),
-             _trunc(dec.decision, 42), size=T_BODY, bold=True, color=C_DARK, wrap=True)
+def _slide_simulation(prs, edm, result: dict, company: str, date_str: str, page: int):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _header_band(slide, "SIMULATION", company)
+    _footer_band(slide, page, company)
+    _slide_title(slide, "Impact action vs inaction", "Trajectoire sur 12 mois")
 
-        # Séparateur
-        _rect(slide, int(cx + Inches(0.18)), int(card_top + Inches(1.92)),
-              int(card_w - Inches(0.36)), Emu(16000), C_LINE)
+    series_a = edm.action_series or []
+    series_b = edm.do_nothing_series or []
+    has_data = (len(series_a) == 12 and len(series_b) == 12
+                and any(v != 0 for v in series_a))
 
-        # Impact annuel — hero T_HERO_M (34pt)
-        _txt(slide, int(cx + Inches(0.18)), int(card_top + Inches(2.06)),
-             int(card_w - Inches(0.36)), Inches(0.34),
-             'Impact annuel', size=T_LABEL, color=C_SLATE)
-        _txt(slide, int(cx + Inches(0.18)), int(card_top + Inches(2.40)),
-             int(card_w - Inches(0.36)), Inches(0.56),
-             _fmt(dec.annual_impact),
-             size=T_HERO_M, bold=True,
-             color=C_GREEN if (dec.annual_impact or 0) > 0 else C_RED)
+    tbl_top = MT + Inches(0.55)
 
-        # Séparateur
-        _rect(slide, int(cx + Inches(0.18)), int(card_top + Inches(3.04)),
-              int(card_w - Inches(0.36)), Emu(14000), C_LINE)
-
-        # Grille 2×2 métriques (T_LABEL labels, T_BODY valeurs)
-        half_w = int((card_w - Inches(0.44)) / 2)
-        fields = [
-            ('ROI Score',    f"{dec.roi_score:.1f} / 10" if dec.roi_score else '—', C_DARK),
-            ('Difficulté',   _difficulty_fr(dec.difficulty),                         C_DARK),
-            ('Délai',        _trunc(dec.timeline, 18) or '—',                        C_DARK),
-            ('Responsable',  _trunc(dec.owner, 18) or '—',                           C_DARK),
+    if has_data:
+        simplified_headers = ["", "Mois 3", "Mois 6", "Mois 9", "Mois 12"]
+        rows = [
+            ["Avec action (scenario central)",
+             _fmt_auto(series_a[2]), _fmt_auto(series_a[5]),
+             _fmt_auto(series_a[8]), _fmt_auto(series_a[11])],
+            ["Sans action",
+             _fmt_auto(series_b[2]), _fmt_auto(series_b[5]),
+             _fmt_auto(series_b[8]), _fmt_auto(series_b[11])],
         ]
-        for j, (lbl, val, vc) in enumerate(fields):
-            col = j % 2
-            row = j // 2
-            mx  = int(cx + Inches(0.18) + col * (half_w + Inches(0.08)))
-            my  = int(card_top + Inches(3.18) + row * Inches(0.76))
-
-            _txt(slide, mx, my, half_w, Inches(0.30), lbl,
-                 size=T_LABEL, color=C_SLATE)
-            _txt(slide, mx, my + Inches(0.30), half_w, Inches(0.36),
-                 val, size=T_BODY, bold=True, color=vc)
-
-        # Priorité
-        _txt(slide, int(cx + Inches(0.18)), int(card_top + Inches(4.76)),
-             int(card_w - Inches(0.36)), Inches(0.30),
-             'Priorité', size=T_LABEL, color=C_SLATE)
-        _txt(slide, int(cx + Inches(0.18)), int(card_top + Inches(5.06)),
-             int(card_w - Inches(0.36)), Inches(0.38),
-             dec.priority or '—', size=T_BODY, bold=True, color=acc)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SLIDE 05 — POURQUOI CES DÉCISIONS (Matrice)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _s05_matrix(prs, edm, date_str: str):
-    slide = _blank(prs)
-    _header(slide, '05 — PRIORISATION', 'Pourquoi ces décisions ?')
-    _footer(slide, 5, date_str)
-
-    decisions = (edm.executive_decisions or [])[:3]
-    if not decisions:
-        _txt(slide, MARGIN_L, HDR_TOP, CONTENT_W, CONTENT_H,
-             'Aucune décision disponible pour la matrice.', size=T_LABEL, color=C_GRAY)
-        return
-
-    matrix_w = int(CONTENT_W * 0.58)
-    legend_x = MARGIN_L + matrix_w + Inches(0.50)
-    legend_w = CONTENT_W - matrix_w - Inches(0.50)
-
-    _matrix(slide, decisions,
-            left=MARGIN_L,
-            top=HDR_TOP + Inches(0.10),
-            width=matrix_w,
-            height=int(CONTENT_H - Inches(0.10)))
-
-    # Légende droite (T_LABEL minimum = 20pt)
-    _txt(slide, int(legend_x), int(HDR_TOP + Inches(0.10)),
-         int(legend_w), Inches(0.36),
-         'DÉCISIONS', size=T_ACCENT, bold=True, color=C_NAVY)
-
-    for i, dec in enumerate(decisions):
-        ly = int(HDR_TOP + Inches(0.60) + i * Inches(1.60))
-
-        # Badge numéro
-        _rect(slide, int(legend_x), ly, Inches(0.40), Inches(0.40), C_NAVY)
-        _txt(slide, int(legend_x), ly, Inches(0.40), Inches(0.40),
-             str(i + 1), size=T_LABEL, bold=True, color=C_WHITE,
-             align=PP_ALIGN.CENTER)
-
-        # Texte décision (T_LABEL = 20pt)
-        _txt(slide, int(legend_x + Inches(0.50)), ly,
-             int(legend_w - Inches(0.50)), Inches(0.56),
-             _trunc(dec.decision, 48), size=T_LABEL, bold=True, color=C_DARK,
-             wrap=True)
-
-        # Impact + difficulté (T_LABEL = 20pt)
-        _txt(slide, int(legend_x + Inches(0.50)), ly + Inches(0.58),
-             int(legend_w - Inches(0.50)), Inches(0.30),
-             f'{_fmt(dec.annual_impact)}  ·  {_difficulty_fr(dec.difficulty)}',
-             size=T_LABEL, color=C_GRAY)
-
-        # Séparateur léger
-        if i < len(decisions) - 1:
-            _rect(slide, int(legend_x), ly + Inches(1.05),
-                  int(legend_w), Emu(10000), C_LINE)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SLIDE 06 — EBITDA BRIDGE
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _s06_bridge(prs, edm, date_str: str):
-    slide = _blank(prs)
-    _header(slide, '06 — IMPACT', 'EBITDA Bridge.')
-    _footer(slide, 6, date_str)
-
-    ebitda_now = _parse_amount(edm.ebitda)
-    decisions  = (edm.executive_decisions or [])[:3]
-
-    items: List[dict] = [{'label': 'EBITDA\nactuel', 'value': ebitda_now, 'type': 'start'}]
-    total_impact = 0.0
-    for i, dec in enumerate(decisions):
-        impact = dec.annual_impact or 0
-        label  = _trunc(dec.decision, 12)
-        items.append({'label': label, 'value': impact, 'type': 'delta'})
-        total_impact += impact
-
-    items.append({'label': 'EBITDA\nprojeté', 'value': ebitda_now + total_impact, 'type': 'end'})
-
-    _waterfall(slide, items,
-               left=MARGIN_L,
-               top=HDR_TOP + Inches(0.12),
-               width=CONTENT_W,
-               height=CONTENT_H - Inches(0.56))
-
-    # Conclusion obligatoire (T_ACCENT = 24pt)
-    if ebitda_now != 0 and total_impact != 0:
-        reduction_pct = abs(total_impact / ebitda_now * 100)
-        msg = (f'Les décisions proposées améliorent l\'EBITDA de {_fmt(total_impact, sign=True)} '
-               f'({reduction_pct:.0f} %).')
+        tbl_h = Inches(1.8)
+        tbl = slide.shapes.add_table(3, 5, ML, tbl_top, CW, tbl_h).table
+        col_pct = [0.38, 0.155, 0.155, 0.155, 0.155]
+        for i, pct in enumerate(col_pct):
+            tbl.columns[i].width = int(CW * pct)
+        for ci, hdr in enumerate(simplified_headers):
+            cell = tbl.cell(0, ci)
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = NAVY
+            _set_para(cell.text_frame.paragraphs[0], hdr, 11, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
+        for ri, row in enumerate(rows):
+            fc = GREEN if ri == 0 else RED
+            for ci, val in enumerate(row):
+                cell = tbl.cell(ri + 1, ci)
+                cell.fill.background()
+                _set_para(cell.text_frame.paragraphs[0], val, 13,
+                          bold=(ci > 0), color=fc if ci > 0 else DARK,
+                          align=PP_ALIGN.LEFT if ci == 0 else PP_ALIGN.CENTER)
+        scen_y = MT + Inches(2.55)
     else:
-        msg = f'Gain total projeté : {_fmt(total_impact, sign=True)}'
+        _text(slide, "Données insuffisantes", ML, tbl_top, CW, Inches(1), size=22, color=GRAY)
+        scen_y = MT + Inches(1.8)
 
-    _txt(slide, MARGIN_L, SLIDE_H - FTR_H - Inches(0.54),
-         CONTENT_W, Inches(0.44),
-         msg, size=T_ACCENT, bold=True,
-         color=C_GREEN if total_impact >= 0 else C_RED,
-         align=PP_ALIGN.CENTER)
+    # Scénarios dans les 3 colonnes
+    scenarios = result.get("scenarios") or edm.scenarios or []
+    scen_map = {}
+    for sc in scenarios:
+        if isinstance(sc, dict):
+            nom, lbl, desc = sc.get("nom", ""), sc.get("label", ""), sc.get("description", "")
+        else:
+            nom = getattr(sc, "nom", "")
+            lbl = getattr(sc, "label", "")
+            desc = getattr(sc, "description", "")
+        n = nom.lower()
+        if "best" in n or "meilleur" in n:
+            scen_map["best"] = (lbl, desc)
+        elif "likely" in n or "probable" in n or "most" in n:
+            scen_map["likely"] = (lbl, desc)
+        elif "worst" in n or "pire" in n:
+            scen_map["worst"] = (lbl, desc)
+
+    scen_data = [
+        ("Meilleur cas",         scen_map.get("best",   ("", ""))[1], GREEN),
+        ("Cas le plus probable", scen_map.get("likely", ("", ""))[1], BLUE),
+        ("Pire cas",             scen_map.get("worst",  ("", ""))[1], RED),
+    ]
+    sw_col = CW / 3 - Inches(0.1)
+    col_h = SH - scen_y - Inches(0.5)
+    for i, (lbl, desc, c) in enumerate(scen_data):
+        lx = ML + i * (sw_col + Inches(0.15))
+        _rect(slide, lx, scen_y, sw_col, col_h, fill_color=_rgb("F5F8FF"), line_color=c)
+        _text(slide, lbl.upper(), lx + Inches(0.1), scen_y + Inches(0.08),
+              sw_col - Inches(0.2), Inches(0.35), size=11, bold=True, color=c)
+        _text(slide, desc[:200] if desc else "Données insuffisantes",
+              lx + Inches(0.1), scen_y + Inches(0.48), sw_col - Inches(0.2),
+              col_h - Inches(0.6), size=11, color=DARK)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SLIDE 07 — AVANT / APRÈS
-# ─────────────────────────────────────────────────────────────────────────────
+# ─── SLIDE 10 : PROJECTION ────────────────────────────────────────────────────
 
-def _s07_before_after(prs, edm, date_str: str):
-    slide = _blank(prs)
-    _header(slide, '07 — IMPACT', 'Avant / Après.')
-    _footer(slide, 7, date_str)
+def _slide_projection(prs, edm, result: dict, company: str, date_str: str, page: int):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _header_band(slide, "PROJECTION", company)
+    _footer_band(slide, page, company)
+    _slide_title(slide, "Trajectoire financière — 12 mois",
+                 "Si les décisions prioritaires sont engagées maintenant")
 
-    ebitda_now  = _parse_amount(edm.ebitda)
-    cash_now    = _parse_amount(edm.available_cash)
-    decisions   = edm.executive_decisions or []
-    total_gain  = sum(d.annual_impact or 0 for d in decisions[:3] if (d.annual_impact or 0) > 0)
-    ebitda_after = ebitda_now + total_gain
-    cash_after   = cash_now + total_gain * 0.6
+    series = edm.monthly_projection or []
+    has_data = len(series) == 12 and any(v != 0 for v in series)
+    tbl_top = MT + Inches(0.55)
+    tbl_h = Inches(2.2)
 
-    burn_now   = abs(ebitda_now / 12) if ebitda_now < 0 else None
-    burn_after = abs(ebitda_after / 12) if ebitda_after < 0 else None
-    runway_now   = (f"{cash_now / burn_now:.0f} mois" if burn_now and cash_now > 0 else
-                    ('∞' if ebitda_now >= 0 else '—'))
-    runway_after = (f"{cash_after / burn_after:.0f} mois" if burn_after and cash_after > 0 else '∞')
+    if has_data:
+        tbl = slide.shapes.add_table(2, 12, ML, tbl_top, CW, tbl_h).table
+        for i in range(12):
+            tbl.columns[i].width = int(CW / 12)
+        for ci in range(12):
+            cell = tbl.cell(0, ci)
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = NAVY
+            _set_para(cell.text_frame.paragraphs[0], f"M{ci+1}", 10, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
+        for ci, v in enumerate(series):
+            cell = tbl.cell(1, ci)
+            fc = GREEN if v >= 0 else RED
+            cell.fill.background()
+            _set_para(cell.text_frame.paragraphs[0], _fmt_auto(v), 11, bold=True, color=fc, align=PP_ALIGN.CENTER)
+        break_even = next((i + 1 for i, v in enumerate(series) if v >= 0), None)
+        msg = (f"Retour à l'équilibre estimé au mois {break_even}, sous réserve d'engagement des décisions."
+               if break_even
+               else "Le retour à l'équilibre n'est pas atteint sur 12 mois dans le scénario central.")
+        _text(slide, msg, ML, tbl_top + tbl_h + Inches(0.2), CW, Inches(0.5),
+              size=14, color=GRAY, italic=True)
+    else:
+        _text(slide, "Données insuffisantes", ML, tbl_top, CW, Inches(1), size=22, color=GRAY)
 
-    destroyers  = edm.value_destroyers or []
-    rev_est     = ebitda_now + sum(abs(d.annual_impact or 0) for d in destroyers)
-    margin_now  = f"{ebitda_now / rev_est * 100:.1f} %" if rev_est > 0 else '—'
-    margin_aft  = f"{ebitda_after / rev_est * 100:.1f} %" if rev_est > 0 else '—'
+    coi = edm.cost_of_inaction
+    if coi and coi.per_year:
+        sub_y = MT + Inches(3.5)
+        _rect(slide, ML, sub_y, CW, Inches(1.5), fill_color=_rgb("FBF0EE"), line_color=RED)
+        _text(slide, "Coût total si aucune action sur 12 mois",
+              ML + Inches(0.2), sub_y + Inches(0.15), CW - Inches(0.4), Inches(0.4),
+              size=13, color=RED, bold=True)
+        _text(slide, _fmt_auto(abs(coi.per_year)),
+              ML + Inches(0.2), sub_y + Inches(0.6), CW - Inches(0.4), Inches(0.6),
+              size=30, bold=True, color=RED)
 
-    kpis = [
-        ('EBITDA',   _fmt(ebitda_now), _fmt(ebitda_after),  ebitda_after > ebitda_now),
-        ('Cash',     _fmt(cash_now),   _fmt(cash_after),    cash_after > cash_now),
-        ('Marge',    margin_now,        margin_aft,          True),
-        ('Runway',   runway_now,        runway_after,         True),
+
+# ─── SLIDE 11 : RISQUES ───────────────────────────────────────────────────────
+
+def _slide_risques(prs, edm, result: dict, company: str, date_str: str, page: int):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _header_band(slide, "RISQUES", company)
+    _footer_band(slide, page, company)
+    _slide_title(slide, "Risques majeurs identifiés")
+
+    risques_raw = result.get("problemes_critiques") or result.get("alertes") or []
+    destroyers = edm.value_destroyers
+    rows = []
+    for i, r in enumerate(risques_raw[:6]):
+        sev = "Élevé" if i < 2 else ("Moyen" if i < 4 else "Faible")
+        rows.append([str(r)[:80], sev, "Fort" if i < 2 else "Modéré", "Immédiat" if i < 2 else "Court terme"])
+    if not rows and destroyers:
+        for i, d in enumerate(destroyers[:5]):
+            sev = "Élevé" if d.annual_impact and abs(d.annual_impact) > 500_000 else "Moyen"
+            rows.append([d.name[:80], sev, "Fort", "Immédiat"])
+    if not rows:
+        rows = [["Données insuffisantes", "—", "—", "—"]]
+
+    tbl_top = MT + Inches(0.55)
+    tbl_h = CH - Inches(0.6)
+    tbl = slide.shapes.add_table(len(rows) + 1, 4, ML, tbl_top, CW, tbl_h).table
+    col_pct = [0.50, 0.15, 0.20, 0.15]
+    for i, pct in enumerate(col_pct):
+        tbl.columns[i].width = int(CW * pct)
+    for ci, hdr in enumerate(["Risque identifié", "Sévérité", "Impact potentiel", "Horizon"]):
+        cell = tbl.cell(0, ci)
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = NAVY
+        _set_para(cell.text_frame.paragraphs[0], hdr, 11, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
+    for ri, row in enumerate(rows):
+        for ci, val in enumerate(row):
+            cell = tbl.cell(ri + 1, ci)
+            if ri % 2 == 1:
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = _rgb("F5F8FF")
+            else:
+                cell.fill.background()
+            fc = RED if val == "Élevé" else (AMBER if val == "Moyen" else DARK)
+            if ci != 1:
+                fc = DARK
+            _set_para(cell.text_frame.paragraphs[0], val, 12, color=fc,
+                      align=PP_ALIGN.LEFT if ci == 0 else PP_ALIGN.CENTER)
+
+
+# ─── SLIDE 12 : PRIORITÉS (matrice impact/effort) ────────────────────────────
+
+def _slide_priorites(prs, edm, result: dict, company: str, date_str: str, page: int):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _header_band(slide, "PRIORITÉS", company)
+    _footer_band(slide, page, company)
+    _slide_title(slide, "Matrice de priorisation — Impact / Effort")
+
+    q_w = CW / 2 - Inches(0.1)
+    q_h = (CH - Inches(0.6)) / 2 - Inches(0.05)
+    q_l = ML
+    q_t = MT + Inches(0.55)
+
+    quads = [
+        ("IMPACT ÉLEVÉ — EFFORT FAIBLE", "Démarrer immédiatement", GREEN, _rgb("EFF8F1")),
+        ("IMPACT ÉLEVÉ — EFFORT FORT",   "Planifier avec soin",    AMBER,  _rgb("FDF6EC")),
+        ("IMPACT FAIBLE — EFFORT FAIBLE","Opportunités rapides",   BLUE,   _rgb("EFF5FF")),
+        ("IMPACT FAIBLE — EFFORT FORT",  "Déprioritiser",          GRAY,   _rgb("F5F5F5")),
     ]
 
-    col_w   = int((CONTENT_W - Inches(0.50)) / 2)
-    col_l   = MARGIN_L
-    col_r   = MARGIN_L + col_w + Inches(0.50)
-    col_top = HDR_TOP + Inches(0.12)
-    kpi_h   = (CONTENT_H - Inches(0.62)) / len(kpis)
+    decisions = edm.executive_decisions
+    q_items: list = [[], [], [], []]
+    for dec in decisions:
+        high_impact = dec.annual_impact and abs(dec.annual_impact) > 200_000
+        dif = (dec.difficulty or "").lower()
+        high_effort = "élevé" in dif or "high" in dif or "fort" in dif or "difficile" in dif
+        if high_impact and not high_effort:
+            q_items[0].append(dec.decision[:50])
+        elif high_impact and high_effort:
+            q_items[1].append(dec.decision[:50])
+        elif not high_impact and not high_effort:
+            q_items[2].append(dec.decision[:50])
+        else:
+            q_items[3].append(dec.decision[:50])
 
-    # En-têtes colonnes (T_ACCENT = 24pt)
-    for cx, lbl, bg, fc in [
-        (col_l, "AUJOURD'HUI",    C_LIGHT_RED,   C_RED),
-        (col_r, 'APRÈS DÉCISIONS', C_LIGHT_GREEN, C_GREEN),
-    ]:
-        _rect(slide, int(cx), int(col_top), int(col_w), Inches(0.54), bg)
-        _txt(slide, int(cx + Inches(0.14)), int(col_top + Inches(0.09)),
-             int(col_w - Inches(0.28)), Inches(0.38),
-             lbl, size=T_ACCENT, bold=True, color=fc, align=PP_ALIGN.CENTER)
-
-    # Séparateur central
-    mid_x = int(MARGIN_L + col_w + Inches(0.25))
-    _rect(slide, mid_x - Emu(7000), int(col_top), Emu(14000), int(CONTENT_H), C_LINE)
-
-    # Lignes KPI
-    for i, (name, val_now, val_aft, improved) in enumerate(kpis):
-        ky = int(col_top + Inches(0.64) + i * kpi_h)
-
-        for cx, val, is_after in [(col_l, val_now, False), (col_r, val_aft, True)]:
-            _rect(slide, int(cx + Inches(0.06)), ky,
-                  int(col_w - Inches(0.12)), int(kpi_h - Inches(0.08)), C_LIGHT)
-            # Nom KPI (T_LABEL = 20pt)
-            _txt(slide, int(cx + Inches(0.20)), ky + Inches(0.06),
-                 int(col_w - Inches(0.40)), Inches(0.32),
-                 name, size=T_LABEL, color=C_SLATE)
-            # Valeur KPI (T_HERO_M = 34pt)
-            v_color = (C_GREEN if improved else C_RED) if is_after else C_DARK
-            _txt(slide, int(cx + Inches(0.20)), ky + Inches(0.36),
-                 int(col_w - Inches(0.40)), kpi_h - Inches(0.48),
-                 val, size=T_HERO_M, bold=True, color=v_color)
-
-        # Flèche centrale (T_BODY = 22pt)
-        _txt(slide, mid_x - Inches(0.28), int(ky + kpi_h / 2 - Inches(0.18)),
-             Inches(0.56), Inches(0.36),
-             '→', size=T_BODY, bold=True,
-             color=C_GREEN if improved else C_GRAY,
-             align=PP_ALIGN.CENTER)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SLIDE 08 — PLAN D'EXÉCUTION (3 colonnes 30/60/90j)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _s08_plan(prs, edm, date_str: str):
-    slide = _blank(prs)
-    _header(slide, '08 — PLAN', 'Plan d\'exécution — 90 jours.')
-    _footer(slide, 8, date_str)
-
-    phases = edm.roadmap_90_days or []
-    if not phases:
-        _txt(slide, MARGIN_L, HDR_TOP, CONTENT_W, CONTENT_H,
-             'Roadmap 90 jours non disponible.', size=T_LABEL, color=C_GRAY)
-        return
-
-    _plan_columns(slide, phases,
-                  left=MARGIN_L,
-                  top=HDR_TOP + Inches(0.10),
-                  width=CONTENT_W,
-                  height=CONTENT_H - Inches(0.10))
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SLIDE 09 — DÉCISION DU CONSEIL (Vote)
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _s09_vote(prs, edm, date_str: str):
-    slide = _blank(prs)
-    _header(slide, '09 — VOTE', 'Décision du Conseil.')
-    _footer(slide, 9, date_str)
-
-    decisions = (edm.executive_decisions or [])[:3]
-    n = len(decisions)
-    if n == 0:
-        _txt(slide, MARGIN_L, HDR_TOP, CONTENT_W, CONTENT_H,
-             'Aucune décision à voter.', size=T_LABEL, color=C_GRAY)
-        return
-
-    card_gap = Inches(0.26)
-    card_w   = (CONTENT_W - card_gap * (n - 1)) / n
-    card_top = HDR_TOP + Inches(0.12)
-    card_h   = CONTENT_H - Inches(0.12)
-
-    for i, dec in enumerate(decisions):
-        cx = MARGIN_L + i * (card_w + card_gap)
-
-        _rect(slide, int(cx), int(card_top), int(card_w), int(card_h),
-              C_LIGHT, border_color=C_LINE, border_pt=1.0)
-        _rect(slide, int(cx), int(card_top), int(card_w), Inches(0.08), C_NAVY)
-
-        # Badge D1 / D2 / D3 (T_ACCENT = 24pt) — boîte assez grande pour tenir sur 1 ligne
-        badge_w = Inches(0.64)
-        _rect(slide, int(cx + Inches(0.18)), int(card_top + Inches(0.16)),
-              int(badge_w), int(badge_w * 0.70), C_NAVY)
-        _txt(slide, int(cx + Inches(0.18)), int(card_top + Inches(0.16)),
-             int(badge_w), int(badge_w * 0.70), f'D{i + 1}',
-             size=T_ACCENT, bold=True, color=C_WHITE, align=PP_ALIGN.CENTER)
-
-        # Texte décision (T_BODY = 22pt)
-        _txt(slide, int(cx + Inches(0.18)), int(card_top + Inches(0.72)),
-             int(card_w - Inches(0.36)), Inches(1.10),
-             _trunc(dec.decision, 42), size=T_BODY, bold=True, color=C_DARK,
-             wrap=True)
-
-        # Impact (T_BODY = 22pt)
-        _txt(slide, int(cx + Inches(0.18)), int(card_top + Inches(1.90)),
-             int(card_w - Inches(0.36)), Inches(0.36),
-             f'Impact : {_fmt(dec.annual_impact)}',
-             size=T_BODY, bold=True,
-             color=C_GREEN if (dec.annual_impact or 0) > 0 else C_RED)
-
-        # Séparateur
-        _rect(slide, int(cx + Inches(0.18)), int(card_top + Inches(2.34)),
-              int(card_w - Inches(0.36)), Emu(16000), C_LINE)
-
-        # Options de vote (T_ACCENT = 24pt)
-        vote_options = [
-            ('□  APPROUVÉE', C_GREEN),
-            ('□  REPORTÉE',  C_AMBER),
-            ('□  REFUSÉE',   C_RED),
-        ]
-        opt_h = Inches(0.82)
-        for j, (option, color) in enumerate(vote_options):
-            vy = int(card_top + Inches(2.52) + j * (opt_h + Inches(0.10)))
-            _rect(slide, int(cx + Inches(0.18)), vy,
-                  int(card_w - Inches(0.36)), int(opt_h),
-                  C_WHITE, border_color=color, border_pt=1.8)
-            _txt(slide, int(cx + Inches(0.34)), vy + Inches(0.18),
-                 int(card_w - Inches(0.68)), int(opt_h - Inches(0.22)),
-                 option, size=T_ACCENT, bold=True, color=color)
-
-    # Note (T_LABEL = 20pt)
-    _txt(slide, MARGIN_L, SLIDE_H - FTR_H - Inches(0.42),
-         CONTENT_W, Inches(0.34),
-         'Cocher une case par décision — vote du Conseil d\'Administration.',
-         size=T_LABEL, italic=True, color=C_SLATE, align=PP_ALIGN.CENTER)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# SLIDE 10 — RECOMMANDATION DU COPILOTE FINANCIER
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _s10_recommendation(prs, edm, date_str: str):
-    slide = _blank(prs)
-    _header(slide, '10 — RECOMMANDATION', 'Recommandation du Copilote Financier.')
-    _footer(slide, 10, date_str)
-
-    decisions   = edm.executive_decisions or []
-    coi         = edm.cost_of_inaction
-    total_gain  = sum(d.annual_impact or 0 for d in decisions if (d.annual_impact or 0) > 0)
-
-    # ── Paragraphe 1 : Ce que je retiens ─────────────────────────────────────
-    if decisions:
-        top_dec = _trunc(_strip_md(decisions[0].decision), 70)
-        roi_str = f"{decisions[0].roi_score:.1f}/10" if decisions[0].roi_score else '—'
-        p1 = (f"L'analyse identifie {len(decisions)} décision(s) prioritaire(s) "
-              f"pour un impact annuel total de {_fmt(total_gain)}. "
-              f"La décision principale — « {top_dec} » — affiche un ROI de {roi_str}.")
-    else:
-        p1 = "L'analyse n'a pas encore produit de décision prioritaire quantifiée."
-
-    # ── Paragraphe 2 : Ce qui doit être décidé cette semaine ─────────────────
-    p0_decs = [d for d in decisions if (d.priority or '').upper().startswith('P0')][:2]
-    if p0_decs:
-        names = ' et '.join(f'« {_trunc(_strip_md(d.decision), 38)} »' for d in p0_decs)
-        weekly = _fmt(total_gain / 52) if total_gain > 0 else '—'
-        p2 = (f"Les décisions {names} sont P0 et peuvent être engagées immédiatement. "
-              f"Chaque semaine d'attente représente {weekly} de valeur non créée.")
-    else:
-        weekly = _fmt(total_gain / 52) if total_gain > 0 else '—'
-        p2 = (f"Les décisions identifiées nécessitent une validation formelle du Conseil "
-              f"avant engagement. Chaque semaine d'attente représente {weekly} de valeur non créée.")
-
-    # ── Paragraphe 3 : Ce qui se produira si rien n'est fait ─────────────────
-    per_month = getattr(coi, 'per_month', None) if coi else None
-    if per_month and abs(per_month) > 0:
-        p3 = (f"En l'absence de décision, la valeur détruite s'élève à "
-              f"{_fmt(abs(per_month))} par mois, soit {_fmt(abs(per_month) * 12)} sur 12 mois. "
-              f"Ce scénario est entièrement évitable dès cette semaine.")
-    else:
-        per_year = getattr(coi, 'per_year', None) if coi else None
-        ref = abs(per_year) if per_year else abs(total_gain) if total_gain else 0
-        p3 = (f"En l'absence de décision, la perte annuelle estimée s'élève à "
-              f"{_fmt(ref)}. Chaque mois d'inaction réduit la marge de manœuvre disponible.")
-
-    # ── Layout : 3 blocs empilés ──────────────────────────────────────────────
-    BLOCKS = [
-        ('1.  Ce que je retiens.',                     p1, C_BLUE),
-        ('2.  Ce qui doit être décidé cette semaine.', p2, C_NAVY),
-        ('3.  Ce qui se produira si rien n\'est fait.', p3, C_RED),
+    positions = [
+        (q_l,                      q_t),
+        (q_l + q_w + Inches(0.2),  q_t),
+        (q_l,                      q_t + q_h + Inches(0.1)),
+        (q_l + q_w + Inches(0.2),  q_t + q_h + Inches(0.1)),
     ]
 
-    block_h = (CONTENT_H - Inches(0.50)) / 3
-    gap_h   = Inches(0.14)
-
-    for k, (hdr_text, body_text, accent_c) in enumerate(BLOCKS):
-        by = int(HDR_TOP + Inches(0.10) + k * (block_h + gap_h))
-
-        # Fond du bloc
-        _rect(slide, MARGIN_L, by, int(CONTENT_W), int(block_h), C_LIGHT)
-        # Bande accent gauche
-        _rect(slide, MARGIN_L, by, Inches(0.09), int(block_h), accent_c)
-
-        # En-tête de bloc (T_ACCENT = 24pt)
-        _txt(slide, int(MARGIN_L + Inches(0.22)), by + Inches(0.12),
-             int(CONTENT_W - Inches(0.28)), Inches(0.40),
-             hdr_text, size=T_ACCENT, bold=True, color=C_NAVY)
-
-        # Corps de texte (T_BODY = 22pt)
-        body_h = block_h - Inches(0.58)
-        _txt(slide, int(MARGIN_L + Inches(0.22)), by + Inches(0.54),
-             int(CONTENT_W - Inches(0.28)), int(body_h),
-             body_text, size=T_BODY, color=C_DARK, wrap=True)
-
-    # Signature
-    _txt(slide, MARGIN_L, SLIDE_H - FTR_H - Inches(0.46),
-         CONTENT_W, Inches(0.38),
-         'Pepperyn Executive Financial Copilot.',
-         size=T_LABEL, italic=True, color=C_SLATE, align=PP_ALIGN.RIGHT)
+    for idx, ((label, subtitle, c, bg), pos) in enumerate(zip(quads, positions)):
+        lx, ly = pos
+        _rect(slide, lx, ly, q_w, q_h, fill_color=bg, line_color=c)
+        _text(slide, label, lx + Inches(0.1), ly + Inches(0.08),
+              q_w - Inches(0.2), Inches(0.4), size=10, bold=True, color=c)
+        _text(slide, subtitle, lx + Inches(0.1), ly + Inches(0.48),
+              q_w - Inches(0.2), Inches(0.3), size=10, color=GRAY, italic=True)
+        items = q_items[idx] or ["Données insuffisantes"]
+        ty = ly + Inches(0.85)
+        for it in items[:3]:
+            _text(slide, f"• {it}", lx + Inches(0.15), ty, q_w - Inches(0.25), Inches(0.35),
+                  size=11, color=DARK)
+            ty += Inches(0.38)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# POINT D'ENTRÉE PRINCIPAL
-# ─────────────────────────────────────────────────────────────────────────────
+# ─── SLIDE 13 : SUIVI / CARNET D'EXÉCUTION ───────────────────────────────────
+
+def _slide_suivi(prs, edm, result: dict, company: str, date_str: str, page: int):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _header_band(slide, "SUIVI", company)
+    _footer_band(slide, page, company)
+    _slide_title(slide, "Carnet d'exécution")
+
+    exec_items = edm.execution_log or []
+    decisions = edm.executive_decisions
+    rows = []
+    if exec_items:
+        for item in exec_items[:8]:
+            rows.append([
+                item.decision[:70], item.owner or "Direction",
+                item.due_date or "—", item.status or "À lancer",
+                _fmt_auto(item.impact) if item.impact else "—",
+                f"{item.roi_score:.1f}/10",
+            ])
+    elif decisions:
+        for dec in decisions[:8]:
+            rows.append([
+                dec.decision[:70], dec.owner or "Direction",
+                dec.timeline or "—", dec.status or "À lancer",
+                _fmt_auto(dec.annual_impact) if dec.annual_impact else "—",
+                f"{dec.roi_score:.1f}/10",
+            ])
+    if not rows:
+        rows = [["Données insuffisantes", "—", "—", "—", "—", "—"]]
+
+    tbl_top = MT + Inches(0.55)
+    tbl_h = CH - Inches(0.6)
+    tbl = slide.shapes.add_table(len(rows) + 1, 6, ML, tbl_top, CW, tbl_h).table
+    col_pct = [0.35, 0.14, 0.12, 0.13, 0.14, 0.12]
+    for i, pct in enumerate(col_pct):
+        tbl.columns[i].width = int(CW * pct)
+    for ci, hdr in enumerate(["Action", "Responsable", "Horizon", "Statut", "Impact", "ROI"]):
+        cell = tbl.cell(0, ci)
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = NAVY
+        _set_para(cell.text_frame.paragraphs[0], hdr, 11, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
+    for ri, row in enumerate(rows):
+        for ci, val in enumerate(row):
+            cell = tbl.cell(ri + 1, ci)
+            if ri % 2 == 1:
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = _rgb("F5F8FF")
+            else:
+                cell.fill.background()
+            fc = RED if ci == 4 else DARK
+            _set_para(cell.text_frame.paragraphs[0], val, 11, color=fc,
+                      align=PP_ALIGN.LEFT if ci == 0 else PP_ALIGN.CENTER)
+
+
+# ─── SLIDE 14 : PILOTAGE / TABLEAU DE BORD ───────────────────────────────────
+
+def _slide_pilotage(prs, edm, result: dict, company: str, date_str: str, page: int):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _header_band(slide, "PILOTAGE", company)
+    _footer_band(slide, page, company)
+    _slide_title(slide, "Tableau de bord de pilotage")
+
+    decisions = edm.executive_decisions[:7]
+    rows = []
+    for dec in decisions:
+        rows.append([
+            dec.decision[:60],
+            _fmt_auto(dec.annual_impact) if dec.annual_impact else "Non défini",
+            "À mesurer", "—", "0 %", dec.status or "À lancer",
+        ])
+    if not rows:
+        rows = [["Données insuffisantes", "—", "—", "—", "—", "—"]]
+
+    tbl_top = MT + Inches(0.55)
+    tbl_h = CH - Inches(0.6)
+    tbl = slide.shapes.add_table(len(rows) + 1, 6, ML, tbl_top, CW, tbl_h).table
+    col_pct = [0.34, 0.16, 0.14, 0.12, 0.12, 0.12]
+    for i, pct in enumerate(col_pct):
+        tbl.columns[i].width = int(CW * pct)
+    for ci, hdr in enumerate(["Décision", "Objectif", "Réalisé", "Écart", "Avancement", "Statut"]):
+        cell = tbl.cell(0, ci)
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = NAVY
+        _set_para(cell.text_frame.paragraphs[0], hdr, 11, bold=True, color=WHITE, align=PP_ALIGN.CENTER)
+    for ri, row in enumerate(rows):
+        for ci, val in enumerate(row):
+            cell = tbl.cell(ri + 1, ci)
+            if ri % 2 == 1:
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = _rgb("F5F8FF")
+            else:
+                cell.fill.background()
+            _set_para(cell.text_frame.paragraphs[0], val, 11, color=DARK,
+                      align=PP_ALIGN.LEFT if ci == 0 else PP_ALIGN.CENTER)
+
+
+# ─── SLIDE 15 : LUNDI MATIN ───────────────────────────────────────────────────
+
+def _slide_lundi_matin(prs, edm, result: dict, company: str, date_str: str, page: int):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _header_band(slide, "LUNDI MATIN", company)
+    _footer_band(slide, page, company)
+    _slide_title(slide, "Ce que vous faites lundi matin",
+                 "3 décisions à enclencher dès cette semaine")
+
+    top_3 = edm.executive_decisions[:3]
+    card_h = (CH - Inches(0.7)) / 3 - Inches(0.1)
+    card_top = MT + Inches(0.55)
+
+    for i in range(3):
+        dec = top_3[i] if i < len(top_3) else None
+        cy = card_top + i * (card_h + Inches(0.12))
+        c = [RED, AMBER, BLUE][i]
+        _rect(slide, ML, cy, CW, card_h, fill_color=_rgb("F5F8FF"), line_color=c)
+        _text(slide, str(i + 1), ML + Inches(0.15), cy + Inches(0.08), Inches(0.45), card_h,
+              size=34, bold=True, color=c, align=PP_ALIGN.CENTER)
+        dec_txt = dec.decision[:120] if dec else "Données insuffisantes"
+        _text(slide, dec_txt, ML + Inches(0.75), cy + Inches(0.08),
+              Inches(7.5), card_h - Inches(0.1), size=16, bold=True, color=DARK)
+        if dec:
+            items = [
+                (dec.owner or "Direction", "Responsable"),
+                (_fmt_auto(dec.annual_impact) if dec.annual_impact else "—", "Impact / an"),
+                (dec.timeline or "—", "Horizon"),
+                (f"{min(100, int(dec.roi_score * 10))}%" if dec.roi_score else "—", "Prob. succès"),
+            ]
+            for j, (val, lbl) in enumerate(items):
+                lx = Inches(8.5) + j * Inches(1.0)
+                _text(slide, val[:15], lx, cy + Inches(0.08), Inches(0.95), Inches(0.5),
+                      size=12, bold=True, color=c, align=PP_ALIGN.CENTER)
+                _text(slide, lbl, lx, cy + Inches(0.58), Inches(0.95), Inches(0.3),
+                      size=8, color=GRAY, align=PP_ALIGN.CENTER)
+
+
+# ─── SLIDE 16 : ANNEXE ────────────────────────────────────────────────────────
+
+def _slide_annexe(prs, edm, result: dict, company: str, date_str: str, page: int):
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _header_band(slide, "ANNEXE", company)
+    _footer_band(slide, page, company)
+    _slide_title(slide, "Annexe — Qualité, Méthodologie et Engagements")
+
+    dq = edm.data_quality
+    score_data = dq.score_data if dq else (result.get("score_confiance") or 70)
+    anomalies = (dq.anomalies if dq and dq.anomalies else result.get("coaching_issues") or [])
+    assumptions = (dq.assumptions if dq and dq.assumptions else [])
+
+    col_w = CW / 3 - Inches(0.12)
+    col_top = MT + Inches(0.55)
+    col_h = CH - Inches(0.6)
+
+    # Colonne 1 : Qualité des données
+    lx1 = ML
+    _rect(slide, lx1, col_top, col_w, col_h, fill_color=_rgb("F5F8FF"), line_color=BLUE)
+    _text(slide, "QUALITÉ DES DONNÉES", lx1 + Inches(0.1), col_top + Inches(0.1),
+          col_w - Inches(0.2), Inches(0.4), size=11, bold=True, color=BLUE)
+    _text(slide, f"Score de confiance : {score_data}%",
+          lx1 + Inches(0.1), col_top + Inches(0.6), col_w - Inches(0.2), Inches(0.4),
+          size=16, bold=True, color=NAVY)
+    ay = col_top + Inches(1.1)
+    if anomalies:
+        for a in anomalies[:4]:
+            _text(slide, f"• {str(a)[:80]}", lx1 + Inches(0.1), ay,
+                  col_w - Inches(0.2), Inches(0.4), size=11, color=DARK)
+            ay += Inches(0.43)
+    else:
+        _text(slide, "Aucune anomalie majeure détectée.", lx1 + Inches(0.1), ay,
+              col_w - Inches(0.2), Inches(0.4), size=11, color=GREEN)
+
+    # Colonne 2 : Hypothèses et Méthodologie
+    lx2 = ML + col_w + Inches(0.18)
+    _rect(slide, lx2, col_top, col_w, col_h, fill_color=_rgb("F5F8FF"), line_color=AMBER)
+    _text(slide, "HYPOTHÈSES ET MÉTHODOLOGIE", lx2 + Inches(0.1), col_top + Inches(0.1),
+          col_w - Inches(0.2), Inches(0.4), size=11, bold=True, color=AMBER)
+    hyp = assumptions[:4] or [
+        "Calculs basés sur les données soumises uniquement.",
+        "Les projections supposent une mise en œuvre dans les 30 jours.",
+        "Aucune extrapolation sectorielle n'a été effectuée.",
+        "Le coût de l'inaction est calculé par interpolation linéaire.",
+    ]
+    hy = col_top + Inches(0.6)
+    for h in hyp:
+        _text(slide, f"• {str(h)[:80]}", lx2 + Inches(0.1), hy,
+              col_w - Inches(0.2), Inches(0.42), size=11, color=DARK)
+        hy += Inches(0.45)
+
+    # Colonne 3 : Engagements Pepperyn
+    lx3 = ML + 2 * (col_w + Inches(0.18))
+    _rect(slide, lx3, col_top, col_w, col_h, fill_color=_rgb("F5F8FF"), line_color=NAVY)
+    _text(slide, "ENGAGEMENTS PEPPERYN", lx3 + Inches(0.1), col_top + Inches(0.1),
+          col_w - Inches(0.2), Inches(0.4), size=11, bold=True, color=NAVY)
+    engagements = [
+        "Accompagnement sur 90 jours pour l'implémentation.",
+        "Révision bimensuelle des indicateurs de pilotage.",
+        "Adaptation du plan en cas de changement de contexte.",
+        "Disponibilité directe : equipe@pepperyn.fr",
+    ]
+    ey = col_top + Inches(0.6)
+    for e in engagements:
+        _text(slide, f"• {e}", lx3 + Inches(0.1), ey,
+              col_w - Inches(0.2), Inches(0.42), size=11, color=DARK)
+        ey += Inches(0.45)
+
+    _text(slide,
+          "Ce document est confidentiel et destiné exclusivement à la direction de l'entreprise cliente. "
+          "Pepperyn ne garantit pas l'exactitude des projections qui dépendent des données fournies.",
+          ML, SH - Inches(0.85), CW, Inches(0.35), size=9, color=GRAY, italic=True)
+
+
+# ─── POINT D'ENTRÉE ───────────────────────────────────────────────────────────
 
 def generate_pptx_report(result: Any, company_name: Optional[str] = None) -> bytes:
     """
-    Génère l'Executive Board Deck V6 (10 slides) depuis l'EDM.
-    `result` peut être :
-      - un objet avec attribut `edm` (ExecutiveDecisionModel)
-      - un dict (result_dict depuis le cache Supabase/mémoire)
-    Retourne les bytes du fichier .pptx.
+    Génère le Board Deck Pepperyn (16 slides).
+    Signature inchangée pour compatibilité avec analyze.py.
+
+    Args:
+        result: dict brut de l'analyse LLM (original_data).
+        company_name: nom de la société (couverture).
     """
-    edm = getattr(result, 'edm', None)
-    if edm is None and isinstance(result, dict):
-        edm = result.get('edm')
-
-    if edm is None:
-        try:
-            from services.executive_decision_model import build_executive_decision_model
-            result_dict = result if isinstance(result, dict) else result.__dict__
-            edm = build_executive_decision_model(result_dict)
-        except Exception as exc:
-            raise ValueError(
-                f"Impossible de construire l'EDM pour le Board Deck : {exc}"
-            ) from exc
-
-    company  = company_name or 'Votre Entreprise'
-    date_str = datetime.now().strftime('%d %B %Y')
+    edm = build_executive_decision_model(result)
+    date_str = datetime.now().strftime("%d %B %Y")
+    company = company_name or result.get("company_name") or "—"
 
     prs = Presentation()
-    prs.slide_width  = SLIDE_W
-    prs.slide_height = SLIDE_H
+    prs.slide_width = SW
+    prs.slide_height = SH
 
-    _s01_cover(prs, edm, company, date_str)
-    _s02_inaction(prs, edm, date_str)
-    _s03_waterfall(prs, edm, date_str)
-    _s04_decisions(prs, edm, date_str)
-    _s05_matrix(prs, edm, date_str)
-    _s06_bridge(prs, edm, date_str)
-    _s07_before_after(prs, edm, date_str)
-    _s08_plan(prs, edm, date_str)
-    _s09_vote(prs, edm, date_str)
-    _s10_recommendation(prs, edm, date_str)
+    slides_builders = [
+        _slide_cover,                   # S1
+        _slide_exec_summary,            # S2
+        _slide_diagnostic,              # S3
+        _slide_dashboard,               # S4
+        _slide_impact_financier,        # S5
+        _slide_cout_inaction,           # S6
+        _slide_decisions_prioritaires,  # S7
+        _slide_execution,               # S8
+        _slide_simulation,              # S9
+        _slide_projection,              # S10
+        _slide_risques,                 # S11
+        _slide_priorites,               # S12
+        _slide_suivi,                   # S13
+        _slide_pilotage,                # S14
+        _slide_lundi_matin,             # S15
+        _slide_annexe,                  # S16
+    ]
+
+    for page_num, builder in enumerate(slides_builders, start=1):
+        try:
+            builder(prs, edm, result, company, date_str, page_num)
+        except Exception as exc:
+            slide = prs.slides.add_slide(prs.slide_layouts[6])
+            _header_band(slide, f"SLIDE {page_num}", company)
+            _footer_band(slide, page_num, company)
+            _text(slide, f"Slide {page_num} — Données insuffisantes",
+                  ML, MT + Inches(1), CW, Inches(1), size=18, color=GRAY)
 
     buf = io.BytesIO()
     prs.save(buf)
-    buf.seek(0)
-    return buf.read()
+    return buf.getvalue()
