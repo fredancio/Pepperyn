@@ -587,9 +587,36 @@ async def _run_analysis_pipeline(
         except Exception:
             recommendations_tracking = None
 
+    # Cache analysis result dict for on-demand PDF/PPTX generation
+    _analysis_result_cache[analyse_id] = analysis_result.model_dump()
+
+    # ── V2 : construire l'ExecutiveCaseJSON (Agent 1 — Claude Opus) ──────────
+    # Fait ici, une seule fois, pendant le pipeline principal.
+    # • L'Excel en bénéficie immédiatement (cohérence des chiffres).
+    # • Le PDF et le PPTX (à la demande) trouvent le JSON en cache → zéro appel Opus supplémentaire.
+    # • Non-bloquant : si Opus est indisponible, le fallback Python prend le relais.
+    result_for_exports = analysis_result.model_dump()
+    try:
+        company_name_for_export = None
+        try:
+            from main import get_supabase_service
+            _sb = get_supabase_service()
+            _row = _sb.from_("companies").select("name").eq("id", company_id).single().execute()
+            if _row.data:
+                company_name_for_export = _row.data.get("name")
+        except Exception:
+            pass
+        _executive_case = await _get_or_build_executive_case(
+            analyse_id, result_for_exports, company_name_for_export
+        )
+        result_for_exports = _executive_case   # type: ignore[assignment]
+    except Exception as _exc:
+        logger.warning("[V2] Échec construction ExecutiveCaseJSON en pipeline principal: %s", _exc)
+        # result_for_exports reste le dict — Excel sera généré en mode legacy
+
     # Generate Excel export — all plans
     try:
-        excel_bytes = generate_excel_report(analysis_result, parsed_data, file.filename)
+        excel_bytes = generate_excel_report(analysis_result, result_for_exports, file.filename)
         _export_cache[analyse_id] = excel_bytes
         analysis_result.excel_export_url = f"/api/export/{analyse_id}"
         analysis_result.excel_export_nom = (
@@ -597,9 +624,6 @@ async def _run_analysis_pipeline(
         )
     except Exception:
         pass  # Export failure is non-blocking
-
-    # Cache analysis result dict for on-demand PDF/PPTX generation
-    _analysis_result_cache[analyse_id] = analysis_result.model_dump()
 
     # ── SÉCURITÉ : suppression fichier source ───────────────────────────────
     # Le fichier uploadé (file_bytes) est en mémoire Python uniquement —

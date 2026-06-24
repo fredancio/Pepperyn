@@ -37,6 +37,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from models.schemas import AnalysisResult
+from models.executive_case import ExecutiveCaseJSON
 
 # ─── Palette Pepperyn ────────────────────────────────────────────────────────
 P_NAVY    = "0A2540"
@@ -1193,21 +1194,37 @@ def _build_historique(wb: Workbook, edm) -> None:
 
 def generate_excel_report(
     analysis: AnalysisResult,
-    original_data: dict[str, Any],
+    original_data: "dict[str, Any] | ExecutiveCaseJSON",
     filename: str = "analyse",
 ) -> bytes:
     """
     Génère l'Executive Financial Model™ v0.9 (9 feuilles).
-    Signature maintenue pour compatibilité avec analyze.py.
+
+    Args:
+        analysis     : AnalysisResult (inchangé — non utilisé en V2).
+        original_data: ExecutiveCaseJSON (V2 — source unique de vérité)
+                       OU dict brut de l'analyse LLM (legacy).
+        filename     : nom du fichier (couverture Accueil).
+
+    Pipeline V2 :
+        - Si ExecutiveCaseJSON → adapté via case_to_edm() + case_to_result_dict()
+          Garantie : Excel affiche exactement les mêmes chiffres que PDF et PPTX.
+        - Si dict → comportement legacy inchangé.
 
     Ordre des feuilles :
       0. 🏠 Accueil   1. 📊 Dashboard  2. ⚙ Hypothèses  3. 🎯 Decision Lab
       4. 📈 Sensibilité  5. 📉 Scénarios  6. 🗺 Roadmap  7. 🕒 Historique
       8. EDM (masquée)
     """
-    from services.executive_decision_model import build_executive_decision_model
-
-    edm = build_executive_decision_model(original_data or {})
+    if isinstance(original_data, ExecutiveCaseJSON):
+        # ── V2 : source unique de vérité ─────────────────────────────────────
+        from services.executive_case_builder import case_to_edm, case_to_result_dict
+        edm          = case_to_edm(original_data)
+        original_data = case_to_result_dict(original_data)
+    else:
+        # ── Legacy : comportement existant ───────────────────────────────────
+        from services.executive_decision_model import build_executive_decision_model
+        edm = build_executive_decision_model(original_data or {})
 
     wb = Workbook()
     wb.remove(wb.active)
