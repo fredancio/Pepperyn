@@ -36,6 +36,7 @@ from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 
 from services.executive_decision_model import build_executive_decision_model
+from models.executive_case import ExecutiveCaseJSON
 
 # ─── PALETTE ─────────────────────────────────────────────────────────────────
 def _rgb(hex_str: str) -> RGBColor:
@@ -950,15 +951,30 @@ def _slide_annexe(prs, edm, result: dict, company: str, date_str: str, page: int
 def generate_pptx_report(result: Any, company_name: Optional[str] = None) -> bytes:
     """
     Génère le Board Deck Pepperyn (16 slides).
-    Signature inchangée pour compatibilité avec analyze.py.
 
     Args:
-        result: dict brut de l'analyse LLM (original_data).
+        result: ExecutiveCaseJSON (V2 — source unique de vérité)
+                OU dict brut de l'analyse LLM (legacy — rétrocompatibilité).
         company_name: nom de la société (couverture).
+
+    Pipeline V2 :
+        - Si ExecutiveCaseJSON → adapté via case_to_edm() + case_to_result_dict()
+          Garantie : PDF, PPTX et Excel affichent exactement les mêmes chiffres.
+        - Si dict → comportement legacy inchangé.
     """
-    edm = build_executive_decision_model(result)
-    date_str = datetime.now().strftime("%d %B %Y")
-    company = company_name or result.get("company_name") or "—"
+    if isinstance(result, ExecutiveCaseJSON):
+        # ── V2 : source unique de vérité ─────────────────────────────────────
+        from services.executive_case_builder import case_to_edm, case_to_result_dict
+        edm        = case_to_edm(result)
+        result_raw = case_to_result_dict(result)
+        company    = company_name or result.company_name or "—"
+        date_str   = result.analysis_date or datetime.now().strftime("%d %B %Y")
+        result     = result_raw   # alias pour les builders internes (inchangés)
+    else:
+        # ── Legacy : comportement existant ───────────────────────────────────
+        edm      = build_executive_decision_model(result)
+        date_str = datetime.now().strftime("%d %B %Y")
+        company  = company_name or result.get("company_name") or "—"
 
     prs = Presentation()
     prs.slide_width = SW

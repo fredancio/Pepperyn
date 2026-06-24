@@ -40,6 +40,7 @@ from reportlab.graphics.shapes import Drawing, Line, String as RLString, Rect
 from reportlab.graphics.charts.linecharts import HorizontalLineChart
 
 from services.executive_decision_model import build_executive_decision_model
+from models.executive_case import ExecutiveCaseJSON
 
 # ─── PALETTE (identique au master) ───────────────────────────────────────────
 C_NAVY   = colors.HexColor("#0A2540")   # fond boîte dark, titre couverture
@@ -1118,20 +1119,36 @@ def _build_page_final(edm, styles: dict) -> list:
 
 # ─── POINT D'ENTRÉE ───────────────────────────────────────────────────────────
 
-def generate_pdf_report(result: dict, company_name: str | None = None) -> bytes:
+def generate_pdf_report(result, company_name: str | None = None) -> bytes:
     """
     Génère le Rapport exécutif Pepperyn (10 pages).
-    Signature inchangée pour compatibilité avec analyze.py.
 
     Args:
-        result: dict brut de l'analyse LLM (original_data).
+        result: ExecutiveCaseJSON (V2 — source unique de vérité)
+                OU dict brut de l'analyse LLM (legacy — rétrocompatibilité).
         company_name: nom de la société (couverture).
-    """
-    edm = build_executive_decision_model(result)
 
-    date_str  = datetime.now().strftime("%d/%m/%Y")
-    doc_type  = "PREVISIONNEL"
-    name      = company_name or result.get("company_name") or "—"
+    Pipeline V2 :
+        - Si ExecutiveCaseJSON → adapté via case_to_edm() + case_to_result_dict()
+          Garantie : PDF, PPTX et Excel affichent exactement les mêmes chiffres.
+        - Si dict → comportement legacy inchangé.
+    """
+    if isinstance(result, ExecutiveCaseJSON):
+        # ── V2 : source unique de vérité ─────────────────────────────────────
+        from services.executive_case_builder import case_to_edm, case_to_result_dict
+        edm        = case_to_edm(result)
+        result_raw = case_to_result_dict(result)
+        name       = company_name or result.company_name or "—"
+        date_str   = result.analysis_date or datetime.now().strftime("%d/%m/%Y")
+    else:
+        # ── Legacy : comportement existant ───────────────────────────────────
+        result_raw = result
+        edm        = build_executive_decision_model(result)
+        name       = company_name or result.get("company_name") or "—"
+        date_str   = datetime.now().strftime("%d/%m/%Y")
+
+    doc_type = "PREVISIONNEL"
+    result   = result_raw   # alias pour les builders internes (inchangés)
 
     styles = _build_styles()
 

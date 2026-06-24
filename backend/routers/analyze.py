@@ -59,6 +59,13 @@ _analysis_result_cache: dict[str, dict] = {}  # analyse_id → result dict (pour
 _anonymization_cache: dict[str, CorrespondenceTable] = {}  # analyse_id → table de correspondance (jamais envoyée à l'IA)
 _analysis_owner: dict[str, str] = {}          # analyse_id → company_id (contrôle d'accès aux exports)
 
+# ── V2 : Executive Case JSON cache ───────────────────────────────────────────
+# Source unique de vérité pour PDF, PPTX et Excel.
+# Produit lazily par l'Executive Case Builder (Agent 1 — Claude Opus)
+# lors du premier export. Réutilisé pour tous les exports suivants.
+from models.executive_case import ExecutiveCaseJSON as _ExecutiveCaseJSON
+_executive_case_cache: dict[str, _ExecutiveCaseJSON] = {}  # analyse_id → ExecutiveCaseJSON
+
 
 def _build_relation_section(entity_name: str, is_primary: bool, relation_type: Optional[str]) -> str:
     """
@@ -980,6 +987,41 @@ async def download_excel(
     )
 
 
+async def _get_or_build_executive_case(
+    analyse_id: str,
+    result_dict: dict,
+    company_name: Optional[str] = None,
+) -> "_ExecutiveCaseJSON":
+    """
+    Retourne l'ExecutiveCaseJSON pour une analyse — V2 Pipeline.
+
+    Ordre de priorité :
+      1. Cache mémoire (_executive_case_cache) — le plus rapide.
+      2. Appel Agent 1 (Claude Opus via executive_case_builder).
+         Le résultat est mis en cache mémoire pour les exports suivants.
+
+    Ce JSON est la source unique de vérité : PDF, PPTX et Excel reçoivent
+    tous le même objet — aucun recalcul, aucune divergence possible.
+    """
+    if analyse_id in _executive_case_cache:
+        logger.info("[V2] ExecutiveCaseJSON depuis cache mémoire (id=%s)", analyse_id[:8])
+        return _executive_case_cache[analyse_id]
+
+    logger.info("[V2] Construction ExecutiveCaseJSON via Agent 1 (id=%s)", analyse_id[:8])
+    try:
+        from services.executive_case_builder import build_executive_case
+        case = await build_executive_case(result_dict, company_name=company_name or "")
+    except Exception as exc:
+        logger.error("[V2] Échec Agent 1 (%s) — fallback Python pur.", exc)
+        from services.executive_case_builder import _python_mapper
+        from services.executive_decision_model import build_executive_decision_model
+        edm  = build_executive_decision_model(result_dict)
+        case = _python_mapper(result_dict, edm, company_name or "")
+
+    _executive_case_cache[analyse_id] = case
+    return case
+
+
 @router.get("/export-pdf/{analyse_id}")
 async def download_pdf(
     analyse_id: str,
@@ -1026,10 +1068,9 @@ async def download_pdf(
     # Return cached PDF if available
     pdf_bytes = _pdf_cache.get(analyse_id)
     if not pdf_bytes:
-        # Generate on demand from cached result
+        # Charger le result_dict depuis cache mémoire ou DB
         result_dict = _analysis_result_cache.get(analyse_id)
         if not result_dict:
-            # Try to fetch from DB
             try:
                 from main import get_supabase_service
                 supabase = get_supabase_service()
@@ -1046,7 +1087,11 @@ async def download_pdf(
             )
 
         try:
-            pdf_bytes = generate_pdf_report(result_dict, company_name=company_name)
+            # ── V2 : construire/charger l'ExecutiveCaseJSON (source unique de vérité)
+            executive_case = await _get_or_build_executive_case(
+                analyse_id, result_dict, company_name
+            )
+            pdf_bytes = generate_pdf_report(executive_case, company_name=company_name)
             _pdf_cache[analyse_id] = pdf_bytes
         except Exception as e:
             logger.error("[ANALYZE] Erreur génération PDF: %s", e)
@@ -1126,7 +1171,12 @@ async def download_pptx(
             )
 
         try:
-            pptx_bytes = generate_pptx_report(result_dict, company_name=company_name)
+            # ── V2 : réutiliser l'ExecutiveCaseJSON déjà construit (source unique de vérité)
+            # Si le PDF a déjà été généré, le cache évite un second appel Opus.
+            executive_case = await _get_or_build_executive_case(
+                analyse_id, result_dict, company_name
+            )
+            pptx_bytes = generate_pptx_report(executive_case, company_name=company_name)
             _pptx_cache[analyse_id] = pptx_bytes
         except Exception as e:
             logger.error("[ANALYZE] Erreur génération PowerPoint: %s", e)
