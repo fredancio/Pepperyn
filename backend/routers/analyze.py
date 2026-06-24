@@ -590,33 +590,13 @@ async def _run_analysis_pipeline(
     # Cache analysis result dict for on-demand PDF/PPTX generation
     _analysis_result_cache[analyse_id] = analysis_result.model_dump()
 
-    # ── V2 : construire l'ExecutiveCaseJSON (Agent 1 — Claude Opus) ──────────
-    # Fait ici, une seule fois, pendant le pipeline principal.
-    # • L'Excel en bénéficie immédiatement (cohérence des chiffres).
-    # • Le PDF et le PPTX (à la demande) trouvent le JSON en cache → zéro appel Opus supplémentaire.
-    # • Non-bloquant : si Opus est indisponible, le fallback Python prend le relais.
-    result_for_exports = analysis_result.model_dump()
-    try:
-        company_name_for_export = None
-        try:
-            from main import get_supabase_service
-            _sb = get_supabase_service()
-            _row = _sb.from_("companies").select("name").eq("id", company_id).single().execute()
-            if _row.data:
-                company_name_for_export = _row.data.get("name")
-        except Exception:
-            pass
-        _executive_case = await _get_or_build_executive_case(
-            analyse_id, result_for_exports, company_name_for_export
-        )
-        result_for_exports = _executive_case   # type: ignore[assignment]
-    except Exception as _exc:
-        logger.warning("[V2] Échec construction ExecutiveCaseJSON en pipeline principal: %s", _exc)
-        # result_for_exports reste le dict — Excel sera généré en mode legacy
-
     # Generate Excel export — all plans
+    # Note V2 : l'Excel est généré ici avec le result_dict (pipeline legacy).
+    # L'ExecutiveCaseJSON est construit lazily lors du premier export PDF/PPTX
+    # à la demande — évite d'ajouter un appel Opus supplémentaire dans ce pipeline
+    # principal (risque de timeout Railway).
     try:
-        excel_bytes = generate_excel_report(analysis_result, result_for_exports, file.filename)
+        excel_bytes = generate_excel_report(analysis_result, analysis_result.model_dump(), file.filename)
         _export_cache[analyse_id] = excel_bytes
         analysis_result.excel_export_url = f"/api/export/{analyse_id}"
         analysis_result.excel_export_nom = (
