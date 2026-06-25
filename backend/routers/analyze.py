@@ -1084,6 +1084,47 @@ async def _get_or_build_executive_case_v2(
         return None
 
 
+@router.get("/conversation-context/{analyse_id}")
+async def get_conversation_context(
+    analyse_id: str,
+    authorization: Optional[str] = Header(default=None),
+    x_auth_type: Optional[str] = Header(default=None),
+):
+    """
+    Retourne le contexte conversationnel V2 pour un analyse_id donné.
+
+    Payload retourné (3 champs uniquement) :
+      - auto_opening_message : str
+      - suggested_quick_prompts : list[str]
+      - sacred_sentence : str (Literal "Aucune question n'est trop simple.")
+
+    L'ExecutiveCase complet n'est JAMAIS exposé par cet endpoint.
+    Aucun appel LLM — construction Python déterministe uniquement.
+    """
+    from fastapi.responses import JSONResponse
+
+    company_id, plan, auth_type = await _resolve_auth(authorization, x_auth_type)
+
+    # Contrôle d'accès : l'analyse doit appartenir à la company authentifiée
+    _verify_export_access(analyse_id, company_id)
+
+    # Construire / récupérer l'ExecutiveCase V2 (lazy, Python pur, sans LLM)
+    case_v2 = await _get_or_build_executive_case_v2(analyse_id)
+
+    if case_v2 is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Contexte conversationnel non disponible — lancez d'abord une analyse.",
+        )
+
+    ce = case_v2.conversation_engine
+    return JSONResponse({
+        "auto_opening_message":   ce.auto_opening_message,
+        "suggested_quick_prompts": ce.suggested_quick_prompts,
+        "sacred_sentence":        ce.sacred_sentence,
+    })
+
+
 @router.get("/export-pdf/{analyse_id}")
 async def download_pdf(
     analyse_id: str,
