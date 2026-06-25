@@ -101,13 +101,15 @@ interface MessageBubbleProps {
   plan?: string;
   /** Appelé quand l'utilisateur a terminé (ou passé) le bilan pré-analyse. */
   onCheckInDone?: () => void;
+  /** Appelé quand l'utilisateur clique sur un suggested_quick_prompt (Commit 8). */
+  onQuickPromptClick?: (text: string) => void;
 }
 
 function formatTime(dateStr: string): string {
   return new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 }
 
-export function MessageBubble({ message, questionsRestantes, plan = 'free', onCheckInDone }: MessageBubbleProps) {
+export function MessageBubble({ message, questionsRestantes, plan = 'free', onCheckInDone, onQuickPromptClick }: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const isAssistant = message.role === 'assistant';
 
@@ -212,6 +214,12 @@ export function MessageBubble({ message, questionsRestantes, plan = 'free', onCh
   }
 
   if (isAssistant) {
+    // ── Suggested quick prompts (V2 Conversation Engine — Commit 8) ───────────
+    // Présents uniquement sur le message d'accueil post-analyse.
+    // Effacés dans ChatContainer dès qu'un bouton est cliqué (anti-doublon).
+    const quickPrompts = (message.metadata?.quick_prompts as string[] | undefined) ?? [];
+    const hasPrompts = quickPrompts.length > 0 && typeof onQuickPromptClick === 'function';
+
     return (
       <div className="flex items-start gap-3 max-w-[85%] md:max-w-[70%] animate-slide-up">
         {/* Bot avatar */}
@@ -222,6 +230,19 @@ export function MessageBubble({ message, questionsRestantes, plan = 'free', onCh
           <div className="bg-white rounded-2xl rounded-tl-none px-4 py-3 shadow-sm border border-gray-100">
             <MarkdownContent text={message.content} />
           </div>
+          {hasPrompts && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {quickPrompts.map((prompt, i) => (
+                <button
+                  key={i}
+                  onClick={() => onQuickPromptClick!(prompt)}
+                  className="text-xs bg-white border border-[#1B73E8]/40 text-[#1B73E8] rounded-full px-3 py-1.5 hover:bg-[#EFF6FF] hover:border-[#1B73E8] transition-colors font-medium shadow-sm"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          )}
           <p className="text-xs text-[#5F6368] mt-1 ml-1">{formatTime(message.created_at)}</p>
         </div>
       </div>

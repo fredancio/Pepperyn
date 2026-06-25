@@ -309,7 +309,13 @@ export function ChatContainer() {
           openingShownRef.current.add(analyseId);
           fetchConversationContext(analyseId).then(ctx => {
             if (ctx?.auto_opening_message) {
-              const openingMsg = makeLocalMessage('assistant', ctx.auto_opening_message, 'text');
+              const prompts = ctx.suggested_quick_prompts?.length ? ctx.suggested_quick_prompts : undefined;
+              const openingMsg = makeLocalMessage(
+                'assistant',
+                ctx.auto_opening_message,
+                'text',
+                prompts ? { quick_prompts: prompts } : undefined,
+              );
               setMessages(prev => [...prev, openingMsg]);
             }
           }).catch(() => {
@@ -338,6 +344,19 @@ export function ChatContainer() {
       void proceedWithUpload(pending.file, pending.context, pending.mode);
     }
   }, [proceedWithUpload]);
+
+  // ── V2 Conversation Engine : clic sur un suggested_quick_prompt ─────────────
+  // 1. Efface les boutons du message d'accueil (vide metadata.quick_prompts)
+  //    pour éviter les doublons visuels après le premier clic.
+  // 2. Envoie le texte comme message utilisateur normal dans le chat.
+  const handleQuickPromptClick = useCallback((text: string) => {
+    setMessages(prev => prev.map(m =>
+      Array.isArray(m.metadata?.quick_prompts)
+        ? { ...m, metadata: { ...m.metadata, quick_prompts: [] } }
+        : m
+    ));
+    void handleSendMessage(text);
+  }, [handleSendMessage]);
 
   const handleSendFile = useCallback(async (file: File, context: string, mode: 'quick' | 'complete') => {
     // Check question limit for free plan
@@ -884,6 +903,7 @@ export function ChatContainer() {
                       : null
                   }
                   onCheckInDone={handleCheckInDone}
+                  onQuickPromptClick={handleQuickPromptClick}
                 />
               ))}
               {isTyping && <TypingIndicator />}
