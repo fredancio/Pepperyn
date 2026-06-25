@@ -849,12 +849,35 @@ async def chat_with_analysis(
         ]
 
     try:
-        response_text, model_used = await call_chat_intelligent(
-            message=chat_message,
-            analysis_context=chat_context,
-            history=chat_history,
-            model_tier=model_tier,
-        )
+        # ── V2 Conversation Engine — routage conditionnel ─────────────────────
+        # Si analyse_id présent ET ExecutiveCase V2 disponible → Conversation Engine.
+        # Sinon → comportement legacy (call_chat_intelligent) strictement inchangé.
+        _case_v2 = None
+        if request.analysis_id:
+            try:
+                _case_v2 = await _get_or_build_executive_case_v2(request.analysis_id)
+            except Exception as _v2_exc:
+                logger.warning("[V2-CE] Échec construction V2 — fallback legacy: %s", _v2_exc)
+
+        if _case_v2 is not None:
+            logger.info(
+                "[V2-CE] Conversation Engine utilisé (id=%s)",
+                (request.analysis_id or "")[:8],
+            )
+            from services.conversation_engine import get_chat_response as _ce_chat
+            response_text, model_used = await _ce_chat(
+                executive_case_v2=_case_v2,
+                user_message=chat_message,
+                history=chat_history,
+            )
+        else:
+            # ── Legacy path (comportement original inchangé) ──────────────────
+            response_text, model_used = await call_chat_intelligent(
+                message=chat_message,
+                analysis_context=chat_context,
+                history=chat_history,
+                model_tier=model_tier,
+            )
     except Exception as e:
         logger.error("[ANALYZE] Erreur IA (chat): %s", e)
         raise HTTPException(status_code=500, detail="Erreur lors de la génération de la réponse.")
