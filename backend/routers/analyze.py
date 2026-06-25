@@ -66,6 +66,14 @@ _analysis_owner: dict[str, str] = {}          # analyse_id → company_id (contr
 from models.executive_case import ExecutiveCaseJSON as _ExecutiveCaseJSON
 _executive_case_cache: dict[str, _ExecutiveCaseJSON] = {}  # analyse_id → ExecutiveCaseJSON
 
+# ── V2 Conversation Engine cache ──────────────────────────────────────────────
+# Source de vérité pour le Conversation Engine (chat).
+# Produit lazily par executive_case_v2_builder (Python pur, sans LLM).
+# Construit UNIQUEMENT sur demande d'un endpoint ou du chat.
+# JAMAIS dans le pipeline d'analyse principal.
+from models.executive_case_v2 import ExecutiveCase as _ExecutiveCase
+_executive_case_v2_cache: dict[str, _ExecutiveCase] = {}  # analyse_id → ExecutiveCase V2
+
 
 def _build_relation_section(entity_name: str, is_primary: bool, relation_type: Optional[str]) -> str:
     """
@@ -1024,6 +1032,56 @@ async def _get_or_build_executive_case(
 
     _executive_case_cache[analyse_id] = case
     return case
+
+
+async def _get_or_build_executive_case_v2(
+    analyse_id: str,
+) -> Optional["_ExecutiveCase"]:
+    """
+    Retourne l'ExecutiveCase V2 pour une analyse — Conversation Engine.
+
+    Ordre de priorité :
+      1. Cache mémoire (_executive_case_v2_cache) — cache hit, retour immédiat.
+      2. Construction Python déterministe (executive_case_v2_builder) depuis
+         _analysis_result_cache. Aucun appel LLM, aucun ralentissement du pipeline.
+
+    Retourne None si aucun résultat d'analyse n'est disponible pour cet analyse_id.
+    Ne modifie PAS le pipeline d'analyse, les exports PDF/PPTX/XLSX, ni le chat.
+    """
+    # ── 1. Cache hit ──────────────────────────────────────────────────────────
+    if analyse_id in _executive_case_v2_cache:
+        logger.info("[V2-CE] ExecutiveCase V2 depuis cache mémoire (id=%s)", analyse_id[:8])
+        return _executive_case_v2_cache[analyse_id]
+
+    # ── 2. Vérifier disponibilité du résultat d'analyse ──────────────────────
+    result_dict = _analysis_result_cache.get(analyse_id)
+    if not result_dict:
+        logger.warning(
+            "[V2-CE] Aucun résultat d'analyse disponible pour id=%s — "
+            "le pipeline d'analyse doit avoir été exécuté en premier.",
+            analyse_id[:8],
+        )
+        return None
+
+    # ── 3. Cache miss — construction déterministe (Python pur, sans LLM) ─────
+    logger.info("[V2-CE] Construction ExecutiveCase V2 (id=%s)", analyse_id[:8])
+    try:
+        from services.executive_case_v2_builder import build_executive_case_v2
+        company_name = result_dict.get("company_name", "")
+        case_v2 = build_executive_case_v2(
+            result_dict=result_dict,
+            company_name=company_name,
+            analyse_id=analyse_id,
+        )
+        _executive_case_v2_cache[analyse_id] = case_v2
+        logger.info("[V2-CE] ExecutiveCase V2 construit et mis en cache (id=%s)", analyse_id[:8])
+        return case_v2
+    except Exception as exc:
+        logger.error(
+            "[V2-CE] Échec construction ExecutiveCase V2 (id=%s) : %s",
+            analyse_id[:8], exc,
+        )
+        return None
 
 
 @router.get("/export-pdf/{analyse_id}")
