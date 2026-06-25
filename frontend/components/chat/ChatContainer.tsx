@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { Message, Session } from '@/lib/types';
-import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, fetchPreviousRecommendations, type BillingUsage, type Entity, type EntityRelationType } from '@/lib/api';
+import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, fetchPreviousRecommendations, fetchConversationContext, type BillingUsage, type Entity, type EntityRelationType } from '@/lib/api';
 import { getCurrentAuthMode, signOutAdmin, clearGuestAuth, getGuestPlan } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { MessageBubble, TypingIndicator } from './MessageBubble';
@@ -255,6 +255,10 @@ export function ChatContainer() {
   // Upload en attente d'un bilan pré-analyse (mémoire décisionnelle).
   const pendingUploadRef = useRef<{ file: File; context: string; mode: 'quick' | 'complete' } | null>(null);
 
+  // Anti-doublon : ensemble des analyse_id ayant déjà reçu le message d'accueil V2.
+  // Évite les injections multiples en cas de re-render ou de re-montage.
+  const openingShownRef = useRef<Set<string>>(new Set());
+
   const proceedWithUpload = useCallback(async (file: File, context: string, mode: 'quick' | 'complete') => {
     const userMsg = makeLocalMessage('user', `📎 ${file.name}${context ? `\n\nContexte : ${context}` : ''}`, 'file');
     // Remplacer le message d'accueil par "Analyse en cours." pendant le traitement
@@ -295,6 +299,22 @@ export function ChatContainer() {
             recommendations: result.recommendations_tracking,
           });
           setMessages(prev => [...prev, feedbackMsg]);
+        }
+
+        // ── V2 Conversation Engine : message d'accueil ──────────────────────
+        // Appel silencieux à /api/conversation-context/{analyseId}.
+        // Anti-doublon : injecté une seule fois par analyse_id.
+        // Les suggested_quick_prompts ne sont pas encore affichés ici (Commit 8).
+        if (analyseId && !openingShownRef.current.has(analyseId)) {
+          openingShownRef.current.add(analyseId);
+          fetchConversationContext(analyseId).then(ctx => {
+            if (ctx?.auto_opening_message) {
+              const openingMsg = makeLocalMessage('assistant', ctx.auto_opening_message, 'text');
+              setMessages(prev => [...prev, openingMsg]);
+            }
+          }).catch(() => {
+            // Silencieux — ne pas bloquer l'affichage du rapport si le CE échoue
+          });
         }
 
         // Refresh sidebar history

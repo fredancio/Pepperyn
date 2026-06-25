@@ -259,6 +259,26 @@ export async function fetchPreviousRecommendations(): Promise<PreviousRecommenda
 }
 
 /**
+ * Récupère le contexte conversationnel V2 pour un analyse_id donné.
+ * Retourne auto_opening_message, suggested_quick_prompts et sacred_sentence.
+ * Retourne null silencieusement en cas d'erreur (analyse non encore disponible, etc.).
+ */
+export async function fetchConversationContext(analyseId: string): Promise<{
+  auto_opening_message: string;
+  suggested_quick_prompts: string[];
+  sacred_sentence: string;
+} | null> {
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_URL}/api/conversation-context/${analyseId}`, { headers });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Enregistre (ou met à jour) le feedback de l'utilisateur sur une
  * recommandation : intention (post-rapport) ou bilan (pré-analyse).
  * Aucun appel à Claude — écriture Supabase uniquement.
