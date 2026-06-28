@@ -1167,12 +1167,8 @@ async def run_full_pipeline(
             synthese=analysis_dict.get("resume_executif", "Analyse effectuée avec succès."),
         )
 
-    # Attacher UNIQUEMENT les champs hors schéma Pydantic (value_destroyers,
-    # note_copilote…). Ne pas écraser les instances déjà validées par Pydantic
-    # (PlanActionItem, ScenarioCase, etc.) — cela provoquerait des erreurs de
-    # sérialisation ("Expected PlanActionItem but got dict") et un crash du stream.
-    extra_only = {k: v for k, v in analysis_dict.items() if k not in AnalysisResult.model_fields}
-    result.__dict__.update(extra_only)
+    # Attach v3 extra fields as extra attributes (returned in dict for the route)
+    result.__dict__.update({k: v for k, v in analysis_dict.items()})
 
     return result, total_tokens, round(cost, 4)
 

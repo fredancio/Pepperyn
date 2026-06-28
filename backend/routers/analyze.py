@@ -414,12 +414,7 @@ async def _stream_analysis_response(**kwargs):
         logger.error(f"[ANALYZE STREAM] erreur pipeline: {e}")
         result = AnalyzeResponse(success=False, message="Erreur lors de l'analyse")
 
-    try:
-        yield result.model_dump_json().encode("utf-8")
-    except Exception as _ser_exc:
-        logger.error("[ANALYZE STREAM] Erreur sérialisation finale: %s", _ser_exc)
-        _fallback = AnalyzeResponse(success=False, message="Erreur interne lors de la sérialisation")
-        yield _fallback.model_dump_json().encode("utf-8")
+    yield result.model_dump_json().encode("utf-8")
 
 
 async def _run_analysis_pipeline(

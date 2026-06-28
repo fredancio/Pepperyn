@@ -2,17 +2,18 @@
 export_pdf_service.py — Rapport exécutif Pepperyn
 Master de référence officiel : "Ancienne version du PDF.pdf"
 
-Structure IMMUABLE — 10 pages exactes :
+Structure — 11 pages (v2 Stabilisation MVP) :
   P1  Couverture
   P2  Le coût réel de l'inaction
   P3  Pourquoi votre rentabilité se dégrade
   P4  Où en êtes-vous aujourd'hui ?
   P5  Vos indicateurs clés
-  P6  Que faire maintenant ?
-  P7  Ce qui détruit réellement votre rentabilité
-  P8  Agir ou ne rien faire ?
-  P9  Quand retrouverez-vous l'équilibre ?
-  P10 Décision prioritaire (page finale)
+  P6  Que faire maintenant ? (décisions + score ROI)
+  P7  Plan d'exécution 30 / 60 / 90 jours
+  P8  Ce qui détruit réellement votre rentabilité
+  P9  Agir ou ne rien faire ?
+  P10 Quand retrouverez-vous l'équilibre ?
+  P11 Décision prioritaire (page finale)
 
 RÈGLE ABSOLUE : seules les données changent. La structure est figée.
 Si une donnée est absente → afficher "Données insuffisantes".
@@ -647,7 +648,7 @@ def _build_page_indicators(result: dict, edm, styles: dict) -> list:
             val_p = Paragraph("Données<br/>insuffisantes", styles["indic_miss"])
         else:
             val_p = Paragraph(
-                f'<font color="{val_hex}"><b>{_rl(val_str[:60])}</b></font>',
+                f'<font color="{val_hex}"><b>{_rl(val_str)}</b></font>',
                 ParagraphStyle("cv", fontName="Helvetica-Bold", fontSize=12, leading=16,
                                alignment=1, textColor=C_DARK)
             )
@@ -723,10 +724,10 @@ def _build_page_decisions(edm, styles: dict) -> list:
     ))
     s.append(_sp(4))
 
-    # Table des décisions
-    headers = ["Décision", "Impact annuel", "Délai", "Difficulté", "Priorité"]
-    col_w = [CONTENT_W * 0.38, CONTENT_W * 0.18, CONTENT_W * 0.14,
-             CONTENT_W * 0.14, CONTENT_W * 0.16]
+    # Table des décisions — 6 colonnes avec score ROI
+    headers = ["Décision", "Impact annuel", "ROI", "Délai", "Difficulté", "Priorité"]
+    col_w = [CONTENT_W * 0.32, CONTENT_W * 0.16, CONTENT_W * 0.10,
+             CONTENT_W * 0.12, CONTENT_W * 0.12, CONTENT_W * 0.18]
 
     data = [[Paragraph(h, styles["tbl_hdr"]) for h in headers]]
 
@@ -742,14 +743,16 @@ def _build_page_decisions(edm, styles: dict) -> list:
 
     decisions = edm.executive_decisions[:10]
     if not decisions:
-        data.append([Paragraph("Données insuffisantes", styles["tbl_cell"]), "", "", "", ""])
+        data.append([Paragraph("Données insuffisantes", styles["tbl_cell"]), "", "", "", "", ""])
     else:
         for dec in decisions:
             impact_str = (_fmt_eur(dec.annual_impact, sign=True)
                           if dec.annual_impact else "—")
+            roi_str = f"{dec.roi_score:.1f}/10" if dec.roi_score else "—"
             data.append([
-                Paragraph(_rl(dec.decision[:100]), styles["tbl_cell"]),
+                Paragraph(_rl(dec.decision), styles["tbl_cell"]),
                 Paragraph(impact_str, styles["tbl_impact"]),
+                Paragraph(roi_str, styles["tbl_cell"]),
                 Paragraph(dec.timeline or "—", styles["tbl_cell"]),
                 Paragraph(dec.difficulty or "—", styles["tbl_cell"]),
                 _prio_p(dec.priority),
@@ -774,7 +777,112 @@ def _build_page_decisions(edm, styles: dict) -> list:
     return s
 
 
-# ─── PAGE 7 : CE QUI DÉTRUIT RÉELLEMENT VOTRE RENTABILITÉ ────────────────────
+# ─── PAGE 7 : PLAN D'EXÉCUTION 30 / 60 / 90 JOURS ───────────────────────────
+
+def _build_page_roadmap(edm, styles: dict) -> list:
+    s = []
+    s.append(_sp(6))
+    s.append(_section_header("PLAN D'EXÉCUTION 30 / 60 / 90 JOURS", styles))
+    s.append(_hr())
+    s.append(_sp(6))
+
+    phases_edm = edm.roadmap_90_days or []
+
+    def _phase_items(horizon: str) -> list[str]:
+        for phase in phases_edm:
+            if str(getattr(phase, "horizon", "")) == horizon:
+                return [
+                    getattr(a, "decision", str(a))
+                    for a in (phase.actions or [])[:6]
+                ]
+        return []
+
+    cols_def = [
+        ("30 JOURS",   "30", C_BLUE),
+        ("60 JOURS",   "60", C_AMBER),
+        ("90 JOURS",   "90", C_GREEN),
+    ]
+
+    col_w = (CONTENT_W - 4 * mm) / 3   # léger espace entre colonnes via padding
+
+    def _col_table(label: str, horizon: str, color) -> Table:
+        items = _phase_items(horizon)
+
+        # En-tête de colonne
+        hdr_style = ParagraphStyle(
+            f"rmap_h_{horizon}", fontName="Helvetica-Bold", fontSize=10,
+            textColor=C_WHITE, alignment=TA_CENTER, leading=14,
+        )
+        hdr = Table(
+            [[Paragraph(label, hdr_style)]],
+            colWidths=[col_w],
+        )
+        hdr.setStyle(TableStyle([
+            ("BACKGROUND",    (0, 0), (-1, -1), color),
+            ("TOPPADDING",    (0, 0), (-1, -1), 7),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 4),
+        ]))
+
+        # Corps : lignes d'actions
+        item_style = ParagraphStyle(
+            f"rmap_i_{horizon}", fontName="Helvetica", fontSize=9,
+            textColor=C_DARK, leading=13, leftIndent=6,
+        )
+        miss_style = ParagraphStyle(
+            f"rmap_m_{horizon}", fontName="Helvetica-Oblique", fontSize=9,
+            textColor=C_GRAY, leading=13, leftIndent=6,
+        )
+
+        if not items:
+            body_rows = [[Paragraph("Données insuffisantes", miss_style)]]
+        else:
+            body_rows = [[Paragraph(f"→  {txt}", item_style)] for txt in items]
+
+        body = Table(body_rows, colWidths=[col_w])
+        body_cmds = [
+            ("TOPPADDING",    (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 4),
+            ("BACKGROUND",    (0, 0), (-1, -1), C_LBGRAY),
+            ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ]
+        for i in range(len(body_rows) - 1):
+            body_cmds.append(("LINEBELOW", (0, i), (-1, i), 0.3, C_LGRAY))
+        body.setStyle(TableStyle(body_cmds))
+
+        # Colonne = header + body empilés
+        col = Table([[hdr], [body]], colWidths=[col_w])
+        col.setStyle(TableStyle([
+            ("TOPPADDING",    (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ]))
+        return col
+
+    cols = [_col_table(label, horizon, color) for label, horizon, color in cols_def]
+
+    outer = Table(
+        [cols],
+        colWidths=[col_w] * 3,
+        hAlign="LEFT",
+    )
+    outer.setStyle(TableStyle([
+        ("TOPPADDING",    (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 2 * mm),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+    ]))
+    s.append(outer)
+    s.append(PageBreak())
+    return s
+
+
+# ─── PAGE 8 : CE QUI DÉTRUIT RÉELLEMENT VOTRE RENTABILITÉ ────────────────────
 
 def _build_page_destroyers(edm, styles: dict) -> list:
     s = []
@@ -797,7 +905,7 @@ def _build_page_destroyers(edm, styles: dict) -> list:
             mon_str = _fmt_eur(d.monthly_impact) if d.monthly_impact else "—"
             trend = d.trend or "—"
             data.append([
-                Paragraph(_rl(d.name[:120]), styles["tbl_cell"]),
+                Paragraph(_rl(d.name), styles["tbl_cell"]),
                 Paragraph(ann_str, styles["tbl_impact"]),
                 Paragraph(mon_str, styles["tbl_cell"]),
                 Paragraph(trend, styles["tbl_cell"]),
@@ -951,7 +1059,7 @@ def _build_page_simulation(edm, result: dict, styles: dict) -> list:
         inner = Table([
             [Paragraph(lbl.upper(), head_style)],
             [_sp(2)],
-            [Paragraph(_rl(desc[:300]) if desc else "Données insuffisantes",
+            [Paragraph(_rl(desc) if desc else "Données insuffisantes",
                        styles["scen_body"])],
         ], colWidths=[CONTENT_W / 3 - 6 * mm])
         inner.setStyle(TableStyle([
@@ -1034,7 +1142,7 @@ def _build_page_final(edm, styles: dict) -> list:
             "dp_lbl", fontName="Helvetica-Bold", fontSize=9,
             textColor=colors.HexColor("#8899BB"), leading=13))],
         [_sp(3)],
-        [Paragraph(_rl(dec_text[:160]), ParagraphStyle(
+        [Paragraph(_rl(dec_text), ParagraphStyle(
             "dp_dec", fontName="Helvetica-Bold", fontSize=16,
             textColor=C_WHITE, leading=22))],
         [_sp(3)],
@@ -1158,7 +1266,7 @@ def generate_pdf_report(result, company_name: str | None = None) -> bytes:
         # P1 — Couverture (pas de header/footer sur cette page)
         story.extend(_build_cover(name, date_str, styles))
 
-        # P2-P10 — pages de contenu (header/footer dessiné sur canvas)
+        # P2-P11 — pages de contenu (header/footer dessiné sur canvas)
         story.extend(_build_page_inaction(
             edm,
             result.get("risque_inaction"),
@@ -1168,6 +1276,7 @@ def generate_pdf_report(result, company_name: str | None = None) -> bytes:
         story.extend(_build_page_health(result, edm, styles))
         story.extend(_build_page_indicators(result, edm, styles))
         story.extend(_build_page_decisions(edm, styles))
+        story.extend(_build_page_roadmap(edm, styles))          # P7 — NOUVEAU
         story.extend(_build_page_destroyers(edm, styles))
         story.extend(_build_page_simulation(edm, result, styles))
         story.extend(_build_page_projection(edm, styles))

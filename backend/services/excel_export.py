@@ -278,11 +278,27 @@ def _build_edm(wb: Workbook, edm, raw: dict) -> None:
             ).font = _font(italic=True, color=P_SLATE)
 
     coi = edm.cost_of_inaction
+
+    # ── Extraire EBITDA et Cash depuis le kpi_dashboard (raw dict) ────────────
+    # edm.ebitda / edm.available_cash sont None dans le pipeline V2 :
+    # case_to_edm() ne les propage pas (champs absents du modèle EDM legacy).
+    # RULE 004 — le renderer AFFICHE. Il lit depuis la source : raw.ceo_dashboard.
+    # RULE 001 — aucune valeur ne peut rester à 0 si la donnée est disponible.
+    _ebitda_val = 0.0
+    _cash_val   = 0.0
+    for _card in ((raw or {}).get("ceo_dashboard") or []):
+        _lbl = (_card.get("label", "") if isinstance(_card, dict) else "").lower()
+        _val = (_card.get("value", "") if isinstance(_card, dict) else "")
+        if "ebitda" in _lbl:
+            _ebitda_val = _parse_eur(_val)
+        elif any(k in _lbl for k in ("trésor", "tresor", "cash", "liquid")):
+            _cash_val = _parse_eur(_val)
+
     global_rows = [
         (EDM_R_HEALTH,    "Score Santé",                edm.health_score or 0),
         (EDM_R_CONFID,    "Niveau de confiance",        edm.executive_confidence or 0),
-        (EDM_R_EBITDA,    "EBITDA (numérique €)",       _parse_eur(edm.ebitda)),
-        (EDM_R_CASH,      "Cash disponible (€)",        _parse_eur(edm.available_cash)),
+        (EDM_R_EBITDA,    "EBITDA (numérique €)",       _ebitda_val),
+        (EDM_R_CASH,      "Cash disponible (€)",        _cash_val),
         (EDM_R_COI_YEAR,  "Coût de l'inaction / an",    (coi.per_year or 0) if coi else 0),
         (EDM_R_COI_MONTH, "Coût de l'inaction / mois",  (coi.per_month or 0) if coi else 0),
         (EDM_R_COI_WEEK,  "Coût de l'inaction / sem.",  (coi.per_week or 0) if coi else 0),
