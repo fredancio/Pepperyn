@@ -292,16 +292,29 @@ def _slide_diagnostic(prs, edm, result: dict, company: str, date_str: str, page:
 
     diag = (result.get("diagnostic_immediat") or result.get("resume_executif")
             or result.get("synthese") or "Données insuffisantes")
-    _text(slide, diag.strip(), ML, MT + Inches(0.55), CW, Inches(1.6), size=22, color=DARK)
+    _text(slide, diag.strip(), ML, MT + Inches(0.55), CW, Inches(1.35), size=22, color=DARK)
+
+    # CV-C01 — tension_phrase : urgence narrative alignée avec le PDF
+    tension = result.get("phrase_tension")
+    if tension:
+        tp_top = MT + Inches(1.98)
+        tp_bg = slide.shapes.add_shape(
+            1, ML, tp_top, CW, Inches(0.52)  # MSO_SHAPE_TYPE.RECTANGLE
+        )
+        tp_bg.fill.solid()
+        tp_bg.fill.fore_color.rgb = _rgb("0A2540")
+        tp_bg.line.fill.background()
+        _text(slide, tension.strip(), ML + Inches(0.15), tp_top + Pt(5),
+              CW - Inches(0.3), Inches(0.46), size=13, bold=True, color=WHITE, italic=True)
 
     destroyers = edm.value_destroyers[:3]
     if destroyers:
-        _text(slide, "TOP 3 DESTRUCTEURS DE VALEUR", ML, MT + Inches(2.35),
+        _text(slide, "TOP 3 DESTRUCTEURS DE VALEUR", ML, MT + Inches(2.6),
               CW, Inches(0.4), size=12, bold=True, color=AMBER)
         card_w = CW / 3 - Inches(0.1)
         for i, d in enumerate(destroyers):
             lx = ML + i * (card_w + Inches(0.15))
-            ly = MT + Inches(2.8)
+            ly = MT + Inches(3.05)
             _rect(slide, lx, ly, card_w, Inches(1.8), fill_color=_rgb("FBF0EE"), line_color=_rgb("E8B0A8"))
             ann_str = _fmt_auto(d.annual_impact) if d.annual_impact else "Non chiffrable"
             _text(slide, ann_str, lx + Inches(0.1), ly + Inches(0.08),
@@ -415,18 +428,19 @@ def _slide_cout_inaction(prs, edm, result: dict, company: str, date_str: str, pa
     _slide_title(slide, "Le coût de l'inaction", "Si rien ne change maintenant")
 
     coi = edm.cost_of_inaction
-    hero_str = (_fmt_eur(abs(coi.per_month)) if coi and coi.per_month
+    # CV-C02 — héros annuel (aligné avec PDF P2) ; mensuel en premier sous-indicateur
+    hero_str = (_fmt_auto(abs(coi.per_year)) if coi and coi.per_year
                 else "Données insuffisantes")
     _text(slide, hero_str, ML, MT + Inches(0.5), Inches(8), Inches(1.15),
           size=52, bold=True, color=RED, align=PP_ALIGN.LEFT)
-    _text(slide, "COÛT DE L'INACTION — PAR MOIS", ML, MT + Inches(1.7),
+    _text(slide, "COÛT DE L'INACTION — PAR AN", ML, MT + Inches(1.7),
           Inches(8), Inches(0.35), size=13, bold=True, color=RED)
     _rect(slide, ML, MT + Inches(2.15), Inches(8), Pt(2), fill_color=RED)
 
     sub_vals = [
-        (_fmt_eur(abs(coi.per_week)) if coi and coi.per_week else "—", "PAR SEMAINE"),
-        (_fmt_eur(abs(coi.per_day))  if coi and coi.per_day  else "—", "PAR JOUR"),
-        (_fmt_eur(abs(coi.per_hour)) if coi and coi.per_hour else "—", "PAR HEURE"),
+        (_fmt_eur(abs(coi.per_month)) if coi and coi.per_month else "—", "PAR MOIS"),
+        (_fmt_eur(abs(coi.per_week))  if coi and coi.per_week  else "—", "PAR SEMAINE"),
+        (_fmt_eur(abs(coi.per_day))   if coi and coi.per_day   else "—", "PAR JOUR"),
     ]
     sub_w = Inches(3.5)
     for i, (val, lbl) in enumerate(sub_vals):
@@ -457,8 +471,8 @@ def _slide_decisions_prioritaires(prs, edm, result: dict, company: str, date_str
     )
     reasoning_by_idx = {r["decision_index"]: r for r in reasoning_list}
 
-    # Si raisonnement présent, on réserve 1.9" pour le panneau inférieur
-    REASONING_PANEL_H = Inches(1.9) if has_reasoning else Inches(0)
+    # CV-C03 — panneau agrandi pour raisonnement lisible (min 10pt)
+    REASONING_PANEL_H = Inches(2.5) if has_reasoning else Inches(0)
 
     decisions = edm.executive_decisions[:8]
     rows = []
@@ -525,12 +539,12 @@ def _slide_decisions_prioritaires(prs, edm, result: dict, company: str, date_str
         tf.word_wrap = False
         p = tf.paragraphs[0]
         run = p.add_run()
-        run.text = "POURQUOI PEPPERYN RECOMMANDE CES DÉCISIONS"
-        run.font.size = Pt(7.5)
+        run.text = "RAISONNEMENT — POURQUOI CES DÉCISIONS"
+        run.font.size = Pt(9)
         run.font.bold = True
         run.font.color.rgb = _rgb("1B73E8")
 
-        # Contenu : une ligne compacte par décision ayant un raisonnement
+        # CV-C03 — contenu lisible : top 3 décisions, 2 lignes par décision, 10pt
         content_top = panel_top + Inches(0.30)
         content_h = panel_h - Inches(0.34)
         content_box = slide.shapes.add_textbox(
@@ -540,40 +554,40 @@ def _slide_decisions_prioritaires(prs, edm, result: dict, company: str, date_str
         tf2 = content_box.text_frame
         tf2.word_wrap = True
 
-        first = True
-        for i, dec in enumerate(decisions):
+        shown = 0
+        for i, dec in enumerate(decisions[:3]):  # Top 3 uniquement — lisibilité
             r = reasoning_by_idx.get(i, {})
             why = r.get("why_this_decision")
-            risk = r.get("inaction_risk")
             prob = r.get("problem_source")
             conf = r.get("decision_confidence")
-            match_conf = r.get("matching_confidence", "")
             if not why and not prob:
                 continue
 
-            # Un paragraphe par décision, compact
-            para = tf2.paragraphs[0] if first else tf2.add_paragraph()
-            first = False
+            # Ligne 1 : numéro + décision (gras)
+            para1 = tf2.paragraphs[0] if shown == 0 else tf2.add_paragraph()
+            run_title = para1.add_run()
+            run_title.text = f"#{i+1}  {dec.decision}"
+            run_title.font.size = Pt(10)
+            run_title.font.bold = True
+            run_title.font.color.rgb = _rgb("0A2540")
 
-            parts = [f"#{i+1} {dec.decision}"]
-            if prob:
-                suffix = ""
-                if match_conf == "LOW":
-                    suffix = " (≈)"
-                elif match_conf == "FALLBACK_INDEX":
-                    suffix = " (~)"
-                parts.append(f"↔ {prob}{suffix}")
-            if why:
-                # Truncate for slide legibility
-                parts.append(f"→ {why}")
-            if conf is not None:
-                parts.append(f"[Confiance : {conf}%]")
+            # Ligne 2 : raisonnement (normal)
+            para2 = tf2.add_paragraph()
+            run_why = para2.add_run()
+            why_text = why or prob or ""
+            # Tronquer à 120 caractères pour tenir sur une ligne
+            if len(why_text) > 120:
+                why_text = why_text[:117] + "…"
+            conf_tag = f"  [Confiance : {conf}%]" if conf is not None else ""
+            run_why.text = f"→ {why_text}{conf_tag}"
+            run_why.font.size = Pt(10)
+            run_why.font.color.rgb = _rgb("444444")
 
-            line = "  |  ".join(parts)
-            run2 = para.add_run()
-            run2.text = line
-            run2.font.size = Pt(7)
-            run2.font.color.rgb = DARK
+            # Séparateur vide entre décisions
+            if shown < 2:
+                tf2.add_paragraph()
+
+            shown += 1
 
 
 # ─── SLIDE 8 : EXÉCUTION (ROADMAP 30/60/90) ──────────────────────────────────
@@ -999,7 +1013,7 @@ def _slide_lundi_matin(prs, edm, result: dict, company: str, date_str: str, page
                 (dec.owner or "Direction", "Responsable"),
                 (_fmt_auto(dec.annual_impact) if dec.annual_impact else "—", "Impact / an"),
                 (dec.timeline or "—", "Horizon"),
-                (f"{min(100, int(dec.roi_score * 10))}%" if dec.roi_score else "—", "Prob. succès"),
+                (f"{dec.roi_score:.1f}/10" if dec.roi_score else "—", "Score ROI"),
             ]
             for j, (val, lbl) in enumerate(items):
                 lx = Inches(8.5) + j * Inches(1.0)

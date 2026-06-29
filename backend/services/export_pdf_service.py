@@ -524,10 +524,10 @@ def _build_page_health(result: dict, edm, styles: dict) -> list:
     s.append(_sp(3))
 
     dims = [
-        ("Rentabilité", result.get("score_rentabilite"), "CRITIQUE",  C_RED),
-        ("Risque",      result.get("score_risque"),      "ÉLEVÉ",     C_AMBER),
-        ("Structure",   result.get("score_structure"),   "FRAGILE",   C_GRAY),
-        ("Liquidité",   result.get("score_liquidite"),   "TENDUE",    C_AMBER),
+        ("Rentabilité", result.get("score_rentabilite"), "N/D", C_GRAY),
+        ("Risque",      result.get("score_risque"),      "N/D", C_GRAY),
+        ("Structure",   result.get("score_structure"),   "N/D", C_GRAY),
+        ("Liquidité",   result.get("score_liquidite"),   "N/D", C_GRAY),
     ]
 
     # Détecter badge approprié selon score
