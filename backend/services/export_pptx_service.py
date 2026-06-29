@@ -309,8 +309,8 @@ def _slide_diagnostic(prs, edm, result: dict, company: str, date_str: str, page:
 
     destroyers = edm.value_destroyers[:3]
     if destroyers:
-        _text(slide, "TOP 3 DESTRUCTEURS DE VALEUR", ML, MT + Inches(2.6),
-              CW, Inches(0.4), size=12, bold=True, color=AMBER)
+        _text(slide, "TOP 3 LEVIERS D'OPTIMISATION", ML, MT + Inches(2.6),
+              CW, Inches(0.4), size=12, bold=True, color=_rgb("1B73E8"))
         card_w = CW / 3 - Inches(0.1)
         for i, d in enumerate(destroyers):
             lx = ML + i * (card_w + Inches(0.15))
@@ -374,7 +374,7 @@ def _slide_impact_financier(prs, edm, result: dict, company: str, date_str: str,
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _header_band(slide, "IMPACT FINANCIER", company)
     _footer_band(slide, page, company)
-    _slide_title(slide, "Où la valeur est détruite", "Analyse des destructeurs de valeur")
+    _slide_title(slide, "Où la valeur attend d'être libérée", "Analyse des leviers d'optimisation")
 
     destroyers = edm.value_destroyers[:8]
     rows = []
@@ -588,6 +588,152 @@ def _slide_decisions_prioritaires(prs, edm, result: dict, company: str, date_str
                 tf2.add_paragraph()
 
             shown += 1
+
+
+# ─── SLIDE 7b : RAISONNEMENT DÉCISIONNEL (EDX-002) ───────────────────────────
+# La slide McKinsey. "J'ai étudié N options. J'en ai éliminé N-1. Voici pourquoi."
+# Affichée uniquement si options_considered existe dans au moins 1 raisonnement.
+
+def _slide_raisonnement_comparatif(prs, edm, result: dict, company: str, date_str: str, page: int):
+    """
+    Slide de raisonnement comparatif EDX-002.
+    Montre pour les 2 premières décisions :
+    - Les options évaluées et leur critère d'élimination
+    - Pourquoi l'option retenue domine
+    - Ce qui ferait changer d'avis (conditions de révision)
+    """
+    reasoning_list = result.get("decision_reasoning", []) or []
+    decisions_with_options = [
+        r for r in reasoning_list
+        if r.get("options_considered")
+    ]
+
+    # Ne pas ajouter la slide si aucune donnée EDX-002
+    if not decisions_with_options:
+        return
+
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    _header_band(slide, "RAISONNEMENT DÉCISIONNEL", company)
+    _footer_band(slide, page, company)
+    _slide_title(slide, "Comment Pepperyn a raisonné",
+                 "Options évaluées • Éliminations • Décision dominante • Conditions de révision")
+
+    decisions = edm.executive_decisions
+    reasoning_by_idx = {r["decision_index"]: r for r in reasoning_list}
+
+    # Layout : jusqu'à 2 décisions côte à côte ou en colonne selon la disponibilité
+    top_decisions = [r for r in decisions_with_options[:2]]
+    n_blocks = len(top_decisions)
+
+    # Largeur et hauteur de chaque bloc
+    block_w = CW if n_blocks == 1 else (CW - Inches(0.15)) / 2
+    block_h = CH - Inches(0.65)
+    block_top = MT + Inches(0.55)
+
+    for b_idx, r in enumerate(top_decisions):
+        bx = ML + b_idx * (block_w + Inches(0.15))
+        dec_idx = r["decision_index"]
+        dec = next((d for i, d in enumerate(decisions) if i == dec_idx), None)
+        options   = r.get("options_considered") or []
+        dominant  = r.get("dominant_rationale") or ""
+        tippings  = r.get("tipping_conditions") or []
+
+        # Fond du bloc
+        bg = slide.shapes.add_shape(1, bx, block_top, block_w, block_h)
+        bg.fill.solid()
+        bg.fill.fore_color.rgb = _rgb("F5F8FF")
+        bg.line.color.rgb = _rgb("C5D5F0")
+        bg.line.width = Pt(0.5)
+
+        # Titre de la décision
+        dec_name = dec.decision if dec else f"Décision #{dec_idx + 1}"
+        impact_str = (_fmt_auto(dec.annual_impact) if dec and dec.annual_impact else "")
+        header_text = f"#{dec_idx + 1} — {dec_name}"
+        if impact_str:
+            header_text += f"  |  {impact_str}/an"
+        _text(slide, header_text, bx + Inches(0.1), block_top + Inches(0.08),
+              block_w - Inches(0.2), Inches(0.32),
+              size=11, bold=True, color=NAVY)
+
+        # Sous-titre "N options évaluées"
+        n_opt = len(options)
+        n_elim = n_opt
+        subtitle_text = (
+            f"Pepperyn a évalué {n_opt + 1} option{'s' if n_opt > 0 else ''} — "
+            f"{n_elim} écartée{'s' if n_elim != 1 else ''}"
+        )
+        _text(slide, subtitle_text, bx + Inches(0.1), block_top + Inches(0.38),
+              block_w - Inches(0.2), Inches(0.2),
+              size=9, color=_rgb("1B73E8"), italic=True)
+
+        # Séparateur
+        sep = slide.shapes.add_shape(1, bx + Inches(0.1),
+                                      block_top + Inches(0.56),
+                                      block_w - Inches(0.2), Pt(0.5))
+        sep.fill.solid()
+        sep.fill.fore_color.rgb = _rgb("C5D5F0")
+        sep.line.fill.background()
+
+        # Options éliminées
+        opts_top = block_top + Inches(0.64)
+        opts_h = Inches(0.22)
+        for opt in options[:4]:  # Max 4 options pour lisibilité
+            opt_name = opt.get("option", "")[:70]
+            elim = opt.get("elimination_criterion", "")[:90]
+            if len(opt.get("option", "")) > 70:
+                opt_name += "…"
+            if len(opt.get("elimination_criterion", "")) > 90:
+                elim += "…"
+            _text(slide, f"✗  {opt_name}",
+                  bx + Inches(0.12), opts_top,
+                  block_w - Inches(0.24), opts_h,
+                  size=9, bold=False, color=_rgb("CC3333"))
+            opts_top += opts_h
+            if elim:
+                _text(slide, f"   → {elim}",
+                      bx + Inches(0.12), opts_top,
+                      block_w - Inches(0.24), opts_h,
+                      size=8, color=_rgb("777777"), italic=True)
+                opts_top += opts_h
+
+        # Option dominante (si espace disponible)
+        if dominant and opts_top < block_top + block_h - Inches(0.6):
+            # Fond distinct pour l'option dominante
+            dom_top = opts_top + Inches(0.08)
+            dom_h = Inches(0.35)
+            dom_bg = slide.shapes.add_shape(1, bx + Inches(0.1), dom_top,
+                                            block_w - Inches(0.2), dom_h)
+            dom_bg.fill.solid()
+            dom_bg.fill.fore_color.rgb = _rgb("0A2540")
+            dom_bg.line.fill.background()
+
+            dominant_short = dominant[:140] + "…" if len(dominant) > 140 else dominant
+            _text(slide, f"✓  {dominant_short}",
+                  bx + Inches(0.18), dom_top + Inches(0.04),
+                  block_w - Inches(0.36), dom_h - Inches(0.08),
+                  size=9, bold=True, color=WHITE)
+            opts_top = dom_top + dom_h
+
+        # Conditions de révision (si espace)
+        if tippings and opts_top < block_top + block_h - Inches(0.25):
+            tip_top = opts_top + Inches(0.1)
+            _text(slide, "Conditions de révision :",
+                  bx + Inches(0.12), tip_top,
+                  block_w - Inches(0.24), Inches(0.18),
+                  size=8, bold=True, color=AMBER)
+            tip_top += Inches(0.18)
+            for t in tippings[:2]:
+                cond = t.get("condition", "")[:80]
+                if len(t.get("condition", "")) > 80:
+                    cond += "…"
+                h_days = t.get("horizon_days", 90)
+                _text(slide, f"Si {cond} (J+{h_days})",
+                      bx + Inches(0.12), tip_top,
+                      block_w - Inches(0.24), Inches(0.18),
+                      size=8, color=_rgb("555555"), italic=True)
+                tip_top += Inches(0.18)
+                if tip_top >= block_top + block_h - Inches(0.05):
+                    break
 
 
 # ─── SLIDE 8 : EXÉCUTION (ROADMAP 30/60/90) ──────────────────────────────────
@@ -1133,22 +1279,23 @@ def generate_pptx_report(result: Any, company_name: Optional[str] = None) -> byt
     prs.slide_height = SH
 
     slides_builders = [
-        _slide_cover,                   # S1
-        _slide_exec_summary,            # S2
-        _slide_diagnostic,              # S3
-        _slide_dashboard,               # S4
-        _slide_impact_financier,        # S5
-        _slide_cout_inaction,           # S6
-        _slide_decisions_prioritaires,  # S7
-        _slide_execution,               # S8
-        _slide_simulation,              # S9
-        _slide_projection,              # S10
-        _slide_risques,                 # S11
-        _slide_priorites,               # S12
-        _slide_suivi,                   # S13
-        _slide_pilotage,                # S14
-        _slide_lundi_matin,             # S15
-        _slide_annexe,                  # S16
+        _slide_cover,                        # S1
+        _slide_exec_summary,                 # S2
+        _slide_diagnostic,                   # S3
+        _slide_dashboard,                    # S4
+        _slide_impact_financier,             # S5
+        _slide_cout_inaction,                # S6
+        _slide_decisions_prioritaires,       # S7
+        _slide_raisonnement_comparatif,      # S7b — EDX-002 (omit si pas de données)
+        _slide_execution,                    # S8
+        _slide_simulation,                   # S9
+        _slide_projection,                   # S10
+        _slide_risques,                      # S11
+        _slide_priorites,                    # S12
+        _slide_suivi,                        # S13
+        _slide_pilotage,                     # S14
+        _slide_lundi_matin,                  # S15
+        _slide_annexe,                       # S16
     ]
 
     for page_num, builder in enumerate(slides_builders, start=1):

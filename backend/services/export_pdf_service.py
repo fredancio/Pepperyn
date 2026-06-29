@@ -386,7 +386,7 @@ def _build_page_inaction(edm, risque_text: Optional[str], styles: dict) -> list:
 def _build_page_diagnostic(edm, result: dict, styles: dict) -> list:
     s = []
     s.append(_sp(6))
-    s.append(_section_header("POURQUOI VOTRE RENTABILITÉ SE DÉGRADE", styles))
+    s.append(_section_header("COMMENT VOTRE CAPITAL EST ALLOUÉ AUJOURD'HUI", styles))
     s.append(_hr())
     s.append(_sp(6))
 
@@ -786,7 +786,7 @@ def _build_page_decisions(edm, styles: dict, result_dict: dict | None = None) ->
     if has_reasoning and decisions:
         s.append(_sp(10))
         s.append(Paragraph(
-            "POURQUOI PEPPERYN RECOMMANDE CES DÉCISIONS",
+            "COMMENT PEPPERYN A RAISONNÉ",
             ParagraphStyle(
                 "chain_hdr", fontName="Helvetica-Bold", fontSize=9,
                 textColor=C_GRAY, leading=13, spaceAfter=3,
@@ -795,10 +795,10 @@ def _build_page_decisions(edm, styles: dict, result_dict: dict | None = None) ->
         s.append(_hr())
         s.append(_sp(4))
 
-        # Style compact pour le bloc raisonnement
-        lbl_style = ParagraphStyle(
-            "chain_lbl", fontName="Helvetica-Bold", fontSize=8,
-            textColor=colors.HexColor("#444444"), leading=11,
+        # Styles partagés pour les blocs raisonnement
+        dec_hdr_style = ParagraphStyle(
+            "chain_dec", fontName="Helvetica-Bold", fontSize=8.5,
+            textColor=colors.HexColor(HEX_BLUE), leading=12, spaceBefore=6,
         )
         val_style = ParagraphStyle(
             "chain_val", fontName="Helvetica", fontSize=8,
@@ -806,7 +806,28 @@ def _build_page_decisions(edm, styles: dict, result_dict: dict | None = None) ->
         )
         conf_style = ParagraphStyle(
             "chain_conf", fontName="Helvetica-Oblique", fontSize=8,
-            textColor=C_GRAY, leading=11, spaceAfter=6,
+            textColor=C_GRAY, leading=11, spaceAfter=3,
+        )
+        opt_hdr_style = ParagraphStyle(
+            "opt_hdr", fontName="Helvetica-Bold", fontSize=7.5,
+            textColor=colors.HexColor("#555555"), leading=11, spaceBefore=4,
+        )
+        opt_item_style = ParagraphStyle(
+            "opt_item", fontName="Helvetica", fontSize=7.5,
+            textColor=colors.HexColor("#333333"), leading=11, leftIndent=8,
+        )
+        elim_style = ParagraphStyle(
+            "elim", fontName="Helvetica-Oblique", fontSize=7.5,
+            textColor=C_GRAY, leading=11, leftIndent=16, spaceAfter=2,
+        )
+        dominant_style = ParagraphStyle(
+            "dominant", fontName="Helvetica", fontSize=8,
+            textColor=colors.HexColor("#0A2540"), leading=12,
+            leftIndent=8, spaceAfter=2, borderPad=3,
+        )
+        tipping_style = ParagraphStyle(
+            "tipping", fontName="Helvetica", fontSize=7.5,
+            textColor=colors.HexColor("#555555"), leading=11, leftIndent=8, spaceAfter=2,
         )
 
         # Indexer les raisonnements par decision_index
@@ -814,49 +835,85 @@ def _build_page_decisions(edm, styles: dict, result_dict: dict | None = None) ->
 
         for i, dec in enumerate(decisions):
             r = reasoning_by_idx.get(i, {})
-            why   = r.get("why_this_decision")
-            prob  = r.get("problem_source")
-            risk  = r.get("inaction_risk")
-            conf  = r.get("decision_confidence")
-            conf_expl = r.get("confidence_explanation")
+            why        = r.get("why_this_decision")
+            prob       = r.get("problem_source")
+            risk       = r.get("inaction_risk")
+            conf       = r.get("decision_confidence")
+            conf_expl  = r.get("confidence_explanation")
             match_conf = r.get("matching_confidence", "")
+            options    = r.get("options_considered") or []
+            dominant   = r.get("dominant_rationale")
+            tippings   = r.get("tipping_conditions") or []
 
             # N'affiche le bloc que si au moins why_this_decision est disponible
             if not why and not prob:
                 continue
 
-            # Numéro + libellé de la décision (wrapping assuré par ReportLab)
+            # ── Titre de la décision ──────────────────────────────────────
             s.append(Paragraph(
-                f"<b>#{i + 1} — {_rl(dec.decision)}</b>",
-                ParagraphStyle(
-                    "chain_dec", fontName="Helvetica-Bold", fontSize=8.5,
-                    textColor=colors.HexColor(HEX_BLUE), leading=12, spaceBefore=4,
-                )
+                f"<b>#{i + 1} — {_rl(dec.decision)}</b>", dec_hdr_style
             ))
 
+            # EDX-001 — Raisonnement simple
             if prob:
-                # LOW-confidence ou FALLBACK : indicateur discret
                 prob_text = _rl(prob)
                 if match_conf == "LOW":
                     prob_text += " <i>(correspondance approximative)</i>"
                 elif match_conf == "FALLBACK_INDEX":
                     prob_text += " <i>(correspondance estimée)</i>"
                 s.append(Paragraph(
-                    f"<b>Problème résolu :</b> {prob_text}", val_style))
+                    f"<b>Opportunité ciblée :</b> {prob_text}", val_style))
 
             if why:
                 s.append(Paragraph(
-                    f"<b>Raisonnement :</b> {_rl(why)}", val_style))
+                    f"<b>Pourquoi cette décision :</b> {_rl(why)}", val_style))
 
             if risk:
                 s.append(Paragraph(
                     f"<b>Si vous n'agissez pas :</b> {_rl(risk)}", val_style))
 
             if conf is not None:
-                conf_line = f"Confiance Pepperyn : {conf}%"
+                conf_line = f"Confiance : {conf}%"
                 if conf_expl:
                     conf_line += f" — {_rl(conf_expl)}"
                 s.append(Paragraph(conf_line, conf_style))
+
+            # EDX-002 — Options évaluées et écartées
+            if options:
+                s.append(Paragraph(
+                    f"Options évaluées ({len(options)} alternatives) :", opt_hdr_style
+                ))
+                for j, opt in enumerate(options):
+                    opt_name = _rl(opt.get("option", ""))
+                    elim_crit = _rl(opt.get("elimination_criterion", ""))
+                    s.append(Paragraph(
+                        f"<b>✗ {opt_name}</b>", opt_item_style
+                    ))
+                    if elim_crit:
+                        s.append(Paragraph(
+                            f"→ Écarté : {elim_crit}", elim_style
+                        ))
+
+            # EDX-002 — Pourquoi l'option retenue domine
+            if dominant:
+                s.append(Paragraph(
+                    f"<b>Pourquoi cette option domine :</b> {_rl(dominant)}",
+                    dominant_style
+                ))
+
+            # EDX-002 — Conditions de révision
+            if tippings:
+                s.append(Paragraph(
+                    "Ce qui ferait changer d'avis :", opt_hdr_style
+                ))
+                for t in tippings:
+                    cond = _rl(t.get("condition", ""))
+                    alt  = _rl(t.get("alternative_recommendation", ""))
+                    h    = t.get("horizon_days", 90)
+                    s.append(Paragraph(
+                        f"<b>Si</b> {cond} (horizon : {h}j) → {alt}",
+                        tipping_style
+                    ))
 
     s.append(PageBreak())
     return s
@@ -972,11 +1029,11 @@ def _build_page_roadmap(edm, styles: dict) -> list:
 def _build_page_destroyers(edm, styles: dict) -> list:
     s = []
     s.append(_sp(6))
-    s.append(_section_header("CE QUI DÉTRUIT RÉELLEMENT VOTRE RENTABILITÉ", styles, bar_color=C_RED))
+    s.append(_section_header("OPPORTUNITÉS D'OPTIMISATION IDENTIFIÉES", styles, bar_color=C_BLUE))
     s.append(_hr())
     s.append(_sp(4))
 
-    headers = ["Destructeur de valeur", "Impact annuel", "Impact mensuel", "Tendance"]
+    headers = ["Levier d'optimisation", "Potentiel annuel", "Potentiel mensuel", "Tendance"]
     col_w = [CONTENT_W * 0.40, CONTENT_W * 0.22, CONTENT_W * 0.22, CONTENT_W * 0.16]
 
     data = [[Paragraph(h, styles["tbl_hdr"]) for h in headers]]

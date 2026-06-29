@@ -298,6 +298,55 @@ confidence_explanation :
   Cite ce qui renforce la confiance ET ce qui l'affaiblit (si applicable).
   Ne donne AUCUN chiffre que tu n'aurais pas reçu dans les sources.
   Tu n'évalues pas — tu expliques le score fourni.
+
+─── CHAMPS EDX-002 — Raisonnement comparatif (Chemin A) ─────────────────────
+Tu es un conseiller financier senior avec 20+ ans d'expérience PME. Pour chaque
+décision prioritaire, tu conduis un raisonnement comparatif complet et honnête.
+
+RÈGLES ANTI-HALLUCINATION (strictes) :
+• Tu ne cites JAMAIS de chiffres que tu n'as pas reçus dans les sources.
+• Tes alternatives sont ancrées dans le TYPE de problème identifié et la
+  situation réelle de l'entreprise (taille, cash disponible, secteur, urgence).
+• Tes critères d'élimination RÉFÉRENCENT des données sources (ex : "runway de
+  11 semaines", "DSO à 87j", "EBITDA négatif", "CA de 3,2 M€").
+• Si les données sont insuffisantes pour des alternatives crédibles :
+  options_considered = [] (liste vide — ne jamais inventer).
+
+options_considered :
+  Liste de 3 à 5 alternatives sérieuses que tu as évaluées pour atteindre
+  le même objectif que la décision retenue. Chaque alternative :
+    option : description concise (1 ligne, ton affirmé — pas de conditionnel).
+      Exemples : "Provisionnement comptable immédiat"
+                 "Cession d'actifs immobilisés au prix marché"
+                 "Renégociation des délais fournisseurs (J+60)"
+    elimination_criterion : le critère PRÉCIS et FACTUEL qui écarte cette option.
+      • PAS "moins efficace" ou "moins adapté" — un critère spécifique :
+        timeline incompatible avec le runway cash, impact insuffisant vs objectif,
+        capacité organisationnelle absente, risque contrepartie trop élevé,
+        horizon de retour incompatible avec l'urgence identifiée, etc.
+      • Le critère DOIT pouvoir être vérifié dans les données sources.
+  Ces alternatives doivent être RÉELLEMENT distinctes — pas des variantes.
+  Elles doivent être RÉALISTES pour une PME dans cette situation précise.
+
+dominant_rationale :
+  1 à 2 phrases. Pourquoi l'option retenue domine la MEILLEURE des alternatives
+  écartées. Formule le trade-off exact entre les deux options.
+  Structure : "L'option retenue [avantage concret chiffré ou qualifié] là où
+  [alternative] [limite spécifique]. Le différentiel décisif est [facteur X]."
+  Cite les deux options par leur nature — jamais "option A" et "option B".
+  INTERDIT : arguments vagues ou génériques sans ancrage dans les données.
+
+tipping_conditions :
+  Liste de 1 à 2 conditions précises et observables qui renverseraient cette
+  recommandation dans les 90 prochains jours. Chaque condition :
+    condition : l'événement précis et observable (pas une tendance générale).
+      Exemples : "Le client [Secteur] représente plus de 35% du stock concerné"
+                 "La trésorerie passe sous 80 K€ avant le J+15 de l'exécution"
+                 "Le prix de revient des matières premières augmente de >15%"
+    horizon_days : dans combien de jours cette condition doit être surveillée
+      (entre 30 et 90 selon la nature de la condition).
+    alternative_recommendation : la décision de substitution concrète si la
+      condition se réalise — 1 phrase, actionnable immédiatement.
 ─────────────────────────────────────────────────────────────────────────────
 
 FORMAT DE SORTIE : JSON pur uniquement.
@@ -501,16 +550,35 @@ def case_to_result_dict(case: ExecutiveCaseJSON) -> dict:
         for h, actions in case.roadmap_30_60_90.items()
     ]
 
-    # EDX-001 — chaîne décisionnelle sérialisée pour les renderers
+    # EDX-001 + EDX-002 — chaîne décisionnelle sérialisée pour les renderers
     decision_reasoning = [
         {
+            # EDX-001 — déterministe
             "decision_index":         r.decision_index,
             "problem_source":         r.problem_source,
             "matching_confidence":    r.matching_confidence,
+            "decision_confidence":    r.decision_confidence,
+            # EDX-001 — LLM
             "why_this_decision":      r.why_this_decision,
             "inaction_risk":          r.inaction_risk,
-            "decision_confidence":    r.decision_confidence,
             "confidence_explanation": r.confidence_explanation,
+            # EDX-002 — raisonnement comparatif
+            "options_considered": [
+                {
+                    "option":                o.option,
+                    "elimination_criterion": o.elimination_criterion,
+                }
+                for o in (r.options_considered or [])
+            ],
+            "dominant_rationale":  r.dominant_rationale,
+            "tipping_conditions": [
+                {
+                    "condition":                  t.condition,
+                    "horizon_days":               t.horizon_days,
+                    "alternative_recommendation": t.alternative_recommendation,
+                }
+                for t in (r.tipping_conditions or [])
+            ],
         }
         for r in case.decision_reasoning
     ]
@@ -814,18 +882,35 @@ def _schema_example() -> dict:
         },
         "major_risks": [{"description": "", "severity": "", "impact": "", "horizon": ""}],
         "data_quality": {"score": 70, "anomalies": [], "assumptions": [], "limits": []},
-        # EDX-001 — decision_reasoning
-        # Copie decision_index / problem_source / matching_confidence /
-        # decision_confidence depuis reasoning_skeleton.
-        # Génère why_this_decision / inaction_risk / confidence_explanation.
+        # EDX-001 + EDX-002 — decision_reasoning
+        # EDX-001 : Copie decision_index / problem_source / matching_confidence /
+        #           decision_confidence depuis reasoning_skeleton.
+        #           Génère why_this_decision / inaction_risk / confidence_explanation.
+        # EDX-002 : Génère options_considered / dominant_rationale / tipping_conditions.
+        #           Voir règles anti-hallucination dans le prompt ci-dessus.
         "decision_reasoning": [{
             "decision_index":         0,
-            "problem_source":         None,      # COPIER depuis reasoning_skeleton
-            "matching_confidence":    None,      # COPIER depuis reasoning_skeleton
-            "why_this_decision":      None,      # GÉNÉRER — voix Pepperyn
-            "inaction_risk":          None,      # GÉNÉRER — horizon 90 jours
-            "decision_confidence":    None,      # COPIER depuis reasoning_skeleton
-            "confidence_explanation": None,      # GÉNÉRER — expliquer le score
+            "problem_source":         None,   # COPIER depuis reasoning_skeleton
+            "matching_confidence":    None,   # COPIER depuis reasoning_skeleton
+            "decision_confidence":    None,   # COPIER depuis reasoning_skeleton
+            "why_this_decision":      None,   # GÉNÉRER EDX-001 — voix Pepperyn
+            "inaction_risk":          None,   # GÉNÉRER EDX-001 — horizon 90 jours
+            "confidence_explanation": None,   # GÉNÉRER EDX-001 — expliquer le score
+            # EDX-002 — raisonnement comparatif (Chemin A)
+            "options_considered": [           # GÉNÉRER — alternatives évaluées et écartées
+                {
+                    "option": "Description alternative évaluée",
+                    "elimination_criterion": "Critère précis ancré dans les données"
+                }
+            ],
+            "dominant_rationale": None,       # GÉNÉRER — pourquoi l'option retenue domine
+            "tipping_conditions": [           # GÉNÉRER — conditions de révision
+                {
+                    "condition": "Événement précis et observable",
+                    "horizon_days": 90,
+                    "alternative_recommendation": "Décision de substitution concrète"
+                }
+            ],
         }],
     }
 

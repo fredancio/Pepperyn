@@ -56,30 +56,72 @@ class ValueDestroyerItem(BaseModel):
     trend:          Optional[str]   = None   # "↑" | "↓" | "→" | None
 
 
+class EliminatedOption(BaseModel):
+    """
+    Une option alternative évaluée et écartée dans le raisonnement comparatif.
+
+    EDX-002 — Chemin A : le LLM génère librement les alternatives,
+    ancrées dans les données sources de l'entreprise.
+
+    Règle anti-hallucination : elimination_criterion DOIT référencer
+    une donnée factuelle fournie dans les sources (cash runway, DSO, EBITDA,
+    horizon temporel, etc.). Aucun chiffre inventé.
+    """
+    option:                str  # Description concise de l'alternative (1 ligne, ton affirmé)
+    elimination_criterion: str  # Critère précis et factuel qui écarte cette option
+
+
+class TippingCondition(BaseModel):
+    """
+    Une condition observable qui renverserait la recommandation dans l'horizon cible.
+
+    EDX-002 — Pepperyn ne dit pas "je pourrais me tromper".
+    Il dit : "Voici exactement ce qui me ferait changer d'avis, et vers quoi."
+    """
+    condition:                  str      # L'événement précis et observable
+    horizon_days:               int = 90 # Délai de surveillance en jours
+    alternative_recommendation: str      # La décision de substitution si condition réalisée
+
+
 class DecisionReasoning(BaseModel):
     """
-    Chaîne de raisonnement associée à une décision prioritaire — EDX-001.
+    Chaîne de raisonnement associée à une décision prioritaire.
 
-    Séparée de PriorityDecisionItem pour permettre l'évolution indépendante
-    du raisonnement (EDX-002 : alternatives, hypothèses, conditions de révision,
-    mémoire décisionnelle).
+    EDX-001 (champs existants) — matching déterministe + raisonnement simple.
+    EDX-002 (champs nouveaux) — raisonnement comparatif McKinsey :
+      "J'ai étudié N options. J'en ai éliminé N-1. Voici pourquoi.
+       Parmi les survivantes, j'en recommande une. Voici pourquoi elle domine.
+       Voici ce qui pourrait me faire changer d'avis dans 90 jours."
 
     Responsabilité par champ :
-      decision_index        → clé de liaison avec priority_decisions[i]
-      problem_source        → Python pur (matching mots-clés vs value_destroyers)
-      matching_confidence   → Python pur ("HIGH" | "LOW" | "FALLBACK_INDEX" | None)
-      decision_confidence   → Python pur (formule déterministe)
-      why_this_decision     → LLM — voix Pepperyn, lien causal
-      inaction_risk         → LLM — conséquence à 90 jours
-      confidence_explanation → LLM — explication du score, jamais évaluation
+      decision_index          → clé de liaison avec priority_decisions[i]
+      problem_source          → Python pur (matching mots-clés vs value_destroyers)
+      matching_confidence     → Python pur ("HIGH" | "LOW" | "FALLBACK_INDEX" | None)
+      decision_confidence     → Python pur (formule déterministe)
+      why_this_decision       → LLM EDX-001 — voix Pepperyn, lien causal
+      inaction_risk           → LLM EDX-001 — conséquence à 90 jours
+      confidence_explanation  → LLM EDX-001 — explication du score
+      options_considered      → LLM EDX-002 — alternatives évaluées et écartées
+      dominant_rationale      → LLM EDX-002 — pourquoi l'option retenue domine
+      tipping_conditions      → LLM EDX-002 — conditions de révision à 90 jours
     """
-    decision_index:          int
-    problem_source:          Optional[str] = None
-    matching_confidence:     Optional[str] = None  # "HIGH" | "LOW" | "FALLBACK_INDEX"
-    why_this_decision:       Optional[str] = None
-    inaction_risk:           Optional[str] = None
-    decision_confidence:     Optional[int] = None
-    confidence_explanation:  Optional[str] = None
+    # ── EDX-001 — déterministe (Python pur) ──────────────────────────────────
+    decision_index:         int
+    problem_source:         Optional[str] = None
+    matching_confidence:    Optional[str] = None   # "HIGH" | "LOW" | "FALLBACK_INDEX"
+    decision_confidence:    Optional[int] = None
+
+    # ── EDX-001 — LLM ────────────────────────────────────────────────────────
+    why_this_decision:      Optional[str] = None
+    inaction_risk:          Optional[str] = None
+    confidence_explanation: Optional[str] = None
+
+    # ── EDX-002 — LLM (raisonnement comparatif — Chemin A) ───────────────────
+    # Le LLM génère librement les alternatives, ancrées dans les données sources.
+    # Liste vide si données insuffisantes pour alternatives crédibles.
+    options_considered:  List["EliminatedOption"]  = Field(default_factory=list)
+    dominant_rationale:  Optional[str]             = None
+    tipping_conditions:  List["TippingCondition"]  = Field(default_factory=list)
 
 
 class PriorityDecisionItem(BaseModel):
