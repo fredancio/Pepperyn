@@ -36,6 +36,15 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
+from config.excel_layout import (
+    ROW_H_HEADER, ROW_H_SECTION, ROW_H_COL_HDR, ROW_H_NAV,
+    ROW_H_INSTRUCTION, ROW_H_INSTRUCTION_WIDE, ROW_H_KPI_PROJECTED,
+    ROW_H_GUIDE_NOTE,
+    COL_END_EDM, COL_END_DASHBOARD, COL_END_HYPOTHESES, COL_END_DECISION_LAB,
+    COL_END_SENSIBILITE, COL_END_SCENARIOS, COL_END_ROADMAP, COL_END_HISTORIQUE,
+    COLS_EDM, COLS_DASHBOARD, COLS_HYPOTHESES, COLS_DECISION_LAB,
+    COLS_SENSIBILITE, COLS_SCENARIOS, COLS_ROADMAP, COLS_HISTORIQUE,
+)
 from models.schemas import AnalysisResult
 from models.executive_case import ExecutiveCaseJSON
 
@@ -175,7 +184,7 @@ def _header_bar(ws, row: int, text: str, col_start: int = 1,
     c.font = _font(size=size, bold=True, color=P_WHITE)
     c.fill = _fill(bg)
     c.alignment = _align("left")
-    ws.row_dimensions[row].height = 34
+    ws.row_dimensions[row].height = ROW_H_HEADER
 
 def _section_bar(ws, row: int, text: str, col_start: int = 1,
                  col_end: int = 18, bg: str = P_BLUE) -> None:
@@ -185,7 +194,7 @@ def _section_bar(ws, row: int, text: str, col_start: int = 1,
     c.font = _font(size=9, bold=True, color=P_WHITE)
     c.fill = _fill(bg)
     c.alignment = _align("left")
-    ws.row_dimensions[row].height = 22
+    ws.row_dimensions[row].height = ROW_H_SECTION
 
 def _col_headers(ws, row: int, headers: list, start_col: int = 1,
                  bg: str = P_NAVY) -> None:
@@ -195,15 +204,16 @@ def _col_headers(ws, row: int, headers: list, start_col: int = 1,
         c.fill = _fill(bg)
         c.alignment = _align("center")
         c.border = _border_thin()
-    ws.row_dimensions[row].height = 22
+    ws.row_dimensions[row].height = ROW_H_COL_HDR
 
-def _instruction(ws, row: int, text: str, col: int = 1, col_end: int = 18) -> None:
+def _instruction(ws, row: int, text: str, col: int = 1, col_end: int = 18,
+                 height: float = ROW_H_INSTRUCTION) -> None:
     ws.merge_cells(start_row=row, start_column=col, end_row=row, end_column=col_end)
     c = ws.cell(row=row, column=col, value=f"  ℹ  {text}")
     c.font = _font(size=9, italic=True, color=P_SLATE)
     c.fill = _fill("FFFBEB")
-    c.alignment = _align("left")
-    ws.row_dimensions[row].height = 20
+    c.alignment = _align("left", "center", wrap=True)
+    ws.row_dimensions[row].height = height
 
 def _kpi_block(ws, row: int, col: int, label: str, value, *,
                width: int = 3, height: int = 3, fill_c: str = P_LIGHT,
@@ -238,6 +248,29 @@ def _freeze(ws, cell: str = "A4") -> None:
     ws.freeze_panes = cell
 
 
+def _row_height_for_text(text: str, col_width: float,
+                         font_size: int = 10,
+                         min_height: float = 30.0,
+                         padding: float = 8.0) -> float:
+    """
+    PEPPERYN_EXECUTIVE_RENDERING_SPECIFICATION — Rows:
+    'Dynamic height. Renderer computes row height. Never fixed.'
+
+    Compute the row height in points required to display `text` fully
+    when wrapped in a column of `col_width` character units (openpyxl unit).
+
+    At Calibri 10pt, one openpyxl character unit ≈ 0.85 visible characters.
+    One line height ≈ font_size × 1.5 (standard leading).
+    A safety factor of 0.85 ensures text never clips at the boundary.
+    """
+    if not text:
+        return min_height
+    chars_per_line = max(int(col_width * 0.85), 1)
+    num_lines = -(-len(str(text)) // chars_per_line)   # ceiling division
+    height = num_lines * font_size * 1.5 + padding
+    return max(height, min_height)
+
+
 # ─── Helpers UX ──────────────────────────────────────────────────────────────
 
 def _setup_sheet(ws) -> None:
@@ -262,7 +295,7 @@ def _nav_bar(ws, active: str, row: int = 3, col_end: int = 18) -> None:
     c.font = _font(size=7, color="8899BB")
     c.fill = _fill(P_NAVY2)
     c.alignment = _align("left", "center")
-    ws.row_dimensions[row].height = 18
+    ws.row_dimensions[row].height = ROW_H_NAV
 
 
 # ─── FEUILLE EDM (masquée — source unique) ────────────────────────────────────
@@ -359,7 +392,7 @@ def _build_edm(wb: Workbook, edm, raw: dict) -> None:
     for j, v in enumerate(edm.monthly_projection[:12]):
         ws.cell(row=r + 3, column=2 + j, value=v)
 
-    _widths(ws, {"A": 35, "B": 18, "C": 16, "D": 14, "E": 28, "F": 14, "G": 10})
+    _widths(ws, COLS_EDM)
 
 
 # ─── FEUILLE 0 : ACCUEIL ─────────────────────────────────────────────────────
@@ -549,16 +582,19 @@ def _build_dashboard(wb: Workbook, edm, raw: dict) -> None:
     _setup_sheet(ws)
 
     date_str = datetime.now().strftime("%d %B %Y")
-    _header_bar(ws, 1, f"EXECUTIVE DASHBOARD  ·  {date_str}  ·  CONFIDENTIEL", col_end=20)
+    _header_bar(ws, 1, f"EXECUTIVE DASHBOARD  ·  {date_str}  ·  CONFIDENTIEL", col_end=17)
     _instruction(ws, 2,
                  "Tableau de bord en temps réel — toutes les valeurs se mettent à jour automatiquement "
                  "lorsque vous modifiez vos hypothèses ou simulez des décisions dans Decision Lab.",
-                 col_end=20)
-    _nav_bar(ws, SN_DASH, row=3, col_end=20)
+                 col_end=17, height=ROW_H_INSTRUCTION_WIDE)
+    _nav_bar(ws, SN_DASH, row=3, col_end=17)
 
     # Ligne 1 de KPI
     kpi_cols = [2, 6, 10, 14]
     kpi_w = 3
+    # Colonnes espaceurs (A=1, E=5, I=9, M=13, Q=17) — doivent partager le fond
+    # du bloc pour former un rectangle homogène entre les barres.
+    spacer_cols = [1, 5, 9, 13, 17]
 
     kpi_r1 = [
         ("EBITDA actuel",       f"=EDM!B{EDM_R_EBITDA}",  P_DARK,  "#,##0 €;(#,##0 €);-"),
@@ -567,6 +603,10 @@ def _build_dashboard(wb: Workbook, edm, raw: dict) -> None:
         ("Niveau de confiance", f"=EDM!B{EDM_R_CONFID}",  P_DARK,  "0\"/10\""),
     ]
     r1_start = 4
+    # Fond homogène sur toute la largeur avant de poser les blocs KPI
+    for sc in spacer_cols:
+        for r in range(r1_start, r1_start + 4):
+            ws.cell(row=r, column=sc).fill = _fill(P_LIGHT)
     for (label, val, vc, nf), col in zip(kpi_r1, kpi_cols):
         _kpi_block(ws, r1_start, col, label, val, width=kpi_w, height=4,
                    val_size=18, val_color=vc, num_format=nf)
@@ -574,10 +614,13 @@ def _build_dashboard(wb: Workbook, edm, raw: dict) -> None:
     kpi_r2 = [
         ("Coût inaction / an",  f"=EDM!B{EDM_R_COI_YEAR}",            P_RED,   "#,##0 €;(#,##0 €);-"),
         ("Impact identifié",    f"=EDM!B{EDM_R_IMPACT}",               P_AMBER, "#,##0 €;(#,##0 €);-"),
-        ("EBITDA projeté",      f"='{SN_LAB}'!B{LAB_R_PROJ}",          P_GREEN, "#,##0 €;(#,##0 €);-"),
-        ("Variation projetée",  f"='{SN_LAB}'!B{LAB_R_VAR_PCT}",       P_BLUE,  "0.0%"),
+        ("EBITDA projeté",      f"='{SN_LAB}'!C{LAB_R_PROJ}",          P_GREEN, "#,##0 €;(#,##0 €);-"),
+        ("Variation projetée",  f"='{SN_LAB}'!C{LAB_R_VAR_PCT}",       P_BLUE,  "0.0%"),
     ]
     r2_start = r1_start + 5
+    for sc in spacer_cols:
+        for r in range(r2_start, r2_start + 4):
+            ws.cell(row=r, column=sc).fill = _fill(P_LIGHT)
     for (label, val, vc, nf), col in zip(kpi_r2, kpi_cols):
         _kpi_block(ws, r2_start, col, label, val, width=kpi_w, height=4,
                    val_size=18, val_color=vc, num_format=nf)
@@ -585,7 +628,7 @@ def _build_dashboard(wb: Workbook, edm, raw: dict) -> None:
     # Coût de l'inaction détaillé
     r_coi_hdr = r2_start + 5
     ws.row_dimensions[r_coi_hdr].height = 8
-    _section_bar(ws, r_coi_hdr + 1, "COÛT DE L'INACTION — Chaque heure compte", col_end=20)
+    _section_bar(ws, r_coi_hdr + 1, "COÛT DE L'INACTION — Chaque heure compte", col_end=17)
     coi_items = [
         ("Par heure",   f"=EDM!B{EDM_R_COI_HOUR}", 2),
         ("Par jour",    f"=EDM!B{EDM_R_COI_DAY}",  6),
@@ -593,6 +636,9 @@ def _build_dashboard(wb: Workbook, edm, raw: dict) -> None:
         ("Par mois",    f"=EDM!B{EDM_R_COI_MONTH}",14),
     ]
     cr = r_coi_hdr + 2
+    for sc in spacer_cols:
+        for r in range(cr, cr + 3):
+            ws.cell(row=r, column=sc).fill = _fill("FFF8F8")
     for label, val, col in coi_items:
         _kpi_block(ws, cr, col, label, val, width=kpi_w, height=3,
                    fill_c="FFF8F8", val_size=14, val_color=P_RED,
@@ -601,13 +647,17 @@ def _build_dashboard(wb: Workbook, edm, raw: dict) -> None:
     # Navigation rapide
     nav_r = cr + 4
     ws.row_dimensions[nav_r].height = 8
-    _section_bar(ws, nav_r + 1, "NAVIGATION RAPIDE", col_end=20)
+    _section_bar(ws, nav_r + 1, "NAVIGATION RAPIDE", col_end=17)
     nav_items = [
         (2,  "→  Hypothèses",    "Modifier les paramètres"),
         (6,  "→  Decision Lab",  "Simuler des décisions"),
         (10, "→  Sensibilité",   "Identifier les leviers"),
         (14, "→  Scénarios",     "Comparer les visions"),
     ]
+    # Fond homogène sur toute la largeur des 2 lignes de nav
+    for ci in range(1, 18):
+        ws.cell(row=nav_r + 2, column=ci).fill = _fill(P_LIGHT)
+        ws.cell(row=nav_r + 3, column=ci).fill = _fill(P_LIGHT)
     for col, name, desc in nav_items:
         c = ws.cell(row=nav_r + 2, column=col, value=name)
         c.font = _font(size=9, color=P_BLUE, bold=True)
@@ -620,9 +670,7 @@ def _build_dashboard(wb: Workbook, edm, raw: dict) -> None:
         ws.merge_cells(start_row=nav_r + 3, start_column=col,
                        end_row=nav_r + 3, end_column=col + kpi_w - 1)
 
-    _widths(ws, {i: 7 for i in range(1, 21)})
-    _widths(ws, {"A": 1.5, "E": 1.5, "I": 1.5, "M": 1.5, "Q": 1.5})
-    _freeze(ws, "A4")
+    _widths(ws, COLS_DASHBOARD)
 
 
 # ─── FEUILLE 2 : HYPOTHÈSES ───────────────────────────────────────────────────
@@ -632,12 +680,12 @@ def _build_hypotheses(wb: Workbook, edm) -> None:
     ws.tab_color = P_BLUE
     _setup_sheet(ws)
 
-    _header_bar(ws, 1, "HYPOTHÈSES — Paramètres de votre modèle financier", col_end=12)
+    _header_bar(ws, 1, "HYPOTHÈSES — Paramètres de votre modèle financier", col_end=4)
     _instruction(ws, 2,
                  "Cellules BLEUES = vous pouvez les modifier. "
                  "Toutes les autres feuilles se recalculent immédiatement.",
-                 col_end=12)
-    _nav_bar(ws, SN_HYPO, row=3, col_end=12)
+                 col_end=4)
+    _nav_bar(ws, SN_HYPO, row=3, col_end=4)
     _col_headers(ws, 4, ["Paramètre", "Valeur", "Unité", "Note / Source"], bg=P_NAVY)
 
     # Section A — Données de référence EDM
@@ -725,8 +773,7 @@ def _build_hypotheses(wb: Workbook, edm) -> None:
         c.border = _border_thin()
         ws.cell(row=r, column=4, value=note).font = _font(italic=True, color=P_SLATE)
 
-    _widths(ws, {"A": 36, "B": 22, "C": 12, "D": 34})
-    _freeze(ws, "A5")
+    _widths(ws, COLS_HYPOTHESES)
 
 
 # ─── FEUILLE 3 : DECISION LAB ─────────────────────────────────────────────────
@@ -736,14 +783,14 @@ def _build_decision_lab(wb: Workbook, edm) -> None:
     ws.tab_color = P_GREEN
     _setup_sheet(ws)
 
-    _header_bar(ws, 1, "DECISION LAB — Simulateur stratégique", col_end=10)
+    _header_bar(ws, 1, "DECISION LAB — Simulateur stratégique", col_end=8)
     _instruction(ws, 2,
                  "Modifiez la colonne EXÉCUTION % (cellules bleues) pour simuler vos scénarios. "
                  "Tous les indicateurs se recalculent instantanément. "
                  "0% = décision non prise. 100% = décision totalement exécutée.",
-                 col_end=10)
-    _nav_bar(ws, SN_LAB, row=3, col_end=10)
-    _section_bar(ws, 4, "SIMULATION — Ajustez le % d'exécution pour chaque décision", col_end=10)
+                 col_end=8)
+    _nav_bar(ws, SN_LAB, row=3, col_end=8)
+    _section_bar(ws, 4, "SIMULATION — Ajustez le % d'exécution pour chaque décision", col_end=8)
 
     headers = ["#", "Décision", "Impact de base (€)", "Exécution %",
                "Impact projeté (€)", "Responsable", "Horizon", "Priorité"]
@@ -770,7 +817,8 @@ def _build_decision_lab(wb: Workbook, edm) -> None:
         c.fill = _fill(alt)
         c.border = _border_thin()
         c.alignment = _align("left", wrap=True)
-        ws.row_dimensions[r].height = 30
+        # SPEC: Rows — Dynamic height. Renderer computes row height. Never fixed.
+        ws.row_dimensions[r].height = _row_height_for_text(dec_text, 90)
 
         edm_ref = f"EDM!B{EDM_R_DEC_START + i}"
         c = ws.cell(row=r, column=3, value=f"={edm_ref}")
@@ -799,11 +847,13 @@ def _build_decision_lab(wb: Workbook, edm) -> None:
         c.font = _font(color=FONT_INPUT)
         c.fill = _fill(alt)
         c.border = _border_thin()
+        c.alignment = _align("left", wrap=True)   # SPEC: Left for descriptions, Wrap mandatory
 
         c = ws.cell(row=r, column=7, value=dec.timeline if dec else "—")
         c.font = _font(color=FONT_INPUT)
         c.fill = _fill(alt)
         c.border = _border_thin()
+        c.alignment = _align("left", wrap=True)   # SPEC: Left for descriptions, Wrap mandatory
 
         if dec:
             p_lower = (dec.priority or "").lower()
@@ -814,6 +864,7 @@ def _build_decision_lab(wb: Workbook, edm) -> None:
             ws.cell(row=r, column=8, value="—").font = _font(color=P_SLATE)
         ws.cell(row=r, column=8).fill = _fill(alt)
         ws.cell(row=r, column=8).border = _border_thin()
+        ws.cell(row=r, column=8).alignment = _align("center")
 
     # Ligne totaux
     r_tot = LAB_R_TOTAL
@@ -838,7 +889,7 @@ def _build_decision_lab(wb: Workbook, edm) -> None:
 
     # Tableau de bord projeté
     ws.row_dimensions[r_tot + 1].height = 10
-    _section_bar(ws, r_tot + 2, "TABLEAU DE BORD PROJETÉ — Recalcul automatique", col_end=10)
+    _section_bar(ws, r_tot + 2, "TABLEAU DE BORD PROJETÉ — Recalcul automatique", col_end=8)
 
     proj_def = [
         (LAB_R_EBITDA,   "EBITDA de base (€)",
@@ -846,26 +897,33 @@ def _build_decision_lab(wb: Workbook, edm) -> None:
         (LAB_R_IMPACT,   "Impact simulé total (€)",
          f"={lc}{r_tot}", "#,##0 €;(#,##0 €);-", FONT_FORMULA),
         (LAB_R_PROJ,     "EBITDA projeté (€)",
-         f"=B{LAB_R_EBITDA}+B{LAB_R_IMPACT}", "#,##0 €;(#,##0 €);-", FONT_FORMULA),
+         f"=C{LAB_R_EBITDA}+C{LAB_R_IMPACT}", "#,##0 €;(#,##0 €);-", FONT_FORMULA),
         (LAB_R_VAR_PCT,  "Variation vs actuel (%)",
-         f"=IFERROR(B{LAB_R_IMPACT}/ABS(B{LAB_R_EBITDA}),0)", "0.0%", FONT_FORMULA),
+         f"=IFERROR(C{LAB_R_IMPACT}/ABS(C{LAB_R_EBITDA}),0)", "0.0%", FONT_FORMULA),
         (LAB_R_VAR_PCT+1,"Coût de l'inaction (rappel)",
          f"=EDM!B{EDM_R_COI_YEAR}", "#,##0 €;(#,##0 €);-", FONT_LINK),
         (LAB_R_VAR_PCT+2,"Gain net vs inaction",
-         f"=B{LAB_R_PROJ}+ABS(EDM!B{EDM_R_COI_YEAR})",
+         f"=C{LAB_R_PROJ}+ABS(EDM!B{EDM_R_COI_YEAR})",
          "#,##0 €;(#,##0 €);-", FONT_FORMULA),
     ]
     for r, label, val, nf, fc in proj_def:
-        ws.cell(row=r, column=1, value=label).font = _font(color=P_GRAY, bold=True)
-        c = ws.cell(row=r, column=2, value=val)
+        # Label in col B (90u) — no merge needed, right-aligned for clean layout
+        lbl = ws.cell(row=r, column=2, value=label)
+        lbl.font = _font(color=P_GRAY, bold=True)
+        lbl.alignment = _align("right", "center")
+        ws.row_dimensions[r].height = ROW_H_KPI_PROJECTED
+        # Value in col C (20u) — wide enough for any formatted monetary value
+        c = ws.cell(row=r, column=3, value=val)
         c.font = _font(bold=True, color=fc, size=12)
         c.number_format = nf
         c.border = _border_thin()
         c.alignment = _align("right")
 
-    _widths(ws, {"A": 4, "B": 44, "C": 22, "D": 16, "E": 22,
-                 "F": 20, "G": 16, "H": 16})
-    _freeze(ws, "B6")
+    # SPEC: Widths are fixed. Renderer must apply predefined widths.
+    # Décision (B) = primary content column — 51 % de la largeur totale (174u).
+    # Colonnes secondaires comprimées à leur minimum fonctionnel.
+    # Cible : décisions standard (≤ 100 chars) sur 2 lignes maximum.
+    _widths(ws, COLS_DECISION_LAB)
 
 
 # ─── FEUILLE 4 : SENSIBILITÉ ──────────────────────────────────────────────────
@@ -875,12 +933,12 @@ def _build_sensitivity(wb: Workbook, edm) -> None:
     ws.tab_color = P_AMBER
     _setup_sheet(ws)
 
-    _header_bar(ws, 1, "ANALYSE DE SENSIBILITÉ — Qu'est-ce qui influence le plus notre résultat ?", col_end=12)
+    _header_bar(ws, 1, "ANALYSE DE SENSIBILITÉ — Qu'est-ce qui influence le plus notre résultat ?", col_end=8)
     _instruction(ws, 2,
                  "Ce tableau montre l'impact € d'une variation de ±X% de chaque variable sur votre résultat. "
                  "Les valeurs se recalculent automatiquement lorsque vous modifiez la feuille Hypothèses.",
-                 col_end=12)
-    _nav_bar(ws, SN_SENSI, row=3, col_end=12)
+                 col_end=8)
+    _nav_bar(ws, SN_SENSI, row=3, col_end=8)
 
     pcts = [-0.20, -0.10, -0.05, 0.05, 0.10, 0.20]
     pct_labels = [f"{int(p*100):+d}%" for p in pcts]
@@ -921,7 +979,7 @@ def _build_sensitivity(wb: Workbook, edm) -> None:
         lev.border = _border_thin()
 
     r_note = 5 + len(sens_vars) + 2
-    _section_bar(ws, r_note, "COMMENT LIRE CE TABLEAU", col_end=12, bg=P_NAVY)
+    _section_bar(ws, r_note, "COMMENT LIRE CE TABLEAU", col_end=8, bg=P_NAVY)
     guide = [
         ("Valeurs vertes (+)", "  Signifie : la variable aide le résultat quand elle augmente (ex: CA, prix, volume)"),
         ("Valeurs rouges (−)", "  Signifie : la variable pèse sur le résultat quand elle augmente (ex: coûts)"),
@@ -933,10 +991,9 @@ def _build_sensitivity(wb: Workbook, edm) -> None:
         ws.cell(row=r, column=1, value=label).font = _font(bold=True, color=P_DARK)
         c = ws.cell(row=r, column=2, value=val)
         c.font = _font(color=P_GRAY)
-        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=9)
+        ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=8)
 
-    _widths(ws, {"A": 34, "B": 14, "C": 14, "D": 14, "E": 14, "F": 14, "G": 14, "H": 18})
-    _freeze(ws, "B5")
+    _widths(ws, COLS_SENSIBILITE)
 
 
 # ─── FEUILLE 5 : SCÉNARIOS ───────────────────────────────────────────────────
@@ -946,19 +1003,19 @@ def _build_scenarios(wb: Workbook, edm) -> None:
     ws.tab_color = P_BLUE
     _setup_sheet(ws)
 
-    _header_bar(ws, 1, "COMPARAISON DE SCÉNARIOS — Prudent · Central · Ambitieux · Personnalisé", col_end=14)
+    _header_bar(ws, 1, "COMPARAISON DE SCÉNARIOS — Prudent · Central · Ambitieux · Personnalisé", col_end=5)
     _instruction(ws, 2,
                  "Le scénario Personnalisé reprend vos simulations du Decision Lab en temps réel. "
                  "Les trois autres appliquent des multiplicateurs au même impact de base.",
-                 col_end=14)
-    _nav_bar(ws, SN_SCEN, row=3, col_end=14)
+                 col_end=5)
+    _nav_bar(ws, SN_SCEN, row=3, col_end=5)
 
     _col_headers(ws, 4, ["Indicateur", "Prudent (75%)", "Central (100%)",
                           "Ambitieux (130%)", "Personnalisé (Decision Lab)"], bg=P_NAVY)
 
     lc = get_column_letter(LAB_COL_IMPACT)
     lab_total_ref   = f"='{SN_LAB}'!{lc}{LAB_R_TOTAL}"
-    lab_ebitda_ref  = f"='{SN_LAB}'!B{LAB_R_EBITDA}"
+    lab_ebitda_ref  = f"='{SN_LAB}'!C{LAB_R_EBITDA}"
 
     row_base   = 5   # ligne EBITDA de base
     row_impact = 6   # ligne Impact décisions
@@ -1016,8 +1073,11 @@ def _build_scenarios(wb: Workbook, edm) -> None:
     # Scénarios qualitatifs LLM
     if edm.scenarios:
         r_sc = row_base + len(metrics) + 2
-        _section_bar(ws, r_sc, "SCÉNARIOS IDENTIFIÉS PAR LE COPILOTE", col_end=14)
-        _col_headers(ws, r_sc + 1, ["Scénario", "Label", "Description"], bg=P_NAVY)
+        _section_bar(ws, r_sc, "SCÉNARIOS IDENTIFIÉS PAR LE COPILOTE", col_end=5)
+        _col_headers(ws, r_sc + 1, ["Scénario", "Label", "Description", "", ""], bg=P_NAVY)
+        # Fusionner le header "Description" pour qu'il couvre C-E comme le contenu
+        ws.merge_cells(start_row=r_sc + 1, start_column=3,
+                       end_row=r_sc + 1, end_column=5)
         for k, sc in enumerate(edm.scenarios[:5]):
             r = r_sc + 2 + k
             ws.cell(row=r, column=1, value=getattr(sc, "nom", f"S{k+1}")).font = _font(bold=True)
@@ -1025,10 +1085,9 @@ def _build_scenarios(wb: Workbook, edm) -> None:
             desc = getattr(sc, "description", "—")
             c = ws.cell(row=r, column=3, value=(desc or "")[:140])
             c.font = _font(color=P_GRAY)
-            ws.merge_cells(start_row=r, start_column=3, end_row=r, end_column=14)
+            ws.merge_cells(start_row=r, start_column=3, end_row=r, end_column=5)
 
-    _widths(ws, {"A": 32, "B": 24, "C": 24, "D": 24, "E": 30})
-    _freeze(ws, "B5")
+    _widths(ws, COLS_SCENARIOS)
 
 
 # ─── FEUILLE 6 : ROADMAP ─────────────────────────────────────────────────────
@@ -1038,12 +1097,12 @@ def _build_roadmap(wb: Workbook, edm) -> None:
     ws.tab_color = P_NAVY
     _setup_sheet(ws)
 
-    _header_bar(ws, 1, "ROADMAP D'EXÉCUTION — Pilotage des décisions", col_end=16)
+    _header_bar(ws, 1, "ROADMAP D'EXÉCUTION — Pilotage des décisions", col_end=9)
     _instruction(ws, 2,
                  "Modifiez le Statut (colonne D, cellule bleue) pour suivre l'avancement. "
                  "Valeurs : To launch · In progress · Completed · Blocked",
-                 col_end=16)
-    _nav_bar(ws, SN_ROAD, row=3, col_end=16)
+                 col_end=9)
+    _nav_bar(ws, SN_ROAD, row=3, col_end=9)
 
     _col_headers(ws, 4, ["#", "Décision / Action", "Responsable", "Statut",
                           "Impact (€)", "Priorité", "Horizon", "Phase 90j", "ROI score"])
@@ -1069,10 +1128,12 @@ def _build_roadmap(wb: Workbook, edm) -> None:
             c = ws.cell(row=r, column=2, value=dec.decision)
             c.font = _font(color=P_DARK, bold=True)
             c.alignment = _align("left", wrap=True)
-            ws.row_dimensions[r].height = 30
+            # SPEC: Rows — Dynamic height. Renderer computes row height. Never fixed.
+            ws.row_dimensions[r].height = _row_height_for_text(dec.decision, 76)
 
             c = ws.cell(row=r, column=3, value=dec.owner or "À définir")
             c.font = _font(color=FONT_INPUT)
+            c.alignment = _align("left", wrap=True)   # SPEC: Left for descriptions, Wrap mandatory
 
             c = ws.cell(row=r, column=4, value=dec.status)
             c.font = _font(color=statuses_color.get(dec.status, P_SLATE), bold=True)
@@ -1086,7 +1147,9 @@ def _build_roadmap(wb: Workbook, edm) -> None:
             p_lower = (dec.priority or "").lower()
             p_color = P_RED if "high" in p_lower else (P_AMBER if "medium" in p_lower else P_GRAY)
             ws.cell(row=r, column=6, value=dec.priority).font = _font(color=p_color, bold=True)
-            ws.cell(row=r, column=7, value=dec.timeline or "—").font = _font(color=P_GRAY)
+            c7 = ws.cell(row=r, column=7, value=dec.timeline or "—")
+            c7.font = _font(color=P_GRAY)
+            c7.alignment = _align("left", wrap=True)   # SPEC: Left for descriptions, Wrap mandatory
             phase_label = "0–30j" if i < 3 else ("30–60j" if i < 6 else "60–90j")
             ws.cell(row=r, column=8, value=phase_label).font = _font(color=P_SLATE)
 
@@ -1100,12 +1163,12 @@ def _build_roadmap(wb: Workbook, edm) -> None:
     # Phases roadmap
     if edm.roadmap_90_days:
         r_ph = 5 + MAX_DEC + 2
-        _section_bar(ws, r_ph, "DÉTAIL PHASES 30 / 60 / 90 JOURS (source EDM)", col_end=16)
+        _section_bar(ws, r_ph, "DÉTAIL PHASES 30 / 60 / 90 JOURS (source EDM)", col_end=9)
         r_ph += 1
         for phase in edm.roadmap_90_days[:3]:
             _section_bar(ws, r_ph,
                          f"Phase {phase.horizon} jours — {phase.phase_label}",
-                         col_end=16, bg=P_SLATE)
+                         col_end=9, bg=P_SLATE)
             r_ph += 1
             for action in (phase.actions or [])[:6]:
                 ws.cell(row=r_ph, column=1, value="›").font = _font(color=P_BLUE, bold=True)
@@ -1120,9 +1183,7 @@ def _build_roadmap(wb: Workbook, edm) -> None:
                     c.number_format = "#,##0 €;(#,##0 €);-"
                 r_ph += 1
 
-    _widths(ws, {"A": 4, "B": 42, "C": 20, "D": 16, "E": 20, "F": 14,
-                 "G": 14, "H": 12, "I": 12})
-    _freeze(ws, "B5")
+    _widths(ws, COLS_ROADMAP)
 
 
 # ─── FEUILLE 7 : HISTORIQUE ───────────────────────────────────────────────────
@@ -1133,12 +1194,12 @@ def _build_historique(wb: Workbook, edm) -> None:
     _setup_sheet(ws)
 
     date_now = datetime.now().strftime("%b %Y")
-    _header_bar(ws, 1, "HISTORIQUE — Comparaison inter-périodes", col_end=12)
+    _header_bar(ws, 1, "HISTORIQUE — Comparaison inter-périodes", col_end=6)
     _instruction(ws, 2,
                  "Colonne actuelle = données EDM en temps réel. "
                  "Renseignez les colonnes bleues manuellement à chaque nouvelle analyse.",
-                 col_end=12)
-    _nav_bar(ws, SN_HIST, row=3, col_end=12)
+                 col_end=6)
+    _nav_bar(ws, SN_HIST, row=3, col_end=6)
 
     _col_headers(ws, 4, ["Indicateur", date_now, "Mois N-1",
                           "Trim. N-1", "An N-1", "Évolution (vs An N-1)"], bg=P_NAVY)
@@ -1150,8 +1211,8 @@ def _build_historique(wb: Workbook, edm) -> None:
         ("Impact total identifié",   f"=EDM!B{EDM_R_IMPACT}",    "#,##0 €;(#,##0 €);-"),
         ("Score santé",              f"=EDM!B{EDM_R_HEALTH}",    "0\"/10\""),
         ("Niveau de confiance",      f"=EDM!B{EDM_R_CONFID}",    "0\"/10\""),
-        ("EBITDA projeté (Decision Lab)", f"='{SN_LAB}'!B{LAB_R_PROJ}", "#,##0 €;(#,##0 €);-"),
-        ("Variation projetée (%)",   f"='{SN_LAB}'!B{LAB_R_VAR_PCT}", "0.0%"),
+        ("EBITDA projeté (Decision Lab)", f"='{SN_LAB}'!C{LAB_R_PROJ}", "#,##0 €;(#,##0 €);-"),
+        ("Variation projetée (%)",   f"='{SN_LAB}'!C{LAB_R_VAR_PCT}", "0.0%"),
     ]
 
     for i, (label, cur_val, nf) in enumerate(metrics):
@@ -1187,7 +1248,7 @@ def _build_historique(wb: Workbook, edm) -> None:
 
     # Guide d'utilisation
     r_guide = 5 + len(metrics) + 2
-    _section_bar(ws, r_guide, "MODE D'EMPLOI", col_end=12, bg=P_SLATE)
+    _section_bar(ws, r_guide, "MODE D'EMPLOI", col_end=6, bg=P_SLATE)
     guide = [
         "Après chaque nouvelle analyse Pepperyn, copiez-collez les valeurs actuelles dans 'Mois N-1'.",
         "Renseignez 'Trim. N-1' et 'An N-1' manuellement depuis vos données de gestion.",
@@ -1199,11 +1260,10 @@ def _build_historique(wb: Workbook, edm) -> None:
         c = ws.cell(row=r, column=1, value=f"  {k+1}.  {note}")
         c.font = _font(italic=True, color=P_GRAY)
         c.fill = _fill(P_LIGHT)
-        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=12)
-        ws.row_dimensions[r].height = 22
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=6)
+        ws.row_dimensions[r].height = ROW_H_GUIDE_NOTE
 
-    _widths(ws, {"A": 34, "B": 22, "C": 20, "D": 20, "E": 20, "F": 22})
-    _freeze(ws, "B5")
+    _widths(ws, COLS_HISTORIQUE)
 
 
 # ─── POINT D'ENTRÉE ───────────────────────────────────────────────────────────
