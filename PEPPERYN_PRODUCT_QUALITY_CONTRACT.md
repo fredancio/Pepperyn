@@ -1,148 +1,261 @@
 # PEPPERYN_PRODUCT_QUALITY_CONTRACT.md
-Version : 1.0  
-Status : FROZEN  
-Authority : CTO Contract
 
-## Purpose
+Version : 2.0
+Status : FROZEN
+Date : 2026-06-29
+Authority : CTO
 
-Pepperyn is an Executive Decision System.  
-Every deliverable produced by Pepperyn must be immediately usable by a CEO, CFO or Board of Directors without any manual correction.  
-This contract has authority over every renderer.  
-No feature, refactoring, optimisation or architectural improvement may violate this contract.
+---
+
+## Product Philosophy
+
+Pepperyn is **not** a reporting software.
+
+Pepperyn is an **Executive Decision Engine**.
+
+Every deliverable must help a CEO or a Board of Directors make better decisions.
+
+The objective is never to generate documents.
+
+The objective is to generate confidence.
+
+If confidence is lost, the product fails.
+
+---
+
+## GOLDEN RULE
+
+A renderer exists for one purpose only:
+
+> Display the Executive Decision Model.
+
+It never:
+
+- thinks
+- recalculates
+- interprets
+- simplifies
+- truncates
+- invents
+
+It only displays.
 
 ---
 
 ## RULE 001 — Zero Manual Intervention
 
-Every generated deliverable must be immediately usable.  
-The user must never need to:
+No user must ever modify a generated deliverable.
 
-* resize a column;
-* resize a row;
-* wrap text manually;
-* repair a formula;
-* correct an alignment;
-* complete missing values;
-* modify formatting.
+Never.
 
-If any manual intervention is required after generation, the renderer is NON-COMPLIANT.
+The generated PDF, PPTX and Excel must be immediately usable.
+
+If the user needs to:
+
+- resize a column
+- resize a row
+- wrap text
+- move an object
+- replace a value
+- repair a formula
+- correct a layout
+
+then the renderer has failed.
 
 ---
 
 ## RULE 002 — Zero Truncated Content
 
-No information may be visually truncated.  
-If the content is longer than the available space, the renderer must automatically adapt:
+No information may disappear because of presentation.
 
-* column width;
-* row height;
-* font size (within acceptable limits);
-* wrap text;
-* page layout.
+Never.
 
-Truncation is forbidden.
+The renderer adapts itself.
+The content never adapts itself to the renderer.
+
+Forbidden:
+
+- `[:80]`
+- `[:120]`
+- `[...]`
+- visual clipping
+- hidden rows
+- hidden text
+- cropped shapes
+
+Allowed:
+
+- automatic row height
+- automatic font scaling
+- page breaks
+- wrapping
+- additional pages
+
+Information always wins.
 
 ---
 
 ## RULE 003 — Renderer Responsibility
 
-A renderer is responsible for presentation.  
-It is never allowed to delegate presentation problems to the user.  
-Every renderer must automatically guarantee:
+Presentation problems are renderer problems.
 
-* AutoFit
-* Wrap Text
-* Vertical Alignment
-* Horizontal Alignment
-* Readable spacing
-* Printable layout
+Never user problems.
+Never data problems.
+Never LLM problems.
 
 ---
 
-## RULE 004 — Single Source of Truth
+## RULE 004 — Single Source Of Truth
 
-Every renderer consumes exactly the same ExecutiveCase.  
-A renderer may NEVER:
+ExecutiveCase is the only truth.
 
-* recalculate a value;
-* reinterpret a priority;
-* invent a classification;
-* generate an alternative narrative;
-* derive information that is not explicitly present in the ExecutiveCase.
+Every renderer must display exactly the same:
 
-Renderers DISPLAY.  
-They never THINK.
+- values
+- priorities
+- impacts
+- decisions
+- risks
+- roadmap
+- scenarios
+
+If two renderers disagree,
+the renderer is wrong.
+Never the ExecutiveCase.
 
 ---
 
 ## RULE 005 — Narrative Consistency
 
-The three deliverables must always tell exactly the same executive story.  
-They must expose:
+The PDF,
+the PPT,
+and the Excel
+must tell exactly the same executive story.
 
-* the same findings;
-* the same priorities;
-* the same decisions;
-* the same roadmap;
-* the same risks;
-* the same confidence.
-
-Only the presentation changes.  
-The meaning never changes.
+Changing the medium must never change the message.
 
 ---
 
 ## RULE 006 — Executive Readability
 
-Every page, slide and worksheet must answer one executive question.  
-The reader must never wonder:  
-*"What am I supposed to understand here?"*  
-If the message is not immediately obvious, the renderer is non-compliant.
+A CEO must understand the situation in less than five minutes.
+
+Every page answers one executive question.
+
+Nothing else.
 
 ---
 
 ## RULE 007 — Zero Ambiguity
 
-No renderer may display wording that contradicts the available data.  
-Examples:
+Pepperyn never sends contradictory messages.
 
-* "Données insuffisantes" while a value exists.
-* "Impact faible" while ROI is high.
-* "Unknown" while the information is available.
+Forbidden examples:
 
-Semantic contradictions are considered critical defects.
+- "Données insuffisantes" when the value exists.
+- "Impact faible" when ROI is high.
+- "Priority High" and "Do later" for the same decision.
 
----
-
-## RULE 008 — Delivery Refusal
-
-A version must not be released if any of the following remains true:
-
-* truncated text;
-* unresolved formulas;
-* inconsistent figures;
-* contradictory priorities;
-* unreadable layout;
-* manual corrections required;
-* ExecutiveCase inconsistently rendered.
-
-One violation is sufficient to refuse delivery.
+One truth.
+One interpretation.
 
 ---
 
-## RULE 009 — Commercial Readiness
+## RULE 008 — Cause → Decision → Impact
 
-Every release must satisfy one question:  
-*"Could a CEO present these three deliverables tomorrow morning to his Board of Directors without modifying anything?"*  
-If the answer is NO, the release is rejected.
+Every executive decision must explicitly answer three questions.
+
+1. What problem does it solve?
+2. Why is it the priority?
+3. What measurable impact is expected?
+
+If this causal chain is missing, Pepperyn is no longer an Executive Decision Engine.
 
 ---
 
-## RULE 010 — Feature Freeze
+## RULE 009 — Visual Confidence
 
-During Executive Polish:  
-No new functionality.  
-No architectural evolution.  
-No optimisation unrelated to Product Quality.  
-Only quality improvements are authorised.  
-This contract remains in force until Commercial Freeze is officially lifted.
+A CEO must be proud to project every page.
+
+No page may create embarrassment.
+No page may require explanation.
+No page may require an apology.
+
+---
+
+## RULE 010 — CEO Review
+
+Passing automated tests is never sufficient.
+
+Every RULE follows the same lifecycle.
+
+```
+Implementation
+↓
+Tests
+↓
+Visual Inspection
+↓
+CEO Review
+↓
+Freeze
+```
+
+Only the CEO Review can freeze a RULE.
+
+---
+
+## RULE 011 — Delivery Refusal
+
+Pepperyn refuses its own release whenever one of the following exists:
+
+- manual correction required
+- contradictory information
+- missing values
+- visual truncation
+- broken formulas
+- corrupted text
+- placeholder remaining
+- renderer disagreement
+- impossible interpretation
+
+One single violation blocks the release.
+
+---
+
+## RULE 012 — Product Before Code
+
+The product is judged only through its deliverables.
+
+Not through:
+
+- commits
+- tests
+- architecture
+- documentation
+- code quality
+
+Only one question matters:
+
+> "Would a CEO confidently present these three documents tomorrow morning to his Board of Directors?"
+
+If the answer is not an unequivocal **YES**,
+the release is refused.
+
+---
+
+## FINAL GOVERNANCE RULE
+
+The renderer never decides.
+The developer never decides.
+The tests never decide.
+
+Only the CEO validates the product.
+
+Until the CEO explicitly declares
+**RULE X — FROZEN**
+the work is considered unfinished.
+
+---
+
+*End of Contract.*
