@@ -1245,24 +1245,41 @@ def generate_excel_report(
     wb = Workbook()
     wb.remove(wb.active)
 
+    # RULE 003 — Renderer Responsibility
+    # Each sheet builder is isolated. A crash on one sheet never kills the workbook.
+    # The renderer owns its presentation problems — they never reach the caller.
+
+    def _safe_sheet(sheet_name, builder_fn):
+        try:
+            builder_fn()
+        except Exception:
+            # Graceful fallback: minimal sheet with error label
+            if sheet_name not in wb.sheetnames:
+                ws_err = wb.create_sheet(sheet_name)
+            else:
+                ws_err = wb[sheet_name]
+            ws_err["A1"] = f"{sheet_name} — données insuffisantes"
+
     # EDM en premier (toutes les autres feuilles le référencent)
-    _build_edm(wb, edm, original_data)
+    _safe_sheet(SN_EDM, lambda: _build_edm(wb, edm, original_data))
 
     # 8 feuilles visibles — Accueil en tête
-    _build_accueil(wb)
-    _build_dashboard(wb, edm, original_data)
-    _build_hypotheses(wb, edm)
-    _build_decision_lab(wb, edm)
-    _build_sensitivity(wb, edm)
-    _build_scenarios(wb, edm)
-    _build_roadmap(wb, edm)
-    _build_historique(wb, edm)
+    _safe_sheet(SN_ACCUEIL,  lambda: _build_accueil(wb))
+    _safe_sheet(SN_DASH,     lambda: _build_dashboard(wb, edm, original_data))
+    _safe_sheet(SN_HYPO,     lambda: _build_hypotheses(wb, edm))
+    _safe_sheet(SN_LAB,      lambda: _build_decision_lab(wb, edm))
+    _safe_sheet(SN_SENSI,    lambda: _build_sensitivity(wb, edm))
+    _safe_sheet(SN_SCEN,     lambda: _build_scenarios(wb, edm))
+    _safe_sheet(SN_ROAD,     lambda: _build_roadmap(wb, edm))
+    _safe_sheet(SN_HIST,     lambda: _build_historique(wb, edm))
 
     # Masquer la feuille EDM
-    wb[SN_EDM].sheet_state = "hidden"
+    if SN_EDM in wb.sheetnames:
+        wb[SN_EDM].sheet_state = "hidden"
 
     # Accueil actif à l'ouverture
-    wb.active = wb[SN_ACCUEIL]
+    if SN_ACCUEIL in wb.sheetnames:
+        wb.active = wb[SN_ACCUEIL]
 
     # Recalcul automatique à l'ouverture
     wb.calculation.calcMode = "auto"

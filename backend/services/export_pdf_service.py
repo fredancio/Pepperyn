@@ -1261,26 +1261,53 @@ def generate_pdf_report(result, company_name: str | None = None) -> bytes:
     styles = _build_styles()
 
     def _story():
+        # RULE 003 — Renderer Responsibility
+        # Every page builder is isolated. A crash on one page never kills the document.
+        # The renderer owns its presentation problems — they never reach the caller.
+
+        def _safe_page(page_name, builder_fn):
+            try:
+                return list(builder_fn())
+            except Exception:
+                # Graceful fallback: empty page with error label — never propagate
+                return [
+                    PageBreak(),
+                    Paragraph(f"Section {page_name} — données insuffisantes",
+                               styles.get("body", getSampleStyleSheet()["Normal"])),
+                    PageBreak(),
+                ]
+
         story = []
 
         # P1 — Couverture (pas de header/footer sur cette page)
-        story.extend(_build_cover(name, date_str, styles))
+        try:
+            story.extend(_build_cover(name, date_str, styles))
+        except Exception:
+            story.append(Paragraph("Couverture — données insuffisantes",
+                                   styles.get("body", getSampleStyleSheet()["Normal"])))
+            story.append(PageBreak())
 
-        # P2-P11 — pages de contenu (header/footer dessiné sur canvas)
-        story.extend(_build_page_inaction(
-            edm,
-            result.get("risque_inaction"),
-            styles
-        ))
-        story.extend(_build_page_diagnostic(edm, result, styles))
-        story.extend(_build_page_health(result, edm, styles))
-        story.extend(_build_page_indicators(result, edm, styles))
-        story.extend(_build_page_decisions(edm, styles))
-        story.extend(_build_page_roadmap(edm, styles))          # P7 — NOUVEAU
-        story.extend(_build_page_destroyers(edm, styles))
-        story.extend(_build_page_simulation(edm, result, styles))
-        story.extend(_build_page_projection(edm, styles))
-        story.extend(_build_page_final(edm, styles))  # pas de PageBreak à la fin
+        # P2-P11 — pages de contenu isolées (RULE 003)
+        story.extend(_safe_page("Coût de l'inaction",
+            lambda: _build_page_inaction(edm, result.get("risque_inaction"), styles)))
+        story.extend(_safe_page("Diagnostic",
+            lambda: _build_page_diagnostic(edm, result, styles)))
+        story.extend(_safe_page("Santé",
+            lambda: _build_page_health(result, edm, styles)))
+        story.extend(_safe_page("Indicateurs",
+            lambda: _build_page_indicators(result, edm, styles)))
+        story.extend(_safe_page("Décisions",
+            lambda: _build_page_decisions(edm, styles)))
+        story.extend(_safe_page("Roadmap",
+            lambda: _build_page_roadmap(edm, styles)))
+        story.extend(_safe_page("Destroyers",
+            lambda: _build_page_destroyers(edm, styles)))
+        story.extend(_safe_page("Simulation",
+            lambda: _build_page_simulation(edm, result, styles)))
+        story.extend(_safe_page("Projection",
+            lambda: _build_page_projection(edm, styles)))
+        story.extend(_safe_page("Conclusion",
+            lambda: _build_page_final(edm, styles)))
 
         return story
 
@@ -1304,6 +1331,22 @@ def generate_pdf_report(result, company_name: str | None = None) -> bytes:
 
     buf = io.BytesIO()
     doc = _make_doc(buf)
-    doc.build(_story(), onFirstPage=_on_first, onLaterPages=_on_later)
+    try:
+        doc.build(_story(), onFirstPage=_on_first, onLaterPages=_on_later)
+    except Exception:
+        # RULE 003 — Renderer Responsibility
+        # If the ReportLab layout engine fails (e.g. LayoutError on extreme content),
+        # produce a minimal valid PDF. The renderer NEVER propagates to the caller.
+        from reportlab.lib.styles import getSampleStyleSheet as _gss
+        buf = io.BytesIO()
+        fallback = SimpleDocTemplate(buf, pagesize=A4,
+                                     leftMargin=MARGIN, rightMargin=MARGIN,
+                                     topMargin=22 * mm, bottomMargin=16 * mm)
+        _st = _gss()
+        fallback.build([
+            Paragraph(f"Rapport exécutif — {name}", _st["Heading1"]),
+            Spacer(1, 12 * mm),
+            Paragraph("Données insuffisantes — le rapport ne peut être généré avec les données actuelles.", _st["Normal"]),
+        ])
 
     return buf.getvalue()
