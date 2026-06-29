@@ -709,7 +709,7 @@ def _build_page_indicators(result: dict, edm, styles: dict) -> list:
 
 # ─── PAGE 6 : QUE FAIRE MAINTENANT ? ─────────────────────────────────────────
 
-def _build_page_decisions(edm, styles: dict) -> list:
+def _build_page_decisions(edm, styles: dict, result_dict: dict | None = None) -> list:
     s = []
     s.append(_sp(6))
     s.append(_section_header("QUE FAIRE MAINTENANT ?", styles))
@@ -773,6 +773,91 @@ def _build_page_decisions(edm, styles: dict) -> list:
         style_cmds.append(("LINEBELOW", (0, i), (-1, i), 0.5, C_LGRAY))
     tbl.setStyle(TableStyle(style_cmds))
     s.append(tbl)
+
+    # ── EDX-001 : Chaîne décisionnelle ───────────────────────────────────────
+    # Affiche le raisonnement Pepperyn pour chaque décision disposant de données.
+    # Aucune nouvelle page — le flux ReportLab coule naturellement.
+    reasoning_list = (result_dict or {}).get("decision_reasoning", [])
+    has_reasoning = any(
+        r.get("why_this_decision") or r.get("problem_source")
+        for r in reasoning_list
+    )
+
+    if has_reasoning and decisions:
+        s.append(_sp(10))
+        s.append(Paragraph(
+            "POURQUOI PEPPERYN RECOMMANDE CES DÉCISIONS",
+            ParagraphStyle(
+                "chain_hdr", fontName="Helvetica-Bold", fontSize=9,
+                textColor=C_GRAY, leading=13, spaceAfter=3,
+            )
+        ))
+        s.append(_hr())
+        s.append(_sp(4))
+
+        # Style compact pour le bloc raisonnement
+        lbl_style = ParagraphStyle(
+            "chain_lbl", fontName="Helvetica-Bold", fontSize=8,
+            textColor=colors.HexColor("#444444"), leading=11,
+        )
+        val_style = ParagraphStyle(
+            "chain_val", fontName="Helvetica", fontSize=8,
+            textColor=colors.HexColor("#222222"), leading=11, spaceAfter=2,
+        )
+        conf_style = ParagraphStyle(
+            "chain_conf", fontName="Helvetica-Oblique", fontSize=8,
+            textColor=C_GRAY, leading=11, spaceAfter=6,
+        )
+
+        # Indexer les raisonnements par decision_index
+        reasoning_by_idx = {r["decision_index"]: r for r in reasoning_list}
+
+        for i, dec in enumerate(decisions):
+            r = reasoning_by_idx.get(i, {})
+            why   = r.get("why_this_decision")
+            prob  = r.get("problem_source")
+            risk  = r.get("inaction_risk")
+            conf  = r.get("decision_confidence")
+            conf_expl = r.get("confidence_explanation")
+            match_conf = r.get("matching_confidence", "")
+
+            # N'affiche le bloc que si au moins why_this_decision est disponible
+            if not why and not prob:
+                continue
+
+            # Numéro + libellé de la décision (wrapping assuré par ReportLab)
+            s.append(Paragraph(
+                f"<b>#{i + 1} — {_rl(dec.decision)}</b>",
+                ParagraphStyle(
+                    "chain_dec", fontName="Helvetica-Bold", fontSize=8.5,
+                    textColor=colors.HexColor(HEX_BLUE), leading=12, spaceBefore=4,
+                )
+            ))
+
+            if prob:
+                # LOW-confidence ou FALLBACK : indicateur discret
+                prob_text = _rl(prob)
+                if match_conf == "LOW":
+                    prob_text += " <i>(correspondance approximative)</i>"
+                elif match_conf == "FALLBACK_INDEX":
+                    prob_text += " <i>(correspondance estimée)</i>"
+                s.append(Paragraph(
+                    f"<b>Problème résolu :</b> {prob_text}", val_style))
+
+            if why:
+                s.append(Paragraph(
+                    f"<b>Raisonnement :</b> {_rl(why)}", val_style))
+
+            if risk:
+                s.append(Paragraph(
+                    f"<b>Si vous n'agissez pas :</b> {_rl(risk)}", val_style))
+
+            if conf is not None:
+                conf_line = f"Confiance Pepperyn : {conf}%"
+                if conf_expl:
+                    conf_line += f" — {_rl(conf_expl)}"
+                s.append(Paragraph(conf_line, conf_style))
+
     s.append(PageBreak())
     return s
 
@@ -1297,7 +1382,7 @@ def generate_pdf_report(result, company_name: str | None = None) -> bytes:
         story.extend(_safe_page("Indicateurs",
             lambda: _build_page_indicators(result, edm, styles)))
         story.extend(_safe_page("Décisions",
-            lambda: _build_page_decisions(edm, styles)))
+            lambda: _build_page_decisions(edm, styles, result)))
         story.extend(_safe_page("Roadmap",
             lambda: _build_page_roadmap(edm, styles)))
         story.extend(_safe_page("Destroyers",

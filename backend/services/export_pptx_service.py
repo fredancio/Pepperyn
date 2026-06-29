@@ -449,6 +449,17 @@ def _slide_decisions_prioritaires(prs, edm, result: dict, company: str, date_str
     _footer_band(slide, page, company)
     _slide_title(slide, "Plan d'action prioritaire")
 
+    # ── EDX-001 : récupération du raisonnement ────────────────────────────────
+    reasoning_list = result.get("decision_reasoning", []) or []
+    has_reasoning = any(
+        r.get("why_this_decision") or r.get("problem_source")
+        for r in reasoning_list
+    )
+    reasoning_by_idx = {r["decision_index"]: r for r in reasoning_list}
+
+    # Si raisonnement présent, on réserve 1.9" pour le panneau inférieur
+    REASONING_PANEL_H = Inches(1.9) if has_reasoning else Inches(0)
+
     decisions = edm.executive_decisions[:8]
     rows = []
     for d in decisions:
@@ -466,7 +477,7 @@ def _slide_decisions_prioritaires(prs, edm, result: dict, company: str, date_str
 
     col_pct = [0.26, 0.14, 0.07, 0.10, 0.13, 0.14, 0.16]
     tbl_top = MT + Inches(0.55)
-    tbl_h = CH - Inches(0.6)
+    tbl_h = CH - Inches(0.6) - REASONING_PANEL_H
     tbl = slide.shapes.add_table(len(rows) + 1, 7, ML, tbl_top, CW, tbl_h).table
     for i, pct in enumerate(col_pct):
         tbl.columns[i].width = int(CW * pct)
@@ -489,6 +500,80 @@ def _slide_decisions_prioritaires(prs, edm, result: dict, company: str, date_str
             _set_para(cell.text_frame.paragraphs[0], val, 10, color=fc,
                       align=PP_ALIGN.LEFT if ci == 0 else PP_ALIGN.CENTER)
     _fit_table_rows(tbl, text_col_idx=0, font_pt=10, min_h_pt=32.0)  # RULE 002
+
+    # ── EDX-001 : panneau chaîne décisionnelle ────────────────────────────────
+    # Affiché sous la table, dans la même slide, sans nouvelle slide.
+    if has_reasoning:
+        panel_top = tbl_top + tbl_h + Inches(0.12)
+        panel_h = REASONING_PANEL_H - Inches(0.12)
+
+        # Fond légèrement teinté
+        panel_bg = slide.shapes.add_shape(
+            1, ML, panel_top, CW, panel_h  # MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE=5; RECTANGLE=1
+        )
+        panel_bg.fill.solid()
+        panel_bg.fill.fore_color.rgb = _rgb("EEF3FB")
+        panel_bg.line.color.rgb = _rgb("C5D5F0")
+        panel_bg.line.width = Pt(0.5)
+
+        # Titre du panneau
+        title_box = slide.shapes.add_textbox(
+            ML + Inches(0.08), panel_top + Inches(0.06),
+            CW - Inches(0.16), Inches(0.22)
+        )
+        tf = title_box.text_frame
+        tf.word_wrap = False
+        p = tf.paragraphs[0]
+        run = p.add_run()
+        run.text = "POURQUOI PEPPERYN RECOMMANDE CES DÉCISIONS"
+        run.font.size = Pt(7.5)
+        run.font.bold = True
+        run.font.color.rgb = _rgb("1B73E8")
+
+        # Contenu : une ligne compacte par décision ayant un raisonnement
+        content_top = panel_top + Inches(0.30)
+        content_h = panel_h - Inches(0.34)
+        content_box = slide.shapes.add_textbox(
+            ML + Inches(0.08), content_top,
+            CW - Inches(0.16), content_h
+        )
+        tf2 = content_box.text_frame
+        tf2.word_wrap = True
+
+        first = True
+        for i, dec in enumerate(decisions):
+            r = reasoning_by_idx.get(i, {})
+            why = r.get("why_this_decision")
+            risk = r.get("inaction_risk")
+            prob = r.get("problem_source")
+            conf = r.get("decision_confidence")
+            match_conf = r.get("matching_confidence", "")
+            if not why and not prob:
+                continue
+
+            # Un paragraphe par décision, compact
+            para = tf2.paragraphs[0] if first else tf2.add_paragraph()
+            first = False
+
+            parts = [f"#{i+1} {dec.decision}"]
+            if prob:
+                suffix = ""
+                if match_conf == "LOW":
+                    suffix = " (≈)"
+                elif match_conf == "FALLBACK_INDEX":
+                    suffix = " (~)"
+                parts.append(f"↔ {prob}{suffix}")
+            if why:
+                # Truncate for slide legibility
+                parts.append(f"→ {why}")
+            if conf is not None:
+                parts.append(f"[Confiance : {conf}%]")
+
+            line = "  |  ".join(parts)
+            run2 = para.add_run()
+            run2.text = line
+            run2.font.size = Pt(7)
+            run2.font.color.rgb = DARK
 
 
 # ─── SLIDE 8 : EXÉCUTION (ROADMAP 30/60/90) ──────────────────────────────────

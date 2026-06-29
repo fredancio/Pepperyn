@@ -56,6 +56,32 @@ class ValueDestroyerItem(BaseModel):
     trend:          Optional[str]   = None   # "↑" | "↓" | "→" | None
 
 
+class DecisionReasoning(BaseModel):
+    """
+    Chaîne de raisonnement associée à une décision prioritaire — EDX-001.
+
+    Séparée de PriorityDecisionItem pour permettre l'évolution indépendante
+    du raisonnement (EDX-002 : alternatives, hypothèses, conditions de révision,
+    mémoire décisionnelle).
+
+    Responsabilité par champ :
+      decision_index        → clé de liaison avec priority_decisions[i]
+      problem_source        → Python pur (matching mots-clés vs value_destroyers)
+      matching_confidence   → Python pur ("HIGH" | "LOW" | "FALLBACK_INDEX" | None)
+      decision_confidence   → Python pur (formule déterministe)
+      why_this_decision     → LLM — voix Pepperyn, lien causal
+      inaction_risk         → LLM — conséquence à 90 jours
+      confidence_explanation → LLM — explication du score, jamais évaluation
+    """
+    decision_index:          int
+    problem_source:          Optional[str] = None
+    matching_confidence:     Optional[str] = None  # "HIGH" | "LOW" | "FALLBACK_INDEX"
+    why_this_decision:       Optional[str] = None
+    inaction_risk:           Optional[str] = None
+    decision_confidence:     Optional[int] = None
+    confidence_explanation:  Optional[str] = None
+
+
 class PriorityDecisionItem(BaseModel):
     """Une décision prioritaire. Impact pré-calculé par Python."""
     decision:       str
@@ -159,6 +185,12 @@ class ExecutiveCaseJSON(BaseModel):
     # ── Analyse décisionnelle ─────────────────────────────────────────────────
     value_destroyers:   List[ValueDestroyerItem]   = Field(default_factory=list)
     priority_decisions: List[PriorityDecisionItem] = Field(default_factory=list)
+
+    # ── Chaîne décisionnelle EDX-001 ──────────────────────────────────────────
+    # Raisonnements associés aux décisions prioritaires.
+    # Séparé de priority_decisions pour permettre l'évolution indépendante.
+    # decision_reasoning[i].decision_index → priority_decisions[j]
+    decision_reasoning: List[DecisionReasoning] = Field(default_factory=list)
 
     # ── Roadmap ───────────────────────────────────────────────────────────────
     roadmap_30_60_90: Dict[str, List[str]] = Field(

@@ -31,6 +31,7 @@ from typing import Any, List, Optional
 from models.executive_case import (
     COIBreakdown,
     DataQuality,
+    DecisionReasoning,
     DimensionScores,
     ExecutionLogItem,
     ExecutiveCaseJSON,
@@ -51,6 +52,210 @@ logger = logging.getLogger(__name__)
 
 MODEL_OPUS = "claude-opus-4-6"
 
+# ─── EDX-001 : MATCHING MOTS-CLÉS DÉCISION → DESTRUCTEUR ────────────────────
+# Chaque groupe rassemble les termes financiers sémantiquement liés.
+# Un token de la décision ET un token du destructeur dans le même groupe
+# déclenchent un bonus sémantique de 30 pts.
+
+_STOP_WORDS = {
+    "les", "des", "par", "est", "une", "que", "qui", "son", "ses",
+    "sur", "pas", "non", "car", "ces", "cet", "aux", "eux", "pour",
+    "dans", "avec", "sans", "mais", "donc", "puis", "tout", "tres",
+    "plus", "bien", "etre", "fait", "ont", "sont", "nous", "vous",
+    "ils", "elles", "leur", "leurs", "lui", "elle",
+}
+
+_KEYWORD_GROUPS: list[dict] = [
+    {
+        "id": "stock",
+        "keywords": {
+            "stock", "obsolete", "liquidation", "inventaire", "provision",
+            "rotation", "stockage", "entrepot", "immobilise", "immobilisation",
+        },
+    },
+    {
+        "id": "bfr",
+        "keywords": {
+            "dso", "bfr", "recouvrement", "client", "creance", "delai",
+            "encaissement", "jours", "paiement", "retard", "tresorerie",
+            "cash", "echeance",
+        },
+    },
+    {
+        "id": "marge",
+        "keywords": {
+            "marge", "marges",
+            "fournisseur", "fournisseurs", "fourni",   # fourni = préfixe 6 chars de fournisseur(s)
+            "achat", "achats",
+            "cout", "couts",
+            "negociation", "negocier", "reneg", "renegoc",  # renegoc = préfixe renegocier
+            "approvisionnement", "approvi",
+            "tarif", "tarifa", "tarifai",               # tarifa = préfixe tarifaire(s)
+            "prix",
+            "erosion",
+            "rentabilite", "rentabi",
+            "brute",
+        },
+    },
+    {
+        "id": "commercial",
+        "keywords": {
+            "commission", "commiss",                    # commiss = préfixe commissionnement
+            "commissionnement",
+            "commercial", "commercia", "commer",        # commer = préfixe commercial(e/s)
+            "vente", "ventes",
+            "performance", "perfor",
+            "chiffre",
+            "objectif",
+            "incentive",
+            "restructurer", "restru",
+            "sous",
+            "equipe",
+            "force",
+        },
+    },
+]
+
+
+def _normalize_tokens(text: str) -> set[str]:
+    """
+    Normalise un texte en tokens : minuscules, sans accents, 3+ caractères,
+    sans stop-words. Ajoute un préfixe de 6 chars pour les tokens ≥ 8 chars
+    (couvre les variantes morphologiques : fournisseur/fournisseurs, etc.).
+    """
+    import re
+    import unicodedata
+
+    nfkd = unicodedata.normalize("NFD", text.lower())
+    clean = "".join(c for c in nfkd if unicodedata.category(c) != "Mn")
+    raw_tokens = re.findall(r"[a-z]{3,}", clean)
+    tokens: set[str] = set()
+    for t in raw_tokens:
+        if t not in _STOP_WORDS:
+            tokens.add(t)
+            if len(t) >= 8:
+                tokens.add(t[:6])   # préfixe pour variantes morphologiques
+    return tokens
+
+
+def _semantic_bonus(decision_tokens: set[str], destroyer_tokens: set[str]) -> int:
+    """
+    Retourne 30 si décision et destructeur partagent le même groupe sémantique,
+    0 sinon. S'arrête au premier groupe commun trouvé.
+    """
+    for group in _KEYWORD_GROUPS:
+        kw = group["keywords"]
+        if (decision_tokens & kw) and (destroyer_tokens & kw):
+            return 30
+    return 0
+
+
+def _score_pair(decision_tokens: set[str], destroyer_tokens: set[str]) -> float:
+    """Score de matching entre une décision et un destructeur (0–100+)."""
+    if not decision_tokens or not destroyer_tokens:
+        return 0.0
+    overlap = len(decision_tokens & destroyer_tokens)
+    base = overlap / max(len(decision_tokens), len(destroyer_tokens)) * 100
+    return base + _semantic_bonus(decision_tokens, destroyer_tokens)
+
+
+def _fmt_amount(amount: float | None) -> str:
+    """Formate un montant en K€ ou M€."""
+    if amount is None:
+        return ""
+    a = abs(amount)
+    if a >= 1_000_000:
+        return f"{a / 1_000_000:.1f} M€/an"
+    return f"{a / 1_000:.0f} K€/an"
+
+
+def _compute_reasoning_skeleton(
+    decisions: list,   # List[ExecutiveDecision] from EDM
+    destroyers: list,  # List[ValueDestroyer] from EDM
+    data_quality,      # DataQualityInfo | None
+    global_confidence: int,
+) -> list[dict]:
+    """
+    Calcule le squelette déterministe de la chaîne de raisonnement EDX-001.
+
+    - problem_source      : matching mots-clés décision → destructeur
+    - matching_confidence : "HIGH" (≥40) | "LOW" (20–39) | "FALLBACK_INDEX" | None
+    - decision_confidence : formule Python déterministe
+
+    Aucun LLM. Retourne une liste de dicts (un par décision).
+    Les champs LLM (why_this_decision, inaction_risk, confidence_explanation)
+    sont laissés None ici — Agent 1 les complète.
+    """
+    anomaly_count = len(data_quality.anomalies) if (data_quality and data_quality.anomalies) else 0
+    used_indices: set[int] = set()
+    skeleton: list[dict] = []
+
+    # Pré-calcul des tokens de chaque destructeur
+    destroyer_token_sets = [_normalize_tokens(d.name) for d in destroyers]
+
+    for i, decision in enumerate(decisions):
+        decision_tokens = _normalize_tokens(decision.decision)
+        best_score = 0.0
+        best_j = -1
+
+        for j, d_tokens in enumerate(destroyer_token_sets):
+            if j in used_indices:
+                continue
+            score = _score_pair(decision_tokens, d_tokens)
+            if score > best_score:
+                best_score = score
+                best_j = j
+
+        # Assignation selon les seuils
+        # HIGH ≥ 30 : inclut les matchs purement sémantiques (bonus = 30, overlap = 0)
+        # LOW  15–29 : signal faible, pas de certitude
+        if best_j >= 0 and best_score >= 30:
+            d = destroyers[best_j]
+            amount_str = _fmt_amount(d.annual_impact)
+            problem_source = f"{d.name} — {amount_str}" if amount_str else d.name
+            matching_confidence = "HIGH"
+            used_indices.add(best_j)
+        elif best_j >= 0 and best_score >= 15:
+            d = destroyers[best_j]
+            amount_str = _fmt_amount(d.annual_impact)
+            problem_source = f"{d.name} — {amount_str}" if amount_str else d.name
+            matching_confidence = "LOW"
+            # LOW : le destructeur n'est pas marqué comme utilisé
+            # (une autre décision pourrait mieux le capturer)
+        else:
+            # Fallback index : dernier recours, marqué explicitement
+            if i < len(destroyers) and i not in used_indices:
+                d = destroyers[i]
+                amount_str = _fmt_amount(d.annual_impact)
+                problem_source = f"{d.name} — {amount_str}" if amount_str else d.name
+                matching_confidence = "FALLBACK_INDEX"
+            else:
+                problem_source = None
+                matching_confidence = None
+
+        # Confiance déterministe
+        base = global_confidence
+        if getattr(decision, "annual_impact", None) is None:
+            base -= 15
+        if getattr(decision, "owner", None) is None:
+            base -= 5
+        if getattr(decision, "timeline", None) is None:
+            base -= 5
+        roi = getattr(decision, "roi_score", 0.0) or 0.0
+        roi_bonus = int(roi / 10 * 5)
+        anomaly_penalty = min(anomaly_count * 2, 10)
+        decision_confidence = max(50, min(95, base + roi_bonus - anomaly_penalty))
+
+        skeleton.append({
+            "decision_index":     i,
+            "problem_source":     problem_source,
+            "matching_confidence": matching_confidence,
+            "decision_confidence": decision_confidence,
+        })
+
+    return skeleton
+
+
 # ─── SYSTEM PROMPT — Agent 1 ──────────────────────────────────────────────────
 
 _SYSTEM = """\
@@ -67,6 +272,33 @@ RÈGLES ABSOLUES — AUCUNE EXCEPTION :
 5. Aucune extrapolation. Aucune interpolation. Aucune invention.
 6. Tu COPIES exactement les textes narratifs fournis.
 7. Tu COPIES exactement les chiffres fournis (float, int).
+
+─── CHAMPS EDX-001 — decision_reasoning ────────────────────────────────────
+Les sources fournissent un "reasoning_skeleton" pré-calculé par Python pour
+chaque décision (decision_index, problem_source, matching_confidence,
+decision_confidence). Tu COPIES ces valeurs EXACTEMENT — règle 1 s'applique.
+
+Tu GÉNÈRES les 3 champs narratifs suivants pour chaque entrée du reasoning :
+
+why_this_decision :
+  Commence OBLIGATOIREMENT par "Pepperyn recommande cette décision parce que".
+  2 phrases maximum. Formule le lien causal entre le problem_source et la décision.
+  Cite le gain chiffré (annual_impact de la décision).
+  INTERDIT : "il est recommandé", "les données suggèrent", "il pourrait être".
+  INTERDIT : répéter le libellé de la décision mot pour mot.
+
+inaction_risk :
+  1 à 2 phrases. Décrit ce qui se dégrade concrètement dans les 90 jours si
+  cette décision n'est pas prise. Cite un horizon temporel précis ("À fin [mois]",
+  "Dans 90 jours"). Chiffre la conséquence si les données le permettent.
+  INTERDIT : phrases génériques sans horizon ni conséquence précise.
+
+confidence_explanation :
+  1 phrase. Explique POURQUOI le score decision_confidence est ce qu'il est.
+  Cite ce qui renforce la confiance ET ce qui l'affaiblit (si applicable).
+  Ne donne AUCUN chiffre que tu n'aurais pas reçu dans les sources.
+  Tu n'évalues pas — tu expliques le score fourni.
+─────────────────────────────────────────────────────────────────────────────
 
 FORMAT DE SORTIE : JSON pur uniquement.
 Aucun texte avant { ni après }. Aucun markdown. Aucun commentaire. \
@@ -269,6 +501,20 @@ def case_to_result_dict(case: ExecutiveCaseJSON) -> dict:
         for h, actions in case.roadmap_30_60_90.items()
     ]
 
+    # EDX-001 — chaîne décisionnelle sérialisée pour les renderers
+    decision_reasoning = [
+        {
+            "decision_index":         r.decision_index,
+            "problem_source":         r.problem_source,
+            "matching_confidence":    r.matching_confidence,
+            "why_this_decision":      r.why_this_decision,
+            "inaction_risk":          r.inaction_risk,
+            "decision_confidence":    r.decision_confidence,
+            "confidence_explanation": r.confidence_explanation,
+        }
+        for r in case.decision_reasoning
+    ]
+
     return {
         "company_name":                case.company_name,
         "diagnostic_immediat":         case.executive_diagnosis,
@@ -289,6 +535,8 @@ def case_to_result_dict(case: ExecutiveCaseJSON) -> dict:
         "problemes_critiques":         problemes_critiques,
         "alertes":                     problemes_critiques,
         "plan_action_30_60_90":        plan_action,
+        # EDX-001
+        "decision_reasoning":          decision_reasoning,
     }
 
 
@@ -302,8 +550,16 @@ async def _call_opus(result_dict: dict, edm, company_name: str) -> ExecutiveCase
     if not api_key:
         raise RuntimeError("ANTHROPIC_API_KEY absent")
 
+    # Calcul déterministe du squelette AVANT l'appel LLM
+    skeleton = _compute_reasoning_skeleton(
+        decisions=edm.executive_decisions or [],
+        destroyers=edm.value_destroyers or [],
+        data_quality=edm.data_quality,
+        global_confidence=result_dict.get("score_confiance") or 0,
+    )
+
     client = anthropic.Anthropic(api_key=api_key)
-    user_prompt = _build_user_prompt(result_dict, edm, company_name)
+    user_prompt = _build_user_prompt(result_dict, edm, company_name, skeleton)
 
     resp = client.messages.create(
         model=MODEL_OPUS,
@@ -331,7 +587,7 @@ async def _call_opus(result_dict: dict, edm, company_name: str) -> ExecutiveCase
 
 # ─── CONSTRUCTION DU PROMPT ───────────────────────────────────────────────────
 
-def _build_user_prompt(result_dict: dict, edm, company_name: str) -> str:
+def _build_user_prompt(result_dict: dict, edm, company_name: str, skeleton: list | None = None) -> str:
     """Assemble le prompt utilisateur avec toutes les données sources."""
     coi = edm.cost_of_inaction
 
@@ -437,6 +693,12 @@ def _build_user_prompt(result_dict: dict, edm, company_name: str) -> str:
 
         # Qualité des données
         "data_quality": _extract_dq(result_dict, edm),
+
+        # ── EDX-001 : Squelette déterministe (Python pur) ─────────────────────
+        # problem_source et decision_confidence sont PRÉ-CALCULÉS et VERROUILLÉS.
+        # Tu COPIES ces valeurs exactement (règle 1).
+        # Tu GÉNÈRES why_this_decision, inaction_risk, confidence_explanation.
+        "reasoning_skeleton": skeleton or [],
     }
 
     return (
@@ -552,6 +814,19 @@ def _schema_example() -> dict:
         },
         "major_risks": [{"description": "", "severity": "", "impact": "", "horizon": ""}],
         "data_quality": {"score": 70, "anomalies": [], "assumptions": [], "limits": []},
+        # EDX-001 — decision_reasoning
+        # Copie decision_index / problem_source / matching_confidence /
+        # decision_confidence depuis reasoning_skeleton.
+        # Génère why_this_decision / inaction_risk / confidence_explanation.
+        "decision_reasoning": [{
+            "decision_index":         0,
+            "problem_source":         None,      # COPIER depuis reasoning_skeleton
+            "matching_confidence":    None,      # COPIER depuis reasoning_skeleton
+            "why_this_decision":      None,      # GÉNÉRER — voix Pepperyn
+            "inaction_risk":          None,      # GÉNÉRER — horizon 90 jours
+            "decision_confidence":    None,      # COPIER depuis reasoning_skeleton
+            "confidence_explanation": None,      # GÉNÉRER — expliquer le score
+        }],
     }
 
 
@@ -646,6 +921,27 @@ def _python_mapper(result_dict: dict, edm, company_name: str) -> ExecutiveCaseJS
         limits=[],
     )
 
+    # EDX-001 — squelette déterministe (pas de LLM en fallback)
+    skeleton = _compute_reasoning_skeleton(
+        decisions=edm.executive_decisions or [],
+        destroyers=edm.value_destroyers or [],
+        data_quality=edm.data_quality,
+        global_confidence=result_dict.get("score_confiance") or 0,
+    )
+    reasoning_items = [
+        DecisionReasoning(
+            decision_index=s["decision_index"],
+            problem_source=s["problem_source"],
+            matching_confidence=s["matching_confidence"],
+            decision_confidence=s["decision_confidence"],
+            # LLM fields absent en fallback — None
+            why_this_decision=None,
+            inaction_risk=None,
+            confidence_explanation=None,
+        )
+        for s in skeleton
+    ]
+
     return ExecutiveCaseJSON(
         company_name=company_name or result_dict.get("company_name", ""),
         analysis_date=datetime.now().strftime("%d/%m/%Y"),
@@ -690,4 +986,5 @@ def _python_mapper(result_dict: dict, edm, company_name: str) -> ExecutiveCaseJS
         scenarios=Scenarios(best=scen_best, likely=scen_likely, worst=scen_worst),
         major_risks=risks,
         data_quality=dq,
+        decision_reasoning=reasoning_items,
     )
