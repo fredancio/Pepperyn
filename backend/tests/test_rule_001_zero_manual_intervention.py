@@ -251,19 +251,20 @@ class TestPDFContent:
     # Tokens attendus dans le texte brut extrait par pdftotext
     # pdftotext normalise les espaces → espace ordinaire
     REQUIRED_TOKENS = [
-        "-1,7 M€",
-        "-141 583 €",
-        "-4 654 €",
-        "3/10",
-        "8.4/10",
-        "+400 000 €",
-        "+185 000 €",
-        "9.2/10",
-        "8.7/10",
-        "30 jours",
-        "PLAN D'EXÉCUTION",
-        "Élevé",
-        "81%",
+        # CEO Question Framework v3 — tokens attendus dans le nouveau layout PDF
+        "-1,7 M€",        # COI hero annuel (P3 COI)
+        "-141 583 €",     # COI mensuel (P3 COI)
+        "-4 654 €",       # COI journalier (P3 COI)
+        "2/10",           # Score dimension rentabilité (P1 Verdict)
+        "8.4/10",         # Score de priorisation global (P4 Décisions)
+        "+400 000 €",     # Impact décision 1 (P4/P6)
+        "+185 000 €",     # Impact décision 2 (P4/P6)
+        "9.2/10",         # ROI décision 1 (P4/P6)
+        "8.7/10",         # ROI décision 2 (P4/P6)
+        "30 jours",       # Timeline décision 1 (P4/P7)
+        "CALENDRIER D'ALLOCATION",   # Roadmap (P7)
+        "Élevé",          # Sévérité risque (P9 Risques)
+        "81%",            # Confiance analyse (P10 KPIs)
     ]
     FORBIDDEN_TOKENS = [
         "Données insuffisantes",   # RULE 007 — ne pas afficher quand la valeur existe
