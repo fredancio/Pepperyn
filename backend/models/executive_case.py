@@ -185,6 +185,52 @@ class DataQuality(BaseModel):
     limits:      List[str] = Field(default_factory=list)
 
 
+# ─── ÉTATS FINANCIERS SIMPLIFIÉS ─────────────────────────────────────────────
+
+class PLLine(BaseModel):
+    """Une ligne du compte de résultat."""
+    label:         str
+    value_display: str            # ex: "8 200 K€", "28 %", "-240 K€"
+    indent:        int  = 0       # 0 = ligne principale, 1 = sous-ligne indentée
+    is_subtotal:   bool = False   # sous-total (filet fin dessus)
+    is_total:      bool = False   # total (filet épais dessus + en gras)
+    is_separator:  bool = False   # ligne vide pour aérer
+
+
+class BalanceLine(BaseModel):
+    """Une ligne du bilan simplifié."""
+    label:         str
+    value_display: str
+    indent:        int  = 0
+    is_total:      bool = False
+
+
+class FinancialStatements(BaseModel):
+    """
+    États financiers simplifiés fournis avec le cas.
+    Optionnel — absent si l'entreprise n'a pas fourni ses comptes complets.
+    """
+    # ── Compte de résultat (P&L) ──────────────────────────────────────────
+    pl_period:  str             = ""   # ex: "Exercice 2025–2026 (12 mois estimés)"
+    pl_lines:   List[PLLine]    = Field(default_factory=list)
+    pl_note:    Optional[str]   = None # note de bas de page
+
+    # ── Bilan simplifié ────────────────────────────────────────────────────
+    bilan_date:   str                = ""
+    assets:       List[BalanceLine]  = Field(default_factory=list)
+    liabilities:  List[BalanceLine]  = Field(default_factory=list)
+    bfr_display:  Optional[str]      = None  # ex: "2 340 K€"
+    bilan_note:   Optional[str]      = None
+
+    # ── Position de trésorerie ─────────────────────────────────────────────
+    cash_current:           Optional[str] = None  # ex: "180 K€"
+    cash_burn_monthly:      Optional[str] = None  # ex: "-141 K€ / mois"
+    cash_runway_label:      Optional[str] = None  # ex: "1,3 mois (~5 semaines)"
+    credit_line_available:  Optional[str] = None
+    financing_need_90d:     Optional[str] = None  # ex: "-245 K€"
+    cash_note:              Optional[str] = None
+
+
 # ─── CONTRAT PRINCIPAL ────────────────────────────────────────────────────────
 
 class ExecutiveCaseJSON(BaseModel):
@@ -246,6 +292,9 @@ class ExecutiveCaseJSON(BaseModel):
 
     # ── Risques ───────────────────────────────────────────────────────────────
     major_risks: List[RiskItem] = Field(default_factory=list)
+
+    # ── États financiers simplifiés (optionnel) ───────────────────────────────
+    financial_statements: Optional[FinancialStatements] = None
 
     # ── Qualité des données ───────────────────────────────────────────────────
     data_quality: DataQuality = Field(default_factory=DataQuality)

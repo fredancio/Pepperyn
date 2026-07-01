@@ -1301,6 +1301,30 @@ def _build_page_risks(result: dict, styles: dict) -> list:
     return s
 
 
+# ── Dictionnaire de définitions — affiché sous chaque carte KPI ──────────────
+_KPI_DEFS: dict[str, str] = {
+    "chiffre d'affaires": "Total des ventes facturées sur la période. Point de départ de toute analyse de performance.",
+    "ebitda": "Résultat avant intérêts, impôts et amortissements. Mesure la rentabilité opérationnelle pure, indépendamment de la structure financière.",
+    "résultat net": "Bénéfice ou perte après toutes les charges (exploitation, financières, fiscales). Dernier indicateur de performance globale.",
+    "marge brute": "Part du CA restant après les coûts directs (achats, production). Mesure l'efficacité commerciale avant les charges fixes.",
+    "trésorerie": "Solde immédiatement disponible (comptes bancaires + caisse). C'est le pouls financier de l'entreprise — un indicateur de survie.",
+    "dso clients": "Days Sales Outstanding : délai moyen de règlement des clients, en jours. Un DSO élevé immobilise du capital et accroît le risque de défaillance.",
+    "dso": "Days Sales Outstanding : délai moyen de règlement des clients, en jours.",
+    "stock obsolète": "Valeur des stocks sans perspective de revente à leur valeur comptable. Capital gelé qui doit être libéré en priorité.",
+    "bfr": "Besoin en Fonds de Roulement : décalage entre encaissements clients et décaissements fournisseurs. Un BFR élevé mobilise un financement permanent.",
+    "endettement net": "Dettes financières moins la trésorerie disponible. Mesure la dépendance de l'entreprise vis-à-vis de ses créanciers.",
+    "confiance": "Score de fiabilité de l'analyse Pepperyn, calculé sur la complétude et la cohérence des données transmises.",
+}
+
+def _kpi_definition(label: str) -> str:
+    """Retourne la définition associée à un label KPI (matching partiel insensible à la casse)."""
+    lbl_low = label.lower()
+    for key, defn in _KPI_DEFS.items():
+        if key in lbl_low or lbl_low in key:
+            return defn
+    return ""
+
+
 # ─── P10 : "COMMENT VAIS-JE MESURER ?" — KPIs DE PILOTAGE ───────────────────
 
 def _build_page_kpis(result: dict, edm, styles: dict) -> list:
@@ -1381,9 +1405,14 @@ def _build_page_kpis(result: dict, edm, styles: dict) -> list:
                 ParagraphStyle("kv", fontName="Helvetica-Bold", fontSize=12,
                                leading=16, alignment=1, textColor=C_DARK)
             )
-        lbl_p = Paragraph(label_str, styles["indic_lbl"])
+        lbl_p   = Paragraph(label_str, styles["indic_lbl"])
+        defn    = _kpi_definition(label_str)
+        defn_ps = ParagraphStyle("kdef", fontName="Helvetica-Oblique", fontSize=6.5,
+                                 textColor=C_GRAY, leading=9, alignment=1)
+        defn_p  = Paragraph(_rl(defn), defn_ps) if defn else Paragraph("", defn_ps)
 
-        inner = Table([[val_p], [_sp(1)], [lbl_p]], colWidths=[col_w - 10 * mm])
+        inner = Table([[val_p], [_sp(1)], [lbl_p], [_sp(2)], [defn_p]],
+                      colWidths=[col_w - 10 * mm])
         inner.setStyle(TableStyle([
             ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
             ("TOPPADDING",    (0, 0), (-1, -1), 0),
@@ -1431,11 +1460,355 @@ def _build_page_kpis(result: dict, edm, styles: dict) -> list:
     return s
 
 
+# ─── P11 : COMPTE DE RÉSULTAT ────────────────────────────────────────────────
+
+def _build_page_pl(fs, styles: dict) -> list:
+    """P&L simplifié — une ligne = une vérité chiffrée."""
+    from models.executive_case import FinancialStatements
+    s = []
+    s.append(_sp(6))
+    s.extend(_section_header(
+        "COMPTE DE RÉSULTAT",
+        styles,
+        ceo_question="Quelle est ma rentabilité réelle ?"
+    ))
+    s.append(_sp(4))
+    s.append(Paragraph(
+        "Ce compte de résultat présente la formation du résultat, de la vente au bénéfice net. "
+        "Chaque palier intermédiaire (Marge brute → EBITDA → EBIT → Résultat net) révèle "
+        "où la valeur est créée ou détruite.",
+        styles["body_small"]
+    ))
+    s.append(_sp(5))
+
+    if not fs or not fs.pl_lines:
+        s.append(Paragraph("Compte de résultat non disponible pour cette analyse.", styles["body_small"]))
+        s.append(PageBreak())
+        return s
+
+    if fs.pl_period:
+        s.append(Paragraph(fs.pl_period, ParagraphStyle(
+            "pl_period", fontName="Helvetica-Oblique", fontSize=8, textColor=C_GRAY, leading=12
+        )))
+        s.append(_sp(4))
+
+    # Styles locaux
+    ps_label_main  = ParagraphStyle("plm",  fontName="Helvetica",      fontSize=9,    textColor=C_DARK,  leading=13)
+    ps_label_sub   = ParagraphStyle("pls",  fontName="Helvetica",      fontSize=8.5,  textColor=C_GRAY,  leading=12, leftIndent=12)
+    ps_label_sub2  = ParagraphStyle("plst", fontName="Helvetica-Bold", fontSize=9,    textColor=C_DARK,  leading=13)
+    ps_label_total = ParagraphStyle("plt",  fontName="Helvetica-Bold", fontSize=9.5,  textColor=C_DARK,  leading=14)
+    ps_val_main    = ParagraphStyle("plvm", fontName="Helvetica",      fontSize=9,    textColor=C_DARK,  leading=13, alignment=2)
+    ps_val_sub     = ParagraphStyle("plvs", fontName="Helvetica",      fontSize=8.5,  textColor=C_GRAY,  leading=12, alignment=2)
+    ps_val_sub2    = ParagraphStyle("plvst",fontName="Helvetica-Bold", fontSize=9,    textColor=C_DARK,  leading=13, alignment=2)
+    ps_val_total   = ParagraphStyle("plvt", fontName="Helvetica-Bold", fontSize=9.5,  textColor=C_DARK,  leading=14, alignment=2)
+
+    col_label = CONTENT_W * 0.68
+    col_val   = CONTENT_W * 0.32
+    data  = []
+    cmds  = [
+        ("TOPPADDING",    (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
+        # Séparateur sous l'en-tête invisible (ligne 0 = label fictif non ajouté)
+    ]
+
+    for i, line in enumerate(fs.pl_lines):
+        val_str = str(line.value_display or "")
+        is_neg  = val_str.startswith("-")
+
+        if line.is_total:
+            lbl_ps = ps_label_total
+            val_ps = ParagraphStyle("plvt2", fontName="Helvetica-Bold", fontSize=9.5,
+                                    textColor=C_RED if is_neg else C_GREEN, leading=14, alignment=2)
+            cmds.append(("LINEABOVE",  (0, i), (-1, i), 1.5, C_DARK))
+            cmds.append(("LINEBELOW",  (0, i), (-1, i), 0.5, C_LGRAY))
+        elif line.is_subtotal:
+            lbl_ps = ps_label_sub2
+            val_ps = ParagraphStyle("plvst2", fontName="Helvetica-Bold", fontSize=9,
+                                    textColor=C_RED if is_neg else C_DARK, leading=13, alignment=2)
+            cmds.append(("LINEABOVE",  (0, i), (-1, i), 0.5, C_LGRAY))
+        elif line.indent > 0:
+            lbl_ps = ps_label_sub
+            val_ps = ps_val_sub
+        else:
+            lbl_ps = ps_label_main
+            val_ps = ps_val_main
+
+        data.append([
+            Paragraph(_rl(line.label), lbl_ps),
+            Paragraph(_rl(val_str), val_ps),
+        ])
+
+    tbl = Table(data, colWidths=[col_label, col_val])
+    tbl.setStyle(TableStyle(cmds))
+    s.append(tbl)
+
+    if fs.pl_note:
+        s.append(_sp(5))
+        s.append(_hr(C_LGRAY, 0.5))
+        s.append(_sp(3))
+        s.append(Paragraph(f"<i>{_rl(fs.pl_note)}</i>",
+                           ParagraphStyle("pln", fontName="Helvetica-Oblique", fontSize=7.5,
+                                          textColor=C_GRAY, leading=11)))
+
+    s.append(PageBreak())
+    return s
+
+
+# ─── P12 : BILAN SIMPLIFIÉ ────────────────────────────────────────────────────
+
+def _build_page_bilan(fs, styles: dict) -> list:
+    """Bilan à deux colonnes (Actif | Passif) — vue instantanée du patrimoine."""
+    s = []
+    s.append(_sp(6))
+    s.extend(_section_header(
+        "BILAN SIMPLIFIÉ",
+        styles,
+        ceo_question="Où est engagé mon capital ?"
+    ))
+    s.append(_sp(4))
+    s.append(Paragraph(
+        "Le bilan est une photographie du patrimoine de l'entreprise à une date donnée. "
+        "L'actif montre comment le capital est employé (immobilisations, stocks, créances, "
+        "trésorerie). Le passif montre qui a financé ce capital (actionnaires et créanciers). "
+        "Actif = Passif, toujours.",
+        styles["body_small"]
+    ))
+    s.append(_sp(5))
+
+    if not fs or (not fs.assets and not fs.liabilities):
+        s.append(Paragraph("Bilan non disponible pour cette analyse.", styles["body_small"]))
+        s.append(PageBreak())
+        return s
+
+    if fs.bilan_date:
+        s.append(Paragraph(fs.bilan_date, ParagraphStyle(
+            "bd", fontName="Helvetica-Oblique", fontSize=8, textColor=C_GRAY, leading=12
+        )))
+        s.append(_sp(4))
+
+    ps_hdr = ParagraphStyle("bh",  fontName="Helvetica-Bold", fontSize=8.5, textColor=C_GRAY,
+                            leading=12, alignment=1)
+    ps_lbl = ParagraphStyle("bl",  fontName="Helvetica",      fontSize=9,   textColor=C_DARK, leading=13)
+    ps_sub = ParagraphStyle("bls", fontName="Helvetica",      fontSize=8.5, textColor=C_GRAY, leading=12, leftIndent=10)
+    ps_tot = ParagraphStyle("bt",  fontName="Helvetica-Bold", fontSize=9.5, textColor=C_DARK, leading=14)
+    ps_val = ParagraphStyle("bv",  fontName="Helvetica",      fontSize=9,   textColor=C_DARK, leading=13, alignment=2)
+    ps_vtot= ParagraphStyle("bvt", fontName="Helvetica-Bold", fontSize=9.5, textColor=C_DARK, leading=14, alignment=2)
+
+    half  = CONTENT_W / 2 - 3 * mm
+    col_l = half * 0.65
+    col_v = half * 0.35
+
+    def _side_table(lines, title):
+        data = [[Paragraph(title, ps_hdr), Paragraph("", ps_hdr)]]
+        cmds = [
+            ("TOPPADDING",    (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+            ("LINEBELOW",     (0, 0), (-1, 0),  1.2, C_DARK),
+        ]
+        for i, line in enumerate(lines, start=1):
+            val_str = str(line.value_display or "")
+            if line.is_total:
+                lbl_p = Paragraph(_rl(line.label), ps_tot)
+                val_p = Paragraph(_rl(val_str), ps_vtot)
+                cmds.append(("LINEABOVE", (0, i), (-1, i), 0.8, C_DARK))
+            elif line.indent > 0:
+                lbl_p = Paragraph(_rl(line.label), ps_sub)
+                val_p = Paragraph(_rl(val_str), ParagraphStyle("bvs", fontName="Helvetica",
+                                  fontSize=8.5, textColor=C_GRAY, leading=12, alignment=2))
+            else:
+                lbl_p = Paragraph(_rl(line.label), ps_lbl)
+                val_p = Paragraph(_rl(val_str), ps_val)
+            data.append([lbl_p, val_p])
+            if not line.is_total and i < len(lines):
+                cmds.append(("LINEBELOW", (0, i), (-1, i), 0.4, C_LGRAY))
+        t = Table(data, colWidths=[col_l, col_v])
+        t.setStyle(TableStyle(cmds))
+        return t
+
+    actif_t  = _side_table(fs.assets or [],      "ACTIF")
+    passif_t = _side_table(fs.liabilities or [], "PASSIF")
+
+    bilan_row = Table([[actif_t, passif_t]], colWidths=[half, half])
+    bilan_row.setStyle(TableStyle([
+        ("LEFTPADDING",  (0, 0), (0, 0), 0),
+        ("RIGHTPADDING", (0, 0), (0, 0), 6),
+        ("LEFTPADDING",  (1, 0), (1, 0), 6),
+        ("RIGHTPADDING", (1, 0), (1, 0), 0),
+        ("TOPPADDING",   (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING",(0, 0), (-1, -1), 0),
+        ("VALIGN",       (0, 0), (-1, -1), "TOP"),
+        ("LINEAFTER",    (0, 0), (0, -1), 0.5, C_LGRAY),
+    ]))
+    s.append(bilan_row)
+
+    if fs.bfr_display:
+        s.append(_sp(6))
+        s.append(_hr(C_LGRAY, 0.5))
+        s.append(_sp(3))
+        bfr_note = (f"<b>BFR (Besoin en Fonds de Roulement) : {_rl(fs.bfr_display)}</b>"
+                    " — Décalage entre encaissements clients et paiements fournisseurs. "
+                    "Le BFR représente le capital permanent nécessaire pour financer le cycle d'exploitation.")
+        if fs.bilan_note:
+            bfr_note = f"<i>{_rl(fs.bilan_note)}</i>"
+        s.append(Paragraph(bfr_note, ParagraphStyle(
+            "bfr_n", fontName="Helvetica-Oblique", fontSize=7.5, textColor=C_GRAY, leading=11
+        )))
+
+    s.append(PageBreak())
+    return s
+
+
+# ─── P13 : POSITION DE TRÉSORERIE ─────────────────────────────────────────────
+
+def _build_page_tresorerie(fs, styles: dict) -> list:
+    """Position de trésorerie — urgence cash et runway."""
+    s = []
+    s.append(_sp(6))
+    s.extend(_section_header(
+        "POSITION DE TRÉSORERIE",
+        styles,
+        ceo_question="Combien de temps puis-je tenir ?"
+    ))
+    s.append(_sp(4))
+    s.append(Paragraph(
+        "La trésorerie est le seul indicateur qui ne ment jamais : une entreprise rentable "
+        "peut mourir si elle manque de liquidités. Ce tableau mesure le cash disponible, "
+        "la consommation mensuelle (burn rate) et le délai avant rupture.",
+        styles["body_small"]
+    ))
+    s.append(_sp(6))
+
+    if not fs or not fs.cash_current:
+        s.append(Paragraph("Position de trésorerie non disponible.", styles["body_small"]))
+        s.append(PageBreak())
+        return s
+
+    # ── Indicateurs héros ─────────────────────────────────────────────────
+    metrics = [
+        ("TRÉSORERIE\nDISPONIBLE",     fs.cash_current,          "neutral"),
+        ("BURN RATE\nMENSUEL",         fs.cash_burn_monthly,     "negative"),
+        ("RUNWAY\nESTIMÉ",             fs.cash_runway_label,     "alert"),
+    ]
+    col_w3 = CONTENT_W / 3
+    hero_cells = []
+    for title, val, tone in metrics:
+        if not val:
+            continue
+        is_neg = tone in ("negative", "alert")
+        v_color = C_RED if is_neg else C_DARK
+        v_hex   = HEX_RED if is_neg else HEX_NAVY
+        hero_val = Paragraph(
+            f'<font color="{v_hex}"><b>{_rl(val)}</b></font>',
+            ParagraphStyle("tv", fontName="Helvetica-Bold", fontSize=14,
+                           leading=18, alignment=1, textColor=C_DARK)
+        )
+        hero_lbl = Paragraph(title, ParagraphStyle(
+            "tl", fontName="Helvetica", fontSize=7, textColor=C_GRAY,
+            leading=10, alignment=1, spaceAfter=0
+        ))
+        inner = Table([[hero_lbl], [_sp(3)], [hero_val]], colWidths=[col_w3 - 8 * mm])
+        inner.setStyle(TableStyle([
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        card = Table([[inner]], colWidths=[col_w3 - 4 * mm])
+        card.setStyle(TableStyle([
+            ("BOX", (0, 0), (-1, -1), 1, C_LGRAY),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        hero_cells.append(card)
+
+    while len(hero_cells) < 3:
+        hero_cells.append(Table([[""]], colWidths=[col_w3 - 4 * mm]))
+
+    hero_row = Table([hero_cells], colWidths=[col_w3] * 3)
+    hero_row.setStyle(TableStyle([
+        ("LEFTPADDING",   (0, 0), (-1, -1), 2),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 2),
+        ("TOPPADDING",    (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    s.append(hero_row)
+    s.append(_sp(8))
+
+    # ── Tableau des indicateurs détaillés ─────────────────────────────────
+    ps_r_lbl = ParagraphStyle("rl", fontName="Helvetica",      fontSize=9,   textColor=C_DARK, leading=13)
+    ps_r_val = ParagraphStyle("rv", fontName="Helvetica-Bold", fontSize=9,   textColor=C_DARK, leading=13, alignment=2)
+    ps_r_def = ParagraphStyle("rd", fontName="Helvetica-Oblique", fontSize=7.5, textColor=C_GRAY, leading=11)
+
+    detail_rows = [
+        ("Ligne de crédit disponible",   fs.credit_line_available,
+         "Facilité bancaire pouvant être tirée immédiatement en cas de besoin de liquidités."),
+        ("Besoin de financement à 90j",  fs.financing_need_90d,
+         "Montant à financer dans les 90 jours si la trajectoire actuelle se maintient sans action corrective."),
+    ]
+
+    data = [
+        [Paragraph("INDICATEUR", ParagraphStyle("dh", fontName="Helvetica-Bold", fontSize=7.5,
+                                                textColor=C_GRAY, leading=11)),
+         Paragraph("VALEUR", ParagraphStyle("dvh", fontName="Helvetica-Bold", fontSize=7.5,
+                                            textColor=C_GRAY, leading=11, alignment=2))],
+    ]
+    cmds = [
+        ("TOPPADDING",    (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ("LINEBELOW",     (0, 0), (-1, 0),  1.5, C_DARK),
+    ]
+    for i, (lbl, val, defn) in enumerate(detail_rows, start=1):
+        if not val:
+            continue
+        lbl_cell = Table([
+            [Paragraph(_rl(lbl), ps_r_lbl)],
+            [Paragraph(f"<i>{_rl(defn)}</i>", ps_r_def)],
+        ], colWidths=[CONTENT_W * 0.7])
+        lbl_cell.setStyle(TableStyle([
+            ("TOPPADDING",    (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ]))
+        is_neg = val.startswith("-") if val else False
+        v_col  = C_RED if is_neg else C_DARK
+        v_hex  = HEX_RED if is_neg else HEX_NAVY
+        val_p  = Paragraph(f'<font color="{v_hex}">{_rl(val)}</font>', ps_r_val)
+        data.append([lbl_cell, val_p])
+        cmds.append(("LINEBELOW", (0, i), (-1, i), 0.5, C_LGRAY))
+
+    if len(data) > 1:
+        tbl = Table(data, colWidths=[CONTENT_W * 0.7, CONTENT_W * 0.3])
+        tbl.setStyle(TableStyle(cmds))
+        s.append(tbl)
+
+    if fs.cash_note:
+        s.append(_sp(6))
+        s.append(_hr(C_LGRAY, 0.5))
+        s.append(_sp(3))
+        s.append(Paragraph(f"<i>{_rl(fs.cash_note)}</i>",
+                           ParagraphStyle("cn", fontName="Helvetica-Oblique", fontSize=7.5,
+                                          textColor=C_GRAY, leading=11)))
+
+    s.append(PageBreak())
+    return s
+
+
 # ─── POINT D'ENTRÉE ───────────────────────────────────────────────────────────
 
 def generate_pdf_report(result, company_name: str | None = None) -> bytes:
     """
-    Génère le Rapport exécutif Pepperyn (11 pages — CEO Question Framework v3).
+    Génère le Rapport exécutif Pepperyn (14 pages — CEO Question Framework v4 + états financiers).
 
     Args:
         result: ExecutiveCaseJSON (V2 — source unique de vérité)
@@ -1444,11 +1817,13 @@ def generate_pdf_report(result, company_name: str | None = None) -> bytes:
     """
     if isinstance(result, ExecutiveCaseJSON):
         from services.executive_case_builder import case_to_edm, case_to_result_dict
+        case_obj   = result                            # objet original — pour les états financiers
         edm        = case_to_edm(result)
         result_raw = case_to_result_dict(result)
         name       = company_name or result.company_name or "—"
         date_str   = result.analysis_date or datetime.now().strftime("%d/%m/%Y")
     else:
+        case_obj   = None
         result_raw = result
         edm        = build_executive_decision_model(result)
         name       = company_name or result.get("company_name") or "—"
@@ -1500,6 +1875,16 @@ def generate_pdf_report(result, company_name: str | None = None) -> bytes:
             lambda: _build_page_risks(result, styles)))
         story.extend(_safe_page("KPIs",
             lambda: _build_page_kpis(result, edm, styles)))
+
+        # P11–P13 — États financiers (optionnels — présents si financial_statements fourni)
+        fs = getattr(case_obj, "financial_statements", None) if case_obj else None
+        if fs:
+            story.extend(_safe_page("P&L",
+                lambda: _build_page_pl(fs, styles)))
+            story.extend(_safe_page("Bilan",
+                lambda: _build_page_bilan(fs, styles)))
+            story.extend(_safe_page("Trésorerie",
+                lambda: _build_page_tresorerie(fs, styles)))
 
         return story
 

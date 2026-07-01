@@ -31,7 +31,7 @@ from models.schemas import AnalysisResult
 from models.executive_case import (
     ExecutiveCaseJSON, DimensionScores, COIBreakdown, KPICard, ValueDestroyerItem,
     PriorityDecisionItem, ExecutionLogItem, ProjectionSeries, Scenarios, ScenarioItem,
-    RiskItem, DataQuality,
+    RiskItem, DataQuality, PLLine, BalanceLine, FinancialStatements,
 )
 from services.excel_export import generate_excel_report
 from services.export_pdf_service import generate_pdf_report
@@ -55,11 +55,13 @@ OPTILUX = ExecutiveCaseJSON(
     value_creation_statement="Si les quatre décisions sont engagées, Optilux récupère entre 820 K€ et 1,15 M€.",
     kpi_dashboard=[
         KPICard(label="Chiffre d'affaires", value="8,2 M€"),
-        KPICard(label="EBITDA",             value="-240 K€",  status="missing"),
-        KPICard(label="Trésorerie",         value="180 K€",   status="missing"),
-        KPICard(label="Marge brute",        value="28 %",     status="missing"),
-        KPICard(label="DSO clients",        value="87 jours", status="missing"),
-        KPICard(label="Stock obsolète",     value="620 K€",   status="missing"),
+        KPICard(label="EBITDA",             value="-240 K€"),
+        KPICard(label="Résultat net",       value="-505 K€"),
+        KPICard(label="Marge brute",        value="28 %"),
+        KPICard(label="Trésorerie",         value="180 K€"),
+        KPICard(label="DSO clients",        value="87 jours"),
+        KPICard(label="Stock obsolète",     value="620 K€"),
+        KPICard(label="BFR",                value="2 340 K€"),
     ],
     value_destroyers=[
         ValueDestroyerItem(name="Stock obsolète non provisionné",           annual_impact=-620_000, monthly_impact=-51_667, trend="↑"),
@@ -99,6 +101,55 @@ OPTILUX = ExecutiveCaseJSON(
         RiskItem(description="Perte du client Groupe Lumière (24 % du CA)", severity="Élevé", impact="Fort", horizon="Court terme (3-6 mois)"),
     ],
     data_quality=DataQuality(score=81, anomalies=["Données Q2 2026 partielles"], assumptions=["Taux de réussite liquidation stock estimé à 60 %"], limits=["Filiales hors périmètre"]),
+    financial_statements=FinancialStatements(
+        # ── Compte de résultat ────────────────────────────────────────────
+        pl_period="Exercice 2025–2026 (12 mois estimés)",
+        pl_lines=[
+            PLLine(label="Chiffre d'affaires net",                value_display="8 200 K€"),
+            PLLine(label="dont Services",                          value_display="5 100 K€",  indent=1),
+            PLLine(label="dont Produits",                          value_display="3 100 K€",  indent=1),
+            PLLine(label="Coût des ventes",                        value_display="-5 904 K€"),
+            PLLine(label="Marge brute (28 %)",                     value_display="2 296 K€",  is_subtotal=True),
+            PLLine(label="Charges de personnel",                   value_display="-1 800 K€", indent=1),
+            PLLine(label="Loyers et charges locatives",            value_display="-240 K€",   indent=1),
+            PLLine(label="Autres charges d'exploitation",          value_display="-496 K€",   indent=1),
+            PLLine(label="EBITDA",                                 value_display="-240 K€",   is_subtotal=True),
+            PLLine(label="Amortissements et dotations",            value_display="-180 K€"),
+            PLLine(label="Résultat d'exploitation (EBIT)",         value_display="-420 K€",   is_subtotal=True),
+            PLLine(label="Charges financières nettes",             value_display="-85 K€"),
+            PLLine(label="Résultat avant impôt",                   value_display="-505 K€",   is_subtotal=True),
+            PLLine(label="Impôts (résultat déficitaire)",          value_display="0 K€"),
+            PLLine(label="Résultat net",                           value_display="-505 K€",   is_total=True),
+        ],
+        pl_note="Estimations sur base des 9 premiers mois et de la trajectoire extrapolée. Non audité.",
+        # ── Bilan simplifié ───────────────────────────────────────────────
+        bilan_date="Au 28/06/2026 (estimé)",
+        assets=[
+            BalanceLine(label="Immobilisations nettes",         value_display="1 200 K€"),
+            BalanceLine(label="Stocks (dont 620 K€ obsolètes)", value_display="1 050 K€"),
+            BalanceLine(label="Créances clients (DSO 87j)",     value_display="1 970 K€"),
+            BalanceLine(label="Autres actifs circulants",        value_display="200 K€"),
+            BalanceLine(label="Trésorerie disponible",          value_display="180 K€"),
+            BalanceLine(label="Total actif",                    value_display="4 600 K€",  is_total=True),
+        ],
+        liabilities=[
+            BalanceLine(label="Capitaux propres",               value_display="495 K€"),
+            BalanceLine(label="Dettes financières L/T",         value_display="1 385 K€"),
+            BalanceLine(label="Dettes fournisseurs",            value_display="680 K€"),
+            BalanceLine(label="Dettes sociales et fiscales",    value_display="820 K€"),
+            BalanceLine(label="Autres dettes",                  value_display="1 220 K€"),
+            BalanceLine(label="Total passif",                   value_display="4 600 K€",  is_total=True),
+        ],
+        bfr_display="2 340 K€",
+        bilan_note="BFR = Créances clients (1 970 K€) + Stocks (1 050 K€) − Dettes four. (680 K€). Un BFR de 2,3 M€ sur 8,2 M€ de CA représente 28,5 % du chiffre d'affaires — niveau structurellement élevé.",
+        # ── Position de trésorerie ────────────────────────────────────────
+        cash_current="180 K€",
+        cash_burn_monthly="-141 K€ / mois",
+        cash_runway_label="1,3 mois (~5–6 semaines)",
+        credit_line_available="Non activée",
+        financing_need_90d="-245 K€",
+        cash_note="L'insolvabilité technique peut intervenir avant épuisement complet de la trésorerie, notamment en cas de défaillance d'un client majeur (Groupe Lumière représente 24 % du CA).",
+    ),
 )
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
