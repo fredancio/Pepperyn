@@ -45,24 +45,26 @@ from reportlab.graphics.charts.linecharts import HorizontalLineChart
 from services.executive_decision_model import build_executive_decision_model
 from models.executive_case import ExecutiveCaseJSON
 
-# ─── PALETTE ─────────────────────────────────────────────────────────────────
-C_NAVY   = colors.HexColor("#0A2540")   # fond boîte dark, titre couverture
-C_BLUE   = colors.HexColor("#1B73E8")   # accents principaux, bordures section
-C_RED    = colors.HexColor("#C0392B")   # urgence, score critique
-C_AMBER  = colors.HexColor("#B8763A")   # estimations, priorité moyenne
-C_GREEN  = colors.HexColor("#2C7A4B")   # "avec action", confiance haute
-C_GRAY   = colors.HexColor("#8A9BB0")   # textes secondaires, labels
-C_LGRAY  = colors.HexColor("#D5DCE5")   # filets, bordures légères
+# ─── PALETTE McKINSEY ────────────────────────────────────────────────────────
+# Loi 2 : max 3 couleurs actives par page
+# Sources : SVG_MOBT31_Srvy_CXO_Exhibit2.svg + Exhibit4.svg
+C_NAVY   = colors.HexColor("#0A2540")   # titres, structure (McKinsey #006699 adapté)
+C_BLUE   = colors.HexColor("#1B4F8A")   # accents secondaires (roadmap phases)
+C_RED    = colors.HexColor("#C0392B")   # pertes, urgence — SIGNAL UNIQUE
+C_AMBER  = colors.HexColor("#B8763A")   # priorité moyenne (restreint)
+C_GREEN  = colors.HexColor("#1D6A3A")   # gains, confiance haute — SIGNAL UNIQUE
+C_GRAY   = colors.HexColor("#6B7280")   # labels, captions (McKinsey #676767)
+C_LGRAY  = colors.HexColor("#D8E3E9")   # filets 0.5pt (McKinsey #D8E3E9 exact)
 C_WHITE  = colors.white
-C_DARK   = colors.HexColor("#1A1A2E")   # corps de texte principal
-C_LBGRAY = colors.HexColor("#F5F7FA")   # fond clair pour tableaux alternés
+C_DARK   = colors.HexColor("#1F2937")   # corps de texte (McKinsey #333333 adapté)
+C_LBGRAY = colors.HexColor("#F8FAFB")   # fond très clair pour sections
 
 HEX_RED   = "#C0392B"
 HEX_AMBER = "#B8763A"
-HEX_BLUE  = "#1B73E8"
+HEX_BLUE  = "#1B4F8A"
 HEX_NAVY  = "#0A2540"
-HEX_GRAY  = "#8A9BB0"
-HEX_GREEN = "#2C7A4B"
+HEX_GRAY  = "#6B7280"
+HEX_GREEN = "#1D6A3A"
 
 # ─── LAYOUT A4 ────────────────────────────────────────────────────────────────
 PAGE_W, PAGE_H = A4               # 595 × 842 pts
@@ -156,8 +158,9 @@ def _build_styles() -> dict:
     ps("cover_brand",  fontName="Helvetica-Bold", fontSize=10, textColor=C_BLUE,  alignment=TA_CENTER, leading=14)
     ps("cover_conf",   fontName="Helvetica",      fontSize=8,  textColor=C_GRAY,  alignment=TA_CENTER, leading=12)
 
-    ps("ceo_q",        fontName="Helvetica-Oblique", fontSize=8, textColor=C_GRAY, leading=12, spaceAfter=2)
-    ps("section_title",fontName="Helvetica-Bold", fontSize=14, textColor=C_DARK,  leading=18, leftIndent=8)
+    # Loi McKinsey 6 : titre discret, pas dominant
+    ps("ceo_q",        fontName="Helvetica-Oblique", fontSize=8.5, textColor=C_GRAY, leading=13, spaceAfter=3)
+    ps("section_title",fontName="Helvetica-Bold", fontSize=13, textColor=C_DARK, leading=17, spaceAfter=2)
 
     ps("hero_xl",   fontName="Helvetica-Bold", fontSize=62, textColor=C_RED,   alignment=TA_LEFT, leading=70)
     ps("hero_xl_g", fontName="Helvetica-Bold", fontSize=62, textColor=C_GREEN, alignment=TA_LEFT, leading=70)
@@ -187,7 +190,8 @@ def _build_styles() -> dict:
     ps("quote",      fontName="Helvetica-Oblique", fontSize=10, textColor=C_GRAY, leading=15, leftIndent=10)
 
     ps("prio_score", fontName="Helvetica-Bold", fontSize=11, textColor=C_DARK, leading=15)
-    ps("tbl_hdr",    fontName="Helvetica-Bold", fontSize=9,  textColor=C_DARK, leading=13)
+    # Loi McKinsey 4 : en-têtes de tableau discrets (SMALL CAPS gris)
+    ps("tbl_hdr",    fontName="Helvetica-Bold", fontSize=7.5, textColor=C_GRAY, leading=11)
     ps("tbl_cell",   fontName="Helvetica",      fontSize=10, textColor=C_DARK, leading=14)
     ps("tbl_impact", fontName="Helvetica-Bold", fontSize=14, textColor=C_BLUE, leading=18, alignment=TA_LEFT)
     ps("tbl_impact_g",fontName="Helvetica-Bold",fontSize=14, textColor=C_GREEN,leading=18, alignment=TA_LEFT)
@@ -235,30 +239,16 @@ def _draw_header_footer(canvas, doc, doc_type: str, date_str: str) -> None:
 # ─── COMPOSANTS RÉUTILISABLES ─────────────────────────────────────────────────
 
 def _section_header(title: str, styles: dict, ceo_question: str = "", bar_color=None) -> list:
-    """Titre de section avec question CEO et barre colorée."""
-    if bar_color is None:
-        bar_color = C_BLUE
+    """
+    Titre de section McKinsey — Loi 6 : discret, pas dominant.
+    Question CEO en italique gris → titre bold → règle 0.5pt.
+    Zéro barre colorée latérale.
+    """
     items = []
     if ceo_question:
         items.append(Paragraph(f'<i>{_rl(ceo_question)}</i>', styles["ceo_q"]))
-    bar = Table([[""]], colWidths=[3 * mm], rowHeights=[22])
-    bar.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), bar_color),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-    ]))
-    title_p = Paragraph(title, styles["section_title"])
-    t = Table([[bar, title_p]], colWidths=[5 * mm, CONTENT_W - 5 * mm])
-    t.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 2),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-    ]))
-    items.append(t)
+    items.append(Paragraph(title, styles["section_title"]))
+    items.append(_hr(C_DARK, thickness=1.0))
     return items
 
 
@@ -273,16 +263,18 @@ def _sp(h: float) -> Spacer:
 
 
 def _dark_box(inner_table, styles: dict, bg=None) -> Table:
-    """Boîte fond navy pour hero metrics."""
-    bg = bg or C_NAVY
+    """
+    Encadré héro — Loi McKinsey 3 : fond très clair, pas navy.
+    Le chiffre doit respirer, pas être enfermé dans un rectangle foncé.
+    """
     t = Table([[inner_table]], colWidths=[CONTENT_W])
     t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), bg),
-        ("LEFTPADDING", (0, 0), (-1, -1), 8 * mm),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 8 * mm),
-        ("TOPPADDING", (0, 0), (-1, -1), 6 * mm),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6 * mm),
-        ("ROUNDEDCORNERS", [4]),
+        ("BACKGROUND",    (0, 0), (-1, -1), C_LBGRAY),
+        ("LINEBELOW",     (0, 0), (-1, -1), 2.0, C_NAVY),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 6 * mm),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 6 * mm),
+        ("TOPPADDING",    (0, 0), (-1, -1), 5 * mm),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5 * mm),
     ]))
     return t
 
@@ -305,11 +297,30 @@ def _quote_box(text: str, styles: dict, bar_color=None) -> Table:
 
 # ─── GRAPHIQUES LIGNE ─────────────────────────────────────────────────────────
 
+def _fmt_chart_axis(val: float) -> str:
+    """
+    Formate les labels de l'axe Y des graphiques.
+    Loi McKinsey 5 : axes lisibles (+2 M€, 0, -2 M€), jamais "2000000".
+    """
+    if val == 0:
+        return "0"
+    if abs(val) >= 1_000_000:
+        m = val / 1_000_000
+        prefix = "+" if m > 0 else ""
+        formatted = f"{abs(m):.0f}" if abs(m) == int(abs(m)) else f"{abs(m):.1f}".replace(".", ",")
+        return f"{prefix}{formatted} M€" if m > 0 else f"-{formatted} M€"
+    if abs(val) >= 1_000:
+        k = val / 1_000
+        prefix = "+" if k > 0 else ""
+        return f"{prefix}{abs(k):.0f} K€" if k > 0 else f"-{abs(k):.0f} K€"
+    return f"{val:+.0f} €"
+
+
 def _line_chart_two(series_a, series_b, width, height, y_min, y_max):
     d = Drawing(width, height)
     lc = HorizontalLineChart()
-    lc.x = 38; lc.y = 24
-    lc.width = width - 50; lc.height = height - 36
+    lc.x = 44; lc.y = 24
+    lc.width = width - 56; lc.height = height - 36
     lc.data = [series_a, series_b]
     lc.categoryAxis.categoryNames = [f"M{i + 1}" for i in range(len(series_a))]
     lc.categoryAxis.labels.angle = 0
@@ -319,8 +330,9 @@ def _line_chart_two(series_a, series_b, width, height, y_min, y_max):
     lc.valueAxis.valueStep = (y_max - y_min) / 4
     lc.valueAxis.labels.fontSize = 7
     lc.valueAxis.labels.fontName = "Helvetica"
-    lc.lines[0].strokeColor = C_GREEN; lc.lines[0].strokeWidth = 2
-    lc.lines[1].strokeColor = C_RED;   lc.lines[1].strokeWidth = 2
+    lc.valueAxis.labelTextFormat = _fmt_chart_axis   # ← Loi 5 : axes formatés
+    lc.lines[0].strokeColor = C_GREEN; lc.lines[0].strokeWidth = 1.5
+    lc.lines[1].strokeColor = C_RED;   lc.lines[1].strokeWidth = 1.5
     lc.lines[0].symbol = None; lc.lines[1].symbol = None
     d.add(lc)
     return d
@@ -376,8 +388,7 @@ def _build_page_verdict(result: dict, edm, styles: dict) -> list:
         styles,
         ceo_question="Dois-je m'inquiéter ?"
     ))
-    s.append(_hr())
-    s.append(_sp(5))
+    s.append(_sp(6))
 
     score = result.get("score_global")
     niveau = result.get("niveau_urgence") or ""
@@ -467,9 +478,10 @@ def _build_page_verdict(result: dict, edm, styles: dict) -> list:
         right_items.append(_sp(4))
 
     if tension:
-        right_items.append(Paragraph(f'<b>"{_rl(tension)}"</b>', ParagraphStyle(
-            "ten", fontName="Helvetica-Bold-Oblique", fontSize=11,
-            textColor=C_DARK, leading=16
+        # Loi McKinsey 1 : BoldOblique (pas Bold-Oblique — nom ReportLab correct)
+        right_items.append(Paragraph(f'"{_rl(tension)}"', ParagraphStyle(
+            "ten", fontName="Helvetica-BoldOblique", fontSize=10.5,
+            textColor=C_DARK, leading=15
         )))
         right_items.append(_sp(4))
 
@@ -505,12 +517,12 @@ def _build_page_verdict(result: dict, edm, styles: dict) -> list:
                                               textColor=C_GRAY, leading=10, alignment=1))],
         ], colWidths=[CONTENT_W * 0.13 - 2 * mm])
         inner.setStyle(TableStyle([
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("TOPPADDING",    (0, 0), (-1, -1), 4),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-            ("BOX", (0, 0), (-1, -1), 0.5, C_LGRAY),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+            ("LINEABOVE",     (0, 0), (-1, 0),  1.5, C_LGRAY),  # hairline top seulement
+            ("ALIGN",         (0, 0), (-1, -1), "CENTER"),
         ]))
         return inner
 
@@ -568,8 +580,7 @@ def _build_page_capital(edm, result: dict, styles: dict) -> list:
         styles,
         ceo_question="Pourquoi ?"
     ))
-    s.append(_hr())
-    s.append(_sp(6))
+    s.append(_sp(7))
 
     destroyers = edm.value_destroyers[:5]
 
@@ -624,20 +635,17 @@ def _build_page_capital(edm, result: dict, styles: dict) -> list:
         ])
 
     tbl = Table(data, colWidths=col_w)
+    # McKinsey law 4 : hairlines only, no alternating backgrounds
     cmds = [
-        ("TOPPADDING",    (0, 0), (-1, -1), 9),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING",    (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
         ("LEFTPADDING",   (0, 0), (-1, -1), 3),
         ("RIGHTPADDING",  (0, 0), (-1, -1), 3),
         ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
-        ("LINEBELOW",     (0, 0), (-1, 0),  0.8, C_LGRAY),
-        ("FONTNAME",      (0, 0), (-1, 0),  "Helvetica-Bold"),
-        ("FONTSIZE",      (0, 0), (-1, 0),  9),
+        ("LINEBELOW",     (0, 0), (-1, 0),  1.5, C_DARK),   # règle épaisse sous header
     ]
     for i in range(1, len(data)):
         cmds.append(("LINEBELOW", (0, i), (-1, i), 0.5, C_LGRAY))
-        if i % 2 == 0:
-            cmds.append(("BACKGROUND", (0, i), (-1, i), C_LBGRAY))
     tbl.setStyle(TableStyle(cmds))
     s.append(tbl)
     s.append(_sp(6))
@@ -665,8 +673,7 @@ def _build_page_coi(edm, result: dict, styles: dict) -> list:
         styles,
         ceo_question="Combien cela me coûte de ne rien faire ?"
     ))
-    s.append(_hr())
-    s.append(_sp(5))
+    s.append(_sp(6))
 
     coi = edm.cost_of_inaction
     annual = coi.per_year if coi else None
@@ -765,8 +772,7 @@ def _build_page_decisions(edm, styles: dict, result_dict: dict | None = None) ->
         styles,
         ceo_question="Que dois-je faire ?"
     ))
-    s.append(_hr())
-    s.append(_sp(4))
+    s.append(_sp(5))
 
     score = edm.executive_decisions_score if edm.executive_decisions_score else 0.0
     s.append(Paragraph(
@@ -807,14 +813,12 @@ def _build_page_decisions(edm, styles: dict, result_dict: dict | None = None) ->
 
     tbl = Table(data, colWidths=col_w)
     cmds = [
-        ("TOPPADDING",    (0, 0), (-1, -1), 8),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING",    (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
         ("LEFTPADDING",   (0, 0), (-1, -1), 3),
         ("RIGHTPADDING",  (0, 0), (-1, -1), 3),
         ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
-        ("LINEBELOW",     (0, 0), (-1, 0),  0.8, C_LGRAY),
-        ("FONTNAME",      (0, 0), (-1, 0),  "Helvetica-Bold"),
-        ("FONTSIZE",      (0, 0), (-1, 0),  9),
+        ("LINEBELOW",     (0, 0), (-1, 0),  1.5, C_DARK),   # McKinsey : règle épaisse header
     ]
     for i in range(1, len(data)):
         cmds.append(("LINEBELOW", (0, i), (-1, i), 0.5, C_LGRAY))
@@ -834,8 +838,7 @@ def _build_page_reasoning(edm, styles: dict, result_dict: dict | None = None) ->
         styles,
         ceo_question="Pourquoi cette décision et pas une autre ?"
     ))
-    s.append(_hr())
-    s.append(_sp(4))
+    s.append(_sp(5))
 
     reasoning_list = (result_dict or {}).get("decision_reasoning", [])
     decisions = edm.executive_decisions[:5]
@@ -977,8 +980,7 @@ def _build_page_value_creation(edm, result: dict, styles: dict) -> list:
         styles,
         ceo_question="Combien vais-je gagner ?"
     ))
-    s.append(_hr())
-    s.append(_sp(6))
+    s.append(_sp(7))
 
     decisions = edm.executive_decisions[:10]
     total_ann = sum(
@@ -1031,14 +1033,12 @@ def _build_page_value_creation(edm, result: dict, styles: dict) -> list:
 
         tbl = Table(data, colWidths=col_w)
         cmds = [
-            ("TOPPADDING",    (0, 0), (-1, -1), 8),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING",    (0, 0), (-1, -1), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
             ("LEFTPADDING",   (0, 0), (-1, -1), 3),
             ("RIGHTPADDING",  (0, 0), (-1, -1), 3),
             ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
-            ("LINEBELOW",     (0, 0), (-1, 0),  0.8, C_LGRAY),
-            ("FONTNAME",      (0, 0), (-1, 0),  "Helvetica-Bold"),
-            ("FONTSIZE",      (0, 0), (-1, 0),  9),
+            ("LINEBELOW",     (0, 0), (-1, 0),  1.5, C_DARK),
         ]
         for i in range(1, len(data)):
             cmds.append(("LINEBELOW", (0, i), (-1, i), 0.5, C_LGRAY))
@@ -1067,8 +1067,7 @@ def _build_page_roadmap(edm, styles: dict) -> list:
         styles,
         ceo_question="Dans quel ordre, et qui fait quoi ?"
     ))
-    s.append(_hr())
-    s.append(_sp(6))
+    s.append(_sp(7))
 
     phases_edm = edm.roadmap_90_days or []
 
@@ -1159,8 +1158,7 @@ def _build_page_scenarios(result: dict, styles: dict) -> list:
         styles,
         ceo_question="Et si je me trompe ?"
     ))
-    s.append(_hr())
-    s.append(_sp(6))
+    s.append(_sp(7))
 
     scenarios_raw = result.get("scenarios") or []
     scen_map = {}
@@ -1238,8 +1236,7 @@ def _build_page_risks(result: dict, styles: dict) -> list:
         styles,
         ceo_question="Quels sont les risques que je n'ai pas anticipés ?"
     ))
-    s.append(_hr())
-    s.append(_sp(4))
+    s.append(_sp(5))
 
     risks = result.get("problemes_critiques") or result.get("alertes") or []
 
@@ -1288,20 +1285,16 @@ def _build_page_risks(result: dict, styles: dict) -> list:
 
     tbl = Table(data, colWidths=col_w)
     cmds = [
-        ("TOPPADDING",    (0, 0), (-1, -1), 9),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING",    (0, 0), (-1, -1), 11),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 11),
         ("LEFTPADDING",   (0, 0), (-1, -1), 3),
         ("RIGHTPADDING",  (0, 0), (-1, -1), 3),
         ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
-        ("LINEBELOW",     (0, 0), (-1, 0),  0.8, C_LGRAY),
-        ("FONTNAME",      (0, 0), (-1, 0),  "Helvetica-Bold"),
-        ("FONTSIZE",      (0, 0), (-1, 0),  9),
+        ("LINEBELOW",     (0, 0), (-1, 0),  1.5, C_DARK),   # McKinsey hairline
         ("ALIGN",         (1, 0), (1, -1),  "CENTER"),
     ]
     for i in range(1, len(data)):
         cmds.append(("LINEBELOW", (0, i), (-1, i), 0.5, C_LGRAY))
-        if i % 2 == 0:
-            cmds.append(("BACKGROUND", (0, i), (-1, i), C_LBGRAY))
     tbl.setStyle(TableStyle(cmds))
     s.append(tbl)
     s.append(PageBreak())
@@ -1318,7 +1311,6 @@ def _build_page_kpis(result: dict, edm, styles: dict) -> list:
         styles,
         ceo_question="Comment vais-je mesurer que ça marche ?"
     ))
-    s.append(_hr())
     s.append(_sp(6))
 
     s.append(Paragraph(
@@ -1332,7 +1324,8 @@ def _build_page_kpis(result: dict, edm, styles: dict) -> list:
     dashboard = result.get("ceo_dashboard") or []
     score_conf = result.get("score_confiance")
 
-    # Confiance de l'analyse en premier
+    # Confiance de l'analyse en premier — on l'injecte manuellement,
+    # puis on exclut toute entrée "confiance" déjà présente dans le dashboard
     items = []
     if score_conf:
         items.append({
@@ -1342,10 +1335,16 @@ def _build_page_kpis(result: dict, edm, styles: dict) -> list:
         })
     for card in dashboard:
         if isinstance(card, dict):
+            lbl = str(card.get("label", "")).lower()
+            if score_conf and "confiance" in lbl:
+                continue   # déjà injecté ci-dessus
             items.append(card)
         else:
+            lbl = getattr(card, "label", "")
+            if score_conf and "confiance" in lbl.lower():
+                continue
             items.append({
-                "label": getattr(card, "label", ""),
+                "label": lbl,
                 "value": getattr(card, "value", ""),
                 "status": getattr(card, "status", None)
             })
@@ -1375,7 +1374,7 @@ def _build_page_kpis(result: dict, edm, styles: dict) -> list:
         border_c, val_hex = _card_color(item)
 
         if is_miss:
-            val_p = Paragraph("Données<br/>insuffisantes", styles["indic_miss"])
+            val_p = Paragraph("données<br/>insuffisantes", styles["indic_miss"])
         else:
             val_p = Paragraph(
                 f'<font color="{val_hex}"><b>{_rl(val_str)}</b></font>',
