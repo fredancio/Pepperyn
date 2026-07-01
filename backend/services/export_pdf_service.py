@@ -312,8 +312,11 @@ def _copilot_block(insight: str, action: str = None, styles: dict = None) -> lis
         action  : recommandation d'action optionnelle
         styles  : dict de styles (conservé pour cohérence, non utilisé directement)
     """
-    if not insight or len(insight.strip()) < 10:
-        return []
+    _MISSING_INSIGHT  = "Données manquantes pour analyser cet élément."
+    _MISSING_ACTION   = "Référez-vous à notre outil d'accompagnement Copilot."
+
+    insight_text = insight.strip() if insight else ""
+    missing       = len(insight_text) < 10
 
     rows = []
 
@@ -327,9 +330,15 @@ def _copilot_block(insight: str, action: str = None, styles: dict = None) -> lis
         "cpi", fontName="Helvetica", fontSize=9,
         textColor=C_DARK, leading=13,
     )
-    rows.append([Paragraph(_rl(insight), insight_ps)])
+    rows.append([Paragraph(_rl(_MISSING_INSIGHT if missing else insight_text), insight_ps)])
 
-    if action:
+    if missing:
+        action_ps = ParagraphStyle(
+            "cpa", fontName="Helvetica", fontSize=9,
+            textColor=colors.HexColor("#6B7280"), leading=13, spaceBefore=5,
+        )
+        rows.append([Paragraph(f"→  {_MISSING_ACTION}", action_ps)])
+    elif action:
         action_ps = ParagraphStyle(
             "cpa", fontName="Helvetica-Bold", fontSize=9,
             textColor=C_BLUE, leading=13, spaceBefore=5,
