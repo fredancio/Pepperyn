@@ -295,55 +295,80 @@ def _quote_box(text: str, styles: dict, bar_color=None) -> Table:
     return q
 
 
-def _copilot_block(insight: str, action: str = None, styles: dict = None) -> list:
+def _copilot_block(
+    insight: str,
+    action: str = None,
+    styles: dict = None,
+    hypothesis: str = None,
+) -> list:
     """
     Bloc de raisonnement Pepperyn Copilote — avantage concurrentiel Pepperyn.
 
-    Présent sur chaque page du rapport. Explique comment Pepperyn a raisonné
-    et ce qu'il recommande concrètement. Ancré dans les données transmises,
-    jamais inventé.
+    Structure en 3 couches :
+      1. Diagnostic factuel  — ancré dans les données transmises
+      2. Hypothèse Pepperyn  — anticipation de l'avenir (quitte à pivoter)
+      3. Signal de confirmation — l'indicateur qui valide ou invalide l'hypothèse
 
-    Pepperyn n'est pas un outil d'analyse parmi d'autres : c'est un copilote
-    qui indique à l'entreprise ce qu'elle devrait faire pour se redresser OU
-    pour croître davantage (ARTICLE II — Constitution Pepperyn).
+    Pepperyn n'est pas un ERP (passé) ni un outil BI (présent) : c'est un
+    stratège qui émet des hypothèses de haut niveau et les suit dans le temps
+    (ARTICLE I + ARTICLE II — Constitution Pepperyn).
 
     Paramètres :
-        insight : raisonnement LLM (phrase_tension, risque_inaction, etc.)
-        action  : recommandation d'action optionnelle
-        styles  : dict de styles (conservé pour cohérence, non utilisé directement)
+        insight    : diagnostic factuel (phrase LLM ou calcul Python)
+        hypothesis : hypothèse prospective de Pepperyn (quitte à se tromper)
+        action     : signal de confirmation / recommandation concrète
+        styles     : dict de styles (conservé pour compatibilité)
     """
-    _MISSING_INSIGHT  = "Données manquantes pour analyser cet élément."
-    _MISSING_ACTION   = "Référez-vous à notre outil d'accompagnement Copilot."
+    _MISSING_INSIGHT = "Données manquantes pour analyser cet élément."
+    _MISSING_ACTION  = "Référez-vous à notre outil d'accompagnement Copilot."
 
     insight_text = insight.strip() if insight else ""
-    missing       = len(insight_text) < 10
+    missing      = len(insight_text) < 10
 
     rows = []
 
+    # ── Label ─────────────────────────────────────────────────────────────────
     label_ps = ParagraphStyle(
         "cpl", fontName="Helvetica-Bold", fontSize=6.5,
-        textColor=C_NAVY, leading=10, spaceAfter=5,
+        textColor=C_NAVY, leading=10, spaceAfter=6,
     )
     rows.append([Paragraph("▶  PEPPERYN COPILOTE", label_ps)])
 
+    # ── Diagnostic (couche 1) ─────────────────────────────────────────────────
     insight_ps = ParagraphStyle(
         "cpi", fontName="Helvetica", fontSize=9,
-        textColor=C_DARK, leading=13,
+        textColor=C_DARK, leading=14,
     )
     rows.append([Paragraph(_rl(_MISSING_INSIGHT if missing else insight_text), insight_ps)])
 
     if missing:
-        action_ps = ParagraphStyle(
-            "cpa", fontName="Helvetica", fontSize=9,
+        # Fallback données manquantes
+        fallback_ps = ParagraphStyle(
+            "cpf", fontName="Helvetica", fontSize=9,
             textColor=colors.HexColor("#6B7280"), leading=13, spaceBefore=5,
         )
-        rows.append([Paragraph(f"→  {_MISSING_ACTION}", action_ps)])
-    elif action:
-        action_ps = ParagraphStyle(
-            "cpa", fontName="Helvetica-Bold", fontSize=9,
-            textColor=C_BLUE, leading=13, spaceBefore=5,
-        )
-        rows.append([Paragraph(f"→  {_rl(action)}", action_ps)])
+        rows.append([Paragraph(f"→  {_MISSING_ACTION}", fallback_ps)])
+    else:
+        # ── Hypothèse Pepperyn (couche 2) ─────────────────────────────────────
+        if hypothesis:
+            hyp_label_ps = ParagraphStyle(
+                "cph_lbl", fontName="Helvetica-Bold", fontSize=6.5,
+                textColor=C_NAVY, leading=10, spaceBefore=8, spaceAfter=3,
+            )
+            rows.append([Paragraph("HYPOTHÈSE PEPPERYN", hyp_label_ps)])
+            hyp_ps = ParagraphStyle(
+                "cph", fontName="Helvetica-Oblique", fontSize=9,
+                textColor=colors.HexColor("#2C3E50"), leading=14,
+            )
+            rows.append([Paragraph(_rl(hypothesis), hyp_ps)])
+
+        # ── Signal / Action (couche 3) ─────────────────────────────────────────
+        if action:
+            action_ps = ParagraphStyle(
+                "cpa", fontName="Helvetica-Bold", fontSize=9,
+                textColor=C_BLUE, leading=13, spaceBefore=7,
+            )
+            rows.append([Paragraph(f"→  {_rl(action)}", action_ps)])
 
     inner = Table(rows, colWidths=[CONTENT_W - 22 * mm])
     inner.setStyle(TableStyle([
@@ -356,8 +381,8 @@ def _copilot_block(insight: str, action: str = None, styles: dict = None) -> lis
     outer = Table([[inner]], colWidths=[CONTENT_W])
     outer.setStyle(TableStyle([
         ("LINEBEFORE",    (0, 0), (0, -1), 3.5, C_NAVY),
-        ("TOPPADDING",    (0, 0), (-1, -1), 9),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+        ("TOPPADDING",    (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
         ("LEFTPADDING",   (0, 0), (-1, -1), 14),
         ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
         ("BACKGROUND",    (0, 0), (-1, -1), colors.HexColor("#EEF3F8")),
@@ -638,19 +663,45 @@ def _build_page_verdict(result: dict, edm, styles: dict) -> list:
     ]))
     s.append(two_cols)
 
-    # ── Bloc Copilote ─────────────────────────────────────────────────────────
-    # Le verdict seul ne suffit pas : Pepperyn explique le raisonnement
-    # derrière ce score et ce qu'il faut faire immédiatement.
-    cop_insight = result.get("risque_inaction") or result.get("diagnostic_immediat") or ""
-    cop_action  = None
-    # Ton dualiste : croissance ou redressement selon les données
-    vc = result.get("creation_destruction_valeur") or ""
-    score_g = result.get("score_global") or 0
+    # ── Bloc Copilote P1 ──────────────────────────────────────────────────────
+    diag_p1   = result.get("diagnostic_immediat") or ""
+    tension   = result.get("phrase_tension") or ""
+    risque_p1 = result.get("risque_inaction") or ""
+    score_g   = result.get("score_global") or 0
+    vc_p1     = result.get("creation_destruction_valeur") or ""
+    coi_p1    = edm.cost_of_inaction
+    weekly_p1 = _fmt_eur(abs(coi_p1.per_week) if coi_p1 and coi_p1.per_week else None)
+    n_dec_p1  = len(edm.executive_decisions or [])
+
+    # Diagnostic factuel (couche 1)
+    parts_p1 = [x for x in [diag_p1, tension] if x]
+    cop1_insight = "  ".join(parts_p1) if parts_p1 else (risque_p1 or "")
+
+    # Hypothèse prospective (couche 2)
     if score_g >= 70:
-        cop_action = "Votre structure est saine : orientez l'énergie de direction vers les leviers de croissance prioritaires."
+        cop1_hyp = (
+            f"Pepperyn anticipe que votre structure est en position de croissance : "
+            f"les {n_dec_p1} décisions identifiées permettent d'accélérer la création de valeur sans déstabiliser l'équilibre existant. "
+            f"Cette hypothèse sera confirmée ou révisée dès J+30 selon l'évolution des KPIs de pilotage."
+        )
+        cop1_action = (
+            "Votre avantage concurrentiel est dans l'exécution rapide, pas dans l'analyse supplémentaire. "
+            "Signal de validation à J+30 : premier levier activé, premier KPI en progression mesurable."
+        )
     else:
-        cop_action = "Agir dans les 30 jours est non-négociable. Chaque semaine supplémentaire aggrave la trajectoire."
-    s.extend(_copilot_block(cop_insight, cop_action, styles))
+        cop1_hyp = (
+            f"Pepperyn anticipe qu'à trajectoire constante — sans action dans les 30 prochains jours — "
+            f"la destruction de valeur de {weekly_p1} par semaine atteindra un point de non-retour structurel. "
+            f"Cette hypothèse est révisable si une première décision majeure est engagée et documentée avant J+15."
+        ) if coi_p1 else (
+            f"Pepperyn anticipe que l'inaction dans les 30 prochains jours aggrave irréversiblement la trajectoire. "
+            f"Cette hypothèse sera confirmée ou révisée selon les premiers signaux opérationnels à J+15."
+        )
+        cop1_action = (
+            "Agir dans les 30 jours est non-négociable. "
+            "Signal d'alerte à J+15 : si aucune décision n'est formellement engagée, escalade immédiate au niveau direction."
+        )
+    s.extend(_copilot_block(cop1_insight, cop1_action, styles, hypothesis=cop1_hyp))
 
     s.append(PageBreak())
     return s
@@ -736,26 +787,54 @@ def _build_page_capital(edm, result: dict, styles: dict) -> list:
     s.append(tbl)
     s.append(_sp(6))
 
-    # ── Bloc Copilote ─────────────────────────────────────────────────────────
-    # Pepperyn explique POURQUOI ces leviers ont été identifiés et ce qu'ils
-    # impliquent pour la direction (croissance ou redressement).
-    structural  = result.get("impact_financier_synthese") or ""
-    phrase_tens = result.get("phrase_tension") or ""
-    cop2_insight = structural or phrase_tens or ""
-    cop2_action  = None
+    # ── Bloc Copilote P2 ──────────────────────────────────────────────────────
+    structural_p2  = result.get("impact_financier_synthese") or ""
+    phrase_tens_p2 = result.get("phrase_tension") or ""
+    total_monthly  = total_ann / 12 if total_ann else 0
+    n_destr        = len(destroyers)
+
+    # Diagnostic factuel
+    if total_ann and n_destr:
+        cop2_insight = (
+            f"{structural_p2 or phrase_tens_p2}  "
+            f"Ces {n_destr} leviers concentrent {_fmt_eur(total_ann)} de valeur sous-employée "
+            f"— soit {_fmt_eur(total_monthly)} par mois qui n'entrent pas dans les comptes "
+            f"et n'apparaissent dans aucun tableau de bord standard."
+        ).strip()
+    else:
+        cop2_insight = structural_p2 or phrase_tens_p2 or ""
+
+    # Hypothèse prospective
     if destroyers:
-        first_levier = destroyers[0].name
-        if any(k in (structural + phrase_tens).lower() for k in ("croissance", "accél", "opportunité", "scale")):
+        d0          = destroyers[0]
+        d0_monthly  = _fmt_eur(abs(d0.monthly_impact)) if d0.monthly_impact else "N/D"
+        is_growth   = any(k in (structural_p2 + phrase_tens_p2).lower()
+                          for k in ("croissance", "accél", "opportunité", "scale"))
+        if is_growth:
+            cop2_hyp = (
+                f"Pepperyn anticipe que l'optimisation de **{d0.name}** seul libère {d0_monthly}/mois "
+                f"de capacité opérationnelle — suffisant pour financer une phase d'accélération sans dilution du capital. "
+                f"Cette hypothèse sera confirmée si les premiers indicateurs de ce levier progressent dans les 30 jours."
+            )
             cop2_action = (
-                f"Levier n°1 à activer immédiatement : **{first_levier}**. "
-                "L'optimiser permet de financer la croissance sans ressources supplémentaires."
+                f"Activez **{d0.name}** en premier : c'est le levier dont le déblocage finance les suivants. "
+                f"Si ce levier résiste, c'est un signal que le problème est structurel et non opérationnel — révisez l'hypothèse."
             )
         else:
-            cop2_action = (
-                f"Priorité absolue : **{first_levier}**. "
-                "C'est le levier dont le déblocage rapide génère le plus d'impact sur la trésorerie."
+            cop2_hyp = (
+                f"Pepperyn anticipe que **{d0.name}** est le levier le plus liquide : "
+                f"son déblocage génère {d0_monthly}/mois de trésorerie immédiate sans investissement supplémentaire — "
+                f"uniquement en corrigeant une pratique existante. "
+                f"Si ce n'est pas le cas à J+30, c'est que le levier était surestimé ou que l'exécution a été partielle."
             )
-    s.extend(_copilot_block(cop2_insight, cop2_action, styles))
+            cop2_action = (
+                f"Priorité absolue : **{d0.name}**. "
+                f"Commencez par le levier le plus liquide, pas le plus impactant — "
+                f"la trésorerie crée le temps pour attaquer les leviers structurels suivants."
+            )
+        s.extend(_copilot_block(cop2_insight, cop2_action, styles, hypothesis=cop2_hyp))
+    else:
+        s.extend(_copilot_block(cop2_insight, None, styles))
 
     s.append(PageBreak())
     return s
@@ -808,13 +887,41 @@ def _build_page_coi(edm, result: dict, styles: dict) -> list:
     s.append(kpi_t)
     s.append(_sp(5))
 
-    # ── Bloc Copilote — risque d'inaction ─────────────────────────────────────
-    # Pepperyn quantifie l'inaction ET explique les conséquences opérationnelles.
-    risque = result.get("risque_inaction") or ""
-    if risque:
-        cop3_action = "La simulation ci-dessous montre la divergence entre la trajectoire actuelle et la trajectoire optimisée."
-        s.extend(_copilot_block(risque, cop3_action, styles))
-        s.append(_sp(4))
+    # ── Bloc Copilote P3 ──────────────────────────────────────────────────────
+    risque_p3  = result.get("risque_inaction") or ""
+    coi_p3     = edm.cost_of_inaction
+    monthly_p3 = _fmt_eur(abs(coi_p3.per_month) if coi_p3 and coi_p3.per_month else None)
+    weekly_p3  = _fmt_eur(abs(coi_p3.per_week)  if coi_p3 and coi_p3.per_week  else None)
+    daily_p3   = _fmt_eur(abs(coi_p3.per_day)   if coi_p3 and coi_p3.per_day   else None)
+
+    cop3_insight = (
+        f"Ces chiffres ne sont pas des projections : ils sont calculés mécaniquement "
+        f"à partir des données financières transmises. "
+        f"La destruction de valeur de {monthly_p3}/mois ({weekly_p3}/semaine, {daily_p3}/jour) est silencieuse — "
+        f"elle ne déclenche aucune alerte comptable et n'apparaît dans aucun tableau de bord standard "
+        f"tant que l'entreprise n'atteint pas le point de rupture."
+    ) if coi_p3 else (risque_p3 or "")
+
+    cop3_hyp = (
+        f"Pepperyn anticipe que {risque_p3}  "
+        f"La simulation ci-dessous modélise les deux trajectoires sur 12 mois. "
+        f"L'écart entre la courbe verte (avec action) et la courbe rouge (sans action) "
+        f"représente exactement la valeur que les décisions engagées créent — ou que l'inaction détruit, "
+        f"de façon définitive et non-linéaire dans le temps."
+    ) if risque_p3 else (
+        "Pepperyn anticipe une divergence croissante entre la trajectoire actuelle et une trajectoire optimisée. "
+        "Les premières semaines d'inaction ont un coût faible et réversible — les suivantes deviennent structurellement irréversibles."
+    )
+
+    cop3_action = (
+        f"Chaque semaine sans décision engagée représente {weekly_p3} de valeur définitivement perdue. "
+        f"La fenêtre d'action optimale se rétrécit — non pas linéairement, mais exponentiellement."
+    ) if coi_p3 else (
+        "La fenêtre d'action optimale se rétrécit. La simulation ci-dessous en montre la trajectoire."
+    )
+
+    s.extend(_copilot_block(cop3_insight, cop3_action, styles, hypothesis=cop3_hyp))
+    s.append(_sp(4))
 
     s.append(_hr())
     s.append(_sp(4))
@@ -925,12 +1032,9 @@ def _build_page_decisions(edm, styles: dict, result_dict: dict | None = None) ->
     tbl.setStyle(TableStyle(cmds))
     s.append(tbl)
 
-    # ── Bloc Copilote ─────────────────────────────────────────────────────────
-    # Pepperyn explique le raisonnement de sélection des décisions prioritaires.
-    # Le ton s'adapte : accélération (entreprise saine) ou stabilisation (crise).
+    # ── Bloc Copilote P4 ──────────────────────────────────────────────────────
     reasoning_list = (result_dict or {}).get("decision_reasoning", [])
     cop4_insight = ""
-    cop4_action  = None
     if reasoning_list:
         first_r = reasoning_list[0] if isinstance(reasoning_list, list) else {}
         if isinstance(first_r, dict):
@@ -940,13 +1044,21 @@ def _build_page_decisions(edm, styles: dict, result_dict: dict | None = None) ->
     if not cop4_insight:
         cop4_insight = result_dict.get("creation_destruction_valeur") if result_dict else ""
         cop4_insight = cop4_insight or ""
-    if cop4_insight:
-        n_dec = len(decisions)
-        cop4_action = (
-            f"Ces {n_dec} décisions ont été sélectionnées par ordre de ROI et d'impact sur la valeur. "
-            "Consultez la page suivante pour le détail du raisonnement comparatif."
-        )
-    s.extend(_copilot_block(cop4_insight, cop4_action, styles))
+
+    n_dec4 = len(decisions)
+    cop4_hyp = (
+        f"Pepperyn a sélectionné ces {n_dec4} décisions selon 3 critères stricts : "
+        f"impact trésorerie à court terme, ratio effort/résultat, et indépendance des leviers. "
+        f"Une décision absente de cette liste peut être pertinente sur le fond — "
+        f"mais elle ne maximise pas la valeur dans la contrainte de temps et de ressources actuelles. "
+        f"Cette sélection sera révisée à J+30 selon les premiers résultats d'exécution."
+    )
+    cop4_action = (
+        f"Exécutez dans cet ordre sauf contrainte opérationnelle majeure. "
+        f"Si l'ordre doit changer, documentez la raison et réévaluez l'impact sur les décisions dépendantes. "
+        f"La page suivante détaille le raisonnement comparatif de chaque sélection."
+    )
+    s.extend(_copilot_block(cop4_insight, cop4_action, styles, hypothesis=cop4_hyp))
 
     s.append(PageBreak())
     return s
@@ -1170,17 +1282,37 @@ def _build_page_value_creation(edm, result: dict, styles: dict) -> list:
         s.append(tbl)
         s.append(_sp(6))
 
-    # ── Bloc Copilote — valeur créée si l'entreprise agit ────────────────────
-    # Pepperyn replace la valeur dans le contexte stratégique de l'entreprise :
-    # qu'il s'agisse d'accélérer une croissance ou de récupérer une valeur détruite.
+    # ── Bloc Copilote P6 ──────────────────────────────────────────────────────
     vc_stmt = result.get("creation_destruction_valeur") or ""
-    if vc_stmt:
-        n_d = len(decisions) if decisions else 0
-        cop6_action = (
-            f"Ce potentiel repose sur {n_d} leviers confirmés par les données. "
-            "Il est cumulatif : chaque décision non exécutée réduit le total disponible."
-        )
-        s.extend(_copilot_block(vc_stmt, cop6_action, styles))
+    value_creation_statement = result.get("value_creation_statement") or ""
+    n_d6  = len(decisions) if decisions else 0
+    total_monthly_p6 = _fmt_eur(total_ann / 12) if total_ann else None
+
+    cop6_insight_base = value_creation_statement or vc_stmt or ""
+    cop6_insight = (
+        f"{cop6_insight_base}  "
+        f"Ce potentiel est calculé sur la base des données transmises — sans extrapolation ni hypothèse macro."
+    ).strip() if cop6_insight_base else ""
+
+    cop6_hyp = (
+        f"Pepperyn anticipe que ce potentiel est cumulatif : chaque décision non exécutée soustrait "
+        f"sa propre contribution au total. Si seulement 50 % des {n_d6} décisions sont réalisées, "
+        f"le résultat ne sera pas la moitié de {_fmt_eur(total_ann) if total_ann else 'N/D'} — "
+        f"car certains leviers se conditionnent mutuellement et leur valeur combinée est supérieure à leur somme. "
+        f"L'ordre d'exécution et la complétude de l'engagement déterminent le résultat final."
+    ) if n_d6 else (
+        "Pepperyn anticipe que la valeur mobilisable est conditionnée par la rigueur d'exécution : "
+        "chaque décision partiellement engagée produit une fraction de son potentiel, pas son plein effet."
+    )
+
+    cop6_action = (
+        f"Ce chiffre n'est pas une projection financière — c'est un plafond de valeur mobilisable "
+        f"si l'exécution est rigoureuse et séquencée. "
+        f"Signal à J+30 : les premiers {_fmt_eur(total_monthly_p6) if total_monthly_p6 else 'gains'}/mois "
+        f"devraient être visibles si la décision prioritaire a été engagée."
+    )
+
+    s.extend(_copilot_block(cop6_insight or cop6_hyp, cop6_action, styles, hypothesis=cop6_hyp if cop6_insight else None))
 
     s.append(PageBreak())
     return s
@@ -1274,24 +1406,37 @@ def _build_page_roadmap(edm, styles: dict, result_dict: dict | None = None) -> l
     ]))
     s.append(outer)
 
-    # ── Bloc Copilote ─────────────────────────────────────────────────────────
-    # Pepperyn explique la logique de séquençage : pourquoi cet ordre,
-    # et quel est le signal qui confirme que l'exécution est sur la bonne voie.
+    # ── Bloc Copilote P7 ──────────────────────────────────────────────────────
     urgence = (result_dict or {}).get("niveau_urgence") or ""
-    cop7_insight = ""
     if urgence:
         cop7_insight = (
-            f"Niveau d'urgence : **{urgence}**. "
-            "Le séquençage 30/60/90 jours est conçu pour libérer d'abord la trésorerie, "
-            "puis consolider la structure, puis accélérer la création de valeur."
+            f"Niveau d'urgence : {urgence}. "
+            f"Le séquençage 30/60/90 jours n'est pas arbitraire : J+30 libère la trésorerie (survie opérationnelle), "
+            f"J+60 consolide la structure (stabilité), J+90 accélère la création de valeur (croissance). "
+            f"Cet ordre est calculé — démarrer par J+60 avant J+30 détruirait la séquence de financement."
         )
     else:
         cop7_insight = (
             "Le séquençage 30/60/90 jours classe les actions par impact immédiat d'abord, "
-            "puis par effet de levier structurel. Ne pas réorganiser l'ordre sans re-évaluer les dépendances."
+            "puis par effet de levier structurel. J+30 libère la trésorerie (survie), "
+            "J+60 consolide, J+90 accélère. "
+            "Ne pas réorganiser l'ordre sans réévaluer les dépendances de financement."
         )
-    cop7_action = "Signal de succès à J+30 : première décision exécutée, KPI associé mesuré, résultat constaté ou hypothèse révisée."
-    s.extend(_copilot_block(cop7_insight, cop7_action, styles))
+
+    cop7_hyp = (
+        "Pepperyn anticipe que si la phase J+30 est exécutée correctement, elle libère suffisamment "
+        "de ressources opérationnelles pour financer J+60 sans arbitrage budgétaire supplémentaire. "
+        "Si ce mécanisme de refinancement interne ne se matérialise pas, "
+        "le premier levier était mal dimensionné ou partiellement exécuté — "
+        "c'est le signal pour revoir l'hypothèse avant d'engager J+60."
+    )
+
+    cop7_action = (
+        "Signal de succès à J+30 : première décision exécutée, KPI associé mesuré, résultat documenté. "
+        "Si J+30 échoue — ne pas démarrer J+60 sans diagnostic de l'échec. "
+        "Un pivot documenté vaut mieux qu'une exécution aveugle de la phase suivante."
+    )
+    s.extend(_copilot_block(cop7_insight, cop7_action, styles, hypothesis=cop7_hyp))
 
     s.append(PageBreak())
     return s
@@ -1326,17 +1471,30 @@ def _build_page_scenarios(result: dict, styles: dict) -> list:
         elif "worst" in n or "pire" in n:
             scen_map["worst"] = (lbl or "PIRE CAS", desc)
 
-    # ── Bloc Copilote — comment utiliser les scénarios ───────────────────────
-    likely_desc = scen_map.get("likely", (None, None))[1] if scen_map.get("likely") else ""
+    # ── Bloc Copilote P8 ──────────────────────────────────────────────────────
+    likely_label = scen_map.get("likely", (None, None))[0] if scen_map.get("likely") else "le cas probable"
+    likely_desc  = scen_map.get("likely", (None, None))[1] if scen_map.get("likely") else ""
+
     cop8_insight = (
-        f"Le scénario probable : {likely_desc}" if likely_desc
-        else "Ces trois scénarios ne sont pas des prévisions. Ce sont des cartes de navigation."
+        f"Ces 3 scénarios ne sont pas des prévisions — ce sont des cartes de navigation stratégique. "
+        f"Le scénario \"{likely_label}\" repose sur l'hypothèse que les décisions prioritaires "
+        f"sont engagées dans les 30 prochains jours. "
+        f"{likely_desc[:180] + '...' if likely_desc and len(likely_desc) > 180 else (likely_desc or '')}"
+    ).strip()
+
+    cop8_hyp = (
+        "Pepperyn anticipe que la probabilité de bascule vers le pire cas augmente de façon non-linéaire "
+        "après la semaine 6 d'inaction. Les premières semaines d'inaction ont un coût réversible — "
+        "les suivantes deviennent structurellement irréversibles car certains leviers se ferment. "
+        "Cette hypothèse sera confirmée ou infirmée selon les signaux opérationnels à J+30."
     )
+
     cop8_action = (
-        "Surveillez 1 indicateur par scénario. Si le cas probable se dégrade vers le pire cas, "
-        "passez immédiatement au plan de contingence — ne pas attendre la confirmation complète."
+        "Définissez 1 indicateur de surveillance par scénario aujourd'hui — avant de fermer ce rapport. "
+        "Si le cas probable se dégrade, passez au plan de contingence sans attendre la confirmation complète : "
+        "l'attente de certitude est elle-même une décision d'inaction."
     )
-    s.extend(_copilot_block(cop8_insight, cop8_action, styles))
+    s.extend(_copilot_block(cop8_insight, cop8_action, styles, hypothesis=cop8_hyp))
     s.append(_sp(6))
 
     def _scen_block(key, default_label, head_style, border_color):
@@ -1400,26 +1558,51 @@ def _build_page_risks(result: dict, styles: dict) -> list:
         s.append(PageBreak())
         return s
 
-    # ── Bloc Copilote ─────────────────────────────────────────────────────────
-    # Pepperyn transforme la liste de risques en plan de surveillance active.
-    # Chaque risque a un signal observable et une décision préventive associée.
+    # ── Bloc Copilote P9 ──────────────────────────────────────────────────────
+    first_risk_name = ""
     first_risk_desc = ""
+    first_risk_sev  = ""
+    first_risk_hor  = ""
     if risks:
         r0 = risks[0]
         if isinstance(r0, dict):
+            first_risk_name = r0.get("nom", r0.get("name", ""))
             first_risk_desc = r0.get("description", "")
+            first_risk_sev  = r0.get("severite", r0.get("severity", ""))
+            first_risk_hor  = r0.get("horizon", "")
         else:
+            first_risk_name = getattr(r0, "nom", getattr(r0, "name", ""))
             first_risk_desc = getattr(r0, "description", "")
-    cop9_insight = (
-        f"Risque prioritaire identifié : {_rl(first_risk_desc)}"
-        if first_risk_desc else
-        "Ces risques sont classés par sévérité et horizon. Chaque risque a un signal observable."
+            first_risk_sev  = getattr(r0, "severity", "")
+            first_risk_hor  = getattr(r0, "horizon", "")
+
+    n_risks = len(risks)
+    if first_risk_desc:
+        cop9_insight = (
+            f"Risque prioritaire : {_rl(first_risk_name + ' — ' + first_risk_desc) if first_risk_name else _rl(first_risk_desc)}"
+            + (f"  Classé {first_risk_sev}" if first_risk_sev else "")
+            + (f", horizon {first_risk_hor}" if first_risk_hor else "")
+            + f".  Ces {n_risks} risques sont classés par sévérité et horizon — pas par fréquence d'apparition."
+        )
+    else:
+        cop9_insight = (
+            f"Ces {n_risks} risques sont classés par sévérité et horizon. "
+            "Chaque risque a un signal observable qui permet une détection précoce."
+        )
+
+    cop9_hyp = (
+        "Pepperyn anticipe que ces risques ne sont pas indépendants : la réalisation du risque prioritaire "
+        "augmente la probabilité des suivants en cascade — leur corrélation est non-linéaire. "
+        "Un plan de contingence sur le risque n°1 protège l'ensemble du portefeuille de risques. "
+        "Cette hypothèse sera révisée si le contexte opérationnel change significativement à J+30."
     )
+
     cop9_action = (
-        "Ne traitez pas cette liste comme un inventaire passif. "
-        "Assignez un responsable à chaque risque rouge et définissez le seuil de déclenchement du plan B."
+        "Assignez un responsable et un seuil de déclenchement à chaque risque classé élevé ou critique. "
+        "Un risque sans responsable nommé n'est pas géré — il est subi. "
+        "La liste sans plan d'action est une formalité, pas une protection."
     )
-    s.extend(_copilot_block(cop9_insight, cop9_action, styles))
+    s.extend(_copilot_block(cop9_insight, cop9_action, styles, hypothesis=cop9_hyp))
     s.append(_sp(5))
 
     headers = ["Risque identifié", "Sévérité", "Impact estimé", "Horizon"]
@@ -1507,23 +1690,36 @@ def _build_page_kpis(result: dict, edm, styles: dict) -> list:
     ))
     s.append(_sp(6))
 
-    # ── Bloc Copilote ─────────────────────────────────────────────────────────
-    # Pepperyn sélectionne les KPIs qui mesurent directement l'exécution des
-    # décisions prioritaires — pas la performance générale de l'entreprise.
+    # ── Bloc Copilote P10 ─────────────────────────────────────────────────────
     diag10 = result.get("diagnostic_immediat") or result.get("resume_executif") or ""
-    cop10_insight = (
-        f"Contexte de mesure : {diag10[:200].strip()}..." if len(diag10) > 200
-        else diag10
-    ) if diag10 else (
-        "Ces KPIs mesurent l'exécution des décisions prioritaires, "
-        "pas la performance générale. Un KPI sans décision associée est de l'information, "
-        "pas un outil de pilotage."
+    diag10_short = diag10[:220].strip() + "..." if len(diag10) > 220 else diag10
+
+    if diag10_short:
+        cop10_insight = (
+            f"{diag10_short}  "
+            f"Ces KPIs mesurent l'exécution des décisions prioritaires — pas la performance générale. "
+            f"Un KPI qui ne bouge pas malgré l'action est un signal : soit l'action n'a pas été exécutée, "
+            f"soit l'hypothèse était erronée."
+        )
+    else:
+        cop10_insight = (
+            "Ces KPIs mesurent l'exécution des décisions prioritaires — pas la performance générale. "
+            "Un KPI sans décision associée est de l'information, pas un outil de pilotage."
+        )
+
+    cop10_hyp = (
+        "Hypothèse de pilotage Pepperyn : si ces indicateurs sont partagés en CODIR chaque semaine, "
+        "la qualité d'exécution des décisions est significativement supérieure à un suivi mensuel. "
+        "La fréquence de mesure est un levier d'exécution, pas seulement un outil d'information. "
+        "Cette hypothèse sera confirmée si le rythme hebdomadaire est maintenu pendant 4 semaines."
     )
+
     cop10_action = (
-        "Revoyez ces KPIs à J+30. Si un indicateur ne bouge pas malgré l'action, "
-        "c'est soit que l'action n'a pas été exécutée, soit que l'hypothèse sous-jacente était erronée."
+        "Revoyez ces KPIs à J+30. Pour chaque indicateur sans mouvement : "
+        "l'action a-t-elle vraiment été exécutée ? L'hypothèse est-elle toujours valide ? "
+        "La réponse détermine si vous continuez — ou si vous pivotez."
     )
-    s.extend(_copilot_block(cop10_insight, cop10_action, styles))
+    s.extend(_copilot_block(cop10_insight, cop10_action, styles, hypothesis=cop10_hyp))
     s.append(_sp(6))
 
     dashboard = result.get("ceo_dashboard") or []
