@@ -383,7 +383,10 @@ def _analyze_dataframe(df: pd.DataFrame, sheet_name: str) -> dict[str, Any]:
                 for idx, val in col_data.items():
                     z = abs(val - mean) / std
                     if z > 2.5:
-                        row_label = str(df.iloc[idx, 0]) if isinstance(idx, int) and len(df.columns) > 0 else str(idx)
+                        try:
+                            row_label = str(df.loc[idx, df.columns[0]]) if isinstance(idx, int) and len(df.columns) > 0 else str(idx)
+                        except (KeyError, IndexError):
+                            row_label = str(idx)
                         anomalies_detected.append({
                             "colonne": str(col),
                             "valeur": round(float(val), 2),
