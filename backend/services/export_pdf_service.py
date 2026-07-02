@@ -75,11 +75,19 @@ FOOTER_Y       = 9 * mm
 CONTENT_TOP    = HEADER_Y - 8 * mm
 
 
+# ─── TEXTE FALLBACK OFFICIEL ─────────────────────────────────────────────────
+# Utilisé partout où une donnée est absente — cohérence garantie par cette constante.
+_MANQUE_DATA = (
+    "Il nous manque les données nécessaires pour donner une réponse qualitative à cet élément."
+)
+_MANQUE_DATA_SHORT = "Information non disponible"  # pour les cellules étroites
+
+
 # ─── FORMATAGE NUMÉRIQUE ──────────────────────────────────────────────────────
 
 def _fmt_eur(v: Optional[float], sign: bool = False) -> str:
     if v is None:
-        return "Données insuffisantes"
+        return "—"
     abs_v = abs(v)
     prefix = ("-" if v < 0 else ("+" if sign and v > 0 else ""))
     s = f"{abs_v:,.0f}".replace(",", " ")
@@ -88,7 +96,7 @@ def _fmt_eur(v: Optional[float], sign: bool = False) -> str:
 
 def _fmt_millions(v: Optional[float]) -> str:
     if v is None:
-        return "Données insuffisantes"
+        return "—"
     abs_v = abs(v)
     prefix = "-" if v < 0 else ""
     m = abs_v / 1_000_000
@@ -99,7 +107,7 @@ def _fmt_millions(v: Optional[float]) -> str:
 
 def _fmt_auto(v: Optional[float], sign: bool = False) -> str:
     if v is None:
-        return "Données insuffisantes"
+        return "—"
     if abs(v) >= 950_000:
         raw = _fmt_millions(v)
         if sign and v > 0:
@@ -464,7 +472,38 @@ def _build_cover(company_name: str, date_str: str, styles: dict) -> list:
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
     ]))
     s.append(meta_table)
-    s.append(_sp(30))
+    s.append(_sp(12))
+
+    # ── Note de transparence Pepperyn ─────────────────────────────────────────
+    disclaimer_ps = ParagraphStyle(
+        "cov_disc", fontName="Helvetica", fontSize=7.5,
+        textColor=colors.HexColor("#5A6475"), leading=11.5,
+        leftIndent=0, spaceAfter=0,
+    )
+    disc_border = Table(
+        [[Paragraph(
+            "<b>À propos de ce rapport —</b> "
+            "Pepperyn analyse avec exactitude les données financières transmises. "
+            "Ses recommandations stratégiques sont des hypothèses scorées et argumentées — non des vérités absolues. "
+            "C'est en itérant d'analyse en analyse, et en engageant les décisions proposées, "
+            "que le système apprend votre entreprise, affine son regard et améliore ses stratégies, "
+            "comme un copilote financier qui grandit avec vous. "
+            "Ce rapport s'adresse à toutes les entreprises : celles qui traversent une difficulté, "
+            "celles qui stagnent, et celles qui cherchent à accélérer la création de valeur.",
+            disclaimer_ps
+        )]],
+        colWidths=[CONTENT_W],
+    )
+    disc_border.setStyle(TableStyle([
+        ("TOPPADDING",    (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 10),
+        ("BACKGROUND",    (0, 0), (-1, -1), colors.HexColor("#F4F6F9")),
+        ("LINEBEFORE",    (0, 0), (0, -1), 2, C_NAVY),
+    ]))
+    s.append(disc_border)
+    s.append(_sp(18))
     s.append(_hr(C_LGRAY, thickness=0.5))
     s.append(_sp(4))
     s.append(Paragraph("Pepperyn", styles["cover_brand"]))
@@ -1003,7 +1042,7 @@ def _build_page_decisions(edm, styles: dict, result_dict: dict | None = None) ->
 
     decisions = edm.executive_decisions[:10]
     if not decisions:
-        data.append([Paragraph("Données insuffisantes", styles["tbl_cell"]), "", "", "", "", ""])
+        data.append([Paragraph(_MANQUE_DATA_SHORT, styles["tbl_cell"]), "", "", "", "", ""])
     else:
         for dec in decisions:
             impact_str = (_fmt_eur(dec.annual_impact, sign=True)
@@ -1081,7 +1120,11 @@ def _build_page_reasoning(edm, styles: dict, result_dict: dict | None = None) ->
 
     if not reasoning_list or not decisions:
         s.append(Paragraph(
-            "Le raisonnement comparatif sera disponible à l'activation du module EDX-002.",
+            "Le détail comparatif du raisonnement de sélection sera disponible dans la prochaine version de l'analyse. "
+            "Les décisions présentées à la page précédente ont été sélectionnées par ordre de ROI calculé, "
+            "d'impact immédiat sur la trésorerie, et d'indépendance opérationnelle des leviers. "
+            "À chaque nouvelle analyse, Pepperyn affine son raisonnement en intégrant les résultats "
+            "des décisions déjà engagées — la pertinence des recommandations s'améliore à chaque itération.",
             styles["body_small"]
         ))
         s.append(PageBreak())
@@ -1248,7 +1291,7 @@ def _build_page_value_creation(edm, result: dict, styles: dict) -> list:
         s.append(_dark_box(inner, styles))
         s.append(_sp(8))
     else:
-        s.append(Paragraph("Données insuffisantes — impacts non calculés.", styles["body_small"]))
+        s.append(Paragraph(_MANQUE_DATA, styles["body_small"]))
 
     # Détail par décision
     if decisions:
@@ -1372,7 +1415,7 @@ def _build_page_roadmap(edm, styles: dict, result_dict: dict | None = None) -> l
         body_rows = (
             [[Paragraph(f"→  {txt}", item_style)] for txt in items]
             if items
-            else [[Paragraph("Données insuffisantes", miss_style)]]
+            else [[Paragraph(_MANQUE_DATA_SHORT, miss_style)]]
         )
         body = Table(body_rows, colWidths=[col_w])
         body_cmds = [
@@ -1498,11 +1541,11 @@ def _build_page_scenarios(result: dict, styles: dict) -> list:
     s.append(_sp(6))
 
     def _scen_block(key, default_label, head_style, border_color):
-        lbl, desc = scen_map.get(key, (default_label, "Données insuffisantes"))
+        lbl, desc = scen_map.get(key, (default_label, _MANQUE_DATA))
         inner = Table([
             [Paragraph(lbl.upper(), head_style)],
             [_sp(3)],
-            [Paragraph(_rl(desc) if desc else "Données insuffisantes", styles["scen_body"])],
+            [Paragraph(_rl(desc) if desc else _MANQUE_DATA, styles["scen_body"])],
         ], colWidths=[CONTENT_W / 3 - 6 * mm])
         inner.setStyle(TableStyle([
             ("TOPPADDING", (0, 0), (-1, -1), 0),
@@ -1554,7 +1597,7 @@ def _build_page_risks(result: dict, styles: dict) -> list:
     risks = result.get("problemes_critiques") or result.get("alertes") or []
 
     if not risks:
-        s.append(Paragraph("Aucun risque critique identifié avec les données disponibles.", styles["body_small"]))
+        s.append(Paragraph(_MANQUE_DATA, styles["body_small"]))
         s.append(PageBreak())
         return s
 
@@ -1751,14 +1794,14 @@ def _build_page_kpis(result: dict, edm, styles: dict) -> list:
             })
 
     if not items:
-        s.append(Paragraph("Données insuffisantes — indicateurs non disponibles.", styles["body_small"]))
+        s.append(Paragraph(_MANQUE_DATA, styles["body_small"]))
         s.append(PageBreak())
         return s
 
     def _card_color(item):
         val = str(item.get("value", ""))
         label = str(item.get("label", "")).lower()
-        if item.get("status") == "missing" or "données insuf" in val.lower():
+        if item.get("status") == "missing" or "il nous manque" in val.lower() or "données insuf" in val.lower() or not val or val == "—":
             return C_LGRAY, HEX_GRAY
         if "confiance" in label:
             return C_GREEN, HEX_GREEN
@@ -1771,11 +1814,11 @@ def _build_page_kpis(result: dict, edm, styles: dict) -> list:
     for item in items[:9]:
         val_str   = str(item.get("value", ""))
         label_str = str(item.get("label", ""))
-        is_miss   = (item.get("status") == "missing" or "données insuf" in val_str.lower() or not val_str)
+        is_miss   = (item.get("status") == "missing" or "il nous manque" in val_str.lower() or "données insuf" in val_str.lower() or not val_str or val_str == "—")
         border_c, val_hex = _card_color(item)
 
         if is_miss:
-            val_p = Paragraph("données<br/>insuffisantes", styles["indic_miss"])
+            val_p = Paragraph("Il nous manque<br/>les données<br/>nécessaires", styles["indic_miss"])
         else:
             val_p = Paragraph(
                 f'<font color="{val_hex}"><b>{_rl(val_str)}</b></font>',
@@ -2181,6 +2224,199 @@ def _build_page_tresorerie(fs, styles: dict) -> list:
     return s
 
 
+# ─── PAGE TRANSPARENCE & FIABILITÉ ───────────────────────────────────────────
+
+def _build_page_transparence(result: dict, edm, styles: dict) -> list:
+    """Page dédiée à la fiabilité des données et à la nature du raisonnement Pepperyn."""
+    s = []
+    s.append(_sp(6))
+    s.extend(_section_header(
+        "TRANSPARENCE & FIABILITÉ DE L'ANALYSE",
+        styles,
+        ceo_question="Puis-je faire confiance à ce rapport ?"
+    ))
+    s.append(_sp(7))
+
+    score_data  = result.get("score_confiance") or result.get("confidence_score") or 0
+    health      = result.get("score_global") or 0
+    dq          = result.get("data_quality") or {}
+    anomalies   = dq.get("anomalies") or [] if isinstance(dq, dict) else []
+    assumptions = dq.get("assumptions") or [] if isinstance(dq, dict) else []
+    limits      = dq.get("limits") or [] if isinstance(dq, dict) else []
+
+    # ── Section 1 : scores de confiance ───────────────────────────────────────
+    row_lbl_ps  = ParagraphStyle("tp_lbl", fontName="Helvetica-Bold", fontSize=8.5,
+                                  textColor=C_DARK, leading=12)
+    row_val_ps  = ParagraphStyle("tp_val", fontName="Helvetica-Bold", fontSize=14,
+                                  textColor=C_NAVY, leading=18, alignment=TA_CENTER)
+    row_desc_ps = ParagraphStyle("tp_desc", fontName="Helvetica", fontSize=8,
+                                  textColor=C_GRAY, leading=11)
+
+    def _score_bar(score: int, color) -> Table:
+        pct = max(0, min(score, 100))
+        bar_w = CONTENT_W * 0.38
+        filled = bar_w * pct / 100
+        inner = Table([[""]], colWidths=[filled])
+        inner.setStyle(TableStyle([("BACKGROUND", (0,0),(-1,-1), color),
+                                    ("TOPPADDING",(0,0),(-1,-1),3),
+                                    ("BOTTOMPADDING",(0,0),(-1,-1),3)]))
+        outer = Table([[inner]], colWidths=[bar_w])
+        outer.setStyle(TableStyle([("BOX",(0,0),(-1,-1),0.5,C_LGRAY),
+                                    ("TOPPADDING",(0,0),(-1,-1),0),
+                                    ("BOTTOMPADDING",(0,0),(-1,-1),0),
+                                    ("LEFTPADDING",(0,0),(-1,-1),0),
+                                    ("RIGHTPADDING",(0,0),(-1,-1),0)]))
+        return outer
+
+    score_color_data = C_GREEN if score_data >= 70 else (C_AMBER if score_data >= 40 else C_RED)
+    score_color_stra = C_GREEN if health    >= 70 else (C_AMBER if health    >= 40 else C_RED)
+
+    scores_data = [
+        [
+            Paragraph("FIABILITÉ DES DONNÉES SOURCE", row_lbl_ps),
+            Paragraph("CONFIANCE DU RAISONNEMENT STRATÉGIQUE", row_lbl_ps),
+        ],
+        [
+            Paragraph(f"{score_data}%", row_val_ps),
+            Paragraph(f"{health}/10", row_val_ps),
+        ],
+        [
+            _score_bar(score_data, score_color_data),
+            _score_bar(min(health * 10, 100), score_color_stra),
+        ],
+        [
+            Paragraph(
+                "Mesure la complétude et la cohérence interne des données financières transmises. "
+                "Un score ≥ 80 % signifie que les chiffres sont suffisants pour un diagnostic structurel fiable.",
+                row_desc_ps
+            ),
+            Paragraph(
+                "Reflet de la santé financière globale calculée par Pepperyn. "
+                "Il conditionne le niveau de prudence appliqué aux hypothèses stratégiques : "
+                "plus il est bas, plus les décisions urgentes sont prioritaires.",
+                row_desc_ps
+            ),
+        ],
+    ]
+    scores_table = Table(scores_data, colWidths=[CONTENT_W / 2] * 2)
+    scores_table.setStyle(TableStyle([
+        ("TOPPADDING",    (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 6),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LINEAFTER",     (0, 0), (0, -1), 0.5, C_LGRAY),
+    ]))
+    s.append(scores_table)
+    s.append(_sp(8))
+
+    # ── Section 2 : anomalies, hypothèses, limites ────────────────────────────
+    detail_lbl_ps = ParagraphStyle("tp_dlbl", fontName="Helvetica-Bold", fontSize=8,
+                                    textColor=C_NAVY, leading=12, spaceBefore=6)
+    detail_ps     = ParagraphStyle("tp_d", fontName="Helvetica", fontSize=8,
+                                    textColor=C_DARK, leading=12, leftIndent=8)
+    detail_miss   = ParagraphStyle("tp_dm", fontName="Helvetica-Oblique", fontSize=8,
+                                    textColor=C_GRAY, leading=12, leftIndent=8)
+
+    def _detail_col(title: str, items: list, miss_label: str) -> list:
+        col = [Paragraph(title, detail_lbl_ps)]
+        if items:
+            for item in items[:6]:
+                col.append(Paragraph(f"• {_rl(str(item))}", detail_ps))
+        else:
+            col.append(Paragraph(miss_label, detail_miss))
+        return col
+
+    def _col_table(items_list: list) -> Table:
+        t = Table([[p] for p in items_list], colWidths=[CONTENT_W / 3 - 4 * mm])
+        t.setStyle(TableStyle([
+            ("TOPPADDING",    (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ]))
+        return t
+
+    col_anom  = _detail_col("ANOMALIES DÉTECTÉES",  anomalies,  "Aucune anomalie détectée dans les données transmises.")
+    col_assum = _detail_col("HYPOTHÈSES APPLIQUÉES", assumptions, "Analyse directe — aucune hypothèse de substitution nécessaire.")
+    col_lim   = _detail_col("LIMITES DU PÉRIMÈTRE", limits,      "Périmètre complet — aucune limite identifiée.")
+
+    detail_row = Table(
+        [[_col_table(col_anom), _col_table(col_assum), _col_table(col_lim)]],
+        colWidths=[CONTENT_W / 3] * 3,
+    )
+    detail_row.setStyle(TableStyle([
+        ("TOPPADDING",    (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+        ("LINEAFTER",     (0, 0), (1, -1), 0.5, C_LGRAY),
+    ]))
+    s.append(detail_row)
+    s.append(_sp(8))
+
+    # ── Section 3 : comment Pepperyn crée de la valeur pour TOUTES les entreprises ─
+    s.extend(_copilot_block(
+        insight=(
+            "Pepperyn n'est pas uniquement un outil de diagnostic pour les entreprises en difficulté. "
+            "Il s'adresse avec la même rigueur aux entreprises en croissance, aux structures stables "
+            "qui stagnent et à celles qui cherchent à accélérer la création de valeur. "
+            "Pour chaque profil, il identifie les leviers sous-exploités — "
+            "non pas les problèmes à résoudre, mais les opportunités à saisir."
+        ),
+        action=(
+            "À chaque nouvelle analyse, Pepperyn intègre les résultats des décisions précédemment engagées. "
+            "C'est en itérant que le système apprend votre entreprise, affine son regard "
+            "et améliore la pertinence de ses recommandations — comme tout copilote qui grandit avec vous."
+        ),
+        styles=styles,
+        hypothesis=(
+            "Pepperyn anticipe qu'une entreprise qui analyse sa performance à intervalle régulier "
+            "— et qui engage au moins 50 % des décisions recommandées — voit la pertinence des recommandations "
+            "s'améliorer de façon mesurable à partir de la 3e analyse. "
+            "Cette hypothèse sera documentée et révisée au fil des itérations."
+        ),
+    ))
+
+    s.append(PageBreak())
+    return s
+
+
+# ─── PAGE DE CLÔTURE (BACK COVER) ─────────────────────────────────────────────
+
+def _build_back_cover(styles: dict) -> list:
+    """Page de clôture — sobre, Pepperyn branding."""
+    s = []
+    s.append(_sp(85))
+    s.append(_hr(C_LGRAY, thickness=0.5))
+    s.append(_sp(10))
+
+    brand_ps = ParagraphStyle(
+        "bc_brand", fontName="Helvetica-Bold", fontSize=22,
+        textColor=C_NAVY, leading=28, alignment=TA_CENTER,
+    )
+    sub_ps = ParagraphStyle(
+        "bc_sub", fontName="Helvetica", fontSize=11,
+        textColor=C_GRAY, leading=16, alignment=TA_CENTER,
+    )
+    conf_ps = ParagraphStyle(
+        "bc_conf", fontName="Helvetica", fontSize=7.5,
+        textColor=colors.HexColor("#8899AA"), leading=11, alignment=TA_CENTER,
+    )
+
+    s.append(Paragraph("Pepperyn", brand_ps))
+    s.append(_sp(3))
+    s.append(Paragraph("Financial Control Center", sub_ps))
+    s.append(_sp(14))
+    s.append(Paragraph(
+        "Ce rapport a été préparé à partir des données transmises par votre entreprise. "
+        "Il est destiné exclusivement à un usage interne de direction.",
+        conf_ps
+    ))
+    return s
+
+
 # ─── POINT D'ENTRÉE ───────────────────────────────────────────────────────────
 
 def generate_pdf_report(result, company_name: str | None = None) -> bytes:
@@ -2252,6 +2488,8 @@ def generate_pdf_report(result, company_name: str | None = None) -> bytes:
             lambda: _build_page_risks(result, styles)))
         story.extend(_safe_page("KPIs",
             lambda: _build_page_kpis(result, edm, styles)))
+        story.extend(_safe_page("Transparence",
+            lambda: _build_page_transparence(result, edm, styles)))
 
         # P11–P13 — États financiers (optionnels — présents si financial_statements fourni)
         fs = getattr(case_obj, "financial_statements", None) if case_obj else None
@@ -2262,6 +2500,9 @@ def generate_pdf_report(result, company_name: str | None = None) -> bytes:
                 lambda: _build_page_bilan(fs, styles)))
             story.extend(_safe_page("Trésorerie",
                 lambda: _build_page_tresorerie(fs, styles)))
+
+        # Back cover — toujours en dernière position
+        story.extend(_build_back_cover(styles))
 
         return story
 
