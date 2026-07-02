@@ -327,8 +327,8 @@ def test_pptx_generates_with_edx002_data():
     assert len(pptx_bytes) > 10_000
 
 
-def test_pptx_generates_without_edx002_no_slide_added():
-    """PPTX se génère sans la slide S7b quand EDX-002 est absent."""
+def test_pptx_generates_without_edx002_shows_methodology():
+    """Sans EDX-002, PPTX affiche la slide méthodologie 4 phases (S7b toujours présente)."""
     import io
     from pptx import Presentation
     from services.export_pptx_service import generate_pptx_report
@@ -339,8 +339,17 @@ def test_pptx_generates_without_edx002_no_slide_added():
 
     pptx_bytes = generate_pptx_report(result, "Optilux SAS")
     prs = Presentation(io.BytesIO(pptx_bytes))
-    # Sans EDX-002, le deck doit avoir 16 slides (pas 17)
-    assert len(prs.slides) == 16
+    # S7b existe toujours (slide méthodologie) → 17 slides même sans EDX-002
+    assert len(prs.slides) == 17
+    # Slide 8 (index 7) doit contenir la méthodologie
+    s7b_text = "\n".join(
+        shape.text_frame.text
+        for shape in prs.slides[7].shapes
+        if shape.has_text_frame
+    )
+    assert "MÉTHODOLOGIE" in s7b_text or "PHASE" in s7b_text, (
+        f"Slide S7b sans EDX-002 doit afficher la méthodologie. Texte : {s7b_text[:200]}"
+    )
 
 
 def test_pptx_has_17_slides_with_edx002():

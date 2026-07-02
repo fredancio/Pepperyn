@@ -190,8 +190,8 @@ class TestRendererIsolation:
         result = generate_pptx_report(NONE_FIELDS_CASE, "Test Société")
         assert isinstance(result, bytes), "PPTX doit retourner des bytes."
         prs = Presentation(io.BytesIO(result))
-        assert len(prs.slides) == 16, (
-            f"PPTX doit toujours produire 16 slides. Reçu : {len(prs.slides)} slides."
+        assert len(prs.slides) == 17, (
+            f"PPTX doit toujours produire 17 slides. Reçu : {len(prs.slides)} slides."
         )
 
     def test_excel_produces_valid_bytes_with_empty_lists(self):
@@ -255,8 +255,8 @@ class TestRendererSelfContainment:
                 f"Longueur du texte testé : {len(_LONG_TEXT)} caractères."
             )
         prs = Presentation(io.BytesIO(result))
-        assert len(prs.slides) == 16, (
-            f"PPTX doit toujours produire 16 slides même avec texte extrême. Reçu : {len(prs.slides)}."
+        assert len(prs.slides) == 17, (
+            f"PPTX doit toujours produire 17 slides même avec texte extrême. Reçu : {len(prs.slides)}."
         )
 
     def test_excel_handles_extreme_text_length(self):
