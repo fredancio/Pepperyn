@@ -116,7 +116,7 @@ def _fmt_auto(v: Optional[float], sign: bool = False) -> str:
     return _fmt_eur(v, sign=sign)
 
 
-def _safe(v, fallback: str = "Données insuffisantes") -> str:
+def _safe(v, fallback: str = _MANQUE_DATA_SHORT) -> str:
     if v is None or v == "" or (isinstance(v, (int, float)) and v == 0):
         return fallback
     return str(v)
@@ -327,8 +327,11 @@ def _copilot_block(
         action     : signal de confirmation / recommandation concrète
         styles     : dict de styles (conservé pour compatibilité)
     """
-    _MISSING_INSIGHT = "Données manquantes pour analyser cet élément."
-    _MISSING_ACTION  = "Référez-vous à notre outil d'accompagnement Copilot."
+    _MISSING_INSIGHT = _MANQUE_DATA
+    _MISSING_ACTION  = (
+        "Partagez vos données financières complètes lors de votre prochaine analyse — "
+        "Pepperyn affinera ses recommandations à chaque itération."
+    )
 
     insight_text = insight.strip() if insight else ""
     missing      = len(insight_text) < 10
@@ -350,7 +353,7 @@ def _copilot_block(
     rows.append([Paragraph(_rl(_MISSING_INSIGHT if missing else insight_text), insight_ps)])
 
     if missing:
-        # Fallback données manquantes
+        # Fallback données absentes
         fallback_ps = ParagraphStyle(
             "cpf", fontName="Helvetica", fontSize=9,
             textColor=colors.HexColor("#6B7280"), leading=13, spaceBefore=5,
@@ -1351,7 +1354,7 @@ def _build_page_value_creation(edm, result: dict, styles: dict) -> list:
     cop6_action = (
         f"Ce chiffre n'est pas une projection financière — c'est un plafond de valeur mobilisable "
         f"si l'exécution est rigoureuse et séquencée. "
-        f"Signal à J+30 : les premiers {_fmt_eur(total_monthly_p6) if total_monthly_p6 else 'gains'}/mois "
+        f"Signal à J+30 : les premiers {total_monthly_p6 if total_monthly_p6 else 'gains'}/mois "
         f"devraient être visibles si la décision prioritaire a été engagée."
     )
 
@@ -2453,9 +2456,10 @@ def generate_pdf_report(result, company_name: str | None = None) -> bytes:
                 return list(builder_fn())
             except Exception:
                 return [
-                    PageBreak(),
-                    Paragraph(f"Section {page_name} — données insuffisantes",
-                               styles.get("body", getSampleStyleSheet()["Normal"])),
+                    Paragraph(
+                        f"Section {page_name} — {_MANQUE_DATA}",
+                        styles.get("body", getSampleStyleSheet()["Normal"]),
+                    ),
                     PageBreak(),
                 ]
 
@@ -2536,7 +2540,7 @@ def generate_pdf_report(result, company_name: str | None = None) -> bytes:
         fallback.build([
             Paragraph(f"Rapport exécutif — {name}", _st["Heading1"]),
             Spacer(1, 12 * mm),
-            Paragraph("Données insuffisantes — le rapport ne peut être généré.", _st["Normal"]),
+            Paragraph(_MANQUE_DATA, _st["Normal"]),
         ])
 
     return buf.getvalue()
