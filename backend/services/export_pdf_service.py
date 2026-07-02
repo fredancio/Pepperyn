@@ -1134,45 +1134,46 @@ def _build_page_reasoning(edm, styles: dict, result_dict: dict | None = None) ->
 
         phases = [
             (
-                "PHASE 1 — LECTURE ET VALIDATION DES DONNÉES",
-                "Le pipeline de Pepperyn commence par extraire et normaliser l'intégralité des données transmises : "
-                "compte de résultat, bilan, flux de trésorerie, ratios sectoriels et contexte opérationnel. "
-                "Chaque ligne est vérifiée, les anomalies sont signalées, et un indice de fiabilité est calculé "
-                "avant que toute analyse ne commence. Aucun des deux agents suivants ne peut produire "
-                "une recommandation tant que cette validation n'est pas franchie — "
-                "c'est ce que nous appelons le \"score de confiance des données\", affiché en page de transparence.",
+                "PHASE 1 — CLASSIFICATION ET VALIDATION (AGENT DE CLASSIFICATION)",
+                "Un premier agent spécialisé reçoit vos documents financiers, détecte leur nature "
+                "(compte de résultat, bilan, trésorerie, ou combinaison) et valide leur structure avant toute analyse. "
+                "Il normalise les données, signale les anomalies et calcule le score de fiabilité de la source. "
+                "C'est la porte d'entrée obligatoire : aucun agent d'analyse ne peut démarrer "
+                "tant que cette étape n'est pas franchie — c'est ce \"score de confiance des données\" "
+                "que vous retrouvez en page de transparence.",
             ),
             (
-                "PHASE 2 — CALCUL DES INDICATEURS (MOTEUR DE CALCUL DÉTERMINISTE)",
-                "Avant tout appel à un agent de raisonnement, un moteur de calcul Python — "
-                "entièrement déterministe et auditable — calcule les indicateurs chiffrés de chaque levier d'action : "
-                "impact annuel potentiel (en euros), ROI à 90 jours, délai de retour sur investissement, "
-                "score de santé financière global et indice d'indépendance opérationnelle de chaque décision. "
-                "Aucune IA n'intervient à cette étape : les mêmes données produiront toujours les mêmes chiffres, "
-                "quelle que soit la date de l'analyse. C'est ce moteur qui fournit le squelette chiffré "
-                "sur lequel l'Agent 1 s'appuie ensuite.",
-            ),
-            (
-                "PHASE 3 — ANALYSE DES LEVIERS DE VALEUR (AGENT 1 — RAISONNEMENT STRATÉGIQUE)",
-                "L'Agent 1 — modèle de raisonnement de niveau frontier — reçoit simultanément les données brutes "
-                "et le squelette chiffré produit en Phase 2. "
+                "PHASE 2 — ANALYSE STRATÉGIQUE EN DEUX PASSES (AGENT D'ANALYSE + AGENT DE VÉRIFICATION)",
+                "Un agent d'analyse stratégique effectue une première lecture approfondie des données validées. "
                 "Sa mission est double : identifier les mécanismes par lesquels votre entreprise perd de la valeur "
-                "(DSO trop long, rotation de stock dégradée, structure de commission inadaptée...) "
-                "mais aussi — et c'est essentiel — repérer les leviers sous-exploités susceptibles d'en créer "
-                "(capacités disponibles, niches de marge non activées, opportunités de renégociation). "
-                "L'Agent 1 qualifie chaque levier par sa nature (structurelle vs conjoncturelle) "
-                "et sa réversibilité, puis sélectionne et ordonne les décisions prioritaires "
-                "en s'appuyant sur les scores calculés en Phase 2.",
+                "(DSO élevé, rotation de stock dégradée, marges comprimées...) mais aussi — et c'est essentiel — "
+                "repérer les leviers sous-exploités susceptibles d'en créer "
+                "(niches de marge non activées, opportunités de renégociation, capacités disponibles). "
+                "Sa production est ensuite soumise à un agent de vérification — un second passage critique "
+                "qui corrige les incohérences et évalue la qualité du raisonnement. "
+                "Si le score de qualité est insuffisant, les deux passes s'escaladent automatiquement "
+                "vers un modèle de raisonnement plus puissant.",
             ),
             (
-                "PHASE 4 — FORMULATION DES HYPOTHÈSES ET SIGNAUX (AGENT 1 — COUCHE DE CONVICTION)",
-                "Dans le même passage analytique, l'Agent 1 associe à chaque décision retenue une hypothèse argumentée "
-                "— non une certitude. Il articule ce qu'il croit être vrai, pourquoi, "
-                "et quel signal concret à J+30 permettra de confirmer ou d'invalider cette conviction. "
-                "Cette couche est délibérément distincte des chiffres : "
-                "vous devez savoir ce qui est mesuré par le moteur (reproductible) "
-                "et ce qui est inféré par l'agent (challengeable). "
-                "La page précédente contient les décisions. Cette page contient le raisonnement qui les justifie.",
+                "PHASE 3 — CALCUL DES INDICATEURS (MOTEUR DE CALCUL DÉTERMINISTE)",
+                "Un moteur de calcul Python — entièrement déterministe, aucune IA — prend les leviers "
+                "identifiés en Phase 2 et calcule les indicateurs chiffrés de chaque décision : "
+                "impact annuel potentiel, ROI à 90 jours, délai de retour sur investissement, "
+                "score de santé financière global et indice d'indépendance opérationnelle. "
+                "Aucun modèle de langage n'intervient ici : les mêmes données produiront toujours "
+                "les mêmes chiffres, quelle que soit la date de l'analyse. "
+                "Ce squelette chiffré est ensuite transmis à l'Agent 1.",
+            ),
+            (
+                "PHASE 4 — STRUCTURATION ET CONVICTION (AGENT 1 — EXECUTIVE CASE BUILDER)",
+                "L'Agent 1 — modèle de raisonnement de niveau frontier — reçoit simultanément "
+                "l'analyse vérifiée (Phase 2) et le squelette chiffré (Phase 3). "
+                "Il sélectionne et ordonne les décisions finales, les structure dans le format officiel du rapport, "
+                "puis associe à chacune une hypothèse argumentée et un signal concret à J+30 "
+                "permettant de la confirmer ou de l'invalider. "
+                "C'est lui qui sépare délibérément ce qui est mesuré (reproductible) "
+                "de ce qui est inféré (challengeable) — la distinction fondamentale entre un rapport de chiffres "
+                "et un copilote stratégique.",
             ),
         ]
 
