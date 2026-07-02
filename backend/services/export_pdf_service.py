@@ -1181,9 +1181,9 @@ def _build_page_reasoning(edm, styles: dict, result_dict: dict | None = None) ->
 
         # Copilot block spécifique à cette page (logique itérative)
         meth_insight = (
-            "À ce stade de l'analyse, le raisonnement comparatif décision par décision n'est pas encore disponible "
-            "— Pepperyn présente ici sa méthodologie de sélection pour que vous compreniez la logique "
-            "derrière chaque recommandation."
+            "Cette page présente la méthodologie que Pepperyn applique pour sélectionner et ordonner ses recommandations. "
+            "La comprendre vous permet d'évaluer nos décisions avec le même œil critique que le nôtre — "
+            "et de nous challenger si votre connaissance du terrain contredit notre raisonnement."
         )
         meth_hyp = (
             "Pepperyn anticipe que la transparence de la méthode est aussi importante que le résultat : "
