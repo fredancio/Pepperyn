@@ -1122,14 +1122,83 @@ def _build_page_reasoning(edm, styles: dict, result_dict: dict | None = None) ->
     decisions = edm.executive_decisions[:5]
 
     if not reasoning_list or not decisions:
-        s.append(Paragraph(
-            "Le détail comparatif du raisonnement de sélection sera disponible dans la prochaine version de l'analyse. "
-            "Les décisions présentées à la page précédente ont été sélectionnées par ordre de ROI calculé, "
-            "d'impact immédiat sur la trésorerie, et d'indépendance opérationnelle des leviers. "
-            "À chaque nouvelle analyse, Pepperyn affine son raisonnement en intégrant les résultats "
-            "des décisions déjà engagées — la pertinence des recommandations s'améliore à chaque itération.",
-            styles["body_small"]
-        ))
+        # ── Méthodologie : explication structurée du raisonnement ──────────────
+        phase_lbl = ParagraphStyle(
+            "ph_lbl", fontName="Helvetica-Bold", fontSize=7.5,
+            textColor=C_NAVY, leading=11, spaceBefore=10, spaceAfter=2,
+        )
+        phase_body = ParagraphStyle(
+            "ph_body", fontName="Helvetica", fontSize=9,
+            textColor=colors.HexColor("#222222"), leading=13.5, spaceAfter=4,
+        )
+
+        phases = [
+            (
+                "PHASE 1 — LECTURE ET STRUCTURATION DES DONNÉES",
+                "Pepperyn commence par extraire et normaliser l'intégralité des données transmises : "
+                "compte de résultat, bilan, flux de trésorerie, ratios sectoriels et contexte opérationnel. "
+                "Chaque ligne financière est vérifiée, les anomalies signalées, et un indice de fiabilité de la source calculé "
+                "avant que toute analyse ne commence. Aucune recommandation n'est produite "
+                "tant que cette base n'est pas validée — c'est ce que nous appelons le \"score de confiance des données\" "
+                "affiché en page de transparence.",
+            ),
+            (
+                "PHASE 2 — IDENTIFICATION DES DESTRUCTIONS DE VALEUR (AGENT STRATÉGIQUE)",
+                "Un agent de raisonnement stratégique analyse ensuite les données pour identifier les mécanismes précis "
+                "par lesquels votre entreprise perd de la valeur chaque mois — qu'ils soient visibles dans les chiffres "
+                "de surface ou enfouis dans des ratios de structure (DSO, rotation de stock, levier de marge). "
+                "Chaque destructeur est qualifié par sa nature (structurelle vs conjoncturelle), "
+                "son impact mensuel estimé et sa réversibilité à 90 jours. "
+                "C'est cette liste — et uniquement elle — qui sert de base aux décisions de la page précédente.",
+            ),
+            (
+                "PHASE 3 — SCORING ET SÉLECTION DES DÉCISIONS (MOTEUR DE CALCUL)",
+                "Pour chaque levier d'action identifié, Pepperyn calcule de façon déterministe trois indicateurs : "
+                "l'impact annuel potentiel (en euros), le ROI à 90 jours, et l'indépendance opérationnelle du levier "
+                "— c'est-à-dire sa capacité à être exécuté sans dépendre de l'aboutissement d'un autre levier. "
+                "Les décisions sont ensuite ordonnées selon ces trois critères combinés. "
+                "Un levier à fort ROI mais conditionné à un autre reste en position secondaire : "
+                "l'exécution séquentielle est plus sûre que l'exécution parallèle incertaine.",
+            ),
+            (
+                "PHASE 4 — FORMULATION DES HYPOTHÈSES STRATÉGIQUES",
+                "Chaque décision retenue est accompagnée d'une hypothèse — non d'une certitude. "
+                "Pepperyn articule explicitement ce qu'il croit être vrai (l'hypothèse), "
+                "pourquoi (le raisonnement), et quel signal à J+30 permettra de confirmer ou d'invalider cette croyance. "
+                "Cette séparation est délibérée : vous devez savoir ce qui est mesuré avec exactitude "
+                "et ce qui est inféré par le raisonnement stratégique. "
+                "La page précédente contient des faits. Cette page contient le raisonnement qui les relie.",
+            ),
+        ]
+
+        for lbl, body in phases:
+            s.append(_hr(C_LGRAY, thickness=0.4))
+            s.append(Paragraph(lbl, phase_lbl))
+            s.append(Paragraph(body, phase_body))
+
+        s.append(_hr(C_LGRAY, thickness=0.4))
+        s.append(_sp(6))
+
+        # Copilot block spécifique à cette page (logique itérative)
+        meth_insight = (
+            "À ce stade de l'analyse, le raisonnement comparatif décision par décision n'est pas encore disponible "
+            "— Pepperyn présente ici sa méthodologie de sélection pour que vous compreniez la logique "
+            "derrière chaque recommandation."
+        )
+        meth_hyp = (
+            "Pepperyn anticipe que la transparence de la méthode est aussi importante que le résultat : "
+            "une recommandation que vous comprenez a plus de chances d'être exécutée qu'une recommandation "
+            "que vous subissez. Dans les prochaines versions, ce raisonnement sera disponible décision par décision "
+            "— avec les alternatives écartées et les conditions qui feraient pivoter notre recommandation."
+        )
+        meth_action = (
+            "À chaque nouvelle analyse, Pepperyn intègre les résultats des décisions déjà engagées. "
+            "Si vous avez exécuté la décision n°1 depuis notre dernière analyse, "
+            "son impact réel sera comparé à notre hypothèse initiale — et le raisonnement sera ajusté en conséquence. "
+            "La pertinence des recommandations s'améliore à chaque itération : c'est ainsi qu'un copilote apprend."
+        )
+        s.extend(_copilot_block(meth_insight, meth_action, styles, hypothesis=meth_hyp))
+
         s.append(PageBreak())
         return s
 
