@@ -147,6 +147,11 @@ def _safe(v, fallback: str = "—") -> str:
     return str(v)
 
 
+def _sm(s) -> str:
+    """Strip markdown bold/italic markers (`**`, `*`) from LLM text before PPTX rendering."""
+    return re.sub(r'\*+', '', s or '').strip()
+
+
 # ─── RULE 002 — Helpers anti-troncature ──────────────────────────────────────
 
 def _auto_row_h(text: str, col_w_emu: int, font_pt: int, base_pt: float = 28.0) -> int:
@@ -344,7 +349,7 @@ def _slide_cover(prs, edm, result: dict, company: str, date_str: str, page: int)
 
     # ── Decision — left column ────────────────────────────────────────────────
     dec = edm.executive_decisions[0] if edm.executive_decisions else None
-    dec_txt = dec.decision if dec else "Décision prioritaire non disponible"
+    dec_txt = _sm(dec.decision) if dec else "Décision prioritaire non disponible"
     impact_str = (_fmt_auto(dec.annual_impact) + " / an" if dec and dec.annual_impact
                   else "Non chiffrable")
 
@@ -405,7 +410,7 @@ def _slide_exec_summary(prs, edm, result: dict, company: str, date_str: str, pag
         _rect(slide, ML, y, Inches(0.07), row_h, fill_color=card_color)
         _text(slide, f"#{i + 1}", ML + Inches(0.18), y + Inches(0.08), Inches(0.4), row_h,
               size=16, bold=True, color=card_color)
-        _text(slide, dec.decision, ML + Inches(0.65), y + Inches(0.08),
+        _text(slide, _sm(dec.decision), ML + Inches(0.65), y + Inches(0.08),
               Inches(5.5), row_h - Inches(0.15), size=14, color=DARK)
         # Propriétaire
         owner_str = dec.owner or "Direction"
@@ -499,7 +504,7 @@ def _slide_diagnostic(prs, edm, result: dict, company: str, date_str: str, page:
                   card_w - Inches(0.2), Inches(0.7), size=24, bold=True, color=val_c)
             _text(slide, "/ AN", lx + Inches(0.1), ly + Inches(0.82),
                   card_w - Inches(0.2), Inches(0.25), size=9, color=GRAY)
-            _text(slide, d.name, lx + Inches(0.1), ly + Inches(1.1),
+            _text(slide, _sm(d.name), lx + Inches(0.1), ly + Inches(1.1),
                   card_w - Inches(0.2), Inches(1.3), size=13, bold=True, color=DARK)
             # Mini waterfall bar visuel
             if d.annual_impact:
@@ -568,7 +573,7 @@ def _slide_impact_financier(prs, edm, result: dict, company: str, date_str: str,
     rows = []
     for d in destroyers:
         rows.append([
-            d.name,
+            _sm(d.name),
             _fmt_auto(d.annual_impact) if d.annual_impact else "Non chiffrable",
             _fmt_eur(d.monthly_impact) if d.monthly_impact else "—",
             d.trend or "—",
@@ -731,7 +736,7 @@ def _slide_decisions_prioritaires(prs, edm, result: dict, company: str, date_str
     rows = []
     for d in decisions:
         rows.append([
-            d.decision,
+            _sm(d.decision),
             _fmt_auto(d.annual_impact, sign=True) if d.annual_impact else "Non chiffrable",
             f"{d.roi_score:.1f}/10",
             d.priority or "—",
@@ -826,7 +831,7 @@ def _slide_decisions_prioritaires(prs, edm, result: dict, company: str, date_str
             # Ligne 1 : numéro + décision (gras)
             para1 = tf2.paragraphs[0] if shown == 0 else tf2.add_paragraph()
             run_title = para1.add_run()
-            run_title.text = f"#{i+1}  {dec.decision}"
+            run_title.text = f"#{i+1}  {_sm(dec.decision)}"
             run_title.font.size = Pt(10)
             run_title.font.bold = True
             run_title.font.color.rgb = _rgb("0A2540")
@@ -906,7 +911,7 @@ def _slide_methodologie(prs, edm, result: dict, company: str, date_str: str, pag
         # Numéro + décision
         _text(slide, f"#{i+1}", lx + int(Inches(0.1)), ly + int(Inches(0.1)),
               int(Inches(0.35)), int(Inches(0.5)), size=22, bold=True, color=c)
-        _text(slide, dec.decision, lx + int(Inches(0.5)), ly + int(Inches(0.1)),
+        _text(slide, _sm(dec.decision), lx + int(Inches(0.5)), ly + int(Inches(0.1)),
               int(card_w - Inches(0.62)), int(min(Inches(1.0), card_h * 0.38)),
               size=10, bold=True, color=NAVY)
 
@@ -1401,23 +1406,26 @@ def _slide_projection(prs, edm, result: dict, company: str, date_str: str, page:
         _text(slide, "—", ML, CONTENT_Y, CW, Inches(1), size=22, color=GRAY)
         note_y = CONTENT_Y + Inches(1.1)
 
-    # ── COI box — bottom right, aligned with break-even note ─────────────────
-    coi = edm.cost_of_inaction
-    if coi and coi.per_year:
+    # ── Impact décisions box — bottom right ───────────────────────────────────
+    # mn1 fix: utiliser decisions_net (impact des décisions exécutées) plutôt
+    # que coi.per_year (COI total) pour cohérence avec la courbe du graphique
+    decisions_net = sum((d.annual_impact or 0) for d in (edm.executive_decisions or []))
+    if decisions_net:
         box_x = ML + int(CW * 0.62)
         box_w = int(CW * 0.38)
         box_y = CHART_BOT + Inches(0.51) if has_data else CONTENT_Y + Inches(1.05)
         box_h = Inches(1.08)
+        box_color = GREEN if decisions_net > 0 else RED
         _rect(slide, box_x, box_y, box_w, box_h,
-              fill_color=_rgb("FBF0EE"), line_color=RED)
-        _text(slide, "Coût total si aucune action sur 12 mois",
+              fill_color=_rgb("F0FBF4"), line_color=box_color)
+        _text(slide, "Impact si vous agissez · 12 mois",
               box_x + Inches(0.12), box_y + Inches(0.1),
               box_w - Inches(0.24), Inches(0.3),
-              size=10, bold=True, color=RED, align=PP_ALIGN.CENTER)
-        _text(slide, _fmt_auto(abs(coi.per_year)),
+              size=10, bold=True, color=box_color, align=PP_ALIGN.CENTER)
+        _text(slide, _fmt_auto(abs(decisions_net)),
               box_x + Inches(0.1), box_y + Inches(0.38),
               box_w - Inches(0.2), Inches(0.58),
-              size=30, bold=True, color=RED, align=PP_ALIGN.CENTER)
+              size=30, bold=True, color=box_color, align=PP_ALIGN.CENTER)
 
 
 # ─── SHARED WATERFALL RENDERER ───────────────────────────────────────────────
@@ -1626,7 +1634,7 @@ def _slide_bridge_historique(prs, edm, result: dict, company: str, date_str: str
     items = [("EBITDA", f"Normatif · {year_n}", ebitda_norm, "anchor")]
     for vd in destroyers[:5]:
         delta = vd.annual_impact or 0
-        items.append((_short(vd.name), "", delta, "negative" if delta < 0 else "positive"))
+        items.append((_short(_sm(vd.name)), "", delta, "negative" if delta < 0 else "positive"))
     items.append(("EBITDA", f"Actuel · {year_n}", ebitda_actuel, "anchor"))
 
     # ── Layout + rendu ────────────────────────────────────────────────────────
@@ -1709,7 +1717,7 @@ def _slide_bridge_financier(prs, edm, result: dict, company: str, date_str: str,
     for d in decisions[:5]:
         delta = d.annual_impact or 0
         kind  = "positive" if delta >= 0 else "negative"
-        items.append((_short(d.decision), "", delta, kind))
+        items.append((_short(_sm(d.decision)), "", delta, kind))
     items.append(("EBITDA", f"Cible · {year_n1}", ebitda_end, "anchor"))
 
     # ── Layout + shared renderer ──────────────────────────────────────────────
@@ -1764,7 +1772,7 @@ def _slide_creation_valeur(prs, edm, result: dict, company: str, date_str: str, 
     # ── Data ────────────────────────────────────────────────────────────────────
     decisions  = edm.executive_decisions or []
     p1_total   = sum((d.annual_impact or 0) for d in decisions)
-    p1_items   = [(d.decision[:62] + ("…" if len(d.decision) > 62 else ""),
+    p1_items   = [(_sm(d.decision)[:62] + ("…" if len(_sm(d.decision)) > 62 else ""),
                    _fmt_auto(d.annual_impact)) for d in decisions[:4]]
 
     # Phase 2 : leviers de croissance (strategic_levers ou synthèse contextuelle)
@@ -2068,13 +2076,13 @@ def _slide_priorites(prs, edm, result: dict, company: str, date_str: str, page: 
         # Effort élevé = explicitement fort/élevé/high/difficile
         high_effort = any(w in dif for w in ("élevé", "eleve", "high", "fort", "difficile"))
         if high_impact and not high_effort:
-            q_items[0].append(dec.decision)
+            q_items[0].append(_sm(dec.decision))
         elif high_impact and high_effort:
-            q_items[1].append(dec.decision)
+            q_items[1].append(_sm(dec.decision))
         elif not high_impact and not high_effort:
-            q_items[2].append(dec.decision)
+            q_items[2].append(_sm(dec.decision))
         else:
-            q_items[3].append(dec.decision)
+            q_items[3].append(_sm(dec.decision))
 
     positions = [
         (q_l,                   q_t),
@@ -2133,7 +2141,7 @@ def _slide_suivi(prs, edm, result: dict, company: str, date_str: str, page: int)
     if exec_items:
         for item in exec_items[:8]:
             rows.append([
-                item.decision, item.owner or "Direction",
+                _sm(item.decision), item.owner or "Direction",
                 item.due_date or "—", item.status or "À lancer",
                 _fmt_auto(item.impact) if item.impact else "—",
                 f"{item.roi_score:.1f}/10",
@@ -2141,7 +2149,7 @@ def _slide_suivi(prs, edm, result: dict, company: str, date_str: str, page: int)
     elif decisions:
         for dec in decisions[:8]:
             rows.append([
-                dec.decision, dec.owner or "Direction",
+                _sm(dec.decision), dec.owner or "Direction",
                 dec.timeline or "—", dec.status or "À lancer",
                 _fmt_auto(dec.annual_impact) if dec.annual_impact else "—",
                 f"{dec.roi_score:.1f}/10",
@@ -2238,7 +2246,7 @@ def _slide_pilotage(prs, edm, result: dict, company: str, date_str: str, page: i
         _rect(slide, int(ML), ry, int(Inches(0.06)), row_h, fill_color=sc)
 
         # Decision title (ellipsis if long)
-        title = dec.decision or "—"
+        title = _sm(dec.decision) or "—"
         _text(slide, title,
               int(ML + Inches(0.14)), ry + int(Inches(0.08)),
               int(CW * 0.40), row_h - int(Inches(0.16)),
@@ -2319,7 +2327,7 @@ def _slide_lundi_matin(prs, edm, result: dict, company: str, date_str: str, page
         _rect(slide, ML, cy, CW, card_h, fill_color=_rgb("F5F8FF"), line_color=c)
         _text(slide, str(i + 1), ML + Inches(0.15), cy + Inches(0.08), Inches(0.45), card_h,
               size=34, bold=True, color=c, align=PP_ALIGN.CENTER)
-        dec_txt = dec.decision if dec else "—"
+        dec_txt = _sm(dec.decision) if dec else "—"
         _text(slide, dec_txt, ML + Inches(0.75), cy + Inches(0.08),
               Inches(7.5), card_h - Inches(0.1), size=16, bold=True, color=DARK)
         if dec:

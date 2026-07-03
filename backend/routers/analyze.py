@@ -562,6 +562,21 @@ async def _run_analysis_pipeline(
         except Exception:
             pass
 
+    # A2 fix — aligner plan_action_haute avec les décisions EDM pour cohérence chat/docs
+    # Le plan_action_haute LLM (section PLAN D'ACTION) peut diverger des quick_wins
+    # qui alimentent l'EDM. On remplace par les décisions EDM après ré-identification.
+    try:
+        import re as _re
+        from services.executive_decision_model import build_executive_decision_model as _build_edm
+        _edm_tmp = _build_edm(analysis_result.model_dump())
+        if _edm_tmp.executive_decisions:
+            analysis_result.plan_action_haute = [
+                _re.sub(r'\*+', '', d.decision or '').strip()
+                for d in _edm_tmp.executive_decisions
+            ]
+    except Exception:
+        pass  # non-bloquant — le plan d'action LLM original reste en fallback
+
     # Attach data quality info to result
     analysis_result.data_quality = DataQualityInfo(
         score_data=quality_gate.score_data,

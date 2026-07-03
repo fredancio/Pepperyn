@@ -696,7 +696,7 @@ def _build_dashboard(wb: Workbook, edm, raw: dict) -> None:
 
 # ─── FEUILLE 2 : HYPOTHÈSES ───────────────────────────────────────────────────
 
-def _build_hypotheses(wb: Workbook, edm) -> None:
+def _build_hypotheses(wb: Workbook, edm, raw: dict = None) -> None:
     ws = wb.create_sheet(SN_HYPO)
     ws.tab_color = P_BLUE
     _setup_sheet(ws)
@@ -730,11 +730,21 @@ def _build_hypotheses(wb: Workbook, edm) -> None:
 
     # Section B — Hypothèses de revenus
     ebitda_num = _parse_eur(edm.ebitda)
+    # mn2 fix: récupérer le CA réel depuis le dashboard LLM si disponible
+    ca_initial = 0.0
+    if raw:
+        for _card in (raw.get("ceo_dashboard") or []):
+            _lbl = (_card.get("label", "") if isinstance(_card, dict) else "").lower()
+            if any(k in _lbl for k in ("ca total", "chiffre d'affaires", "revenu", "revenue")):
+                ca_initial = _parse_eur(_card.get("value", "0"))
+                break
+    if not ca_initial:
+        ca_initial = max(ebitda_num * 2.5, 0)
     _section_bar(ws, HYPO_R_CA - 1,
                  "B — HYPOTHÈSES DE REVENUS  ↓ cellules bleues modifiables",
                  col_end=4)
     rev_rows = [
-        (HYPO_R_CA,     "Chiffre d'affaires estimé", max(ebitda_num * 2.5, 0), "#,##0 €;(#,##0 €);-", "Votre estimation CA annuel"),
+        (HYPO_R_CA,     "Chiffre d'affaires estimé", ca_initial, "#,##0 €;(#,##0 €);-", "Source EDM Pepperyn"),
         (HYPO_R_CROISS, "Taux de croissance annuel",  0.05,                     "0.0%",                "Objectif de croissance"),
         (HYPO_R_PRIX,   "Prix moyen de vente (€)",    0.0,                      "#,##0 €;(#,##0 €);-", "Prix unitaire moyen"),
         (HYPO_R_VOLUME, "Volume mensuel (unités)",     0.0,                      "#,##0",               "Nombre d'unités / mois"),
@@ -1252,11 +1262,11 @@ def _build_roadmap(wb: Workbook, edm) -> None:
         ws.cell(row=r, column=1).font = _font(color=P_SLATE, bold=True)
 
         if dec:
-            c = ws.cell(row=r, column=2, value=dec.decision)
+            c = ws.cell(row=r, column=2, value=_strip_md(dec.decision))
             c.font = _font(color=P_DARK, bold=True)
             c.alignment = _align("left", wrap=True)
             # SPEC: Rows — Dynamic height. Renderer computes row height. Never fixed.
-            ws.row_dimensions[r].height = _row_height_for_text(dec.decision, 76)
+            ws.row_dimensions[r].height = _row_height_for_text(_strip_md(dec.decision), 76)
 
             c = ws.cell(row=r, column=3, value=dec.owner or "À définir")
             c.font = _font(color=FONT_INPUT)
@@ -1299,7 +1309,7 @@ def _build_roadmap(wb: Workbook, edm) -> None:
             r_ph += 1
             for action in (phase.actions or [])[:6]:
                 ws.cell(row=r_ph, column=1, value="›").font = _font(color=P_BLUE, bold=True)
-                c = ws.cell(row=r_ph, column=2, value=action.decision)
+                c = ws.cell(row=r_ph, column=2, value=_strip_md(action.decision))
                 c.font = _font(color=P_DARK)
                 ws.merge_cells(start_row=r_ph, start_column=2, end_row=r_ph, end_column=5)
                 ws.cell(row=r_ph, column=6, value=action.owner or "—").font = _font(color=P_GRAY)
@@ -1453,7 +1463,7 @@ def generate_excel_report(
     # 8 feuilles visibles — Accueil en tête
     _safe_sheet(SN_ACCUEIL,  lambda: _build_accueil(wb))
     _safe_sheet(SN_DASH,     lambda: _build_dashboard(wb, edm, original_data))
-    _safe_sheet(SN_HYPO,     lambda: _build_hypotheses(wb, edm))
+    _safe_sheet(SN_HYPO,     lambda: _build_hypotheses(wb, edm, original_data))
     _safe_sheet(SN_LAB,      lambda: _build_decision_lab(wb, edm, original_data))
     _safe_sheet(SN_SENSI,    lambda: _build_sensitivity(wb, edm))
     _safe_sheet(SN_SCEN,     lambda: _build_scenarios(wb, edm))

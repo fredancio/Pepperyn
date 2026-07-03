@@ -152,6 +152,7 @@ def _rl(text: str) -> str:
     text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
     text = re.sub(r"\*(.+?)\*", r"<i>\1</i>", text)
+    text = re.sub(r"\*+", "", text)  # strip remaining unmatched ** markers (LLM output)
     return text
 
 
@@ -992,8 +993,8 @@ def _build_page_coi(edm, result: dict, styles: dict) -> list:
     if has_chart:
         y_min_v = min(min(series_b), 0)
         y_max_v = max(max(series_a), 0)
-        range_v = max(abs(y_min_v), abs(y_max_v), 1_000_000)
-        ceil_m = (int(range_v / 1_000_000) + 1) * 1_000_000
+        range_v = max(abs(y_min_v), abs(y_max_v), 10_000)
+        ceil_m = int(range_v * 1.3 / 10_000 + 1) * 10_000
         chart = _line_chart_two(series_a, series_b, CONTENT_W, 52 * mm,
                                 -ceil_m, ceil_m)
         s.append(chart)
