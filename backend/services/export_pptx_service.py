@@ -547,9 +547,10 @@ def _slide_dashboard(prs, edm, result: dict, company: str, date_str: str, page: 
         val = str(item.get("value", "—"))
         lbl = str(item.get("label", ""))
         _rect(slide, lx, ly, card_w, card_h, fill_color=_rgb("F5F8FF"), line_color=border_c)
+        val_size = 24 if len(val) <= 22 else (18 if len(val) <= 45 else 13)
         _text(slide, val, lx + Inches(0.12), ly + Inches(0.25),
               card_w - Inches(0.24), Inches(0.85),
-              size=24, bold=True, color=val_c, align=PP_ALIGN.CENTER)
+              size=val_size, bold=True, color=val_c, align=PP_ALIGN.CENTER)
         _text(slide, lbl.upper(), lx + Inches(0.1), ly + Inches(1.2),
               card_w - Inches(0.2), Inches(0.5),
               size=11, bold=True, color=GRAY, align=PP_ALIGN.CENTER)
@@ -980,8 +981,8 @@ def _slide_raisonnement_comparatif(prs, edm, result: dict, company: str, date_st
 
     # Largeur et hauteur de chaque bloc
     block_w = CW if n_blocks == 1 else (CW - Inches(0.15)) / 2
-    block_h = CH - Inches(0.65)
-    block_top = MT + Inches(0.55)
+    block_h = CH - Inches(0.82)   # shorter to compensate for later block_top
+    block_top = MT + Inches(0.72)  # subtitle ends at MT+0.65" → start after with margin
 
     for b_idx, r in enumerate(top_decisions):
         bx = ML + b_idx * (block_w + Inches(0.15))
@@ -998,8 +999,8 @@ def _slide_raisonnement_comparatif(prs, edm, result: dict, company: str, date_st
         bg.line.color.rgb = _rgb("C5D5F0")
         bg.line.width = Pt(0.5)
 
-        # Titre de la décision
-        dec_name = dec.decision if dec else f"Décision #{dec_idx + 1}"
+        # Titre de la décision (strip markdown bold markers from LLM output)
+        dec_name = re.sub(r'\*+', '', dec.decision or '').strip() if dec else f"Décision #{dec_idx + 1}"
         impact_str = (_fmt_auto(dec.annual_impact) if dec and dec.annual_impact else "")
         header_text = f"#{dec_idx + 1} — {dec_name}"
         if impact_str:
@@ -1029,8 +1030,8 @@ def _slide_raisonnement_comparatif(prs, edm, result: dict, company: str, date_st
 
         # Options éliminées
         opts_top = block_top + Inches(0.64)
-        opts_h = Inches(0.22)
-        for opt in options[:4]:  # Max 4 options pour lisibilité
+        opts_h = Inches(0.26)
+        for opt in options[:3]:  # Max 3 options pour lisibilité et aération
             opt_name = opt.get("option", "")[:70]
             elim = opt.get("elimination_criterion", "")[:90]
             if len(opt.get("option", "")) > 70:
