@@ -136,10 +136,20 @@ HYPO_R_MARGE_N = 22
 # ─── Utilitaires de formatage ────────────────────────────────────────────────
 
 def _parse_eur(s: Optional[str]) -> float:
-    """'1 800 000 €' → 1_800_000.0  /  '1.2M €' → 1_200_000.0"""
+    """Parses a monetary string to float.
+
+    Handles:
+      '1 800 000 €'                       → 1_800_000.0
+      '1.2M €'                            → 1_200_000.0
+      '**-240 000 €** (marge : -2,9 %)'  → -240_000.0  (markdown + parenthetical)
+    """
     if not s:
         return 0.0
-    c = re.sub(r"[€\s]", "", str(s)).replace(",", ".").strip()
+    # Strip markdown bold/italic markers (** or *)
+    s = re.sub(r"\*+", "", str(s))
+    # Remove parenthetical annotations e.g. "(marge EBITDA : -2,9 %)"
+    s = re.sub(r"\([^)]*\)", "", s)
+    c = re.sub(r"[€\s]", "", s).replace(",", ".").strip()
     try:
         if c.upper().endswith("M"):
             return float(c[:-1]) * 1_000_000

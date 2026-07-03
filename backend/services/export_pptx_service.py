@@ -465,7 +465,10 @@ def _slide_diagnostic(prs, edm, result: dict, company: str, date_str: str, page:
 
     diag = (result.get("diagnostic_immediat") or result.get("resume_executif")
             or result.get("synthese") or "—")
-    _text(slide, diag.strip(), ML, MT + Inches(0.55), CW, Inches(1.1), size=20, color=DARK)
+    diag = diag.strip()
+    if len(diag) > 350:
+        diag = diag[:347] + "…"
+    _text(slide, diag, ML, MT + Inches(0.55), CW, Inches(1.1), size=14, color=DARK)
 
     tension = result.get("phrase_tension")
     if tension:

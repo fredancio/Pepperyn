@@ -123,16 +123,72 @@ def _extract_sheets_openpyxl(
     return sheets_data, overall_null_ratio
 
 
+def _extract_bfr_summary(sheets_data: list[dict[str, Any]]) -> dict[str, Any]:
+    """
+    Proactively extract BFR / liquidity indicators from all parsed sheets.
+
+    Placed at the TOP of the LLM JSON payload so these critical values are
+    never lost due to the 14 000-char truncation applied in llm_service.py.
+    Scans every row of every sheet for cells whose string value contains
+    DSO / DPO / DIO / BFR / trésorerie keywords and picks adjacent numerics.
+    """
+    BFR_PATTERNS = {
+        "dso_jours":     ["dso", "délai de recouvrement", "jours clients", "délai clients",
+                          "days sales outstanding"],
+        "dpo_jours":     ["dpo", "délai fournisseurs", "délai paiement fournisseur",
+                          "days payable outstanding"],
+        "dio_jours":     ["dio", "jours de stock", "rotation des stocks", "days inventory"],
+        "bfr_jours":     ["bfr (jours)", "bfr en jours", "besoin en fonds de roulement (j",
+                          "bfr normatif (j"],
+        "bfr_eur":       ["bfr (€", "bfr total", "besoin en fonds de roulement (€",
+                          "surfinancement", "excédent de bfr"],
+        "tresorerie_eur": ["trésorerie", "tresorerie", "solde de trésorerie", "cash disponible"],
+    }
+
+    found: dict[str, Any] = {}
+
+    for sheet in sheets_data:
+        rows = sheet.get("full_table") or sheet.get("sample_rows") or []
+        sheet_name = sheet.get("sheet_name", "")
+        for row in rows:
+            for cell_val in row.values():
+                if not isinstance(cell_val, str):
+                    continue
+                cell_lower = cell_val.lower()
+                for kpi, patterns in BFR_PATTERNS.items():
+                    if kpi in found:
+                        continue
+                    if any(pat in cell_lower for pat in patterns):
+                        # Pick the first non-zero numeric value in the same row
+                        nums = [
+                            v for v in row.values()
+                            if isinstance(v, (int, float)) and v not in (0, 0.0)
+                        ]
+                        if nums:
+                            found[kpi] = {
+                                "label": cell_val[:80],
+                                "value": nums[0],
+                                "sheet": sheet_name,
+                            }
+
+    return found
+
+
 def _build_excel_result(
     filename: str, sheet_names: list[str], sheets_data: list[dict[str, Any]]
 ) -> dict[str, Any]:
-    return {
+    result: dict[str, Any] = {
         "filename": filename,
         "format": "excel",
         "sheets_count": len(sheet_names),
-        "sheets": sheets_data,
         "total_rows": sum(s.get("rows", 0) for s in sheets_data),
     }
+    # BFR summary injected FIRST so it survives the 14 000-char LLM truncation
+    bfr_summary = _extract_bfr_summary(sheets_data)
+    if bfr_summary:
+        result["bfr_summary"] = bfr_summary
+    result["sheets"] = sheets_data
+    return result
 
 
 def _detect_header_row_from_rows(rows: list[tuple], max_scan: int = 6) -> int:
