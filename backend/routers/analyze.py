@@ -562,18 +562,22 @@ async def _run_analysis_pipeline(
         except Exception:
             pass
 
-    # A2 fix — aligner plan_action_haute avec les décisions EDM pour cohérence chat/docs
-    # Le plan_action_haute LLM (section PLAN D'ACTION) peut diverger des quick_wins
-    # qui alimentent l'EDM. On remplace par les décisions EDM après ré-identification.
+    # A2 fix — aligner plan_action_haute ET plan_action avec les décisions EDM
+    # Racine du bug C1/C2 : le frontend lit result.plan_action (= haute + secondaire),
+    # pas plan_action_haute. On met à jour les DEUX champs pour cohérence chat ↔ docs.
     try:
         import re as _re
         from services.executive_decision_model import build_executive_decision_model as _build_edm
         _edm_tmp = _build_edm(analysis_result.model_dump())
         if _edm_tmp.executive_decisions:
-            analysis_result.plan_action_haute = [
+            _edm_decisions = [
                 _re.sub(r'\*+', '', d.decision or '').strip()
                 for d in _edm_tmp.executive_decisions
             ]
+            analysis_result.plan_action_haute = _edm_decisions
+            # C1/C2 fix : le frontend affiche plan_action (haute + secondaire),
+            # non plan_action_haute seul — synchroniser les deux.
+            analysis_result.plan_action = _edm_decisions
     except Exception:
         pass  # non-bloquant — le plan d'action LLM original reste en fallback
 

@@ -1314,9 +1314,12 @@ def _build_roadmap(wb: Workbook, edm) -> None:
                 ws.merge_cells(start_row=r_ph, start_column=2, end_row=r_ph, end_column=5)
                 ws.cell(row=r_ph, column=6, value=action.owner or "—").font = _font(color=P_GRAY)
                 ws.cell(row=r_ph, column=7, value=action.due_date or "—").font = _font(color=P_GRAY)
-                if action.impact is not None:
+                # M2 fix: action.impact provient du champ impact_attendu LLM (plan_action_30_60_90)
+                # qui peut contenir des valeurs de référence erronées (ex: -30K pour Phase 60j).
+                # On n'affiche que les valeurs positives; les valeurs négatives sont des artefacts LLM.
+                if action.impact is not None and action.impact > 0:
                     c = ws.cell(row=r_ph, column=8, value=action.impact)
-                    c.font = _font(color=P_GREEN if action.impact > 0 else P_RED, bold=True)
+                    c.font = _font(color=P_GREEN, bold=True)
                     c.number_format = "#,##0 €;(#,##0 €);-"
                 r_ph += 1
 

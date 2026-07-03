@@ -777,9 +777,11 @@ def _build_page_capital(edm, result: dict, styles: dict) -> list:
 
     if total_ann:
         hero_text = _fmt_auto(total_ann)
-        hero_lbl = "DE VALEUR IDENTIFIÉE À LIBÉRER"
+        # mn1 fix: label précis → "COÛT DE L'INACTION" aligné sur page 4.
+        # 161K = total perdu si rien ne change (COI) ; les décisions capturent 139K (86%).
+        hero_lbl = "COÛT DE L'INACTION PAR AN"
         inner = Table([
-            [Paragraph("POTENTIEL TOTAL IDENTIFIÉ", ParagraphStyle(
+            [Paragraph("COÛT TOTAL DE L'INACTION IDENTIFIÉ", ParagraphStyle(
                 "pti", fontName="Helvetica-Bold", fontSize=8,
                 textColor=colors.HexColor("#AABBCC"), leading=12))],
             [_sp(2)],
@@ -1462,8 +1464,10 @@ def _build_page_roadmap(edm, styles: dict, result_dict: dict | None = None) -> l
     def _phase_items(horizon: str) -> list[str]:
         for phase in phases_edm:
             if str(getattr(phase, "horizon", "")) == horizon:
+                import re as _re_ph
                 return [
-                    getattr(a, "decision", str(a))
+                    # C3 fix: strip ** markdown LLM avant affichage PDF
+                    _re_ph.sub(r'\*+', '', getattr(a, "decision", str(a))).strip()
                     for a in (phase.actions or [])[:7]
                 ]
         return []

@@ -499,7 +499,8 @@ def _slide_diagnostic(prs, edm, result: dict, company: str, date_str: str, page:
             bord = _rgb("8EC9A2") if growth else _rgb("E8B0A8")
             val_c = GREEN if growth else RED
             _rect(slide, lx, ly, card_w, card_h, fill_color=bg, line_color=bord)
-            ann_str = _fmt_auto(d.annual_impact) if d.annual_impact else "Non chiffré"
+            # M1 fix: afficher abs() — les leviers sont toujours des opportunités positives
+            ann_str = _fmt_auto(abs(d.annual_impact)) if d.annual_impact else "Non chiffré"
             _text(slide, ann_str, lx + Inches(0.1), ly + Inches(0.15),
                   card_w - Inches(0.2), Inches(0.7), size=24, bold=True, color=val_c)
             _text(slide, "/ AN", lx + Inches(0.1), ly + Inches(0.82),
@@ -617,12 +618,16 @@ def _slide_impact_financier(prs, edm, result: dict, company: str, date_str: str,
     _fit_table_rows(tbl, text_col_idx=0, font_pt=12)  # RULE 002
 
     # ── Ligne total ───────────────────────────────────────────────────────────
-    total_annual = sum(d.annual_impact or 0 for d in destroyers)
-    total_monthly = sum(d.monthly_impact or 0 for d in destroyers)
+    # C4 fix: utiliser abs() pour chaque levier → total = COI réel (161K)
+    # et non la somme algébrique (+119K - 42K = 77K) qui sous-estime le potentiel.
+    total_annual = sum(abs(d.annual_impact or 0) for d in destroyers)
+    total_monthly = sum(abs(d.monthly_impact or 0) for d in destroyers)
     if total_annual:
         ty = int(tbl_top + tbl_h + Inches(0.08))
         _rect(slide, int(ML), ty, int(CW), int(Inches(0.48)), fill_color=NAVY)
-        _text(slide, "TOTAL — Valeur à libérer",
+        # mn1 fix: label précis → "Coût de l'inaction" (161K = ce qu'on perd),
+        # distinct de "Impact total décisions" (139K = ce qu'on capture via D1+D2+D3).
+        _text(slide, "TOTAL — Coût de l'inaction · par an",
               int(ML + Inches(0.15)), ty + int(Inches(0.08)),
               int(CW * 0.48), int(Inches(0.32)),
               size=11, bold=True, color=WHITE)
@@ -1109,7 +1114,8 @@ def _slide_execution(prs, edm, result: dict, company: str, date_str: str, page: 
     def _phase_items(horizon: str) -> List[str]:
         for phase in phases_edm:
             if str(phase.horizon) == horizon:
-                return [a.decision for a in phase.actions[:5]]
+                # C3 fix: appliquer _sm() pour nettoyer les ** markdown LLM
+                return [_sm(a.decision) for a in phase.actions[:5]]
         if plan_items:
             items = []
             for p in plan_items:
@@ -1117,7 +1123,8 @@ def _slide_execution(prs, edm, result: dict, company: str, date_str: str, page: 
                 if h == horizon:
                     act = (getattr(p, "action", None) or p.get("action", "")) if isinstance(p, dict) else getattr(p, "action", "")
                     if act:
-                        items.append(str(act))
+                        # C3 fix: strip markdown ici aussi
+                        items.append(_sm(str(act)))
             return items[:5]
         return []
 
@@ -1622,9 +1629,15 @@ def _slide_bridge_historique(prs, edm, result: dict, company: str, date_str: str
     _header_band(slide, header_txt, company)
 
     # ── Title ─────────────────────────────────────────────────────────────────
+    # mn4 fix: _fmt_chart arrondissait 2,165M et 2,242M tous les deux à "+2,2M€"
+    # → subtitle affichait "normatif (+2,2M€) à actuel (+2,2M€)" (valeurs identiques).
+    # Forcer le format K€ pour que les deux bornes soient distinguables.
+    def _fmt_ke(v: float) -> str:
+        sign = "+" if v >= 0 else ""
+        return f"{sign}{int(round(v / 1_000)):,}K€".replace(",", " ")
     _slide_title(slide, slide_ttl,
-                 f"Exercice {year_n} — de l'EBITDA normatif ({_fmt_chart(ebitda_norm)}) "
-                 f"à la situation actuelle ({_fmt_chart(ebitda_actuel)})")
+                 f"Exercice {year_n} — de l'EBITDA normatif ({_fmt_ke(ebitda_norm)}) "
+                 f"à la situation actuelle ({_fmt_ke(ebitda_actuel)})")
 
     # ── Items ─────────────────────────────────────────────────────────────────
     def _short(txt, n=26):
@@ -2064,11 +2077,12 @@ def _slide_priorites(prs, edm, result: dict, company: str, date_str: str, page: 
     ]
 
     decisions = edm.executive_decisions
-    # Dynamic threshold: "high impact" = at least 50% of the biggest decision OR 50 K€ minimum.
-    # Avoids classifying all decisions as "low impact" when the company is a small/mid-sized PME
-    # whose biggest lever is well below the hard-coded 200 K€ guard.
+    # Dynamic threshold: "high impact" = at least 15% of the biggest decision OR 10 K€ minimum.
+    # mn3 fix: seuil abaissé de 50% à 15% — avec D1=119K et D2=20K, un seuil à 50%
+    # (59.5K) classe D2 en "impact faible" alors que 20K€/an garanti en 1 semaine est
+    # objectivement significatif. À 15% (17.85K), D2 bascule correctement en "impact élevé".
     _max_impact = max((abs(d.annual_impact or 0) for d in decisions), default=1)
-    _high_impact_threshold = max(50_000, _max_impact * 0.5)
+    _high_impact_threshold = max(10_000, _max_impact * 0.15)
     q_items: list = [[], [], [], []]
     for dec in decisions:
         high_impact = dec.annual_impact and abs(dec.annual_impact) >= _high_impact_threshold
