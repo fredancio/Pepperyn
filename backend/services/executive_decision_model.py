@@ -381,9 +381,6 @@ def build_executive_decision_model(result: dict) -> ExecutiveDecisionModel:
     available_cash = _find_dashboard_value(raw_dashboard, "cash")
     total_revenue = parse_amount_eur(_find_dashboard_value(raw_dashboard, "chiffre d'affaires", "ca total"))
 
-    global_impact = parse_amount_eur(result.get("impact_financier_synthese"))
-    cost_of_inaction = compute_cost_of_inaction(global_impact)
-
     executive_decisions = _build_executive_decisions(result.get("quick_wins") or [])
     executive_decisions_score = (
         round(sum(d.roi_score for d in executive_decisions) / len(executive_decisions), 1)
@@ -398,6 +395,14 @@ def build_executive_decision_model(result: dict) -> ExecutiveDecisionModel:
         total_revenue,
     )
 
+    # COI = somme des impacts absolus des leviers identifiés (valeur sous-optimisée)
+    # C'est le coût d'opportunité réel, pas le montant de la trésorerie.
+    # Fallback sur impact_financier_synthese si aucun levier n'est disponible.
+    destroyers_total = sum(abs(v.annual_impact or 0) for v in value_destroyers)
+    global_impact_fallback = parse_amount_eur(result.get("impact_financier_synthese"))
+    coi_base = destroyers_total if destroyers_total > 0 else global_impact_fallback
+    cost_of_inaction = compute_cost_of_inaction(coi_base)
+
     roadmap_90_days = _build_roadmap_90_days(result.get("plan_action_30_60_90") or [])
     execution_log = sorted(
         (action for phase in roadmap_90_days for action in phase.actions),
@@ -405,8 +410,13 @@ def build_executive_decision_model(result: dict) -> ExecutiveDecisionModel:
         reverse=True,
     )
 
-    action_series, do_nothing_series = _build_simulation_series(global_impact)
-    monthly_projection = build_monthly_series(0.0, global_impact, 12) if global_impact is not None else []
+    # Séries temporelles basées sur l'impact NET des décisions (pas le COI)
+    # → action = gain si toutes les décisions sont exécutées
+    # → inaction = perte d'opportunité symétrique
+    decisions_net = sum((d.annual_impact or 0) for d in executive_decisions)
+    series_base = decisions_net if decisions_net != 0 else coi_base
+    action_series, do_nothing_series = _build_simulation_series(series_base)
+    monthly_projection = build_monthly_series(0.0, series_base, 12) if series_base is not None else []
 
     return ExecutiveDecisionModel(
         executive_decision=executive_decision,

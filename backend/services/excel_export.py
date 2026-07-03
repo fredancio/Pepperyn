@@ -139,16 +139,20 @@ def _parse_eur(s: Optional[str]) -> float:
     """Parses a monetary string to float.
 
     Handles:
-      '1 800 000 €'                       → 1_800_000.0
-      '1.2M €'                            → 1_200_000.0
-      '**-240 000 €** (marge : -2,9 %)'  → -240_000.0  (markdown + parenthetical)
+      '1 800 000 €'                        → 1_800_000.0
+      '1.2M €'                             → 1_200_000.0
+      '**-240 000 €** (marge : -2,9 %)'   → -240_000.0  (markdown + parenthetical)
+      '2 242 000 € — 18,2%'               → 2_242_000.0  (em-dash annotation)
     """
     if not s:
         return 0.0
+    s = str(s)
     # Strip markdown bold/italic markers (** or *)
-    s = re.sub(r"\*+", "", str(s))
+    s = re.sub(r"\*+", "", s)
     # Remove parenthetical annotations e.g. "(marge EBITDA : -2,9 %)"
     s = re.sub(r"\([^)]*\)", "", s)
+    # Remove em-dash / en-dash annotations e.g. "— 18,2%" or "– note"
+    s = re.sub(r"[—–]\s*.*$", "", s)
     c = re.sub(r"[€\s]", "", s).replace(",", ".").strip()
     try:
         if c.upper().endswith("M"):
@@ -158,6 +162,13 @@ def _parse_eur(s: Optional[str]) -> float:
         return float(c)
     except (ValueError, TypeError):
         return 0.0
+
+
+def _strip_md(text: Optional[str]) -> str:
+    """Strip markdown bold/italic markers from a string (for Excel cell values)."""
+    if not text:
+        return ""
+    return re.sub(r"\*+", "", str(text)).strip()
 
 
 # ─── Primitives de style ──────────────────────────────────────────────────────
@@ -348,7 +359,7 @@ def _build_edm(wb: Workbook, edm, raw: dict) -> None:
         (EDM_R_COI_DAY,   "Coût de l'inaction / jour",  (coi.per_day or 0) if coi else 0),
         (EDM_R_COI_HOUR,  "Coût de l'inaction / heure", (coi.per_hour or 0) if coi else 0),
         (EDM_R_IMPACT,    "Impact total identifié",
-         -sum(abs(d.annual_impact or 0) for d in edm.value_destroyers)),
+         sum(abs(d.annual_impact or 0) for d in edm.value_destroyers)),
     ]
     for r, label, val in global_rows:
         ws.cell(row=r, column=1, value=label).font = _font(color=P_GRAY)
@@ -359,7 +370,7 @@ def _build_edm(wb: Workbook, edm, raw: dict) -> None:
     _col_headers(ws, dh, ["Levier de destruction", "Impact annuel (€)", "Impact mensuel (€)", "Tendance", "Commentaire"])
     for i, d in enumerate(edm.value_destroyers[:MAX_DEC]):
         r = dh + 1 + i
-        ws.cell(row=r, column=1, value=d.name)
+        ws.cell(row=r, column=1, value=_strip_md(d.name))
         ws.cell(row=r, column=2, value=d.annual_impact or 0)
         ws.cell(row=r, column=3, value=d.monthly_impact or 0)
         ws.cell(row=r, column=4, value=d.trend or "stable")
@@ -371,7 +382,7 @@ def _build_edm(wb: Workbook, edm, raw: dict) -> None:
                              "Horizon", "Responsable", "Priorité", "ROI score"])
     for i, dec in enumerate(edm.executive_decisions[:MAX_DEC]):
         r = EDM_R_DEC_START + i
-        ws.cell(row=r, column=1, value=dec.decision)
+        ws.cell(row=r, column=1, value=_strip_md(dec.decision))
         ws.cell(row=r, column=2, value=dec.annual_impact or 0)
         ws.cell(row=r, column=3, value=dec.difficulty or "—")
         ws.cell(row=r, column=4, value=dec.timeline or "—")
@@ -820,7 +831,7 @@ def _build_decision_lab(wb: Workbook, edm, result_dict: dict | None = None) -> N
         c.border = _border_thin()
         c.alignment = _align("center")
 
-        dec_text = dec.decision if dec else "[Décision disponible]"
+        dec_text = _strip_md(dec.decision) if dec else "[Décision disponible]"
         c = ws.cell(row=r, column=2, value=dec_text)
         c.font = _font(color=P_DARK if dec else P_SLATE,
                        italic=not dec, bold=bool(dec))

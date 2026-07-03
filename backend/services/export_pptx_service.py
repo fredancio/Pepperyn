@@ -2055,9 +2055,14 @@ def _slide_priorites(prs, edm, result: dict, company: str, date_str: str, page: 
     ]
 
     decisions = edm.executive_decisions
+    # Dynamic threshold: "high impact" = at least 50% of the biggest decision OR 50 K€ minimum.
+    # Avoids classifying all decisions as "low impact" when the company is a small/mid-sized PME
+    # whose biggest lever is well below the hard-coded 200 K€ guard.
+    _max_impact = max((abs(d.annual_impact or 0) for d in decisions), default=1)
+    _high_impact_threshold = max(50_000, _max_impact * 0.5)
     q_items: list = [[], [], [], []]
     for dec in decisions:
-        high_impact = dec.annual_impact and abs(dec.annual_impact) > 200_000
+        high_impact = dec.annual_impact and abs(dec.annual_impact) >= _high_impact_threshold
         dif = (dec.difficulty or "").lower()
         # Effort élevé = explicitement fort/élevé/high/difficile
         high_effort = any(w in dif for w in ("élevé", "eleve", "high", "fort", "difficile"))
@@ -2353,7 +2358,7 @@ def _slide_annexe(prs, edm, result: dict, company: str, date_str: str, page: int
     _rect(slide, lx1, col_top, col_w, col_h, fill_color=_rgb("F5F8FF"), line_color=BLUE)
     _text(slide, "QUALITÉ DES DONNÉES", lx1 + Inches(0.1), col_top + Inches(0.1),
           col_w - Inches(0.2), Inches(0.4), size=11, bold=True, color=BLUE)
-    _text(slide, f"Score de confiance : {score_data}%",
+    _text(slide, f"Score qualité données : {score_data}%",
           lx1 + Inches(0.1), col_top + Inches(0.6), col_w - Inches(0.2), Inches(0.4),
           size=16, bold=True, color=NAVY)
     ay = col_top + Inches(1.1)

@@ -139,10 +139,16 @@ def _parse_float(s) -> Optional[float]:
 
 
 def _rl(text: str) -> str:
-    """Échappe le HTML pour ReportLab et convertit le markdown basique."""
+    """Échappe le HTML pour ReportLab et convertit le markdown basique.
+
+    Strips any raw HTML tags first (LLM may output <b>...</b> or <i>...</i>
+    literals that ReportLab would not render and that look like broken markup).
+    """
     if not text:
         return ""
     text = text.strip()
+    # Strip raw HTML tags before escaping — prevents <b>foo</b> from rendering as literal text
+    text = re.sub(r"<[^>]+>", "", text)
     text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
     text = re.sub(r"\*(.+?)\*", r"<i>\1</i>", text)
@@ -1340,11 +1346,10 @@ def _build_page_value_creation(edm, result: dict, styles: dict) -> list:
     s.append(_sp(7))
 
     decisions = edm.executive_decisions[:10]
-    total_ann = sum(
-        abs(d.annual_impact) for d in decisions if d.annual_impact
-    )
+    # Use signed sum so negative-impact decisions reduce the total (e.g. opportunity cost decisions)
+    total_ann = sum(d.annual_impact for d in decisions if d.annual_impact)
 
-    # Hero : total impact si toutes les décisions exécutées
+    # Hero : total impact net si toutes les décisions exécutées
     if total_ann:
         hero_text = _fmt_auto(total_ann)
         inner = Table([
@@ -1378,7 +1383,7 @@ def _build_page_value_creation(edm, result: dict, styles: dict) -> list:
         data = [[Paragraph(h, styles["tbl_hdr"]) for h in headers]]
 
         for dec in decisions:
-            ann_str = _fmt_eur(abs(dec.annual_impact)) if dec.annual_impact else "—"
+            ann_str = _fmt_eur(dec.annual_impact, sign=True) if dec.annual_impact else "—"
             roi_str = f"{dec.roi_score:.1f}/10" if dec.roi_score else "—"
             timeline = dec.timeline or "—"
             data.append([
