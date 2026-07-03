@@ -2398,7 +2398,7 @@ def _slide_annexe(prs, edm, result: dict, company: str, date_str: str, page: int
         "Accompagnement sur 90 jours pour l'implémentation.",
         "Révision bimensuelle des indicateurs de pilotage.",
         "Adaptation du plan en cas de changement de contexte.",
-        "Disponibilité directe : equipe@pepperyn.fr",
+        "Disponibilité directe : info@finflate.com",
     ]
     ey = col_top + Inches(0.6)
     for e in engagements:
