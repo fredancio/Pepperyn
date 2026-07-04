@@ -845,13 +845,14 @@ def _build_page_capital(edm, result: dict, styles: dict) -> list:
     n_destr        = len(destroyers)
 
     # Diagnostic factuel
+    # A fix: ne pas préfixer avec le texte LLM (impact_financier_synthese / phrase_tension)
+    # car il contient des approximations incorrectes (~136 K€) vs le COI réel calculé par l'EDM.
     if total_ann and n_destr:
         cop2_insight = (
-            f"{structural_p2 or phrase_tens_p2}  "
             f"Ces {n_destr} leviers concentrent {_fmt_eur(total_ann)} de valeur sous-employée "
             f"— soit {_fmt_eur(total_monthly)} par mois qui n'entrent pas dans les comptes "
             f"et n'apparaissent dans aucun tableau de bord standard."
-        ).strip()
+        )
     else:
         cop2_insight = structural_p2 or phrase_tens_p2 or ""
 
@@ -944,6 +945,12 @@ def _build_page_coi(edm, result: dict, styles: dict) -> list:
     monthly_p3 = _fmt_eur(abs(coi_p3.per_month) if coi_p3 and coi_p3.per_month else None)
     weekly_p3  = _fmt_eur(abs(coi_p3.per_week)  if coi_p3 and coi_p3.per_week  else None)
     daily_p3   = _fmt_eur(abs(coi_p3.per_day)   if coi_p3 and coi_p3.per_day   else None)
+
+    # A fix: corriger les montants approximatifs du LLM (ex: ~136 K€) par la valeur EDM réelle.
+    import re as _re_coi
+    if risque_p3 and coi_p3 and coi_p3.per_year:
+        _coi_ke = f"{int(round(abs(coi_p3.per_year) / 1_000))} K€"
+        risque_p3 = _re_coi.sub(r'~\s*\d[\d\s]*\s*K€', f'~{_coi_ke}', risque_p3)
 
     cop3_insight = (
         f"Ces chiffres ne sont pas des projections : ils sont calculés mécaniquement "
@@ -1418,10 +1425,9 @@ def _build_page_value_creation(edm, result: dict, styles: dict) -> list:
     total_monthly_p6 = _fmt_eur(total_ann / 12) if total_ann else None
 
     cop6_insight_base = value_creation_statement or vc_stmt or ""
-    cop6_insight = (
-        f"{cop6_insight_base}  "
-        f"Ce potentiel est calculé sur la base des données transmises — sans extrapolation ni hypothèse macro."
-    ).strip() if cop6_insight_base else ""
+    # A fix: ne pas préfixer avec le texte LLM (value_creation_statement / creation_destruction_valeur)
+    # car il contient des approximations incorrectes (~136 K€) vs le total decisions EDM (93 K€ ici).
+    cop6_insight = "Ce potentiel est calculé sur la base des données transmises — sans extrapolation ni hypothèse macro."
 
     cop6_hyp = (
         f"Pepperyn anticipe que ce potentiel est cumulatif : chaque décision non exécutée soustrait "

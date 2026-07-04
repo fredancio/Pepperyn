@@ -677,6 +677,11 @@ def _slide_cout_inaction(prs, edm, result: dict, company: str, date_str: str, pa
               size=10, color=GRAY)
 
     risque = result.get("risque_inaction") or ""
+    # A fix: remplacer les montants approximatifs LLM (~136 K€ etc.) par la valeur EDM réelle (COI/an).
+    if risque and coi and coi.per_year:
+        import re as _re_r
+        _coi_ke = f"{int(round(abs(coi.per_year) / 1_000))} K€"
+        risque = _re_r.sub(r'~\s*\d[\d\s]*\s*K€', f'~{_coi_ke}', risque)
     if risque:
         _rect(slide, ML, MT + Inches(3.35), CW, Inches(0.72),
               fill_color=_rgb("F5F8FF"), line_color=LGRAY)
@@ -2152,12 +2157,34 @@ def _slide_suivi(prs, edm, result: dict, company: str, date_str: str, page: int)
     exec_items = edm.execution_log or []
     decisions = edm.executive_decisions
     rows = []
-    if exec_items:
+    # B+C fix: le carnet utilisait exec_items (actions LLM) dont l'impact peut être négatif
+    # (B: -119 000 € au lieu de +119 000 €) et le ROI calculé sans difficulté (C: 0.3 au lieu de 0.5).
+    # Solution: itérer sur les phases roadmap (30→60→90j) pour le texte/dates, mais utiliser
+    # les décisions EDM (par position) pour l'impact et le ROI — valeurs toujours cohérentes.
+    if decisions and edm.roadmap_90_days:
+        dec_list = list(decisions)
+        dec_index = 0
+        for phase in sorted(edm.roadmap_90_days, key=lambda p: int(str(p.horizon))):
+            for action in (phase.actions or [])[:3]:
+                if dec_index < len(dec_list):
+                    dec = dec_list[dec_index]
+                    rows.append([
+                        _sm(action.decision), action.owner or dec.owner or "Direction",
+                        action.due_date or "—", action.status or dec.status or "À lancer",
+                        _fmt_auto(dec.annual_impact) if dec.annual_impact else "—",
+                        f"{dec.roi_score:.1f}/10",
+                    ])
+                    dec_index += 1
+                if len(rows) >= 8:
+                    break
+            if len(rows) >= 8:
+                break
+    elif exec_items:
         for item in exec_items[:8]:
             rows.append([
                 _sm(item.decision), item.owner or "Direction",
                 item.due_date or "—", item.status or "À lancer",
-                _fmt_auto(item.impact) if item.impact else "—",
+                _fmt_auto(abs(item.impact)) if item.impact else "—",
                 f"{item.roi_score:.1f}/10",
             ])
     elif decisions:
