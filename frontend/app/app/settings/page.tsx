@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { signOutAdmin, getCurrentAuthMode } from '@/lib/auth';
-import { updatePin } from '@/lib/api';
+import { updatePin, fetchBillingUsage, type BillingUsage } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
@@ -28,8 +28,15 @@ export default function SettingsPage() {
   const [pinSuccess, setPinSuccess] = useState('');
   const [savingPin, setSavingPin] = useState(false);
 
-  // Analytics state
-  const [analysisCount] = useState<number>(0);
+  // Billing state (données réelles depuis l'API)
+  const [billingUsage, setBillingUsage] = useState<BillingUsage | null>(null);
+
+  // Send PIN by email state
+  const [showSendPinModal, setShowSendPinModal] = useState(false);
+  const [sendPinEmail, setSendPinEmail] = useState('');
+  const [sendingPin, setSendingPin] = useState(false);
+  const [sendPinSuccess, setSendPinSuccess] = useState('');
+  const [sendPinError, setSendPinError] = useState('');
 
   // Delete account state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -44,6 +51,9 @@ export default function SettingsPage() {
         return;
       }
       await loadProfile();
+      // Charger les vraies données d'utilisation depuis l'API
+      const usage = await fetchBillingUsage();
+      if (usage) setBillingUsage(usage);
     }
     init();
   }, [router]);
@@ -92,6 +102,36 @@ export default function SettingsPage() {
       setPinError(err instanceof Error ? err.message : 'Erreur lors de la mise à jour du PIN');
     } finally {
       setSavingPin(false);
+    }
+  };
+
+  const handleSendPinByEmail = async () => {
+    if (!sendPinEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sendPinEmail)) {
+      setSendPinError('Adresse email invalide');
+      return;
+    }
+    setSendingPin(true);
+    setSendPinError('');
+    setSendPinSuccess('');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/auth/send-pin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': session?.access_token ? `Bearer ${session.access_token}` : '',
+        },
+        body: JSON.stringify({ recipient_email: sendPinEmail }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.detail || "Erreur lors de l'envoi");
+      setSendPinSuccess(`PIN envoyé à ${sendPinEmail}`);
+      setSendPinEmail('');
+      setTimeout(() => { setShowSendPinModal(false); setSendPinSuccess(''); }, 2500);
+    } catch (err) {
+      setSendPinError(err instanceof Error ? err.message : 'Erreur lors de l\'envoi');
+    } finally {
+      setSendingPin(false);
     }
   };
 
@@ -243,22 +283,29 @@ export default function SettingsPage() {
               )}
             </div>
 
-            {/* Usage stats */}
+            {/* Usage stats — données réelles depuis /api/billing/usage */}
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-[#EFF6FF] rounded-xl p-4 text-center">
-                <p className="text-2xl font-extrabold text-[#1B73E8]">{company?.analyses_restantes ?? '—'}</p>
+                <p className="text-2xl font-extrabold text-[#1B73E8]">
+                  {billingUsage ? billingUsage.analyses_remaining : (company?.analyses_restantes ?? '—')}
+                </p>
                 <p className="text-xs text-[#5F6368] mt-0.5">Analyses restantes</p>
               </div>
               <div className="bg-[#EFF6FF] rounded-xl p-4 text-center">
-                <p className="text-2xl font-extrabold text-[#1B73E8]">{company?.analyses_totales_effectuees ?? analysisCount}</p>
-                <p className="text-xs text-[#5F6368] mt-0.5">Analyses réalisées</p>
+                <p className="text-2xl font-extrabold text-[#1B73E8]">
+                  {billingUsage ? billingUsage.analyses_used : (company?.analyses_totales_effectuees ?? '—')}
+                </p>
+                <p className="text-xs text-[#5F6368] mt-0.5">
+                  Analyses réalisées
+                  {billingUsage?.analyses_limit ? <span className="text-[#1B73E8]/60"> / {billingUsage.total_allowed}</span> : null}
+                </p>
               </div>
             </div>
           </div>
         </section>
 
-        {/* PIN management */}
-        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {/* PIN management — visible uniquement sur les plans payants */}
+        {company?.plan !== 'free' && <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
             <h2 className="font-semibold text-[#1A1A2E] flex items-center gap-2">
               <svg className="w-4 h-4 text-[#1B73E8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -308,7 +355,7 @@ export default function SettingsPage() {
               </div>
             )}
 
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <Button
                 variant="secondary"
                 size="sm"
@@ -324,6 +371,16 @@ export default function SettingsPage() {
                 Copier
               </Button>
               <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => { setShowSendPinModal(true); setSendPinError(''); setSendPinSuccess(''); setSendPinEmail(''); }}
+              >
+                <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Envoyer par email
+              </Button>
+              <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => { setShowChangePinModal(true); setPinError(''); setNewPin(''); setConfirmPin(''); }}
@@ -334,8 +391,33 @@ export default function SettingsPage() {
                 Changer le PIN
               </Button>
             </div>
+
+            {/* Modal envoyer PIN par email */}
+            {showSendPinModal && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+                  <h3 className="font-bold text-[#1A1A2E] mb-1">Envoyer le PIN par email</h3>
+                  <p className="text-xs text-[#5F6368] mb-4">Le destinataire recevra le code pour se connecter sans créer de compte.</p>
+                  <Input
+                    type="email"
+                    placeholder="adresse@entreprise.com"
+                    value={sendPinEmail}
+                    onChange={(e) => setSendPinEmail(e.target.value)}
+                    className="mb-3"
+                  />
+                  {sendPinError && <p className="text-xs text-red-500 mb-2">{sendPinError}</p>}
+                  {sendPinSuccess && <p className="text-xs text-green-600 mb-2">{sendPinSuccess}</p>}
+                  <div className="flex gap-2">
+                    <Button variant="secondary" size="sm" onClick={() => setShowSendPinModal(false)} className="flex-1">Annuler</Button>
+                    <Button size="sm" onClick={handleSendPinByEmail} disabled={sendingPin} className="flex-1">
+                      {sendingPin ? 'Envoi...' : 'Envoyer'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        </section>
+        </section>}
 
         {/* Danger zone */}
         <section className="bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden">

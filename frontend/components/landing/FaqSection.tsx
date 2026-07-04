@@ -272,7 +272,12 @@ const faqs: FaqItem[] = [
   },
   {
     question: 'Mes données financières sont-elles sécurisées ?',
-    answer: "Oui. Vos fichiers sources (Excel, CSV, PDF) ne sont jamais stockés sur nos serveurs : ils sont traités en mémoire et immédiatement supprimés après analyse. Vos résultats d'analyse sont conservés dans votre espace sécurisé pour alimenter votre historique, et définitivement effacés si vous supprimez votre compte.",
+    answer: (
+      <div className="text-[#5F6368] leading-relaxed text-sm flex flex-col gap-3">
+        <p>Oui. Vos fichiers sources (Excel, CSV, …) ne sont jamais stockés sur nos serveurs : ils sont traités en mémoire et immédiatement supprimés après analyse. Vos résultats d&apos;analyse sont conservés dans votre espace sécurisé pour alimenter votre historique, et définitivement effacés si vous supprimez votre compte.</p>
+        <a href="/legal/donnees-securisees" className="text-[#1B73E8] font-medium hover:underline w-fit">En savoir plus sur notre politique de sécurité →</a>
+      </div>
+    ),
   },
   {
     question: "Combien d'analyses puis-je faire gratuitement ?",
