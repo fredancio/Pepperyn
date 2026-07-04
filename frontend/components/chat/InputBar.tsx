@@ -202,7 +202,7 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
                 </p>
                 <div className="flex gap-1.5 flex-wrap">
                   {([
-                    { preset: 'end_year' as TargetPreset, label: `Fin ${currentYear}` },
+                    { preset: 'end_year' as TargetPreset, label: 'Fin d\'année' },
                     { preset: 'plus_6m'  as TargetPreset, label: '+6 mois' },
                     { preset: 'plus_12m' as TargetPreset, label: '+12 mois' },
                     { preset: 'custom'   as TargetPreset, label: 'Date libre' },
@@ -355,7 +355,7 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
               </button>
               <span className="text-xs text-[#5F6368] self-center ml-2 mr-1">Objectif :</span>
               {([
-                { preset: 'end_year' as TargetPreset, label: `Fin ${currentYear}` },
+                { preset: 'end_year' as TargetPreset, label: 'Fin d\'année' },
                 { preset: 'plus_6m'  as TargetPreset, label: '+6m' },
                 { preset: 'plus_12m' as TargetPreset, label: '+12m' },
                 { preset: 'custom'   as TargetPreset, label: '📅' },
