@@ -253,13 +253,13 @@ export function ChatContainer() {
   }, [sessionId, analysisReceived, plan, questionsPostAnalysis]);
 
   // Upload en attente d'un bilan pré-analyse (mémoire décisionnelle).
-  const pendingUploadRef = useRef<{ file: File; context: string; mode: 'quick' | 'complete' } | null>(null);
+  const pendingUploadRef = useRef<{ file: File; context: string; mode: 'quick' | 'complete'; analysisPeriodMonths: number; targetDate: string } | null>(null);
 
   // Anti-doublon : ensemble des analyse_id ayant déjà reçu le message d'accueil V2.
   // Évite les injections multiples en cas de re-render ou de re-montage.
   const openingShownRef = useRef<Set<string>>(new Set());
 
-  const proceedWithUpload = useCallback(async (file: File, context: string, mode: 'quick' | 'complete') => {
+  const proceedWithUpload = useCallback(async (file: File, context: string, mode: 'quick' | 'complete', analysisPeriodMonths = 12, targetDate = '') => {
     const userMsg = makeLocalMessage('user', `📎 ${file.name}${context ? `\n\nContexte : ${context}` : ''}`, 'file');
     // Remplacer le message d'accueil par "Analyse en cours." pendant le traitement
     setMessages(prev => prev.map((m, i) =>
@@ -270,7 +270,7 @@ export function ChatContainer() {
     setIsTyping(true);
 
     try {
-      const result = await analyzeFile(file, context, mode, sessionId, selectedEntityId || undefined);
+      const result = await analyzeFile(file, context, mode, sessionId, selectedEntityId || undefined, analysisPeriodMonths, targetDate);
       if (result.session_id) setSessionId(result.session_id);
 
       if (result.message) {
@@ -341,7 +341,7 @@ export function ChatContainer() {
     const pending = pendingUploadRef.current;
     pendingUploadRef.current = null;
     if (pending) {
-      void proceedWithUpload(pending.file, pending.context, pending.mode);
+      void proceedWithUpload(pending.file, pending.context, pending.mode, pending.analysisPeriodMonths, pending.targetDate);
     }
   }, [proceedWithUpload]);
 
@@ -358,7 +358,7 @@ export function ChatContainer() {
     void handleSendMessage(text);
   }, [handleSendMessage]);
 
-  const handleSendFile = useCallback(async (file: File, context: string, mode: 'quick' | 'complete') => {
+  const handleSendFile = useCallback(async (file: File, context: string, mode: 'quick' | 'complete', analysisPeriodMonths = 12, targetDate = '') => {
     // Check question limit for free plan
     if (analysisReceived && plan === 'free' && questionsPostAnalysis >= MAX_CHAT_QUESTIONS_FREE) {
       const limitMsg = makeLocalMessage('assistant', LIMIT_MESSAGE, 'text');
@@ -378,14 +378,14 @@ export function ChatContainer() {
           recommendations: previous.recommendations,
         });
         setMessages(prev => [...prev, checkinMsg]);
-        pendingUploadRef.current = { file, context, mode };
+        pendingUploadRef.current = { file, context, mode, analysisPeriodMonths, targetDate };
         return;
       }
     } catch {
       // en cas d'erreur, on ne bloque pas l'analyse
     }
 
-    await proceedWithUpload(file, context, mode);
+    await proceedWithUpload(file, context, mode, analysisPeriodMonths, targetDate);
   }, [analysisReceived, plan, questionsPostAnalysis, proceedWithUpload]);
 
   const handleSignOut = async () => {

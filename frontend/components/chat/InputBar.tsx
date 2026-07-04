@@ -5,7 +5,7 @@ import { GuidedOnboarding } from './GuidedOnboarding';
 
 interface InputBarProps {
   onSendMessage: (text: string) => void;
-  onSendFile: (file: File, context: string, mode: 'quick' | 'complete') => void;
+  onSendFile: (file: File, context: string, mode: 'quick' | 'complete', analysisPeriodMonths: number, targetDate: string) => void;
   disabled?: boolean;
   placeholder?: string;
   uploadOnly?: boolean;
@@ -13,14 +13,42 @@ interface InputBarProps {
   plan?: string;
 }
 
+type TargetPreset = 'end_year' | 'plus_6m' | 'plus_12m' | 'custom';
+
+function computeTargetDate(preset: TargetPreset, customDate: string): string {
+  const now = new Date();
+  if (preset === 'end_year') return `${now.getFullYear()}-12-31`;
+  if (preset === 'plus_6m') {
+    const d = new Date(now); d.setMonth(d.getMonth() + 6);
+    return d.toISOString().split('T')[0];
+  }
+  if (preset === 'plus_12m') {
+    const d = new Date(now); d.setFullYear(d.getFullYear() + 1);
+    return d.toISOString().split('T')[0];
+  }
+  // custom — customDate is YYYY-MM, convert to last day of that month
+  if (customDate) {
+    const [y, m] = customDate.split('-').map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    return `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  }
+  return '';
+}
+
 export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, uploadOnly, onFileChange, plan = 'free' }: InputBarProps) {
   const [text, setText] = useState('');
   const [showFileZone, setShowFileZone] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [fileContext, setFileContext] = useState('');
   const [mode, setMode] = useState<'quick' | 'complete'>('complete');
   const [showGuide, setShowGuide] = useState(false);
+  // Période couverte par le fichier (en mois)
+  const [analysisPeriodMonths, setAnalysisPeriodMonths] = useState<number>(12);
+  // Objectif de projection
+  const [targetPreset, setTargetPreset] = useState<TargetPreset>('plus_12m');
+  const [targetCustomDate, setTargetCustomDate] = useState<string>('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const currentYear = new Date().getFullYear();
 
   const handleSendText = () => {
     if (!text.trim() || disabled) return;
@@ -54,14 +82,16 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
 
   const handleSendFile = () => {
     if (!selectedFile || disabled) return;
-    onSendFile(selectedFile, fileContext, mode);
+    const targetDate = computeTargetDate(targetPreset, targetCustomDate);
+    onSendFile(selectedFile, '', mode, analysisPeriodMonths, targetDate);
     setSelectedFile(null);
-    setFileContext('');
+    setTargetPreset('plus_12m');
+    setTargetCustomDate('');
+    setAnalysisPeriodMonths(12);
   };
 
   const handleRemoveFile = () => {
     setSelectedFile(null);
-    setFileContext('');
     onFileChange?.(null);
   };
 
@@ -88,9 +118,10 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
               </div>
             </div>
           ) : (
-            /* File selected — info + context */
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-3 bg-[#EFF6FF] border border-blue-100 rounded-xl px-3 py-2.5">
+            /* File selected — period + target + mode */
+            <div className="p-4 flex flex-col gap-4">
+              {/* File chip */}
+              <div className="flex items-center justify-between bg-[#EFF6FF] border border-blue-100 rounded-xl px-3 py-2.5">
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 bg-[#1B73E8]/10 rounded-lg flex items-center justify-center flex-shrink-0">
                     <svg className="w-4 h-4 text-[#1B73E8]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -108,13 +139,69 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
                   </svg>
                 </button>
               </div>
-              <input
-                type="text"
-                value={fileContext}
-                onChange={e => setFileContext(e.target.value)}
-                placeholder="Contexte optionnel : ex. P&L Q3 2024..."
-                className="w-full text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-[#1A1A2E] placeholder:text-[#5F6368]/60 focus:outline-none focus:ring-1 focus:ring-[#1B73E8] focus:border-[#1B73E8] mb-3"
-              />
+
+              {/* Période couverte */}
+              <div>
+                <p className="text-xs font-semibold text-[#1A1A2E] mb-2">
+                  📅 Vos données couvrent quelle période ?
+                </p>
+                <div className="flex gap-1.5 flex-wrap">
+                  {([1, 3, 6, 9, 12] as const).map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setAnalysisPeriodMonths(m)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                        analysisPeriodMonths === m
+                          ? 'bg-[#1B73E8] border-[#1B73E8] text-white shadow-sm'
+                          : 'bg-white border-gray-200 text-[#5F6368] hover:border-[#1B73E8]/50 hover:text-[#1A1A2E]'
+                      }`}
+                    >
+                      {m === 12 ? '12 mois (année)' : `${m} mois`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Objectif */}
+              <div>
+                <p className="text-xs font-semibold text-[#1A1A2E] mb-2">
+                  🎯 Jusqu&apos;à quand souhaitez-vous projeter vos objectifs ?
+                </p>
+                <div className="flex gap-1.5 flex-wrap">
+                  {([
+                    { preset: 'end_year' as TargetPreset, label: `Fin ${currentYear}` },
+                    { preset: 'plus_6m'  as TargetPreset, label: '+6 mois' },
+                    { preset: 'plus_12m' as TargetPreset, label: '+12 mois' },
+                    { preset: 'custom'   as TargetPreset, label: 'Date libre' },
+                  ]).map(({ preset, label }) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setTargetPreset(preset)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                        targetPreset === preset
+                          ? 'bg-[#1B73E8] border-[#1B73E8] text-white shadow-sm'
+                          : 'bg-white border-gray-200 text-[#5F6368] hover:border-[#1B73E8]/50 hover:text-[#1A1A2E]'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {targetPreset === 'custom' && (
+                  <input
+                    type="month"
+                    value={targetCustomDate}
+                    onChange={e => setTargetCustomDate(e.target.value)}
+                    min={`${currentYear}-01`}
+                    max={`${currentYear + 5}-12`}
+                    className="mt-2 w-full text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[#1A1A2E] focus:outline-none focus:ring-1 focus:ring-[#1B73E8] focus:border-[#1B73E8]"
+                  />
+                )}
+              </div>
+
+              {/* Mode rapide / complet */}
               <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
                 {(['quick', 'complete'] as const).map(m => (
                   <button key={m} onClick={() => setMode(m)}
@@ -221,14 +308,33 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
               </button>
             </div>
 
-            {/* Context input */}
-            <input
-              type="text"
-              value={fileContext}
-              onChange={e => setFileContext(e.target.value)}
-              placeholder="Contexte optionnel : ex. P&L Q3 2024, comparer avec Q2..."
-              className="w-full text-sm bg-white border border-gray-200 rounded-lg px-3 py-2 text-[#1A1A2E] placeholder:text-[#5F6368]/70 focus:outline-none focus:ring-1 focus:ring-[#1B73E8] focus:border-[#1B73E8] mb-3"
-            />
+            {/* Période + Objectif (compact pour le mode conversation) */}
+            <div className="flex flex-wrap gap-1 mb-2">
+              <span className="text-xs text-[#5F6368] self-center mr-1">Période :</span>
+              {([1, 3, 6, 9, 12] as const).map(m => (
+                <button key={m} type="button" onClick={() => setAnalysisPeriodMonths(m)}
+                  className={`px-2 py-0.5 text-xs rounded border transition-all ${analysisPeriodMonths === m ? 'bg-[#1B73E8] border-[#1B73E8] text-white' : 'bg-white border-gray-200 text-[#5F6368]'}`}>
+                  {m === 12 ? '12m' : `${m}m`}
+                </button>
+              ))}
+              <span className="text-xs text-[#5F6368] self-center ml-2 mr-1">Objectif :</span>
+              {([
+                { preset: 'end_year' as TargetPreset, label: `Fin ${currentYear}` },
+                { preset: 'plus_6m'  as TargetPreset, label: '+6m' },
+                { preset: 'plus_12m' as TargetPreset, label: '+12m' },
+                { preset: 'custom'   as TargetPreset, label: '📅' },
+              ]).map(({ preset, label }) => (
+                <button key={preset} type="button" onClick={() => setTargetPreset(preset)}
+                  className={`px-2 py-0.5 text-xs rounded border transition-all ${targetPreset === preset ? 'bg-[#1B73E8] border-[#1B73E8] text-white' : 'bg-white border-gray-200 text-[#5F6368]'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {targetPreset === 'custom' && (
+              <input type="month" value={targetCustomDate} onChange={e => setTargetCustomDate(e.target.value)}
+                min={`${currentYear}-01`} max={`${currentYear + 5}-12`}
+                className="w-full text-xs bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[#1A1A2E] focus:outline-none focus:ring-1 focus:ring-[#1B73E8] mb-2" />
+            )}
 
             {/* Mode toggle + send */}
             <div className="flex items-center justify-between gap-3">

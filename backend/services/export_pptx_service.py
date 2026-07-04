@@ -1695,7 +1695,7 @@ def _slide_bridge_historique(prs, edm, result: dict, company: str, date_str: str
 
 # ─── SLIDE 10b : BRIDGE FINANCIER ────────────────────────────────────────────
 
-def _slide_bridge_financier(prs, edm, result: dict, company: str, date_str: str, page: int):
+def _slide_bridge_financier(prs, edm, result: dict, company: str, date_str: str, page: int, target_date: Optional[str] = None):
     """
     Waterfall / bridge chart  : EBITDA N  →  décisions  →  EBITDA cible N+1.
     Chaque décision apparaît comme une barre verte flottante.
@@ -1768,13 +1768,27 @@ def _slide_bridge_financier(prs, edm, result: dict, company: str, date_str: str,
             line2 = line2[:n - 1].rstrip() + "…"
         return line1, line2
 
+    # Label de la barre "Cible" — utilise target_date si fourni par l'utilisateur
+    if target_date:
+        _td_parts = _re.match(r'(\d{4})-(\d{2})', target_date or "")
+        if _td_parts:
+            _MOIS_NUM = ["Jan.", "Fév.", "Mar.", "Avr.", "Mai", "Juin",
+                         "Juil.", "Août", "Sep.", "Oct.", "Nov.", "Déc."]
+            _td_year  = int(_td_parts.group(1))
+            _td_month = int(_td_parts.group(2))
+            cible_label = f"Cible · {_MOIS_NUM[_td_month - 1]} {_td_year}"
+        else:
+            cible_label = f"Cible · {month_abbr} {year_n1}"
+    else:
+        cible_label = f"Cible · {month_abbr} {year_n1}"
+
     items = [("EBITDA", f"Actuel · {month_abbr} {year_n}", ebitda_start, "anchor")]
     for d in decisions[:5]:
         delta = d.annual_impact or 0
         kind  = "positive" if delta >= 0 else "negative"
         lbl1, lbl2 = _split_label_bf(_sm(d.decision))
         items.append((lbl1, lbl2, delta, kind))
-    items.append(("EBITDA", f"Cible · {month_abbr} {year_n1}", ebitda_end, "anchor"))
+    items.append(("EBITDA", cible_label, ebitda_end, "anchor"))
 
     # ── Layout + shared renderer ──────────────────────────────────────────────
     YLABEL_W = int(Inches(1.20))
@@ -2501,7 +2515,7 @@ def _slide_annexe(prs, edm, result: dict, company: str, date_str: str, page: int
 
 # ─── POINT D'ENTRÉE ───────────────────────────────────────────────────────────
 
-def generate_pptx_report(result: Any, company_name: Optional[str] = None) -> bytes:
+def generate_pptx_report(result: Any, company_name: Optional[str] = None, target_date: Optional[str] = None) -> bytes:
     """
     Génère le Board Deck Pepperyn (16 slides).
 
@@ -2533,6 +2547,12 @@ def generate_pptx_report(result: Any, company_name: Optional[str] = None) -> byt
     prs.slide_width = SW
     prs.slide_height = SH
 
+    import functools as _functools
+    _bridge_financier = (
+        _functools.partial(_slide_bridge_financier, target_date=target_date)
+        if target_date else _slide_bridge_financier
+    )
+
     slides_builders = [
         _slide_cover,                        # S1
         _slide_exec_summary,                 # S2
@@ -2545,7 +2565,7 @@ def generate_pptx_report(result: Any, company_name: Optional[str] = None) -> byt
         _slide_execution,                    # S8
         _slide_simulation,                   # S9
         _slide_bridge_historique,            # S10 — Bridge passé : Normatif → Actuel
-        _slide_bridge_financier,             # S11 — Bridge futur  : Actuel → Cible
+        _bridge_financier,                   # S11 — Bridge futur  : Actuel → Cible
         _slide_projection,                   # S12
         _slide_creation_valeur,              # S12 — Création de valeur (Phase 1 + Phase 2)
         _slide_risques,                      # S12

@@ -58,6 +58,7 @@ _export_format_chosen: dict[str, str] = {}    # analyse_id → "excel"|"pdf"|"pp
 _analysis_result_cache: dict[str, dict] = {}  # analyse_id → result dict (pour PDF/PPTX à la demande)
 _anonymization_cache: dict[str, CorrespondenceTable] = {}  # analyse_id → table de correspondance (jamais envoyée à l'IA)
 _analysis_owner: dict[str, str] = {}          # analyse_id → company_id (contrôle d'accès aux exports)
+_analysis_params_cache: dict[str, dict] = {}  # analyse_id → {target_date, analysis_period_months}
 
 # ── V2 : Executive Case JSON cache ───────────────────────────────────────────
 # Source unique de vérité pour PDF, PPTX et Excel.
@@ -277,6 +278,8 @@ async def analyze_file(
     mode: str = Form(default="complete"),
     session_id: Optional[str] = Form(default=None),
     entity_id: Optional[str] = Form(default=None),
+    analysis_period_months: Optional[int] = Form(default=None),
+    target_date: Optional[str] = Form(default=None),
     authorization: Optional[str] = Header(default=None),
     x_auth_type: Optional[str] = Header(default=None),
 ):
@@ -372,6 +375,8 @@ async def analyze_file(
             start_time=start_time,
             ext=ext,
             quality_gate=quality_gate,
+            analysis_period_months=analysis_period_months,
+            target_date=target_date,
         ),
         media_type="application/json",
     )
@@ -435,6 +440,8 @@ async def _run_analysis_pipeline(
     start_time: float,
     ext: str,
     quality_gate,
+    analysis_period_months: Optional[int] = None,
+    target_date: Optional[str] = None,
 ) -> AnalyzeResponse:
     # Parse file (Step 1: pre-processing, 0 tokens)
     try:
@@ -604,6 +611,12 @@ async def _run_analysis_pipeline(
     # Contrôle d'accès : mémoriser à quelle company appartient cette analyse,
     # pour que seuls ses membres puissent télécharger les exports (anti-IDOR).
     _analysis_owner[analyse_id] = company_id
+
+    # Mémoriser les paramètres de période/objectif pour la génération des exports.
+    _analysis_params_cache[analyse_id] = {
+        "target_date": target_date or "",
+        "analysis_period_months": analysis_period_months or 12,
+    }
 
     # Conserver la table de correspondance (jamais envoyée à l'IA) pour le
     # chat de suivi sur cette analyse.
@@ -1241,7 +1254,9 @@ async def download_pdf(
             executive_case = await _get_or_build_executive_case(
                 analyse_id, result_dict, company_name
             )
-            pdf_bytes = generate_pdf_report(executive_case, company_name=company_name)
+            _params = _analysis_params_cache.get(analyse_id, {})
+            pdf_bytes = generate_pdf_report(executive_case, company_name=company_name,
+                                            target_date=_params.get("target_date") or None)
             _pdf_cache[analyse_id] = pdf_bytes
         except Exception as e:
             logger.error("[ANALYZE] Erreur génération PDF: %s", e)
@@ -1326,7 +1341,9 @@ async def download_pptx(
             executive_case = await _get_or_build_executive_case(
                 analyse_id, result_dict, company_name
             )
-            pptx_bytes = generate_pptx_report(executive_case, company_name=company_name)
+            _params = _analysis_params_cache.get(analyse_id, {})
+            pptx_bytes = generate_pptx_report(executive_case, company_name=company_name,
+                                              target_date=_params.get("target_date") or None)
             _pptx_cache[analyse_id] = pptx_bytes
         except Exception as e:
             logger.error("[ANALYZE] Erreur génération PowerPoint: %s", e)

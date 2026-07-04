@@ -43,7 +43,9 @@ export async function analyzeFile(
   context: string,
   mode: 'quick' | 'complete' = 'complete',
   sessionId?: string,
-  entityId?: string
+  entityId?: string,
+  analysisPeriodMonths?: number,
+  targetDate?: string
 ) {
   const headers = await getAuthHeaders();
   const formData = new FormData();
@@ -52,6 +54,8 @@ export async function analyzeFile(
   formData.append('mode', mode);
   if (sessionId) formData.append('session_id', sessionId);
   if (entityId) formData.append('entity_id', entityId);
+  if (analysisPeriodMonths !== undefined) formData.append('analysis_period_months', String(analysisPeriodMonths));
+  if (targetDate) formData.append('target_date', targetDate);
 
   const res = await fetch(`${API_URL}/api/analyze`, {
     method: 'POST',
