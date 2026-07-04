@@ -43,6 +43,8 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
   const [showGuide, setShowGuide] = useState(false);
   // Période couverte par le fichier (en mois)
   const [analysisPeriodMonths, setAnalysisPeriodMonths] = useState<number>(12);
+  const [isPeriodCustom, setIsPeriodCustom] = useState<boolean>(false);
+  const [periodCustomMonths, setPeriodCustomMonths] = useState<number>(18);
   // Objectif de projection
   const [targetPreset, setTargetPreset] = useState<TargetPreset>('plus_12m');
   const [targetCustomDate, setTargetCustomDate] = useState<string>('');
@@ -88,6 +90,8 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
     setTargetPreset('plus_12m');
     setTargetCustomDate('');
     setAnalysisPeriodMonths(12);
+    setIsPeriodCustom(false);
+    setPeriodCustomMonths(18);
   };
 
   const handleRemoveFile = () => {
@@ -146,13 +150,13 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
                   📅 Vos données couvrent quelle période ?
                 </p>
                 <div className="flex gap-1.5 flex-wrap">
-                  {([1, 3, 6, 9, 12] as const).map(m => (
+                  {Array.from({length: 12}, (_, i) => i + 1).map(m => (
                     <button
                       key={m}
                       type="button"
-                      onClick={() => setAnalysisPeriodMonths(m)}
+                      onClick={() => { setIsPeriodCustom(false); setAnalysisPeriodMonths(m); }}
                       className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                        analysisPeriodMonths === m
+                        !isPeriodCustom && analysisPeriodMonths === m
                           ? 'bg-[#1B73E8] border-[#1B73E8] text-white shadow-sm'
                           : 'bg-white border-gray-200 text-[#5F6368] hover:border-[#1B73E8]/50 hover:text-[#1A1A2E]'
                       }`}
@@ -160,7 +164,35 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
                       {m === 12 ? '12 mois (année)' : `${m} mois`}
                     </button>
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => { setIsPeriodCustom(true); setAnalysisPeriodMonths(periodCustomMonths); }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                      isPeriodCustom
+                        ? 'bg-[#1B73E8] border-[#1B73E8] text-white shadow-sm'
+                        : 'bg-white border-gray-200 text-[#5F6368] hover:border-[#1B73E8]/50 hover:text-[#1A1A2E]'
+                    }`}
+                  >
+                    + de 12 mois
+                  </button>
                 </div>
+                {isPeriodCustom && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={13}
+                      max={120}
+                      value={periodCustomMonths}
+                      onChange={e => {
+                        const v = Math.max(13, Math.min(120, Number(e.target.value) || 13));
+                        setPeriodCustomMonths(v);
+                        setAnalysisPeriodMonths(v);
+                      }}
+                      className="w-20 text-sm bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-[#1A1A2E] focus:outline-none focus:ring-1 focus:ring-[#1B73E8] focus:border-[#1B73E8]"
+                    />
+                    <span className="text-xs text-[#5F6368]">mois (ex : 18 = 1 an et demi, 24 = 2 ans…)</span>
+                  </div>
+                )}
               </div>
 
               {/* Objectif */}
@@ -311,12 +343,16 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
             {/* Période + Objectif (compact pour le mode conversation) */}
             <div className="flex flex-wrap gap-1 mb-2">
               <span className="text-xs text-[#5F6368] self-center mr-1">Période :</span>
-              {([1, 3, 6, 9, 12] as const).map(m => (
-                <button key={m} type="button" onClick={() => setAnalysisPeriodMonths(m)}
-                  className={`px-2 py-0.5 text-xs rounded border transition-all ${analysisPeriodMonths === m ? 'bg-[#1B73E8] border-[#1B73E8] text-white' : 'bg-white border-gray-200 text-[#5F6368]'}`}>
-                  {m === 12 ? '12m' : `${m}m`}
+              {Array.from({length: 12}, (_, i) => i + 1).map(m => (
+                <button key={m} type="button" onClick={() => { setIsPeriodCustom(false); setAnalysisPeriodMonths(m); }}
+                  className={`px-2 py-0.5 text-xs rounded border transition-all ${!isPeriodCustom && analysisPeriodMonths === m ? 'bg-[#1B73E8] border-[#1B73E8] text-white' : 'bg-white border-gray-200 text-[#5F6368]'}`}>
+                  {`${m}m`}
                 </button>
               ))}
+              <button type="button" onClick={() => { setIsPeriodCustom(true); setAnalysisPeriodMonths(periodCustomMonths); }}
+                className={`px-2 py-0.5 text-xs rounded border transition-all ${isPeriodCustom ? 'bg-[#1B73E8] border-[#1B73E8] text-white' : 'bg-white border-gray-200 text-[#5F6368]'}`}>
+                +12m
+              </button>
               <span className="text-xs text-[#5F6368] self-center ml-2 mr-1">Objectif :</span>
               {([
                 { preset: 'end_year' as TargetPreset, label: `Fin ${currentYear}` },
@@ -330,6 +366,23 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
                 </button>
               ))}
             </div>
+            {isPeriodCustom && (
+              <div className="flex items-center gap-2 mt-1 mb-1">
+                <input
+                  type="number"
+                  min={13}
+                  max={120}
+                  value={periodCustomMonths}
+                  onChange={e => {
+                    const v = Math.max(13, Math.min(120, Number(e.target.value) || 13));
+                    setPeriodCustomMonths(v);
+                    setAnalysisPeriodMonths(v);
+                  }}
+                  className="w-16 text-xs bg-white border border-gray-200 rounded-lg px-2 py-1 text-[#1A1A2E] focus:outline-none focus:ring-1 focus:ring-[#1B73E8]"
+                />
+                <span className="text-xs text-[#5F6368]">mois</span>
+              </div>
+            )}
             {targetPreset === 'custom' && (
               <input type="month" value={targetCustomDate} onChange={e => setTargetCustomDate(e.target.value)}
                 min={`${currentYear}-01`} max={`${currentYear + 5}-12`}
