@@ -38,6 +38,19 @@ export async function loginWithPin(pin: string) {
   return res.json();
 }
 
+export async function loginWithPinAndEmail(email: string, pin: string) {
+  const res = await fetch(`${API_URL}/api/auth/pin-guest`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, pin }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || 'Email ou code PIN incorrect');
+  }
+  return res.json();
+}
+
 export async function analyzeFile(
   file: File,
   context: string,

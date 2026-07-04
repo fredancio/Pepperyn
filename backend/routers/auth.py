@@ -195,7 +195,93 @@ async def send_pin_by_email(
         log.error(f"[SEND-PIN] Resend error: {e}")
         raise HTTPException(status_code=500, detail="Erreur lors de l'envoi de l'email")
 
+    # Enregistrer l'email dans invited_members (upsert — idempotent)
+    try:
+        supabase.from_("invited_members").upsert(
+            {"company_id": company_id, "email": recipient.lower()},
+            on_conflict="company_id,email",
+        ).execute()
+        log.info(f"[SEND-PIN] {recipient} enregistré dans invited_members pour {company_id}")
+    except Exception as e:
+        log.warning(f"[SEND-PIN] invited_members upsert error (non-bloquant): {e}")
+
     return {"success": True, "message": f"PIN envoyé à {recipient}"}
+
+
+class GuestLoginRequest(BaseModel):
+    email: str
+    pin: str
+
+
+@router.post("/pin-guest", response_model=PinLoginResponse)
+async def login_guest_with_email_and_pin(body: GuestLoginRequest, http_request: Request):
+    """
+    Connexion invité : email + code PIN à 4 chiffres.
+    - Valide le PIN contre la table companies (via RPC existante)
+    - Vérifie que l'email est dans invited_members pour cette company
+    - Retourne un JWT guest valable 8 h
+    Protégé contre le brute-force (même rate-limiter que /pin).
+    """
+    import asyncio
+
+    client_ip = client_ip_from_request(http_request)
+    allowed, retry_after = pin_login_limiter.check(client_ip)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail="Trop de tentatives. Réessayez plus tard.",
+            headers={"Retry-After": str(retry_after)},
+        )
+
+    from main import get_supabase_service
+    supabase = get_supabase_service()
+
+    # Étape 1 — valider le PIN
+    try:
+        result = supabase.rpc("validate_pin", {"input_pin": body.pin}).execute()
+    except Exception as e:
+        import logging as _l
+        _l.getLogger(__name__).error(f"[GUEST-LOGIN] validate_pin error: {e}")
+        raise HTTPException(status_code=500, detail="Erreur serveur. Merci de réessayer.")
+
+    if not result.data:
+        pin_login_limiter.record_failure(client_ip)
+        await asyncio.sleep(0.5)
+        raise HTTPException(status_code=401, detail="Email ou code PIN incorrect")
+
+    company    = result.data[0]
+    company_id = str(company["company_id"])
+    plan       = str(company["plan"])
+
+    # Étape 2 — vérifier que l'email est bien invité pour cette company
+    email_normalized = body.email.strip().lower()
+    try:
+        check = (
+            supabase.from_("invited_members")
+            .select("id")
+            .eq("company_id", company_id)
+            .eq("email", email_normalized)
+            .limit(1)
+            .execute()
+        )
+    except Exception as e:
+        import logging as _l
+        _l.getLogger(__name__).error(f"[GUEST-LOGIN] invited_members check error: {e}")
+        raise HTTPException(status_code=500, detail="Erreur serveur.")
+
+    if not check.data:
+        pin_login_limiter.record_failure(client_ip)
+        await asyncio.sleep(0.5)
+        raise HTTPException(status_code=401, detail="Email ou code PIN incorrect")
+
+    pin_login_limiter.record_success(client_ip)
+
+    guest_token = create_guest_jwt(company_id=company_id, plan=plan)
+    return PinLoginResponse(
+        access_token=guest_token,
+        company_id=company_id,
+        plan=plan,
+    )
 
 
 @router.delete("/account")
