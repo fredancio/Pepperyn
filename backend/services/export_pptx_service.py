@@ -1066,20 +1066,20 @@ def _slide_raisonnement_comparatif(prs, edm, result: dict, company: str, date_st
                 opts_top += opts_h
 
         # Option dominante (si espace disponible)
-        if dominant and opts_top < block_top + block_h - Inches(0.6):
+        if dominant and opts_top < block_top + block_h - Inches(0.75):
             # Fond distinct pour l'option dominante
             dom_top = opts_top + Inches(0.08)
-            dom_h = Inches(0.35)
+            dom_h = Inches(0.65)  # was 0.35 — hauteur pour 2 lignes à 9pt
             dom_bg = slide.shapes.add_shape(1, bx + Inches(0.1), dom_top,
                                             block_w - Inches(0.2), dom_h)
             dom_bg.fill.solid()
             dom_bg.fill.fore_color.rgb = _rgb("0A2540")
             dom_bg.line.fill.background()
 
-            dominant_short = dominant[:140] + "…" if len(dominant) > 140 else dominant
+            dominant_short = dominant[:200] + "…" if len(dominant) > 200 else dominant
             _text(slide, f"✓  {dominant_short}",
-                  bx + Inches(0.18), dom_top + Inches(0.04),
-                  block_w - Inches(0.36), dom_h - Inches(0.08),
+                  bx + Inches(0.18), dom_top + Inches(0.06),
+                  block_w - Inches(0.36), dom_h - Inches(0.10),
                   size=9, bold=True, color=WHITE)
             opts_top = dom_top + dom_h
 
@@ -1592,9 +1592,17 @@ def _slide_bridge_historique(prs, edm, result: dict, company: str, date_str: str
     """
     import re as _re, datetime as _dt
 
-    # ── Année de référence ──────────────────────────────────────────────────────
+    # ── Année + mois de référence ───────────────────────────────────────────────
     _ym = _re.search(r"\b(20\d{2})\b", date_str or "")
     year_n = int(_ym.group(1)) if _ym else _dt.datetime.now().year
+    _MOIS_ABBR = {
+        "janvier": "Jan.", "février": "Fév.", "mars": "Mar.",
+        "avril": "Avr.", "mai": "Mai", "juin": "Juin",
+        "juillet": "Juil.", "août": "Août", "septembre": "Sep.",
+        "octobre": "Oct.", "novembre": "Nov.", "décembre": "Déc.",
+    }
+    month_abbr = next((abbr for m, abbr in _MOIS_ABBR.items()
+                       if m in (date_str or "").lower()), str(year_n))
 
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _footer_band(slide, page, company)
@@ -1645,15 +1653,26 @@ def _slide_bridge_historique(prs, edm, result: dict, company: str, date_str: str
                  f"à la situation actuelle ({_fmt_ke(ebitda_actuel)})")
 
     # ── Items ─────────────────────────────────────────────────────────────────
-    def _short(txt, n=26):
+    def _split_label(txt, n=18):
+        """Découpe un label sur 2 lignes (lbl1, lbl2) au lieu de tronquer avec '…'."""
         txt = _re.split(r"[—\(]", txt)[0].strip()
-        return txt[:n].rstrip() + ("…" if len(txt) > n else "")
+        if len(txt) <= n:
+            return txt, ""
+        split_pos = txt[:n].rfind(" ")
+        if split_pos < 6:
+            split_pos = n
+        line1 = txt[:split_pos].rstrip()
+        line2 = txt[split_pos:].strip()
+        if len(line2) > n:
+            line2 = line2[:n - 1].rstrip() + "…"
+        return line1, line2
 
-    items = [("EBITDA", f"Normatif · {year_n}", ebitda_norm, "anchor")]
+    items = [("EBITDA", f"Normatif · {month_abbr} {year_n}", ebitda_norm, "anchor")]
     for vd in destroyers[:5]:
         delta = vd.annual_impact or 0
-        items.append((_short(_sm(vd.name)), "", delta, "negative" if delta < 0 else "positive"))
-    items.append(("EBITDA", f"Actuel · {year_n}", ebitda_actuel, "anchor"))
+        lbl1, lbl2 = _split_label(_sm(vd.name))
+        items.append((lbl1, lbl2, delta, "negative" if delta < 0 else "positive"))
+    items.append(("EBITDA", f"Actuel · {month_abbr} {year_n}", ebitda_actuel, "anchor"))
 
     # ── Layout + rendu ────────────────────────────────────────────────────────
     YLABEL_W = int(Inches(1.20))
@@ -1684,10 +1703,18 @@ def _slide_bridge_financier(prs, edm, result: dict, company: str, date_str: str,
     """
     import re as _re, datetime as _dt
 
-    # ── Années de référence ───────────────────────────────────────────────────
+    # ── Années + mois de référence ────────────────────────────────────────────
     _ym = _re.search(r"\b(20\d{2})\b", date_str or "")
     year_n  = int(_ym.group(1)) if _ym else _dt.datetime.now().year
     year_n1 = year_n + 1
+    _MOIS_ABBR_BF = {
+        "janvier": "Jan.", "février": "Fév.", "mars": "Mar.",
+        "avril": "Avr.", "mai": "Mai", "juin": "Juin",
+        "juillet": "Juil.", "août": "Août", "septembre": "Sep.",
+        "octobre": "Oct.", "novembre": "Nov.", "décembre": "Déc.",
+    }
+    month_abbr = next((abbr for m, abbr in _MOIS_ABBR_BF.items()
+                       if m in (date_str or "").lower()), str(year_n))
 
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _header_band(slide, "BRIDGE FINANCIER", company)
@@ -1727,16 +1754,27 @@ def _slide_bridge_financier(prs, edm, result: dict, company: str, date_str: str,
 
     # ── Bridge items : [(label_line1, label_line2, delta, kind)] ─────────────
     # kind : "anchor" | "positive" | "negative"
-    def _short(txt, n=22):
+    def _split_label_bf(txt, n=18):
+        """Découpe un label sur 2 lignes (lbl1, lbl2) au lieu de tronquer avec '…'."""
         txt = _re.split(r"[—\(,]", txt)[0].strip()
-        return txt[:n].rstrip() + ("…" if len(txt) > n else "")
+        if len(txt) <= n:
+            return txt, ""
+        split_pos = txt[:n].rfind(" ")
+        if split_pos < 6:
+            split_pos = n
+        line1 = txt[:split_pos].rstrip()
+        line2 = txt[split_pos:].strip()
+        if len(line2) > n:
+            line2 = line2[:n - 1].rstrip() + "…"
+        return line1, line2
 
-    items = [("EBITDA", f"Actuel · {year_n}", ebitda_start, "anchor")]
+    items = [("EBITDA", f"Actuel · {month_abbr} {year_n}", ebitda_start, "anchor")]
     for d in decisions[:5]:
         delta = d.annual_impact or 0
         kind  = "positive" if delta >= 0 else "negative"
-        items.append((_short(_sm(d.decision)), "", delta, kind))
-    items.append(("EBITDA", f"Cible · {year_n1}", ebitda_end, "anchor"))
+        lbl1, lbl2 = _split_label_bf(_sm(d.decision))
+        items.append((lbl1, lbl2, delta, kind))
+    items.append(("EBITDA", f"Cible · {month_abbr} {year_n1}", ebitda_end, "anchor"))
 
     # ── Layout + shared renderer ──────────────────────────────────────────────
     YLABEL_W = int(Inches(1.20))
