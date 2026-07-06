@@ -2513,7 +2513,7 @@ def _build_back_cover(styles: dict) -> list:
 
 # ─── POINT D'ENTRÉE ───────────────────────────────────────────────────────────
 
-def generate_pdf_report(result, company_name: str | None = None) -> bytes:
+def generate_pdf_report(result, company_name: str | None = None, target_date: str | None = None) -> bytes:
     """
     Génère le Rapport exécutif Pepperyn (14 pages — CEO Question Framework v4 + états financiers).
 
