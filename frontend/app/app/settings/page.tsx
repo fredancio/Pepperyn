@@ -177,6 +177,8 @@ export default function SettingsPage() {
   const company = profile?.company;
   const planLabels: Record<string, string> = {
     free: 'Gratuit',
+    pro: 'PRO',
+    scale: 'SCALE',
     standard: 'Standard',
     standard_beta: 'Standard Bêta',
     premium: 'Premium',
@@ -260,6 +262,8 @@ export default function SettingsPage() {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
+                    company?.plan === 'pro'  ? 'bg-blue-100 text-blue-700' :
+                    company?.plan === 'scale' ? 'bg-indigo-100 text-indigo-700' :
                     company?.plan === 'premium' ? 'bg-amber-100 text-amber-700' :
                     company?.plan === 'standard' || company?.plan === 'standard_beta' ? 'bg-blue-100 text-blue-700' :
                     'bg-gray-100 text-[#5F6368]'
@@ -273,7 +277,7 @@ export default function SettingsPage() {
                   )}
                 </div>
                 <p className="text-sm text-[#5F6368]">
-                  {company?.subscription_status === 'active' ? 'Abonnement actif' : 'Plan gratuit'}
+                  {company?.plan && company.plan !== 'free' ? 'Abonnement actif' : 'Plan gratuit'}
                 </p>
               </div>
               {company?.plan === 'free' && (
@@ -458,10 +462,10 @@ export default function SettingsPage() {
           <div className="p-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
-                { label: 'Total analyses', value: company?.analyses_totales_effectuees ?? 0, icon: '📊' },
-                { label: 'Analyses restantes', value: company?.analyses_restantes ?? 0, icon: '🔢' },
-                { label: 'Plan actuel', value: planLabels[company?.plan || 'free'] || '—', icon: '⭐', isText: true },
-                { label: 'Statut', value: company?.subscription_status === 'active' ? 'Actif' : 'Inactif', icon: '✅', isText: true },
+                { label: 'Total analyses', value: billingUsage?.analyses_used ?? '—', icon: '📊' },
+                { label: 'Analyses restantes', value: billingUsage?.analyses_remaining ?? '—', icon: '🔢' },
+                { label: 'Plan actuel', value: planLabels[company?.plan || 'free'] || company?.plan || '—', icon: '⭐', isText: true },
+                { label: 'Statut', value: company?.plan && company.plan !== 'free' ? 'Actif' : 'Gratuit', icon: '✅', isText: true },
               ].map((stat, i) => (
                 <div key={i} className="bg-[#EFF6FF] rounded-xl p-4">
                   <p className="text-xl mb-1">{stat.icon}</p>
@@ -473,20 +477,20 @@ export default function SettingsPage() {
               ))}
             </div>
 
-            {/* Usage bar */}
-            {company?.analyses_restantes !== undefined && company?.analyses_totales_effectuees !== undefined && (
+            {/* Barre de progression — données réelles */}
+            {billingUsage && (
               <div className="mt-5">
                 <div className="flex justify-between text-xs text-[#5F6368] mb-1.5">
                   <span>Analyses utilisées ce mois</span>
-                  <span>
-                    {company.analyses_totales_effectuees} / {company.analyses_totales_effectuees + company.analyses_restantes}
-                  </span>
+                  <span>{billingUsage.analyses_used} / {billingUsage.total_allowed}</span>
                 </div>
                 <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-[#1B73E8] rounded-full transition-all duration-500"
                     style={{
-                      width: `${Math.min(100, (company.analyses_totales_effectuees / (company.analyses_totales_effectuees + company.analyses_restantes)) * 100)}%`
+                      width: `${Math.min(100, billingUsage.total_allowed > 0
+                        ? (billingUsage.analyses_used / billingUsage.total_allowed) * 100
+                        : 0)}%`
                     }}
                   />
                 </div>
