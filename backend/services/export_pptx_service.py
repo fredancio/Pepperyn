@@ -550,8 +550,8 @@ def _slide_dashboard(prs, edm, result: dict, company: str, date_str: str, page: 
                       "données insuf" in str(item.get("value", "")).lower())
         border_c = LGRAY if is_missing else BLUE
         val_c = GRAY if is_missing else RED
-        val = str(item.get("value", "—"))
-        lbl = str(item.get("label", ""))
+        val = _sm(str(item.get("value", "—")))
+        lbl = _sm(str(item.get("label", "")))
         _rect(slide, lx, ly, card_w, card_h, fill_color=_rgb("F5F8FF"), line_color=border_c)
         val_size = 24 if len(val) <= 22 else (18 if len(val) <= 45 else 13)
         _text(slide, val, lx + Inches(0.12), ly + Inches(0.25),
@@ -990,12 +990,17 @@ def _slide_raisonnement_comparatif(prs, edm, result: dict, company: str, date_st
     decisions = edm.executive_decisions
     reasoning_by_idx = {r["decision_index"]: r for r in reasoning_list}
 
-    # Layout : jusqu'à 2 décisions côte à côte ou en colonne selon la disponibilité
-    top_decisions = [r for r in decisions_with_options[:2]]
+    # Layout : jusqu'à 3 décisions côte à côte (1, 2 ou 3 colonnes)
+    top_decisions = [r for r in decisions_with_options[:3]]
     n_blocks = len(top_decisions)
 
     # Largeur et hauteur de chaque bloc
-    block_w = CW if n_blocks == 1 else (CW - Inches(0.15)) / 2
+    if n_blocks == 1:
+        block_w = CW
+    elif n_blocks == 2:
+        block_w = (CW - Inches(0.15)) / 2
+    else:  # 3 blocs
+        block_w = (CW - 2 * Inches(0.15)) / 3
     block_h = CH - Inches(0.82)   # shorter to compensate for later block_top
     block_top = MT + Inches(0.72)  # subtitle ends at MT+0.65" → start after with margin
 
@@ -1593,16 +1598,32 @@ def _slide_bridge_historique(prs, edm, result: dict, company: str, date_str: str
     import re as _re, datetime as _dt
 
     # ── Année + mois de référence ───────────────────────────────────────────────
+    # Priorité : année issue des données (KPI labels) plutôt que date du rapport.
+    # Exemple : données 2019 analysées en juillet 2026 → year_n = 2019, pas 2026.
+    _kpi_year_hist = None
+    for _kpi in (result.get("ceo_dashboard") or []):
+        _kpi_lbl = (_kpi.get("label") if isinstance(_kpi, dict) else getattr(_kpi, "label", "")) or ""
+        _kly = _re.search(r"\b(20\d{2})\b", _kpi_lbl)
+        if _kly:
+            _kpi_year_hist = int(_kly.group(1))
+            break
     _ym = _re.search(r"\b(20\d{2})\b", date_str or "")
-    year_n = int(_ym.group(1)) if _ym else _dt.datetime.now().year
+    year_n = _kpi_year_hist or (int(_ym.group(1)) if _ym else _dt.datetime.now().year)
     _MOIS_ABBR = {
         "janvier": "Jan.", "février": "Fév.", "mars": "Mar.",
         "avril": "Avr.", "mai": "Mai", "juin": "Juin",
         "juillet": "Juil.", "août": "Août", "septembre": "Sep.",
         "octobre": "Oct.", "novembre": "Nov.", "décembre": "Déc.",
     }
-    month_abbr = next((abbr for m, abbr in _MOIS_ABBR.items()
-                       if m in (date_str or "").lower()), str(year_n))
+    # Gérer les dates ISO (YYYY-MM-DD) en plus des dates françaises
+    _iso_m = _re.match(r"\d{4}-(\d{2})-\d{2}", date_str or "")
+    if _iso_m:
+        _MOIS_ISO = ["Jan.", "Fév.", "Mar.", "Avr.", "Mai", "Juin",
+                     "Juil.", "Août", "Sep.", "Oct.", "Nov.", "Déc."]
+        month_abbr = _MOIS_ISO[int(_iso_m.group(1)) - 1]
+    else:
+        month_abbr = next((abbr for m, abbr in _MOIS_ABBR.items()
+                           if m in (date_str or "").lower()), "")
 
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _footer_band(slide, page, company)
@@ -1704,8 +1725,16 @@ def _slide_bridge_financier(prs, edm, result: dict, company: str, date_str: str,
     import re as _re, datetime as _dt
 
     # ── Années + mois de référence ────────────────────────────────────────────
+    # Priorité : année issue des données (KPI labels) plutôt que date du rapport.
+    _kpi_year_bf = None
+    for _kpi in (result.get("ceo_dashboard") or []):
+        _kpi_lbl = (_kpi.get("label") if isinstance(_kpi, dict) else getattr(_kpi, "label", "")) or ""
+        _kly = _re.search(r"\b(20\d{2})\b", _kpi_lbl)
+        if _kly:
+            _kpi_year_bf = int(_kly.group(1))
+            break
     _ym = _re.search(r"\b(20\d{2})\b", date_str or "")
-    year_n  = int(_ym.group(1)) if _ym else _dt.datetime.now().year
+    year_n  = _kpi_year_bf or (int(_ym.group(1)) if _ym else _dt.datetime.now().year)
     year_n1 = year_n + 1
     _MOIS_ABBR_BF = {
         "janvier": "Jan.", "février": "Fév.", "mars": "Mar.",
@@ -1713,8 +1742,15 @@ def _slide_bridge_financier(prs, edm, result: dict, company: str, date_str: str,
         "juillet": "Juil.", "août": "Août", "septembre": "Sep.",
         "octobre": "Oct.", "novembre": "Nov.", "décembre": "Déc.",
     }
-    month_abbr = next((abbr for m, abbr in _MOIS_ABBR_BF.items()
-                       if m in (date_str or "").lower()), str(year_n))
+    # Gérer les dates ISO (YYYY-MM-DD) en plus des dates françaises
+    _iso_m_bf = _re.match(r"\d{4}-(\d{2})-\d{2}", date_str or "")
+    if _iso_m_bf:
+        _MOIS_ISO_BF = ["Jan.", "Fév.", "Mar.", "Avr.", "Mai", "Juin",
+                        "Juil.", "Août", "Sep.", "Oct.", "Nov.", "Déc."]
+        month_abbr = _MOIS_ISO_BF[int(_iso_m_bf.group(1)) - 1]
+    else:
+        month_abbr = next((abbr for m, abbr in _MOIS_ABBR_BF.items()
+                           if m in (date_str or "").lower()), "")
 
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _header_band(slide, "BRIDGE FINANCIER", company)
@@ -1736,9 +1772,8 @@ def _slide_bridge_financier(prs, edm, result: dict, company: str, date_str: str,
     kpi_dash = result.get("ceo_dashboard") or []
     ebitda_start = _parse_kpi(kpi_dash, "ebitda")
     if ebitda_start is None:
-        # Fallback : utiliser le COI mensuel comme proxy de la perte annuelle
-        coi = edm.cost_of_inaction
-        ebitda_start = float(getattr(coi, "per_year", 0) or 0) / 12
+        # EBITDA non calculable (données insuffisantes) → 0, cohérent avec slide 11
+        ebitda_start = 0.0
 
     decisions = edm.executive_decisions or []
     total_impact = sum(d.annual_impact or 0 for d in decisions)
@@ -2039,22 +2074,22 @@ def _slide_risques(prs, edm, result: dict, company: str, date_str: str, page: in
     # columns: desc, severite, probabilite, horizon, mitigation
     for r in risques_raw[:6]:
         if isinstance(r, dict):
-            desc = (r.get("description") or str(r))
+            desc = _sm(r.get("description") or str(r))
             sev  = r.get("severite", "Moyen")
             hor  = r.get("horizon", "Court terme")
         else:
-            desc = str(r)
+            desc = _sm(str(r))
             sev  = "Moyen"
             hor  = "Court terme"
         prob = _prob_from_sev(sev)
-        mitig = _mitigation_for(desc)
+        mitig = _sm(_mitigation_for(desc))
         rows.append([desc, sev, prob, hor, mitig])
     if not rows and destroyers:
         for d in destroyers[:5]:
             sev  = "Élevé" if d.annual_impact and abs(d.annual_impact) > 500_000 else "Moyen"
             prob = _prob_from_sev(sev)
-            mitig = (d.name or "À définir")[:55]
-            rows.append([d.name, sev, prob, "Immédiat", mitig])
+            mitig = _sm((d.name or "À définir"))[:55]
+            rows.append([_sm(d.name or "—"), sev, prob, "Immédiat", mitig])
     if not rows:
         rows = [["—", "—", "—", "—", "—"]]
 
