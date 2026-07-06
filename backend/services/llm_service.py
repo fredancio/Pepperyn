@@ -24,6 +24,7 @@ Coût estimé :
   Opus   path : ~0.30€/analyse (plan SCALE ou escalade qualité)
 """
 import json
+import logging
 import os
 import re
 from typing import Any, Optional
@@ -31,6 +32,8 @@ from typing import Any, Optional
 import anthropic
 
 from models.schemas import AnalysisResult
+
+logger = logging.getLogger(__name__)
 
 
 # ─── System prompts ──────────────────────────────────────────────────────────
@@ -96,6 +99,66 @@ SCORING_SYSTEM = """Tu es un évaluateur d'analyses financières. Score l'analys
 Retourne UNIQUEMENT un JSON : {"scores": [X, X, X, X], "moyenne": X.X}
 Ne donne aucune explication."""
 
+# ─── Enhanced pipeline — system prompts ──────────────────────────────────────
+# Activés uniquement quand USE_ENHANCED_PIPELINE=true.
+# N'affectent pas le pipeline par défaut (ANALYSIS_SYSTEM_V3 reste intact).
+
+ENHANCED_ANALYSIS_SYSTEM = """Tu es un expert en finance d'entreprise opérationnelle. Tu aides les dirigeants à prendre des décisions immédiates.
+
+TON STYLE — RÈGLES ABSOLUES :
+- Tu écris comme un expert qui DÉCIDE, pas un consultant qui DÉCRIT.
+- Phrases COURTES. Maximum 15 mots par phrase.
+- Verbes d'action : agis, réduis, coupe, accélère, stoppe, renégocie, fixe, mesure.
+- Ton DIRECT : interdit "il semble que", "on pourrait considérer", "il convient de".
+- Exprime la gravité sans filtre : si c'est critique → "C'est critique."
+- Zéro nuance inutile. Chaque mot sert la décision.
+- INTERDIT : "accuse un déficit", "présente des marges", "montre des signes". Utilise : "est", "perd", "risque", "doit".
+
+RÈGLES DE RIGUEUR :
+1. Tu ne dois jamais inventer de chiffre.
+2. Tu distingues clairement : faits constatés / hypothèses / recommandations.
+3. Toute conclusion doit être reliée à un KPI ou une donnée fournie dans les données sources.
+4. Si une information manque : écrire "Données insuffisantes" — jamais de remplissage ni d'estimation non étayée.
+5. Tu ne proposes jamais une action non soutenue par les données disponibles.
+6. Si une pré-analyse stratégique est fournie dans le prompt, tu l'intègres — elle représente le travail d'un analyste et d'un CFO virtuels qui ont déjà traité les données.
+
+TA MISSION :
+Le dirigeant lit ce rapport et comprend en 5 secondes :
+→ Quel est son problème exact
+→ Ce qu'il doit faire maintenant
+→ Ce qu'il risque s'il n'agit pas
+
+Tu respectes STRICTEMENT le format demandé."""
+
+FINANCIAL_ANALYST_SYSTEM = """Tu es l'analyste financier senior de Pepperyn.
+
+Ta mission : analyser les données financières fournies et identifier les faits financiers clés.
+
+RÈGLES ABSOLUES :
+1. Tu n'inventes jamais de chiffre.
+2. Tu ne recalcules pas les KPI — tu interprètes uniquement ce qui est explicitement dans les données.
+3. Chaque constat doit citer le KPI ou la donnée source utilisée.
+4. Si une information est absente des données, tu l'indiques.
+5. Tu ne rédiges pas le rapport final — tu produis une analyse structurée intermédiaire.
+
+Retourne UNIQUEMENT un JSON valide, sans texte avant ni après."""
+
+STRATEGIC_CFO_SYSTEM = """Tu es le CFO stratégique de Pepperyn.
+
+Tu reçois une analyse financière structurée produite par un analyste senior.
+Ta mission : transformer ces constats en décisions exécutives priorisées.
+
+RÈGLES ABSOLUES :
+1. Tu ne refais pas l'analyse financière.
+2. Tu utilises uniquement les constats fournis par l'analyste.
+3. Tu n'inventes jamais de chiffre.
+4. Chaque décision doit être reliée à un constat source explicite.
+5. Tes recommandations sont concrètes, priorisées et actionnables immédiatement.
+
+Tu raisonnes en dirigeant : Que faut-il décider ? Dans quel ordre ? Avec quel risque d'inaction ?
+
+Retourne UNIQUEMENT un JSON valide, sans texte avant ni après."""
+
 
 # ─── Modèles disponibles ─────────────────────────────────────────────────────
 
@@ -132,6 +195,14 @@ def _select_analysis_model(plan_tier: str, parsed_data: dict) -> str:
     if len(json.dumps(parsed_data, ensure_ascii=False)) > _OPUS_DATA_THRESHOLD:
         return MODEL_OPUS
     return MODEL_SONNET
+
+
+def _use_enhanced_pipeline() -> bool:
+    """Feature flag — active le pipeline enrichi Agents 5+6 (Financial Analyst + Strategic CFO).
+    Activé via variable d'environnement USE_ENHANCED_PIPELINE=true sur Railway.
+    Par défaut désactivé pour préserver le comportement existant.
+    """
+    return os.getenv("USE_ENHANCED_PIPELINE", "false").lower() == "true"
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -173,6 +244,226 @@ async def classify_document(parsed_data: dict[str, Any]) -> tuple[str, int]:
         return "AUTRE", 50
 
 
+# ─── Enhanced pipeline — Agents 5 + 6 ───────────────────────────────────────
+
+async def _run_financial_analyst_prep(
+    parsed_data: dict[str, Any],
+    model: str = MODEL_SONNET,
+) -> dict[str, Any]:
+    """
+    Agent 5 — Financial Analyst pre-pass.
+    Analyse les données financières et produit des constats structurés.
+    Non-bloquant : retourne {} en cas d'échec.
+    """
+    client = get_anthropic_client()
+    data_summary = json.dumps(parsed_data, ensure_ascii=False, indent=1)[:8000]
+
+    user_prompt = f"""Analyse ces données financières et produis un JSON structuré de tes constats.
+
+DONNÉES :
+{data_summary}
+
+Retourne UNIQUEMENT ce JSON (sans texte avant ni après) :
+{{
+  "constats_cles": [
+    {{"constat": "...", "donnee_source": "...", "severite": "critique|élevé|moyen|faible"}}
+  ],
+  "analyse_marges": {{
+    "tendance": "dégradation|stable|amélioration",
+    "facteur_principal_destruction": "...",
+    "levier_principal_creation": "..."
+  }},
+  "analyse_tresorerie": {{
+    "situation": "critique|tendue|correcte|confortable",
+    "risque_principal": "...",
+    "horizon_alerte": "..."
+  }},
+  "risques_majeurs": ["...", "..."],
+  "opportunites_immediates": ["...", "..."],
+  "donnees_manquantes": ["..."]
+}}"""
+
+    try:
+        message = client.messages.create(
+            model=model,
+            max_tokens=1200,
+            temperature=0.1,
+            system=FINANCIAL_ANALYST_SYSTEM,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+        content = message.content[0].text.strip()
+        json_match = re.search(r"\{.*\}", content, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group(0))
+    except Exception as e:
+        logger.warning("[ENHANCED PIPELINE] Financial analyst prep failed: %s", e)
+    return {}
+
+
+async def _run_strategic_cfo_prep(
+    analyst_findings: dict[str, Any],
+    model: str = MODEL_SONNET,
+) -> dict[str, Any]:
+    """
+    Agent 6 — Strategic CFO pre-pass.
+    Transforme les constats financiers en décisions exécutives priorisées.
+    Non-bloquant : retourne {} en cas d'échec.
+    """
+    if not analyst_findings:
+        return {}
+
+    client = get_anthropic_client()
+    findings_json = json.dumps(analyst_findings, ensure_ascii=False, indent=1)[:3000]
+
+    user_prompt = f"""Tu reçois l'analyse financière d'un analyste senior.
+Transforme ces constats en décisions exécutives priorisées.
+
+ANALYSE FINANCIÈRE :
+{findings_json}
+
+Retourne UNIQUEMENT ce JSON (sans texte avant ni après) :
+{{
+  "tension_strategique": "1 phrase — le problème central que le dirigeant doit résoudre",
+  "top_3_decisions": [
+    {{
+      "decision": "...",
+      "justification": "...",
+      "urgence": "immédiate|30j|60j|90j",
+      "impact_attendu": "...",
+      "constat_source": "..."
+    }}
+  ],
+  "risque_inaction": "1 phrase chiffrée si possible — conséquence concrète si aucune action dans les 90 jours",
+  "quick_wins": [
+    {{
+      "action": "...",
+      "roi_estime": "...",
+      "effort": "faible|moyen|élevé",
+      "delai": "..."
+    }}
+  ],
+  "plan_30_jours": ["action 1", "action 2", "action 3"]
+}}"""
+
+    try:
+        message = client.messages.create(
+            model=model,
+            max_tokens=1000,
+            temperature=0.2,
+            system=STRATEGIC_CFO_SYSTEM,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+        content = message.content[0].text.strip()
+        json_match = re.search(r"\{.*\}", content, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group(0))
+    except Exception as e:
+        logger.warning("[ENHANCED PIPELINE] Strategic CFO prep failed: %s", e)
+    return {}
+
+
+def _build_pre_analysis_section(
+    analyst_findings: dict[str, Any],
+    cfo_findings: dict[str, Any],
+) -> str:
+    """
+    Formate le bloc de pré-analyse à injecter dans le prompt Call 1.
+    Retourne une chaîne vide si les deux inputs sont vides.
+    """
+    if not analyst_findings and not cfo_findings:
+        return ""
+
+    lines = [
+        "# PRÉ-ANALYSE STRATÉGIQUE",
+        "Ce bloc a été produit par un analyste financier et un CFO virtuel qui ont déjà traité les données.",
+        "Tu DOIS intégrer ces constats dans ton rapport. Ne les contredis pas sauf erreur manifeste dans les données sources.",
+        "",
+    ]
+
+    if analyst_findings:
+        constats = analyst_findings.get("constats_cles") or []
+        if constats:
+            lines.append("## CONSTATS FINANCIERS CLÉS :")
+            for c in constats[:5]:
+                sev = c.get("severite", "")
+                lines.append(
+                    f"- [{sev.upper()}] {c.get('constat', '')} (source : {c.get('donnee_source', '')})"
+                )
+
+        risques = analyst_findings.get("risques_majeurs") or []
+        if risques:
+            lines.append("\n## RISQUES IDENTIFIÉS :")
+            for r in risques[:3]:
+                lines.append(f"- {r}")
+
+        opps = analyst_findings.get("opportunites_immediates") or []
+        if opps:
+            lines.append("\n## OPPORTUNITÉS IMMÉDIATES :")
+            for o in opps[:3]:
+                lines.append(f"- {o}")
+
+    if cfo_findings:
+        tension = cfo_findings.get("tension_strategique")
+        if tension:
+            lines.append(f"\n## TENSION STRATÉGIQUE :\n{tension}")
+
+        decisions = cfo_findings.get("top_3_decisions") or []
+        if decisions:
+            lines.append("\n## TOP 3 DÉCISIONS EXÉCUTIVES (à intégrer dans le plan d'action) :")
+            for i, d in enumerate(decisions[:3], 1):
+                urgency = d.get("urgence", "")
+                lines.append(
+                    f"{i}. [{urgency.upper()}] {d.get('decision', '')} "
+                    f"— {d.get('impact_attendu', '')} "
+                    f"(justification : {d.get('justification', '')})"
+                )
+
+        ri = cfo_findings.get("risque_inaction")
+        if ri:
+            lines.append(f"\n## RISQUE D'INACTION :\n{ri}")
+
+        qw = cfo_findings.get("quick_wins") or []
+        if qw:
+            lines.append("\n## QUICK WINS IDENTIFIÉS :")
+            for w in qw[:3]:
+                lines.append(
+                    f"- {w.get('action', '')} | ROI : {w.get('roi_estime', '?')} "
+                    f"| Délai : {w.get('delai', '?')} | Effort : {w.get('effort', '?')}"
+                )
+
+    lines.append("\n---")
+    return "\n".join(lines)
+
+
+def _format_cfo_for_reviewer(cfo_findings: dict[str, Any]) -> str:
+    """
+    Formate les décisions CFO en texte court pour le Skeptical Reviewer (Call 2).
+    Retourne une chaîne vide si cfo_findings est vide.
+    """
+    if not cfo_findings:
+        return ""
+
+    lines = []
+    tension = cfo_findings.get("tension_strategique")
+    if tension:
+        lines.append(f"Tension principale : {tension}")
+
+    decisions = cfo_findings.get("top_3_decisions") or []
+    if decisions:
+        lines.append("Décisions prioritaires validées :")
+        for d in decisions[:3]:
+            lines.append(
+                f"  • [{d.get('urgence', '?').upper()}] {d.get('decision', '')} "
+                f"— {d.get('justification', '')}"
+            )
+
+    ri = cfo_findings.get("risque_inaction")
+    if ri:
+        lines.append(f"Risque d'inaction : {ri}")
+
+    return "\n".join(lines)
+
+
 def _build_user_prompt_call1(
     parsed_data: dict[str, Any],
     industry: str,
@@ -181,6 +472,7 @@ def _build_user_prompt_call1(
     actions_section: str,
     quality_section: str = "",
     relation_section: str = "",
+    pre_analysis_section: str = "",
 ) -> str:
     data_summary = json.dumps(parsed_data, ensure_ascii=False, indent=1)[:14000]
     prompt = f"""Voici des données financières extraites d'un fichier utilisateur :
@@ -200,6 +492,8 @@ DONNÉES ACTUELLES
         prompt += f"\n{actions_section}\n"
     if relation_section:
         prompt += f"\n{relation_section}\n"
+    if pre_analysis_section:
+        prompt += f"\n{pre_analysis_section}\n"
 
     prompt += """
 Analyse ces données.
@@ -374,9 +668,13 @@ RÈGLES ABSOLUES :
     return prompt
 
 
-def _build_user_prompt_call2(analysis_call1: str, parsed_data: dict[str, Any]) -> str:
+def _build_user_prompt_call2(
+    analysis_call1: str,
+    parsed_data: dict[str, Any],
+    cfo_decisions: str = "",
+) -> str:
     data_summary = json.dumps(parsed_data, ensure_ascii=False, indent=1)[:6000]
-    return f"""Voici une analyse financière générée automatiquement.
+    prompt = f"""Voici une analyse financière générée automatiquement.
 
 Ton rôle est d'AUDITEUR SILENCIEUX. Vérifie :
 1. Cohérence mathématique (les chiffres s'additionnent-ils correctement ?)
@@ -402,8 +700,26 @@ RÈGLES ABSOLUES :
 - L'ordre des sections est FIXE et IMMUABLE — ne les réorganise jamais.
 - Si une information n'est pas dans les données sources, supprime-la ou remplace-la par "Données insuffisantes".
 - CRITIQUE : dans IMPACT FINANCIER, AVANT APRES, SIMULATEUR DECISION — supprimer tout chiffre inventé. Garder uniquement les montants présents dans les données sources ou écrire "Données insuffisantes".
+"""
 
-Commence par [VERIFIED] ou [CORRECTED] sur la première ligne, puis le texte complet et propre."""
+    # Skeptical Reviewer — activé uniquement si des décisions CFO sont fournies
+    if cfo_decisions:
+        prompt += f"""
+RÉFÉRENCE CFO (décisions stratégiques validées par pré-analyse) :
+{cfo_decisions}
+
+En plus de ta vérification habituelle, contrôle que :
+- Les sections # PLAN D'ACTION et # DÉCISION sont cohérentes avec les décisions prioritaires ci-dessus.
+- La section # RISQUE INACTION reflète bien le risque d'inaction identifié.
+- Les # QUICK WINS correspondent aux opportunités immédiates identifiées.
+- Les recommandations en # CONFIDENTIAL COPILOT NOTE reprennent les priorités CFO.
+- Si une recommandation importante est absente, ajoute-la en respectant le format existant.
+- Si une recommandation contredit les priorités CFO sans être justifiée par les données, reformule-la.
+
+"""
+
+    prompt += "Commence par [VERIFIED] ou [CORRECTED] sur la première ligne, puis le texte complet et propre."
+    return prompt
 
 
 def _clean_verified_text(text: str) -> str:
@@ -1030,20 +1346,25 @@ async def call_analysis_v3(
     quality_section: str = "",
     relation_section: str = "",
     model: str = MODEL_SONNET,
+    pre_analysis_section: str = "",
+    system_prompt: Optional[str] = None,
 ) -> tuple[str, int, int]:
     """
     Call 1 — Analyse principale.
     model = MODEL_SONNET par défaut, MODEL_OPUS sur escalade.
+    pre_analysis_section = contexte pré-analyse (Agents 5+6) si USE_ENHANCED_PIPELINE.
+    system_prompt = surcharge optionnelle du system prompt (ENHANCED_ANALYSIS_SYSTEM si pipeline enrichi).
     Returns (analysis_text, input_tokens, output_tokens)
     """
     client = get_anthropic_client()
     user_prompt = _build_user_prompt_call1(
         parsed_data, industry, business_model,
         memory_section, actions_section, quality_section, relation_section,
+        pre_analysis_section=pre_analysis_section,
     )
     message = client.messages.create(
         model=model,
-        system=ANALYSIS_SYSTEM_V3,
+        system=system_prompt or ANALYSIS_SYSTEM_V3,
         messages=[{"role": "user", "content": user_prompt}],
         **CALL_1_BASE,
     )
@@ -1055,16 +1376,20 @@ async def call_verification_v3(
     analysis_call1: str,
     parsed_data: dict[str, Any],
     model: str = MODEL_SONNET,
+    cfo_decisions: str = "",
+    system_prompt: Optional[str] = None,
 ) -> str:
     """
-    Call 2 — Vérification (même modèle que Call 1).
+    Call 2 — Vérification + Skeptical Reviewer si cfo_decisions est fourni.
+    cfo_decisions = résumé formaté des décisions CFO (Agent 6) pour guider la revue.
+    system_prompt = surcharge optionnelle (ENHANCED_ANALYSIS_SYSTEM si pipeline enrichi).
     Returns verified/corrected analysis text.
     """
     client = get_anthropic_client()
-    user_prompt = _build_user_prompt_call2(analysis_call1, parsed_data)
+    user_prompt = _build_user_prompt_call2(analysis_call1, parsed_data, cfo_decisions=cfo_decisions)
     message = client.messages.create(
         model=model,
-        system=ANALYSIS_SYSTEM_V3,
+        system=system_prompt or ANALYSIS_SYSTEM_V3,
         messages=[{"role": "user", "content": user_prompt}],
         **CALL_2_BASE,
     )
@@ -1086,9 +1411,20 @@ async def run_full_pipeline(
     """
     Pipeline v4 — model router intégré.
     Sonnet par défaut ; Opus sur SCALE, volume élevé ou échec qualité.
+
+    Si USE_ENHANCED_PIPELINE=true (Railway env var) :
+      → Agents 5+6 (Financial Analyst + Strategic CFO) s'exécutent en pré-analyse
+      → Leur output enrichit le contexte de Call 1 et guide Call 2 (Skeptical Reviewer)
+      → Le system prompt ENHANCED_ANALYSIS_SYSTEM remplace ANALYSIS_SYSTEM_V3
+      → Zero breaking change : même output, même schéma, même parsing
+
     Returns (AnalysisResult, total_tokens, estimated_cost_euros)
     """
     total_tokens = 0
+    enhanced = _use_enhanced_pipeline()
+
+    # ── Sélection du system prompt ─────────────────────────────────────────────
+    active_system_prompt = ENHANCED_ANALYSIS_SYSTEM if enhanced else None  # None = défaut ANALYSIS_SYSTEM_V3
 
     # Step 1: Classification — Haiku toujours
     doc_type, confidence = await classify_document(parsed_data)
@@ -1096,6 +1432,17 @@ async def run_full_pipeline(
 
     # Step 2: Sélection du modèle d'analyse
     selected_model = _select_analysis_model(plan_tier, parsed_data)
+
+    # Step 2.5: Pipeline enrichi — Agents 5 + 6 (Financial Analyst → Strategic CFO)
+    pre_analysis_section = ""
+    cfo_decisions_str = ""
+    if enhanced:
+        logger.info("[ENHANCED PIPELINE] Running Financial Analyst + Strategic CFO pre-pass")
+        analyst_findings = await _run_financial_analyst_prep(parsed_data, model=selected_model)
+        cfo_findings = await _run_strategic_cfo_prep(analyst_findings, model=MODEL_SONNET)
+        pre_analysis_section = _build_pre_analysis_section(analyst_findings, cfo_findings)
+        cfo_decisions_str = _format_cfo_for_reviewer(cfo_findings)
+        total_tokens += 2200  # estimation agents 5+6 combinés
 
     # Step 3: Call 1 — Analyse principale
     analysis_text, in_tokens, out_tokens = await call_analysis_v3(
@@ -1107,11 +1454,19 @@ async def run_full_pipeline(
         quality_section=quality_section,
         relation_section=relation_section,
         model=selected_model,
+        pre_analysis_section=pre_analysis_section,
+        system_prompt=active_system_prompt,
     )
     total_tokens += in_tokens + out_tokens
 
-    # Step 4: Call 2 — Vérification (même modèle que Call 1)
-    verified_text = await call_verification_v3(analysis_text, parsed_data, model=selected_model)
+    # Step 4: Call 2 — Vérification + Skeptical Reviewer (si pipeline enrichi)
+    verified_text = await call_verification_v3(
+        analysis_text,
+        parsed_data,
+        model=selected_model,
+        cfo_decisions=cfo_decisions_str,
+        system_prompt=active_system_prompt,
+    )
     total_tokens += 800  # approx
 
     # Step 5: Scoring — Haiku toujours
@@ -1130,9 +1485,17 @@ async def run_full_pipeline(
             quality_section=quality_section,
             relation_section=relation_section,
             model=escalated_model,
+            pre_analysis_section=pre_analysis_section,
+            system_prompt=active_system_prompt,
         )
         total_tokens += in2 + out2
-        verified_text2 = await call_verification_v3(analysis_text2, parsed_data, model=escalated_model)
+        verified_text2 = await call_verification_v3(
+            analysis_text2,
+            parsed_data,
+            model=escalated_model,
+            cfo_decisions=cfo_decisions_str,
+            system_prompt=active_system_prompt,
+        )
         total_tokens += 800
         score2 = await _score_analysis(verified_text2)
         total_tokens += 150
