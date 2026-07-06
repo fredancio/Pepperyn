@@ -379,13 +379,17 @@ async def analyze_file(
             target_date=target_date,
         ),
         media_type="application/json",
+        # Désactive le buffering nginx (Railway) pour que les heartbeats
+        # arrivent immédiatement au client et ne soient pas retenus jusqu'à
+        # la fin de la réponse (évite les timeouts proxy sur analyses longues).
+        headers={"X-Accel-Buffering": "no"},
     )
 
 
 async def _stream_analysis_response(**kwargs):
     """
     Exécute `_run_analysis_pipeline` en tâche de fond et envoie un octet
-    "heartbeat" (espace) toutes les ~15s tant qu'elle n'est pas terminée,
+    "heartbeat" (espace) toutes les ~8s tant qu'elle n'est pas terminée,
     afin de garder la connexion active pendant les analyses longues.
 
     En cas d'erreur dans le pipeline, on encode une `AnalyzeResponse`
@@ -399,15 +403,17 @@ async def _stream_analysis_response(**kwargs):
     (avec sa propre boucle asyncio) pour que la boucle principale reste
     libre d'envoyer les heartbeats pendant ce temps.
     """
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     def _run_sync() -> AnalyzeResponse:
         return asyncio.run(_run_analysis_pipeline(**kwargs))
 
     future = loop.run_in_executor(None, _run_sync)
 
+    # Heartbeat toutes les 8 s (réduit de 15 s) pour éviter les timeouts
+    # de proxies stricts (nginx Railway coupe après ~60 s sans données).
     while not future.done():
-        done, _ = await asyncio.wait({future}, timeout=15)
+        done, _ = await asyncio.wait({future}, timeout=8)
         if not done:
             yield b" "
 
@@ -415,13 +421,15 @@ async def _stream_analysis_response(**kwargs):
         result = future.result()
     except HTTPException as e:
         result = AnalyzeResponse(success=False, message=str(e.detail))
-    except Exception as e:
-        logger.error(f"[ANALYZE STREAM] erreur pipeline: {e}")
+    except BaseException as e:
+        # BaseException (pas seulement Exception) pour attraper CancelledError
+        # et tout autre sous-type qui pourrait terminer silencieusement.
+        logger.error(f"[ANALYZE STREAM] erreur pipeline: {type(e).__name__}: {e}")
         result = AnalyzeResponse(success=False, message="Erreur lors de l'analyse")
 
     try:
         yield result.model_dump_json().encode("utf-8")
-    except Exception as _ser_exc:
+    except BaseException as _ser_exc:
         logger.error("[ANALYZE STREAM] Erreur sérialisation finale: %s", _ser_exc)
         _fallback = AnalyzeResponse(success=False, message="Erreur interne lors de la sérialisation")
         yield _fallback.model_dump_json().encode("utf-8")

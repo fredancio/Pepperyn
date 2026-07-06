@@ -81,12 +81,20 @@ export async function analyzeFile(
   // ne coupe la connexion par inactivité. JSON.parse ignore les espaces
   // de tête, donc on parse le texte brut nous-mêmes.
   const text = await res.text();
+  const trimmed = text.trim();
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let data: any = {};
-  try {
-    data = text.trim() ? JSON.parse(text) : {};
-  } catch {
-    data = {};
+  let data: any = null;
+  if (trimmed) {
+    try {
+      data = JSON.parse(trimmed);
+    } catch {
+      // Réponse reçue mais JSON invalide — lever une erreur explicite
+      throw new Error("La réponse du serveur n'a pas pu être décodée. Réessayez dans quelques instants.");
+    }
+  } else {
+    // Corps vide : la connexion streaming a été coupée avant le JSON final
+    throw new Error("La réponse de l'analyse n'a pas été reçue (connexion interrompue). Réessayez.");
   }
 
   if (!res.ok) {

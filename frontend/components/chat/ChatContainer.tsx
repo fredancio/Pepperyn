@@ -326,7 +326,12 @@ export function ChatContainer() {
         // Refresh sidebar history
         loadSessionHistory();
       } else {
-        const fallbackMsg = makeLocalMessage('assistant', result.response || 'Analyse terminée avec succès.', 'text');
+        // result.result absent malgré success=true : cas inattendu — signaler clairement
+        const fallbackMsg = makeLocalMessage(
+          'assistant',
+          result.response || "L'analyse a été traitée mais le rapport n'a pas pu être affiché. Réessayez ou consultez l'historique si l'analyse y est visible.",
+          'text'
+        );
         setMessages(prev => [...prev, fallbackMsg]);
       }
     } catch (err) {
