@@ -2,8 +2,8 @@ import Link from 'next/link';
 
 /* ─────────────────────────────────────────────────────────────────────────
    HERO SECTION — deux colonnes (texte gauche / image droite)
-   Image droite : PNG statique officiel, affiché comme une photographie.
-   Maquette figée — aucune initiative, aucune reconstruction.
+   Le gradient de la <section> coule de gauche à droite sur toute la largeur.
+   Les colonnes sont transparentes → aucune frontière visible entre elles.
 ───────────────────────────────────────────────────────────────────────── */
 
 const FEATURES = [
@@ -51,20 +51,30 @@ const FEATURES = [
 
 export function HeroSection() {
   return (
+    /*
+      Gradient unique sur la section — coule de gauche (bleu-gris clair)
+      vers la droite (bleu nuit). Les colonnes sont transparentes sur desktop :
+      aucune jointure entre deux fonds différents, donc aucune séparation visible.
+      Sur mobile (flex-col), chaque colonne garde son propre fond via les classes.
+    */
     <section
       className="flex flex-col lg:flex-row w-full overflow-hidden"
-      style={{ minHeight: 'calc(100vh - 64px)' }}
+      style={{
+        minHeight: 'calc(100vh - 64px)',
+        background: 'linear-gradient(to right, #ccd9eb 0%, #d8e8f5 35%, #9ab8d0 41%, #1a3555 47%, #0A1528 55%, #0A1528 100%)',
+      }}
     >
       {/* ═══════════════════════════════════════════════════════════════
-          COLONNE GAUCHE — fond bleu-gris clair, contenu texte
+          COLONNE GAUCHE
+          Mobile   : fond dégradé clair propre (classes Tailwind)
+          Desktop  : fond transparent → gradient section visible dessous
       ═══════════════════════════════════════════════════════════════ */}
       <div
         className="flex flex-col justify-center w-full lg:w-[40%]
                    px-8 sm:px-14 lg:pl-20 xl:pl-28 lg:pr-10
-                   py-16 lg:py-24"
-        style={{
-          background: 'linear-gradient(160deg, #ccd9eb 0%, #d8e8f5 25%, #e5f0f9 55%, #f2f8fd 100%)',
-        }}
+                   py-16 lg:py-24
+                   bg-gradient-to-br from-[#ccd9eb] to-[#f2f8fd]
+                   lg:bg-none"
       >
 
         {/* ── Badge ── */}
@@ -123,7 +133,7 @@ export function HeroSection() {
             fontSize: 'clamp(16px, 1.1vw, 18px)',
             lineHeight: 1.65,
             color: '#334155',
-            maxWidth: 480,
+            maxWidth: 460,
           }}
         >
           Pepperyn transforme un simple fichier Excel en{' '}
@@ -148,13 +158,13 @@ export function HeroSection() {
           ))}
         </div>
 
-        {/* ── CTA buttons ── */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-7">
+        {/* ── CTA buttons — toujours empilés (colonne trop étroite pour côte-à-côte) ── */}
+        <div className="flex flex-col gap-3 mb-7">
           <Link
             href="/register"
             className="inline-flex items-center justify-center gap-2.5
                        bg-[#1B73E8] text-white font-semibold rounded-[14px] px-6
-                       hover:bg-[#0D47A1] transition-all duration-200 whitespace-nowrap flex-shrink-0"
+                       hover:bg-[#0D47A1] transition-all duration-200"
             style={{
               height: 56,
               fontSize: 15,
@@ -170,9 +180,9 @@ export function HeroSection() {
             href="#livrables"
             className="inline-flex items-center justify-center px-6
                        font-semibold rounded-[14px]
-                       hover:bg-white/60 transition-all duration-200 whitespace-nowrap"
+                       hover:bg-white/60 transition-all duration-200"
             style={{
-              height: 56,
+              height: 52,
               fontSize: 15,
               color: '#0A1628',
               border: '1.5px solid rgba(10,22,40,0.20)',
@@ -196,22 +206,11 @@ export function HeroSection() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          COLONNE DROITE — fond sombre, image PNG officielle
-          Ce n'est PAS une interface. C'est un PNG. Affiché tel quel.
+          COLONNE DROITE — image PNG officielle
+          Mobile   : fond sombre explicite
+          Desktop  : transparent → gradient section (dark) visible dessous
       ═══════════════════════════════════════════════════════════════ */}
-      <div
-        className="relative flex-1 w-full min-h-[400px] lg:min-h-0"
-        style={{ background: '#0A1528' }}
-      >
-        {/* Fondu bord gauche : efface la démarcation entre les deux colonnes */}
-        <div
-          className="hidden lg:block absolute top-0 left-0 h-full pointer-events-none"
-          style={{
-            width: '140px',
-            background: 'linear-gradient(to right, rgba(236,245,252,1) 0%, rgba(236,245,252,0) 100%)',
-            zIndex: 1,
-          }}
-        />
+      <div className="flex-1 w-full min-h-[400px] lg:min-h-0 bg-[#0A1528] lg:bg-transparent">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/hero/hero-image.png"
