@@ -70,8 +70,8 @@ export function Navbar() {
               href="/register"
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#1B73E8] text-white text-sm font-semibold rounded-xl hover:bg-[#0D47A1] transition-all duration-200 shadow-sm"
             >
-              <span className="hidden xs:inline">Essai gratuit</span>
-              <span className="xs:hidden">Démarrer</span>
+              <span className="hidden sm:inline">Essai gratuit</span>
+              <span className="sm:hidden">Démarrer</span>
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>

@@ -47,7 +47,7 @@ const RPT_CSS = `
 .rpt-decision{background:#EFF6FF;border:1px solid rgba(27,115,232,.25);border-radius:12px;padding:16px}
 .rpt-decision-title{font-size:11px;font-weight:700;color:#1B73E8;letter-spacing:.06em;margin-bottom:7px}
 .rpt-decision-text{font-size:13px;line-height:1.65;color:#1A1A2E}
-.rpt-btns-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.rpt-btns-row{display:grid;grid-template-columns:1fr;gap:8px}@media(min-width:480px){.rpt-btns-row{grid-template-columns:1fr 1fr 1fr}}
 .rpt-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:13px 6px;border-radius:12px;border:none;cursor:pointer;font-size:10.5px;font-weight:700;letter-spacing:.04em;line-height:1.3;text-align:center;color:#fff}
 .rpt-btn-icon{font-size:17px}
 .rpt-stakeholder{text-align:center;font-size:11.5px;color:#5F6368;padding:4px 0 2px;line-height:1.5}

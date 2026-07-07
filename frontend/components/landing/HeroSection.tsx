@@ -75,16 +75,16 @@ export function HeroSection() {
         {/* ╔══════════════════════════════════════════════════╗
             ║  FEATURE BAR — card with 4 items                ║
             ╚══════════════════════════════════════════════════╝ */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          background: 'rgba(248,251,255,0.97)',
-          border: '1px solid rgba(27,115,232,0.12)',
-          borderRadius: 18,
-          boxShadow: '0 2px 16px rgba(27,115,232,0.07), 0 1px 3px rgba(0,0,0,0.04)',
-          minHeight: 92,
-          marginTop: 44,
-        }}>
+        <div
+          className="grid grid-cols-2 lg:grid-cols-4"
+          style={{
+            background: 'rgba(248,251,255,0.97)',
+            border: '1px solid rgba(27,115,232,0.12)',
+            borderRadius: 18,
+            boxShadow: '0 2px 16px rgba(27,115,232,0.07), 0 1px 3px rgba(0,0,0,0.04)',
+            marginTop: 44,
+          }}
+        >
           {[
             {
               title: 'Sécurisé & confidentiel',
@@ -124,24 +124,30 @@ export function HeroSection() {
                 </svg>
               ),
             },
-          ].map((item, i) => (
-            <div
-              key={i}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 14,
-                padding: '0 28px',
-                borderRight: i < 3 ? '1px solid rgba(27,115,232,0.1)' : 'none',
-              }}
-            >
-              <div style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(27,115,232,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1B73E8', flexShrink: 0 }}>
-                {item.icon}
+          ].map((item, i) => {
+            /* Borders: 2-col mobile → right on col 0, bottom on row 0 ; 4-col desktop → right on first 3, no bottom */
+            const borderCls = [
+              'border-b border-r lg:border-b-0 lg:border-r',          /* i=0 */
+              'border-b lg:border-b-0 lg:border-r',                    /* i=1 */
+              'border-r lg:border-r',                                   /* i=2 */
+              '',                                                        /* i=3 */
+            ][i];
+            return (
+              <div
+                key={i}
+                className={`flex items-center gap-3.5 px-5 py-5 lg:px-7 ${borderCls}`}
+                style={{ borderColor: 'rgba(27,115,232,0.1)' }}
+              >
+                <div style={{ width: 38, height: 38, borderRadius: 11, background: 'rgba(27,115,232,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1B73E8', flexShrink: 0 }}>
+                  {item.icon}
+                </div>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: '#0c1524', lineHeight: 1.3 }}>{item.title}</p>
+                  <p style={{ fontSize: 12, color: '#6b7c8f', lineHeight: 1.3 }}>{item.desc}</p>
+                </div>
               </div>
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 700, color: '#0c1524', lineHeight: 1.3 }}>{item.title}</p>
-                <p style={{ fontSize: 12, color: '#6b7c8f', lineHeight: 1.3 }}>{item.desc}</p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
       </div>
