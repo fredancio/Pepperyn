@@ -59,22 +59,13 @@ export function HeroSection() {
           COLONNE GAUCHE — fond bleu-gris clair, contenu texte
       ═══════════════════════════════════════════════════════════════ */}
       <div
-        className="relative flex flex-col justify-center w-full lg:w-[54%]
-                   px-8 sm:px-14 lg:pl-20 xl:pl-28 lg:pr-12
+        className="flex flex-col justify-center w-full lg:w-[40%]
+                   px-8 sm:px-14 lg:pl-20 xl:pl-28 lg:pr-10
                    py-16 lg:py-24"
         style={{
           background: 'linear-gradient(160deg, #ccd9eb 0%, #d8e8f5 25%, #e5f0f9 55%, #f2f8fd 100%)',
         }}
       >
-        {/* ── Fondu bord droit → fond sombre de la colonne image (desktop) ── */}
-        <div
-          className="hidden lg:block absolute right-0 top-0 h-full pointer-events-none"
-          style={{
-            width: '90px',
-            background: 'linear-gradient(to right, transparent 0%, #0A1528 100%)',
-            zIndex: 1,
-          }}
-        />
 
         {/* ── Badge ── */}
         <div
@@ -209,9 +200,18 @@ export function HeroSection() {
           Ce n'est PAS une interface. C'est un PNG. Affiché tel quel.
       ═══════════════════════════════════════════════════════════════ */}
       <div
-        className="flex-1 w-full min-h-[400px] lg:min-h-0 flex items-center justify-center"
+        className="relative flex-1 w-full min-h-[400px] lg:min-h-0"
         style={{ background: '#0A1528' }}
       >
+        {/* Fondu bord gauche : efface la démarcation entre les deux colonnes */}
+        <div
+          className="hidden lg:block absolute top-0 left-0 h-full pointer-events-none"
+          style={{
+            width: '140px',
+            background: 'linear-gradient(to right, rgba(236,245,252,1) 0%, rgba(236,245,252,0) 100%)',
+            zIndex: 1,
+          }}
+        />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/hero/hero-image.png"
@@ -220,7 +220,7 @@ export function HeroSection() {
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            objectPosition: 'center',
+            objectPosition: 'left center',
             display: 'block',
           }}
         />
