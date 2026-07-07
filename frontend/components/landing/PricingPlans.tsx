@@ -1,8 +1,19 @@
 import Link from 'next/link';
 
+type PlanPhase = {
+  number: string;
+  title: string;
+  badge: string;
+  badgeStyle: 'devis' | 'price';
+  description: string;
+  items: string[];
+  note: string | null;
+};
+
 type PlanExtras = {
   label: string;
   detail: string;
+  phases?: PlanPhase[];
   services?: {
     title: string;
     items: string[];
@@ -71,7 +82,7 @@ const plans: {
   },
   {
     name: 'SCALE',
-    subtitle: 'Pour départements financiers, cabinets & groupes multi-entités',
+    subtitle: 'Pour les entreprises souhaitant intégrer Pepperyn directement à leur ERP, CRM et processus financiers.',
     price: '349€',
     period: '/mois',
     tagline: 'Votre AI Financial Operating System sur-mesure.',
@@ -93,10 +104,43 @@ const plans: {
       'Onboarding dédié & SLA support prioritaire',
     ],
     extras: {
-      label: '🔧 Implémentation sur-mesure incluse',
-      detail: 'Chaque déploiement SCALE fait l\'objet d\'un onboarding personnalisé : cartographie de vos systèmes, intégrations, formation équipe et suivi continu. Devis d\'implémentation fourni à la signature.',
+      label: '🚀 Déploiement en 2 étapes',
+      detail: '',
+      phases: [
+        {
+          number: '1',
+          title: 'Projet d\'implémentation',
+          badge: 'Sur devis — facturé une seule fois',
+          badgeStyle: 'devis',
+          description: 'Chaque entreprise possède un environnement différent. Nous réalisons un déploiement personnalisé comprenant :',
+          items: [
+            'audit de vos systèmes',
+            'connexions ERP / CRM',
+            'intégrations comptables',
+            'workflows sur mesure',
+            'onboarding des équipes',
+            'formation',
+            'mise en production',
+          ],
+          note: 'Cette phase est chiffrée sur devis et facturée une seule fois.',
+        },
+        {
+          number: '2',
+          title: 'Exploitation de Pepperyn',
+          badge: '349 €/mois',
+          badgeStyle: 'price',
+          description: 'Une fois votre environnement opérationnel :',
+          items: [
+            'toutes les fonctionnalités SCALE',
+            'maintenance & mises à jour',
+            'support prioritaire',
+            'exploitation continue',
+          ],
+          note: null,
+        },
+      ],
       services: {
-        title: 'SERVICES DISPONIBLES SUR DEVIS',
+        title: 'Prestations pouvant être intégrées à votre projet',
         items: [
           'Connexions ERP/CRM',
           'Intégrations comptables',
@@ -237,16 +281,61 @@ export function PricingPlans() {
                   ))}
                 </ul>
 
-                {/* ERP/CRM extras block (SCALE only) */}
+                {/* Déploiement 2 étapes block (SCALE only) */}
                 {plan.extras && (
                   <div className="rounded-xl border border-purple-200 bg-purple-50 p-4 space-y-3">
-                    <div>
-                      <p className="text-sm font-bold text-purple-900 mb-1">{plan.extras.label}</p>
-                      <p className="text-xs text-purple-700 leading-relaxed">{plan.extras.detail}</p>
-                    </div>
+                    {/* Header */}
+                    <p className="text-sm font-bold text-purple-900">{plan.extras.label}</p>
+
+                    {/* Phases */}
+                    {plan.extras.phases && plan.extras.phases.map((phase, pi) => (
+                      <div key={pi}>
+                        {/* Arrow between phases */}
+                        {pi > 0 && (
+                          <div className="flex items-center justify-center py-1">
+                            <div className="flex flex-col items-center gap-0.5">
+                              <div className="w-px h-3 bg-purple-300" />
+                              <svg className="w-3 h-3 text-purple-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v10.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 14.586V4a1 1 0 011-1z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                          </div>
+                        )}
+                        <div className={`rounded-lg p-3 ${pi === 0 ? 'bg-white border border-purple-200' : 'bg-purple-100 border border-purple-200'}`}>
+                          {/* Phase header */}
+                          <div className="flex items-start justify-between gap-2 mb-1.5">
+                            <p className="text-xs font-bold text-purple-900">
+                              {phase.number}. {phase.title}
+                            </p>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0 ${
+                              phase.badgeStyle === 'devis'
+                                ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                                : 'bg-purple-700 text-white'
+                            }`}>
+                              {phase.badge}
+                            </span>
+                          </div>
+                          <p className="text-xs text-purple-700 leading-relaxed mb-1.5">{phase.description}</p>
+                          <ul className="space-y-0.5">
+                            {phase.items.map((item, ii) => (
+                              <li key={ii} className="text-xs text-purple-800 flex items-center gap-1.5">
+                                <span className="text-purple-400">•</span>{item}
+                              </li>
+                            ))}
+                          </ul>
+                          {phase.note && (
+                            <p className="text-xs font-semibold text-purple-800 mt-2 pt-2 border-t border-purple-200">
+                              {phase.note}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Services */}
                     {plan.extras.services && (
                       <div className="border-t border-purple-200 pt-3">
-                        <p className="text-xs font-bold text-purple-900 uppercase tracking-widest mb-2">
+                        <p className="text-xs font-semibold text-purple-700 mb-2">
                           {plan.extras.services.title}
                         </p>
                         <div className="flex flex-wrap gap-1.5">
@@ -268,6 +357,25 @@ export function PricingPlans() {
                 <p className={`text-xs italic leading-snug ${isHighlighted ? 'text-slate-400' : 'text-[#5F6368]'}`}>
                   &ldquo;{plan.microcopy}&rdquo;
                 </p>
+
+                {/* Price summary visual (SCALE only) */}
+                {plan.extras?.phases && (
+                  <div className="rounded-xl border border-purple-200 overflow-hidden text-xs font-semibold">
+                    <div className="flex items-center justify-between px-3 py-2 bg-amber-50 border-b border-purple-200">
+                      <span className="text-purple-900">Projet d&apos;implémentation</span>
+                      <span className="text-amber-700">Sur devis · une seule fois</span>
+                    </div>
+                    <div className="flex justify-center py-1 bg-white border-b border-purple-100">
+                      <svg className="w-3.5 h-3.5 text-purple-300" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v10.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 14.586V4a1 1 0 011-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-2 bg-purple-700">
+                      <span className="text-purple-100">Pepperyn déployé</span>
+                      <span className="text-white font-bold">349 €/mois</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* CTA */}
                 <Link
