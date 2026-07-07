@@ -1,12 +1,12 @@
 import Link from 'next/link';
 
 /* ─────────────────────────────────────────────────────────────────────────
-   HERO SECTION — deux colonnes (texte gauche / image droite)
-   Stratégie anti-démarcation :
-   - Colonne gauche : fond dégradé opaque, overflow-hidden
-   - Colonne droite : fond sombre + image cover + overlay 280px à gauche
-     dont la couleur (#D5E5F3→transparent) correspond au bord droit de la
-     colonne gauche (calculé d'après le dégradé 160deg)
+   HERO SECTION
+   Fond : gradient unifié blanc → navy (classe .hero-section dans globals.css)
+   Mobile  : colonne gauche = fond clair, colonne droite = fond sombre
+   Desktop : les deux colonnes transparentes → gradient section visible
+   Démarcation : overlay 240px sur le bord gauche de la colonne droite,
+                 couleur #aecde7 = gradient à ~40% (frontière des colonnes)
 ───────────────────────────────────────────────────────────────────────── */
 
 const FEATURES = [
@@ -55,27 +55,31 @@ const FEATURES = [
 export function HeroSection() {
   return (
     <section
-      className="flex flex-col lg:flex-row w-full overflow-hidden"
+      /* hero-section → globals.css applique le gradient unifié sur desktop */
+      className="hero-section flex flex-col lg:flex-row w-full overflow-hidden"
       style={{ minHeight: 'calc(100vh - 64px)' }}
     >
+
       {/* ═══════════════════════════════════════════════════════════════
-          COLONNE GAUCHE — fond dégradé clair, overflow-hidden
+          COLONNE GAUCHE
+          Mobile  : fond blanc → bleu très clair (inline style)
+          Desktop : transparent (hero-left-col override !important)
       ═══════════════════════════════════════════════════════════════ */}
       <div
-        className="flex flex-col justify-center overflow-hidden w-full lg:w-[40%]
+        className="hero-left-col flex flex-col justify-center overflow-hidden
+                   w-full lg:w-[44%]
                    px-8 sm:px-14 lg:pl-20 xl:pl-28 lg:pr-10
                    py-16 lg:py-24"
-        style={{
-          background: 'linear-gradient(160deg, #ccd9eb 0%, #d8e8f5 25%, #e5f0f9 55%, #f2f8fd 100%)',
-        }}
+        /* fond mobile uniquement — overridé par .hero-left-col sur desktop */
+        style={{ background: 'linear-gradient(160deg, #f8fafc 0%, #eaf3fb 100%)' }}
       >
 
         {/* ── Badge ── */}
         <div
           className="inline-flex items-center gap-2 px-3.5 py-1.5 mb-8 w-fit rounded-full"
           style={{
-            background: 'rgba(255,255,255,0.70)',
-            border: '1.5px solid rgba(27,115,232,0.35)',
+            background: 'rgba(255,255,255,0.80)',
+            border: '1.5px solid rgba(27,115,232,0.30)',
             backdropFilter: 'blur(4px)',
           }}
         >
@@ -92,13 +96,15 @@ export function HeroSection() {
 
         {/* ── H1 ── */}
         <h1 className="mb-6" style={{
-          fontSize: 'clamp(40px, 4vw, 60px)', fontWeight: 900,
+          fontSize: 'clamp(36px, 3.6vw, 56px)', fontWeight: 900,
           lineHeight: 1.06, letterSpacing: '-0.028em', color: '#0A1628',
         }}>
           Ne prenez plus seul vos{' '}
           <span style={{
-            color: '#1B73E8', textDecoration: 'underline',
-            textDecorationColor: '#1B73E8', textDecorationThickness: '3px',
+            color: '#1B73E8',
+            textDecoration: 'underline',
+            textDecorationColor: '#1B73E8',
+            textDecorationThickness: '3px',
             textUnderlineOffset: '8px',
           }}>
             décisions
@@ -108,7 +114,7 @@ export function HeroSection() {
 
         {/* ── Paragraphe ── */}
         <p className="mb-9" style={{
-          fontSize: 'clamp(16px, 1.1vw, 18px)', lineHeight: 1.65,
+          fontSize: 'clamp(15px, 1vw, 17px)', lineHeight: 1.7,
           color: '#334155', maxWidth: 460,
         }}>
           Pepperyn transforme un simple fichier Excel en{' '}
@@ -116,7 +122,7 @@ export function HeroSection() {
           , rapports de direction et plans d&apos;action priorisés en quelques minutes.
         </p>
 
-        {/* ── Feature icons ── */}
+        {/* ── Feature icons — 4 colonnes ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-6 mb-10">
           {FEATURES.map((f) => (
             <div key={f.title} className="flex flex-col gap-1.5">
@@ -127,14 +133,14 @@ export function HeroSection() {
           ))}
         </div>
 
-        {/* ── CTA — empilés (colonne 40% trop étroite pour côte-à-côte) ── */}
-        <div className="flex flex-col gap-3 mb-7">
+        {/* ── CTA — côte à côte si la place le permet, empilés sinon ── */}
+        <div className="flex flex-wrap gap-3 mb-7">
           <Link
             href="/register"
-            className="inline-flex items-center justify-center gap-2.5
-                       bg-[#1B73E8] text-white font-semibold rounded-[14px] px-6 w-fit
-                       hover:bg-[#0D47A1] transition-all duration-200"
-            style={{ height: 56, fontSize: 15, boxShadow: '0 4px 20px rgba(27,115,232,0.42)' }}
+            className="inline-flex items-center justify-center gap-2
+                       bg-[#1B73E8] text-white font-semibold rounded-[14px] px-5
+                       hover:bg-[#0D47A1] transition-all duration-200 whitespace-nowrap"
+            style={{ height: 52, fontSize: 15, boxShadow: '0 4px 20px rgba(27,115,232,0.42)' }}
           >
             Analyser mon premier fichier gratuitement
             <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -143,12 +149,12 @@ export function HeroSection() {
           </Link>
           <Link
             href="#livrables"
-            className="inline-flex items-center justify-center px-6 w-fit
-                       font-semibold rounded-[14px] hover:bg-white/60 transition-all duration-200"
+            className="inline-flex items-center justify-center px-5
+                       font-semibold rounded-[14px] hover:bg-white/60 transition-all duration-200 whitespace-nowrap"
             style={{
               height: 52, fontSize: 15, color: '#0A1628',
               border: '1.5px solid rgba(10,22,40,0.20)',
-              background: 'rgba(255,255,255,0.45)',
+              background: 'rgba(255,255,255,0.50)',
             }}
           >
             Découvrir un rapport exécutif
@@ -156,7 +162,7 @@ export function HeroSection() {
         </div>
 
         {/* ── Réassurance ── */}
-        <div className="flex items-center gap-2" style={{ fontSize: 13, color: '#6b8099' }}>
+        <div className="flex items-center gap-2" style={{ fontSize: 12.5, color: '#6b8099' }}>
           <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
@@ -168,25 +174,24 @@ export function HeroSection() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          COLONNE DROITE — fond sombre + image + fondu gauche (280px)
-          Couleur du fondu : ~#D5E5F3, bord droit de la colonne gauche
-          calculé d'après linear-gradient(160deg) à ~20% (coin haut-droit).
-          La zone de 280px efface optiquement la frontière entre colonnes.
+          COLONNE DROITE
+          Mobile  : fond sombre (inline style)
+          Desktop : transparent (hero-right-col override !important)
+                    → gradient section visible derrière l'image
+          Overlay 240px : masque le bord gauche de l'image et assure
+                          la continuité avec le gradient section (#aecde7)
       ═══════════════════════════════════════════════════════════════ */}
       <div
-        className="relative flex-1 w-full min-h-[400px] lg:min-h-0"
+        className="hero-right-col relative flex-1 w-full min-h-[400px] lg:min-h-0"
+        /* fond mobile uniquement */
         style={{ background: '#0A1528' }}
       >
-        {/* Fondu gauche — large zone pour effacer la frontière */}
+        {/* Fondu gauche — couleur = gradient section à ~40% (#aecde7) */}
         <div
           className="hidden lg:block absolute inset-y-0 left-0 pointer-events-none"
           style={{
-            width: '280px',
-            /* Gradient vertical pour coller aux deux teintes du bord gauche :
-               haut (#D5E5F3, ~20% du dégradé 160deg) → bas (#EBF3F9, ~60%) */
-            background: `linear-gradient(to right,
-              #d5e5f3 0%,
-              rgba(213,229,243,0) 100%)`,
+            width: '240px',
+            background: 'linear-gradient(to right, #aecde7 0%, rgba(174,205,231,0) 100%)',
             zIndex: 1,
           }}
         />
