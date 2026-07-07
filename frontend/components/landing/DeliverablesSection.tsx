@@ -289,11 +289,7 @@ export function DeliverablesSection() {
           </div>
         </div>
 
-        {/* Scroll hint */}
-        <div className="flex items-center justify-end gap-1.5 mt-1 mb-5 pr-1">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9ab0cc" strokeWidth="2.5" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
-          <span className="text-xs text-[#9ab0cc]">Faites défiler pour voir l&apos;analyse complète</span>
-        </div>
+        {/* Scroll hint removed */}
 
         {/* Bridge dots */}
         <div className="relative w-full mb-3">
