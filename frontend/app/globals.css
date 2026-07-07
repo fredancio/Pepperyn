@@ -87,7 +87,8 @@ html, body {
 ──────────────────────────────────────────────────────────────────────── */
 @media (min-width: 1024px) {
   .hero-section {
-    background: linear-gradient(to right, #ffffff 0%, #f3f8fd 10%, #e0eef8 22%, #cadef0 33%, #aecde7 40%, #5595c2 48%, #174b78 56%, #091e3a 63%, #0A1528 70%, #0A1528 100%) !important;
+    /* Gradient calibré : 50% = #DCE5EE = couleur exacte du bord gauche de hero-image.png */
+    background: linear-gradient(to right, #ffffff 0%, #f8fbfd 8%, #edf6fb 18%, #e3eef6 30%, #dce5ee 50%, #9bbdce 58%, #3a7aaa 66%, #0e3060 74%, #0A1528 82%, #0A1528 100%) !important;
   }
   .hero-left-col,
   .hero-right-col {

@@ -52,9 +52,15 @@ const FEATURES = [
   },
 ];
 
-/* Gradient desktop : blanc pur → bleu clair (frontière col. à 40%) → navy */
+/*
+  Gradient desktop calibré :
+  • 50% = #DCE5EE = couleur moyenne exacte du bord gauche de hero-image.png
+    → frontière entre colonne texte et image optiquement invisible
+  • 0-50%  : blanc → très léger bleu-gris (colonne gauche transparente le voit)
+  • 50-100%: transition vers dark navy (cachée par l'image dans la col. droite)
+*/
 const DESKTOP_GRADIENT =
-  'linear-gradient(to right, #ffffff 0%, #f3f8fd 10%, #e0eef8 22%, #cadef0 33%, #aecde7 40%, #5595c2 48%, #174b78 56%, #091e3a 63%, #0A1528 70%, #0A1528 100%)';
+  'linear-gradient(to right, #ffffff 0%, #f8fbfd 8%, #edf6fb 18%, #e3eef6 30%, #dce5ee 50%, #9bbdce 58%, #3a7aaa 66%, #0e3060 74%, #0A1528 82%, #0A1528 100%)';
 
 export function HeroSection() {
   return (
@@ -83,7 +89,7 @@ export function HeroSection() {
         ═══════════════════════════════════════════════════════════════ */}
         <div
           className="hero-left-col flex flex-col justify-center overflow-hidden
-                     w-full lg:w-[44%]
+                     w-full lg:w-1/2
                      px-8 sm:px-14 lg:pl-20 xl:pl-28 lg:pr-10
                      py-16 lg:py-24"
           style={{ background: 'linear-gradient(160deg, #f8fafc 0%, #eaf3fb 100%)' }}
@@ -213,12 +219,17 @@ export function HeroSection() {
               display: 'block',
             }}
           />
-          {/* Fondu gauche : masque le bord de l'image, couleur = gradient à 40% */}
+          {/*
+            Micro-fondu 100px : lisse les légères variations verticales du bord
+            gauche de l'image (top/center/bottom ≠ moyenne exacte).
+            Couleur = #DCE5EE = moyenne mesurée → invisible à la frontière.
+            Assez court pour ne pas masquer les chips 1.Excel / 2.Pepperyn.
+          */}
           <div
             className="hidden lg:block absolute inset-y-0 left-0 pointer-events-none"
             style={{
-              width: '240px',
-              background: 'linear-gradient(to right, #aecde7 0%, rgba(174,205,231,0) 100%)',
+              width: '100px',
+              background: 'linear-gradient(to right, rgba(220,229,238,0.55) 0%, rgba(220,229,238,0) 100%)',
               zIndex: 2,
             }}
           />
