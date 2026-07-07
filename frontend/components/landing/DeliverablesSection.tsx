@@ -89,7 +89,7 @@ export function DeliverablesSection() {
         </div>
 
         {/* ── Scrollable Report ── */}
-        <div className="w-full rounded-2xl border border-[#dce8fc] overflow-hidden" style={{ maxHeight: 540, overflowY: 'auto' }}>
+        <div className="w-full rounded-2xl overflow-hidden" style={{ maxHeight: 540, overflowY: 'auto', border: '1.5px solid #b8cfee', boxShadow: '0 0 0 4px rgba(27,115,232,0.04), 0 8px 32px -4px rgba(27,115,232,0.13), 0 2px 8px rgba(0,0,0,0.06)' }}>
           <div className="rpt-wrap">
 
             {/* Header bar */}
@@ -313,7 +313,7 @@ export function DeliverablesSection() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 
           {/* Card 1 — Executive Report (red) */}
-          <div className="relative bg-white border border-gray-100 rounded-2xl shadow-sm p-6 flex flex-col gap-4 overflow-hidden">
+          <div className="relative bg-white rounded-2xl p-6 flex flex-col gap-4 overflow-hidden" style={{ border: '1.5px solid #e8d0ce', boxShadow: '0 0 0 3px rgba(192,57,43,0.04), 0 8px 28px -4px rgba(192,57,43,0.12), 0 2px 8px rgba(0,0,0,0.05)' }}>
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-[#c0392b]" />
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-[#fff0ef] text-[#c0392b]">ÉTAPE 1 · COMPRENDRE</span>
             <h3 className="text-[15px] font-bold text-[#c0392b] leading-snug">Executive Report</h3>
@@ -325,7 +325,7 @@ export function DeliverablesSection() {
           </div>
 
           {/* Card 2 — Executive Board Deck (orange) */}
-          <div className="relative bg-white border border-gray-100 rounded-2xl shadow-sm p-6 flex flex-col gap-4 overflow-hidden">
+          <div className="relative bg-white rounded-2xl p-6 flex flex-col gap-4 overflow-hidden" style={{ border: '1.5px solid #e8d5be', boxShadow: '0 0 0 3px rgba(224,123,42,0.04), 0 8px 28px -4px rgba(224,123,42,0.12), 0 2px 8px rgba(0,0,0,0.05)' }}>
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-[#e07b2a]" />
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-[#fff3e8] text-[#c06010]">ÉTAPE 2 · COMMUNIQUER</span>
             <h3 className="text-[15px] font-bold text-[#e07b2a] leading-snug">Executive Board Deck</h3>
@@ -337,7 +337,7 @@ export function DeliverablesSection() {
           </div>
 
           {/* Card 3 — Executive Financial Model (blue) */}
-          <div className="relative bg-white border border-gray-100 rounded-2xl shadow-sm p-6 flex flex-col gap-4 overflow-hidden">
+          <div className="relative bg-white rounded-2xl p-6 flex flex-col gap-4 overflow-hidden" style={{ border: '1.5px solid #b8cfee', boxShadow: '0 0 0 3px rgba(27,115,232,0.04), 0 8px 28px -4px rgba(27,115,232,0.12), 0 2px 8px rgba(0,0,0,0.05)' }}>
             <div className="absolute top-0 left-0 right-0 h-0.5 bg-[#1B73E8]" />
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wider bg-[#e8f0fe] text-[#1557b0]">ÉTAPE 3 · MODÉLISER</span>
             <h3 className="text-[15px] font-bold text-[#1B73E8] leading-snug">Executive Financial Model</h3>
