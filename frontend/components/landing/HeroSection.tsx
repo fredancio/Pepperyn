@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import Image from 'next/image';
 
 /* ─────────────────────────────────────────────────────────────────────────
    HERO SECTION — deux colonnes (texte gauche / image droite)
@@ -201,18 +200,20 @@ export function HeroSection() {
           Ce n'est PAS une interface. C'est un PNG. Affiché tel quel.
       ═══════════════════════════════════════════════════════════════ */}
       <div
-        className="relative flex-1 w-full min-h-[400px] lg:min-h-0"
-        style={{
-          background: 'linear-gradient(150deg, #0D1B2E 0%, #0A1525 100%)',
-        }}
+        className="flex-1 w-full min-h-[400px] lg:min-h-0 flex items-center justify-center"
+        style={{ background: '#0A1528' }}
       >
-        <Image
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src="/hero/hero-image.png"
           alt="Pepperyn Hero"
-          priority
-          fill
-          sizes="(max-width: 1024px) 100vw, 46vw"
-          style={{ objectFit: 'contain', objectPosition: 'center' }}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            objectPosition: 'center',
+            display: 'block',
+          }}
         />
       </div>
 
