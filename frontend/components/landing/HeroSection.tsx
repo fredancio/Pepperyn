@@ -9,7 +9,7 @@ export function HeroSection() {
       <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[640px] h-[320px] bg-[#1B73E8]/5 rounded-full blur-3xl pointer-events-none" />
 
       {/* ── Text content — max-w-4xl ── */}
-      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-10 lg:pt-28 flex flex-col items-center text-center gap-7">
+      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-6 lg:pt-20 flex flex-col items-center text-center gap-5">
 
         {/* Badge — UNCHANGED */}
         <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#1B73E8]/10 border border-[#1B73E8]/20 rounded-full">
@@ -56,7 +56,7 @@ export function HeroSection() {
       </div>
 
       {/* ── Hero visual — pleine largeur, fond dissous dans le gradient ── */}
-      <div className="relative w-full max-w-[1440px] mx-auto px-2 sm:px-4 pb-14">
+      <div className="relative w-full max-w-[1440px] mx-auto px-2 sm:px-4 pb-8">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/hero-workflow.png"
@@ -66,7 +66,7 @@ export function HeroSection() {
         />
 
         {/* Trust line */}
-        <p className="text-xs text-[#5F6368] text-center mt-6">
+        <p className="text-xs text-[#5F6368] text-center mt-3">
           Sans carte bancaire · Résultats en quelques minutes · Données anonymisées avant analyse
         </p>
       </div>

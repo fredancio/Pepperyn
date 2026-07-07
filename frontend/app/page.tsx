@@ -18,17 +18,26 @@ export default function LandingPage() {
     <div className="bg-white">
       <Navbar />
 
-      {/* Page content — narration : coût de l'inaction -> diagnostic -> ROI -> livrables -> accompagnement -> positionnement -> preuves -> tarifs */}
+      {/* Page content — narration : je vois → je comprends → je mesure → je décide */}
       <main>
         <HeroSection />
-        <StorytellingSection />
-        <WhyBadDecisionsSection />
-        <ROISection />
+        {/* 1. Je vois immédiatement ce que Pepperyn produit */}
         <DeliverablesSection />
+        {/* 2. Je comprends le bénéfice opérationnel — avant/après */}
+        <StorytellingSection />
+        {/* 3. Je comprends pourquoi les entreprises prennent de mauvaises décisions */}
+        <WhyBadDecisionsSection />
+        {/* 4. Je mesure ce que coûte l'inaction */}
+        <ROISection />
+        {/* 5. Je découvre que Pepperyn ne s'arrête pas au rapport */}
         <CopilotSection />
+        {/* 6. Je comprends pourquoi ce n'est pas un chatbot */}
         <PositioningSection />
+        {/* 7. Je mesure les bénéfices réels */}
         <ProofSection />
+        {/* 8. Je suis rassuré sur la sécurité */}
         <SecuritySection />
+        {/* 9. Je découvre les tarifs */}
         <PricingPlans />
         <FaqSection />
 
