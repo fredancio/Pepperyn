@@ -80,14 +80,14 @@ export function HeroSection() {
           {/* ╔══════════════════════╗
               ║  RIGHT — illustration ║
               ╚══════════════════════╝ */}
-          <div className="flex items-center justify-center lg:justify-end">
+          <div className="flex items-center justify-center lg:justify-end overflow-visible">
             <Image
               src="/hero-mockup.png"
               alt="Pepperyn — dashboard d'analyse financière"
               width={1536}
               height={1024}
               priority
-              className="w-full max-w-[720px] h-auto"
+              className="w-full h-auto"
             />
           </div>
         </div>{/* end grid */}
