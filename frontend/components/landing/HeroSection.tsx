@@ -82,13 +82,13 @@ export function HeroSection() {
               ╚══════════════════════╝ */}
           <div className="flex items-center justify-center lg:justify-end">
             <Image
-              src="/hero-mockup2.jpg"
+              src="/hero-mockup3.jpg"
               alt="Pepperyn — dashboard d'analyse financière"
-              width={1020}
-              height={847}
+              width={1536}
+              height={1024}
               priority
               className="w-full max-w-[720px] h-auto"
-              style={{ mixBlendMode: 'multiply' }}
+              style={{ objectFit: 'contain' }}
             />
           </div>
         </div>{/* end grid */}
