@@ -88,6 +88,7 @@ export function HeroSection() {
               height={740}
               priority
               className="w-full max-w-[720px] h-auto"
+              style={{ mixBlendMode: 'multiply' }}
             />
           </div>
         </div>{/* end grid */}
