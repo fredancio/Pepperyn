@@ -57,8 +57,11 @@ function formatPct(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
-function ScoreCircle({ label, value }: { label: string; value: number }) {
-  const color = value >= 8 ? '#2E7D32' : value >= 5 ? '#FF6B35' : '#DC2626';
+function ScoreCircle({ label, value, inverted = false }: { label: string; value: number; inverted?: boolean }) {
+  // inverted=true : high value = bad (e.g. Risque — 8/10 risk = red)
+  const color = inverted
+    ? (value <= 3 ? '#2E7D32' : value <= 6 ? '#FF6B35' : '#DC2626')
+    : (value >= 8 ? '#2E7D32' : value >= 5 ? '#FF6B35' : '#DC2626');
   return (
     <div className="flex flex-col items-center gap-1">
       <div
@@ -138,6 +141,10 @@ export function AnalysisResult({ data, questionsRestantes, plan = 'free' }: Anal
     cash_forecast_confidence?: number;
     en_resume_cash?: string;
     bfr_indicators?: string[];
+    // V12 — Bilan Intelligence
+    bilan_intelligence?: string[];
+    bilan_confidence?: number;
+    en_resume_bilan?: string;
   };
 
   const [downloading, setDownloading] = useState<ExportFormat>(null);
@@ -421,7 +428,7 @@ export function AnalysisResult({ data, questionsRestantes, plan = 'free' }: Anal
                 <ScoreCircle label="Rentabilité" value={result.score_rentabilite as number} />
               )}
               {result.score_risque != null && (
-                <ScoreCircle label="Risque" value={result.score_risque as number} />
+                <ScoreCircle label="Risque" value={result.score_risque as number} inverted={true} />
               )}
               {result.score_structure != null && (
                 <ScoreCircle label="Structure" value={result.score_structure as number} />
@@ -522,6 +529,50 @@ export function AnalysisResult({ data, questionsRestantes, plan = 'free' }: Anal
                   <div className="border-l-4 border-[#1B73E8] bg-blue-50 px-4 py-2 rounded-r-lg mt-1">
                     <span className="text-xs font-bold text-[#1B73E8]">👉 En résumé : </span>
                     <span className="text-xs text-[#1A1A2E]">{result.en_resume_cash}</span>
+                  </div>
+                )}
+              </div>
+            </CollapseSection>
+          )}
+
+          {/* BILAN INTELLIGENCE */}
+          {result.bilan_intelligence && result.bilan_intelligence.length > 0 && (
+            <CollapseSection title="🏛️ BILAN INTELLIGENCE" color="bg-indigo-600">
+              <div className="flex flex-col gap-2">
+                {result.bilan_confidence != null && (
+                  <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium ${
+                    result.bilan_confidence >= 75 ? 'bg-green-50 text-green-700 border border-green-200' :
+                    result.bilan_confidence >= 50 ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                    'bg-red-50 text-red-700 border border-red-200'
+                  }`}>
+                    Fiabilité bilan : {result.bilan_confidence}%
+                    <span className="ml-1 opacity-70">
+                      {result.bilan_confidence >= 75 ? '· Données suffisantes' :
+                       result.bilan_confidence >= 50 ? '· Bilan partiel' :
+                       '· Données insuffisantes'}
+                    </span>
+                  </div>
+                )}
+                {result.bilan_intelligence.map((item, i) => {
+                  const s = item.replace(/^→\s*/, '');
+                  const isRed = item.startsWith('🔴');
+                  const isGreen = item.startsWith('🟢');
+                  const isWarn = item.startsWith('⚠️');
+                  return (
+                    <div key={i} className={`flex items-start gap-2 p-3 rounded-lg text-sm border ${
+                      isRed ? 'bg-red-50 border-red-100' :
+                      isGreen ? 'bg-green-50 border-green-100' :
+                      isWarn ? 'bg-amber-50 border-amber-100' :
+                      'bg-indigo-50 border-indigo-100'
+                    }`}>
+                      <span className="text-[#1A1A2E] leading-relaxed"><InlineMarkdown text={s} /></span>
+                    </div>
+                  );
+                })}
+                {result.en_resume_bilan && (
+                  <div className="border-l-4 border-indigo-500 bg-indigo-50 px-4 py-2 rounded-r-lg mt-1">
+                    <span className="text-xs font-bold text-indigo-700">👉 En résumé : </span>
+                    <span className="text-xs text-[#1A1A2E]">{result.en_resume_bilan}</span>
                   </div>
                 )}
               </div>

@@ -88,6 +88,7 @@ Règles de communication :
 
 Tu travailles uniquement à partir des données de l'analyse fournie.
 Si une information est absente des données, tu le dis en une phrase, sans développement.
+Si l'utilisateur demande comment structurer ou améliorer son fichier Excel, conseille-lui de consulter le guide disponible à /guide-donnees — mentionne que ce guide explique la structure idéale (P&L mensuel, bilan, nomenclature des lignes) et donne des prompts Copilot/ChatGPT pour restructurer son fichier.
 Tu réponds exclusivement en français."""
 
 SCORING_SYSTEM = """Tu es un évaluateur d'analyses financières. Score l'analyse sur 4 critères de 0 à 10 :
@@ -519,11 +520,11 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 # CEO DASHBOARD
 (une ligne par indicateur — UNIQUEMENT si la donnée est présente ou calculable depuis les données fournies, sinon écrire "Données insuffisantes" — n'invente JAMAIS un montant)
 💵 Chiffre d'affaires total : [montant€ ou "Données insuffisantes"]
-💰 Cash disponible : [montant€ ou "Données insuffisantes"]
+💰 Cash disponible : [utilise Trésorerie actif du bilan si présente dans le fichier, sinon déduis des flux ou de la trésorerie déclarée — "Données insuffisantes" si aucune source disponible]
 📈 EBITDA : CALCULE depuis le P&L si les charges sont disponibles (Résultat d'exploitation + Dotations amortissements/dépréciations, ou CA − charges d'exploitation hors amortissements). Si les charges globales figurent dans le fichier, donne le montant calculé — "Données insuffisantes" SEULEMENT si le compte de résultat est totalement absent ou que seul le CA est visible sans aucune charge
 📊 Marge brute : [marge brute% = (CA − coût des ventes ou charges variables) / CA — si non distinguable, calcule la marge sur coût total ; précise toujours de quelle marge il s'agit dans le label (ex: "Marge brute", "Marge opérationnelle") — "Données insuffisantes" si aucune charge n'est détaillée]
 ⏳ Runway : [nombre de mois ou "Non applicable" ou "Données insuffisantes"]
-🏦 Dette : [montant€ ou "Données insuffisantes"]
+🏦 Dette : [utilise le total dettes financières du bilan si présent — sinon "Données insuffisantes"]
 🚀 Croissance : [% vs période précédente ou "Données insuffisantes"]
 
 # MARGIN INTELLIGENCE
@@ -547,6 +548,22 @@ Raisons fiabilité : [si score < 70% : DSO manquant / échéancier absent / hist
 → BFR estimé : [montant€ ou "Données insuffisantes"]
 ⚠️ Risque liquidité : [risque trésorerie principal — avec échéance estimée si possible]
 👉 En résumé : [1 phrase sur la situation de trésorerie et le risque principal]
+
+# BILAN INTELLIGENCE
+(SI ET SEULEMENT SI le fichier contient des données de bilan — actif / passif / capitaux propres. Si aucune section bilan n'est détectable dans le fichier, omets entièrement cette section en écrivant seulement "Bilan absent".)
+Score fiabilité : [0-100]%
+Raisons fiabilité : [si score < 70% : bilan absent / partiel / non réconcilié — sinon "Bilan disponible et exploitable"]
+→ Total Actif : [montant€ ou "Bilan absent"]
+→ Actifs immobilisés : [montant€ ou "Bilan absent"]
+→ Actifs circulants : [montant€ ou "Bilan absent"]
+→ Créances clients : [montant€ ou "Bilan absent"]
+→ Trésorerie & équivalents : [montant€ ou "Bilan absent"]
+→ Capitaux propres : [montant€ ou "Bilan absent"]
+→ Dettes financières LT : [montant€ ou "Bilan absent"]
+→ Dettes fournisseurs : [montant€ ou "Bilan absent"]
+→ BFR structurel : [montant€ = Créances + Stocks − Dettes fournisseurs — ou "Bilan absent"]
+→ Ratio d'endettement : [Dettes nettes / Capitaux propres — ou "Bilan absent"]
+👉 En résumé : [1 phrase sur la solidité du bilan et les risques identifiés — ou "Bilan non disponible dans ce fichier"]
 
 # IMPACT FINANCIER
 💸 PERTE STRUCTURELLE ESTIMÉE : → [X€/an — chiffre issu des données — OU "Impact non chiffrable sur les données disponibles"]
@@ -772,6 +789,7 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
     diagnostic_immediat_raw = extract_section("DIAGNOSTIC IMMEDIAT")
     margin_intelligence_raw = extract_section("MARGIN INTELLIGENCE")
     cash_forecast_raw = extract_section("CASH FORECAST")
+    # Note: bilan_intelligence_raw is extracted later in V12 block, after helpers are defined
     impact_financier_raw = extract_section("IMPACT FINANCIER")
     avant_apres_raw = extract_section("AVANT APRES")
     simulateur_raw = extract_section("SIMULATEUR DECISION")
@@ -927,6 +945,27 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
         s = ln.strip()
         if any(kw in s.lower() for kw in ["dso", "dpo", "bfr", "besoin en fonds"]):
             bfr_indicators.append(s)
+
+    # ── Parse V12 — Bilan Intelligence ───────────────────────────────────────
+    bilan_intelligence_raw = extract_section("BILAN INTELLIGENCE")
+    # Ignore placeholder-only sections (when LLM writes "Bilan absent" as full section)
+    _bilan_is_absent = (
+        not bilan_intelligence_raw
+        or bilan_intelligence_raw.strip().lower() in ("bilan absent", "")
+    )
+    if _bilan_is_absent:
+        bilan_intelligence: list[str] = []
+        bilan_confidence: Optional[int] = None
+        en_resume_bilan: Optional[str] = None
+    else:
+        bilan_intelligence = _parse_indicator_lines(bilan_intelligence_raw)
+        bilan_confidence = _extract_confidence_score(bilan_intelligence_raw)
+        en_resume_bilan = _extract_en_resume_inner(bilan_intelligence_raw)
+        # If all lines say "Bilan absent", treat section as absent
+        if bilan_intelligence and all("bilan absent" in ln.lower() for ln in bilan_intelligence):
+            bilan_intelligence = []
+            bilan_confidence = None
+            en_resume_bilan = None
 
     # ── Parse V9 — "En résumé" lines ─────────────────────────────────────────
     en_resume_impact = _extract_en_resume_inner(impact_financier_raw)
@@ -1303,6 +1342,10 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
         "cash_forecast_confidence": cash_forecast_confidence,
         "en_resume_cash": en_resume_cash,
         "bfr_indicators": bfr_indicators,
+        # V12 — Bilan Intelligence
+        "bilan_intelligence": bilan_intelligence,
+        "bilan_confidence": bilan_confidence,
+        "en_resume_bilan": en_resume_bilan,
         # V11 — Executive Deliverables Manifesto
         "score_global": score_global,
         "niveau_urgence": niveau_urgence,
