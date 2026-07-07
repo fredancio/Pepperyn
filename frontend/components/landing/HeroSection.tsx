@@ -82,13 +82,12 @@ export function HeroSection() {
               ╚══════════════════════╝ */}
           <div className="flex items-center justify-center lg:justify-end">
             <Image
-              src="/hero-mockup3.jpg"
+              src="/hero-mockup.png"
               alt="Pepperyn — dashboard d'analyse financière"
               width={1536}
               height={1024}
               priority
               className="w-full max-w-[720px] h-auto"
-              style={{ objectFit: 'contain' }}
             />
           </div>
         </div>{/* end grid */}
