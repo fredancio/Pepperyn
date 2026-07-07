@@ -174,36 +174,29 @@ export function HeroSection() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          COLONNE DROITE — image produit
-          IMPORTANT : pas de overflow-hidden ici — il empêchait la résolution
-          de hauteur du parent en flex row, rendant l'image position:absolute
-          invisible (height:100% ne se résolvait pas).
-          Le fond #0A1528 n'est visible que si l'image ne charge pas.
+          COLONNE DROITE — image produit via background-image CSS
+          Approche background-image : aucun problème de résolution de hauteur
+          (contrairement à <img height:100%> ou position:absolute qui dépendent
+          d'une hauteur explicite sur le parent — non garantie en flex layout).
+          Le div remplit son espace flex naturellement ; background-size:cover
+          fait le reste. Fallback fond #0A1528 si l'image ne charge pas.
       ═══════════════════════════════════════════════════════════════ */}
       <div
         className="relative flex-1 w-full min-h-[400px] lg:min-h-0"
-        style={{ background: '#0A1528' }}
+        role="img"
+        aria-label="Illustration produit Pepperyn"
+        style={{
+          backgroundColor: '#0A1528',
+          backgroundImage: "url('/hero/hero-image.png')",
+          backgroundSize: 'cover',
+          backgroundPosition: 'left center',
+          backgroundRepeat: 'no-repeat',
+        }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/hero/hero-image.png"
-          alt="Pepperyn Hero"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            objectPosition: 'left center',
-            display: 'block',
-          }}
-        />
         {/*
-          Overlay 120px : fond de transition pour lisser les légères variations
-          verticales du bord gauche de l'image (top #C9D9E1, center #EAEFF7,
-          bottom #E2E8F3 ≠ moyenne #DCE5EE).
-          Visible uniquement sur desktop (hidden sur mobile).
+          Overlay 120px : lisse les variations verticales du bord gauche de
+          l'image (top #C9D9E1 / center #EAEFF7 / bottom #E2E8F3 ≠ #DCE5EE).
+          absolute + inset-y-0 = s'étire sur toute la hauteur sans height:100%.
         */}
         <div
           className="hidden lg:block absolute inset-y-0 left-0 pointer-events-none"
