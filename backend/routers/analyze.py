@@ -1257,6 +1257,11 @@ async def download_pdf(
                 detail="Données d'analyse non disponibles pour générer le PDF."
             )
 
+        # Priorité au nom de la société cible extrait du fichier analysé (ex: Optilux),
+        # pas au nom du compte utilisateur (ex: Finflate).
+        if result_dict.get("company_name"):
+            company_name = result_dict["company_name"]
+
         try:
             # ── V2 : construire/charger l'ExecutiveCaseJSON (source unique de vérité)
             executive_case = await _get_or_build_executive_case(
@@ -1342,6 +1347,11 @@ async def download_pptx(
                 status_code=404,
                 detail="Données d'analyse non disponibles pour générer le PowerPoint."
             )
+
+        # Priorité au nom de la société cible extrait du fichier analysé (ex: Optilux),
+        # pas au nom du compte utilisateur (ex: Finflate).
+        if result_dict.get("company_name"):
+            company_name = result_dict["company_name"]
 
         try:
             # ── V2 : réutiliser l'ExecutiveCaseJSON déjà construit (source unique de vérité)
