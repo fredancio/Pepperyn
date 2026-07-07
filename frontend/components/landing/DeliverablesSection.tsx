@@ -89,7 +89,29 @@ export function DeliverablesSection() {
         </div>
 
         {/* ── Scrollable Report ── */}
-        <div className="w-full rounded-2xl overflow-hidden" style={{ maxHeight: 540, overflowY: 'auto', border: '1.5px solid #b8cfee', boxShadow: '0 0 0 4px rgba(27,115,232,0.04), 0 8px 32px -4px rgba(27,115,232,0.13), 0 2px 8px rgba(0,0,0,0.06)' }}>
+        <div
+          className="w-full rounded-2xl overflow-hidden"
+          style={{
+            maxHeight: 540,
+            overflowY: 'auto',
+            background: 'rgba(248,251,255,1)',
+            border: '1.5px solid rgba(27,115,232,0.42)',
+            boxShadow: [
+              /* inset glass highlight — bord supérieur lumineux */
+              'inset 0 1.5px 0 0 rgba(255,255,255,0.95)',
+              /* reflet latéral gauche */
+              'inset 1px 0 0 0 rgba(255,255,255,0.55)',
+              /* halo extérieur de premier plan */
+              '0 0 0 5px rgba(27,115,232,0.07)',
+              /* ombre portée proche */
+              '0 2px 8px rgba(0,0,0,0.08)',
+              /* halo bleu intermédiaire */
+              '0 10px 40px -6px rgba(27,115,232,0.26)',
+              /* halo bleu profond */
+              '0 28px 72px -16px rgba(27,115,232,0.20)',
+            ].join(', '),
+          }}
+        >
           <div className="rpt-wrap">
 
             {/* Header bar */}
