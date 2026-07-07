@@ -1,85 +1,6 @@
 import Link from 'next/link';
 
 /* ─────────────────────────────────────────────────────────────────────────
-   SUB-COMPONENTS
-───────────────────────────────────────────────────────────────────────── */
-
-/** Sparkline trend arrow — wider for metric mini-cards */
-function Sparkline({ color = '#16a34a', w = 80, h = 30 }: { color?: string; w?: number; h?: number }) {
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} fill="none" aria-hidden="true">
-      <polyline
-        points={`0,${h - 4} ${w * 0.22},${h * 0.62} ${w * 0.45},${h * 0.48} ${w * 0.68},${h * 0.28} ${w * 0.88},${h * 0.1}`}
-        stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-      />
-      {/* arrowhead */}
-      <polyline
-        points={`${w * 0.76},${h * 0.06} ${w * 0.88},${h * 0.1} ${w * 0.84},${h * 0.4}`}
-        stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-/** Waterfall bar chart — 6 bars with full labels */
-function WaterfallChart() {
-  const bars = [
-    { label: 'EBITDA\nInitial',   value: '2,1M€',  h: 88,  color: '#1B73E8', pos: true  },
-    { label: 'Achats',            value: '-0,6M€', h: 30,  color: '#e07b2a', pos: false },
-    { label: 'Frais fixes',       value: '-0,4M€', h: 22,  color: '#e07b2a', pos: false },
-    { label: 'Sous-traitance',    value: '-0,3M€', h: 15,  color: '#e87070', pos: false },
-    { label: 'Autres',            value: '-0,2M€', h: 11,  color: '#DC2626', pos: false },
-    { label: 'EBITDA\nCible',     value: '2,6M€',  h: 106, color: '#16a34a', pos: true  },
-  ];
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 7, height: 148, padding: '0 2px' }}>
-      {bars.map((b, i) => (
-        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1 }}>
-          <span style={{ fontSize: 8.5, fontWeight: 700, color: b.color, lineHeight: 1.2, textAlign: 'center' }}>
-            {b.value}
-          </span>
-          <div style={{
-            width: '100%', borderRadius: 4, marginTop: 2,
-            height: b.h * 0.9, background: b.color, opacity: b.pos ? 1 : 0.85,
-          }} />
-          <span style={{ fontSize: 7, color: '#9ca3af', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.3, marginTop: 3 }}>
-            {b.label}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** 90-day timeline */
-function Timeline() {
-  const steps = [
-    { days: '30 JOURS', label: 'Lancer',    bg: '#1B73E8', border: '#1B73E8', dot: '#fff' },
-    { days: '60 JOURS', label: 'Accélérer', bg: '#4E95EF', border: '#4E95EF', dot: '#fff' },
-    { days: '90 JOURS', label: 'Mesurer',   bg: '#fff',    border: '#16a34a', dot: '#16a34a' },
-  ];
-  return (
-    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px', marginTop: 4 }}>
-      {/* track */}
-      <div style={{ position: 'absolute', left: 22, right: 22, top: 12, height: 2, background: '#e5e7eb' }} />
-      {/* active segment */}
-      <div style={{ position: 'absolute', left: 22, right: '33%', top: 12, height: 2, background: '#1B73E8' }} />
-      {steps.map((s, i) => (
-        <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, zIndex: 1 }}>
-          <div style={{ width: 24, height: 24, borderRadius: '50%', border: `2.5px solid ${s.border}`, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: s.dot }} />
-          </div>
-          <span style={{ fontSize: 7.5, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.07em', textTransform: 'uppercase' as const }}>
-            {s.days}
-          </span>
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#1a1a2e' }}>{s.label}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────────────────────
    HERO SECTION
 ───────────────────────────────────────────────────────────────────────── */
 
@@ -160,10 +81,10 @@ export function HeroSection() {
               ╚══════════════════════╝ */}
           <div className="relative lg:overflow-visible flex items-start justify-center lg:justify-end pb-16 lg:pb-20">
 
-            {/* Wrapper — positions ghost + main card */}
+            {/* Wrapper — ghost card + main image */}
             <div className="relative w-full lg:w-[720px] lg:flex-shrink-0">
 
-              {/* ── Ghost card behind (deeper angle, offset up-right) ── */}
+              {/* ── Ghost card behind ── */}
               <div style={{
                 position: 'absolute',
                 inset: 0,
@@ -177,9 +98,12 @@ export function HeroSection() {
                 boxShadow: '0 8px 32px rgba(27,115,232,0.07)',
               }} />
 
-              {/* ── Main dashboard card ── */}
-              <div
-                className="bg-white rounded-[22px] overflow-hidden w-full"
+              {/* ── Main image card ── */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/hero-mockup.jpg"
+                alt="Pepperyn — dashboard d'analyse financière"
+                className="w-full rounded-[22px] block"
                 style={{
                   position: 'relative',
                   zIndex: 1,
@@ -194,119 +118,7 @@ export function HeroSection() {
                   transform: 'rotate(1.5deg) translateY(-10px)',
                   transformOrigin: 'center top',
                 }}
-              >
-
-                {/* ═══ TOP: two panels side by side ═══ */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: '1px solid #eef2f8' }}>
-
-                  {/* ── Panel L: DÉCISION PRIORITAIRE ── */}
-                  <div style={{ padding: '22px 22px 20px', borderRight: '1px solid #eef2f8', display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-                    <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', color: '#1B73E8', textTransform: 'uppercase' as const }}>
-                      Décision prioritaire
-                    </p>
-
-                    <p style={{ fontSize: 18, fontWeight: 700, fontStyle: 'italic', color: '#0c1524', lineHeight: 1.25, marginTop: -4 }}>
-                      Réduire les achats indirects
-                    </p>
-
-                    {/* Impact + ROI */}
-                    <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
-                      <div>
-                        <p style={{ fontSize: 9, color: '#94a3b8', marginBottom: 4, fontStyle: 'italic' }}>Impact annuel estimé</p>
-                        <p style={{ fontSize: 32, fontWeight: 800, color: '#16a34a', lineHeight: 1 }}>+480 K€</p>
-                      </div>
-                      <div>
-                        <p style={{ fontSize: 9, color: '#94a3b8', marginBottom: 6 }}>ROI</p>
-                        {/* GREEN stars — not amber */}
-                        <div style={{ display: 'flex', gap: 2 }}>
-                          {[1,2,3,4,5].map(i => (
-                            <svg key={i} width="15" height="15" viewBox="0 0 20 20" fill="#22c55e">
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                            </svg>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* MARGE / EBITDA / CASH — each in a mini-card */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, paddingTop: 4 }}>
-                      {[
-                        { label: 'MARGE',  value: '+1,8 pt',  check: false },
-                        { label: 'EBITDA', value: '+480 K€',  check: true  },
-                        { label: 'CASH',   value: '+320 K€',  check: false },
-                      ].map(m => (
-                        <div
-                          key={m.label}
-                          style={{
-                            background: '#f7fafd',
-                            border: '1px solid #e2ecf7',
-                            borderRadius: 10,
-                            padding: '10px 10px 8px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 3,
-                          }}
-                        >
-                          {/* Label row — with optional checkmark for EBITDA */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                            {m.check && (
-                              <svg width="10" height="10" viewBox="0 0 12 12" fill="none" aria-hidden="true">
-                                <path d="M1.5 6l3 3 6-6" stroke="#1B73E8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
-                            )}
-                            <p style={{ fontSize: 8, fontWeight: 700, color: '#94a3b8', letterSpacing: '0.07em', textTransform: 'uppercase' as const }}>
-                              {m.label}
-                            </p>
-                          </div>
-                          <p style={{ fontSize: 13, fontWeight: 800, color: '#16a34a' }}>{m.value}</p>
-                          <Sparkline color="#16a34a" w={76} h={28} />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* ── Panel R: 5 DÉCISIONS + PLAN 90 JOURS ── */}
-                  <div style={{ padding: '22px 22px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-                    <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', color: '#94a3b8', textTransform: 'uppercase' as const }}>
-                      5 Décisions prioritaires
-                    </p>
-
-                    <WaterfallChart />
-
-                    <div style={{ borderTop: '1px solid #eef2f8', paddingTop: 14 }}>
-                      <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.09em', color: '#94a3b8', textTransform: 'uppercase' as const, marginBottom: 12 }}>
-                        Plan 90 jours
-                      </p>
-                      <Timeline />
-                    </div>
-                  </div>
-                </div>
-
-                {/* ═══ BOTTOM: Recommandations clés ═══ */}
-                <div style={{ padding: '18px 22px 20px', background: '#f8fbff', borderTop: '1px solid #eef2f8' }}>
-                  <p style={{ fontSize: 13, fontWeight: 700, fontStyle: 'italic', color: '#3d4f6a', marginBottom: 12 }}>
-                    Recommandations clés
-                  </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 28px' }}>
-                    {[
-                      'Concentration client à risque',
-                      'Nouveau segment à fort potentiel',
-                      'BFR en dégradation structurelle',
-                      'Dérive de la masse salariale',
-                    ].map((rec, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#22c55e" strokeWidth={2.5}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span style={{ fontSize: 11.5, color: '#4a5878' }}>{rec}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-              </div>{/* end main card */}
+              />
             </div>{/* end wrapper */}
           </div>{/* end right col */}
         </div>{/* end grid */}
