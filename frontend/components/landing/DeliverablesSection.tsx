@@ -94,7 +94,7 @@ export function DeliverablesSection() {
 
             {/* Header bar */}
             <div className="rpt-hdr">
-              <span className="rpt-badge">SAAS_B2B</span>
+              <span className="rpt-badge">Résumé de l&apos;analyse</span>
               <span className="rpt-conf-label">Score de confiance : 94%</span>
             </div>
 
