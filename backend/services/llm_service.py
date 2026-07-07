@@ -520,7 +520,7 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 (une ligne par indicateur — UNIQUEMENT si la donnée est présente ou calculable depuis les données fournies, sinon écrire "Données insuffisantes" — n'invente JAMAIS un montant)
 💵 Chiffre d'affaires total : [montant€ ou "Données insuffisantes"]
 💰 Cash disponible : [montant€ ou "Données insuffisantes"]
-📈 EBITDA : [montant€ ou % ou "Données insuffisantes"]
+📈 EBITDA : CALCULE depuis le P&L si les charges sont disponibles (Résultat d'exploitation + Dotations amortissements/dépréciations, ou CA − charges d'exploitation hors amortissements). Si les charges globales figurent dans le fichier, donne le montant calculé — "Données insuffisantes" SEULEMENT si le compte de résultat est totalement absent ou que seul le CA est visible sans aucune charge
 📊 Marge : [% ou "Données insuffisantes"]
 ⏳ Runway : [nombre de mois ou "Non applicable" ou "Données insuffisantes"]
 🏦 Dette : [montant€ ou "Données insuffisantes"]

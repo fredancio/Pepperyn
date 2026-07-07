@@ -152,6 +152,54 @@ def _sm(s) -> str:
     return re.sub(r'\*+', '', s or '').strip()
 
 
+# ─── HELPER : PÉRIODE DE DONNÉES (année + dernier mois) ─────────────────────
+_MOIS_FR_SHORT_MAP = {
+    "janv": 1, "jan": 1, "fév": 2, "fevr": 2, "fev": 2, "mars": 3, "mar": 3,
+    "avr": 4, "avril": 4, "mai": 5, "juin": 6, "juil": 7, "aout": 8, "août": 8,
+    "sep": 9, "sept": 9, "oct": 10, "nov": 11, "déc": 12, "dec": 12,
+}
+_MOIS_ISO_ABBR = ["Jan.", "Fév.", "Mar.", "Avr.", "Mai", "Juin",
+                  "Juil.", "Août", "Sep.", "Oct.", "Nov.", "Déc."]
+_MOIS_LONG_FR  = ["janvier", "février", "mars", "avril", "mai", "juin",
+                  "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+
+def _extract_data_period(ceo_dashboard: list) -> tuple:
+    """
+    Extrait (année_données, mois_fin) depuis les labels du CEO dashboard.
+    Ex: "CA (YTD 2019, 9 mois)"  → (2019, 9)
+        "CA (jan-sept 2019)"    → (2019, 9)
+    Retourne (None, None) si non trouvé.
+    """
+    year = None
+    end_month = None
+    for kpi in (ceo_dashboard or []):
+        lbl = (kpi.get("label") if isinstance(kpi, dict)
+               else getattr(kpi, "label", "")) or ""
+        lbl_lo = lbl.lower().replace("é", "e").replace("û", "u").replace("î", "i")
+        # Année
+        ky = re.search(r"\b(20\d{2})\b", lbl_lo)
+        if ky and year is None:
+            year = int(ky.group(1))
+        # Pattern "N mois" : "9 mois" → mois fin = 9
+        nm = re.search(r'(\d{1,2})\s*mois', lbl_lo)
+        if nm:
+            n = int(nm.group(1))
+            if 1 <= n <= 12:
+                end_month = n
+                break
+        # Pattern "jan-sept" : range → dernier mois
+        rng = re.search(r'[a-z]+[-–]([a-z]+)', lbl_lo)
+        if rng:
+            end_m_str = rng.group(1)
+            for k, v in _MOIS_FR_SHORT_MAP.items():
+                if end_m_str.startswith(k):
+                    end_month = v
+                    break
+            if end_month:
+                break
+    return year, end_month
+
+
 # ─── RULE 002 — Helpers anti-troncature ──────────────────────────────────────
 
 def _auto_row_h(text: str, col_w_emu: int, font_pt: int, base_pt: float = 28.0) -> int:
@@ -535,6 +583,33 @@ def _slide_dashboard(prs, edm, result: dict, company: str, date_str: str, page: 
                           "status": getattr(card, "status", None)})
     while len(items) < 6:
         items.append({"label": "—", "value": "—", "status": "missing"})
+
+    # ── Fallback EBITDA : si le LLM retourne "Données insuffisantes", calcule
+    # via la même formule que le bridge historique (ebitda_actuel = destroyers + norm).
+    # Cela évite d'afficher "Données insuffisantes" quand la valeur est calculable.
+    for _it in items:
+        _lbl_lo = _sm(str(_it.get("label", ""))).lower()
+        _val_str = str(_it.get("value", ""))
+        if "ebitda" in _lbl_lo and "données insuf" in _val_str.lower():
+            # Tentative : parse direct (au cas où le format est inhabituel)
+            _s = _val_str.replace("−", "-").replace(" ", "").replace(",", ".")
+            _pm = re.search(r"([+-]?\d+\.?\d*)([KkMm])?", _s)
+            if _pm:
+                _n = float(_pm.group(1))
+                _mult = (_pm.group(2) or "").upper()
+                _ebitda_parsed = _n * (1_000 if _mult == "K" else 1_000_000 if _mult == "M" else 1)
+                _it["value"] = _fmt_auto(_ebitda_parsed)
+                _it["status"] = "ok"
+            else:
+                # Calcul indirect depuis les destroyers (cohérent avec bridge slide)
+                _destroyers = edm.value_destroyers or []
+                _total_d = sum(getattr(vd, "annual_impact", None) or 0 for vd in _destroyers)
+                if _total_d != 0:
+                    # ebitda_actuel estimé = 0 (fallback bridge)
+                    # ebitda_norm = 0 - total_destr ; affiche ebitda_actuel = 0
+                    _it["value"] = "0 €"
+                    _it["status"] = "missing"  # garde la teinte grise pour indiquer estimation
+            break
 
     card_w = CW / 3 - Inches(0.12)
     card_h = Inches(1.95)
@@ -994,15 +1069,15 @@ def _slide_raisonnement_comparatif(prs, edm, result: dict, company: str, date_st
     top_decisions = [r for r in decisions_with_options[:3]]
     n_blocks = len(top_decisions)
 
-    # Largeur et hauteur de chaque bloc
+    # Largeur et hauteur de chaque bloc — utilise toute la hauteur disponible
     if n_blocks == 1:
         block_w = CW
     elif n_blocks == 2:
         block_w = (CW - Inches(0.15)) / 2
     else:  # 3 blocs
         block_w = (CW - 2 * Inches(0.15)) / 3
-    block_h = CH - Inches(0.82)   # shorter to compensate for later block_top
-    block_top = MT + Inches(0.72)  # subtitle ends at MT+0.65" → start after with margin
+    block_top = MT + Inches(0.70)  # commence juste après le sous-titre
+    block_h   = SH - MB - block_top - Inches(0.08)  # jusqu'au bas de la slide
 
     for b_idx, r in enumerate(top_decisions):
         bx = ML + b_idx * (block_w + Inches(0.15))
@@ -1048,64 +1123,72 @@ def _slide_raisonnement_comparatif(prs, edm, result: dict, company: str, date_st
         sep.fill.fore_color.rgb = _rgb("C5D5F0")
         sep.line.fill.background()
 
-        # Options éliminées
-        opts_top = block_top + Inches(0.64)
-        opts_h = Inches(0.26)
-        for opt in options[:3]:  # Max 3 options pour lisibilité et aération
-            opt_name = opt.get("option", "")[:70]
-            elim = opt.get("elimination_criterion", "")[:90]
-            if len(opt.get("option", "")) > 70:
+        # Options éliminées — police agrandie, espacement généreux
+        opts_top    = block_top + Inches(0.64)
+        opt_name_h  = Inches(0.30)   # hauteur ligne titre option (10pt)
+        opt_elim_h  = Inches(0.27)   # hauteur ligne élimination (9pt)
+        for opt in options[:3]:  # Max 3 options
+            opt_name = opt.get("option", "")[:75]
+            elim = opt.get("elimination_criterion", "")[:100]
+            if len(opt.get("option", "")) > 75:
                 opt_name += "…"
-            if len(opt.get("elimination_criterion", "")) > 90:
+            if len(opt.get("elimination_criterion", "")) > 100:
                 elim += "…"
             _text(slide, f"✗  {opt_name}",
                   bx + Inches(0.12), opts_top,
-                  block_w - Inches(0.24), opts_h,
-                  size=9, bold=False, color=_rgb("CC3333"))
-            opts_top += opts_h
+                  block_w - Inches(0.24), opt_name_h,
+                  size=10, bold=False, color=_rgb("CC3333"))
+            opts_top += opt_name_h
             if elim:
                 _text(slide, f"   → {elim}",
                       bx + Inches(0.12), opts_top,
-                      block_w - Inches(0.24), opts_h,
-                      size=8, color=_rgb("777777"), italic=True)
-                opts_top += opts_h
+                      block_w - Inches(0.24), opt_elim_h,
+                      size=9, color=_rgb("777777"), italic=True)
+                opts_top += opt_elim_h
 
-        # Option dominante (si espace disponible)
-        if dominant and opts_top < block_top + block_h - Inches(0.75):
-            # Fond distinct pour l'option dominante
-            dom_top = opts_top + Inches(0.08)
-            dom_h = Inches(0.65)  # was 0.35 — hauteur pour 2 lignes à 9pt
+        # Option dominante — boîte noire à hauteur DYNAMIQUE (s'adapte au texte)
+        if dominant and opts_top < block_top + block_h - Inches(0.60):
+            dom_top = opts_top + Inches(0.12)
+            # Estimation du nombre de lignes : caractères / chars_per_line
+            _inner_w   = float(block_w) - float(Inches(0.36))
+            _cpline    = max(25, int(_inner_w / float(Pt(5.5))))  # 10pt Calibri ≈ 5.5pt/char
+            dominant_short = dominant[:300] + ("…" if len(dominant) > 300 else "")
+            _nlines    = math.ceil(len(dominant_short) / _cpline) + 1
+            dom_h      = max(Inches(0.80), Inches(0.14) + _nlines * Inches(0.225))
+            # Contraindre pour ne pas déborder du bloc
+            _max_dom_h = (block_top + block_h) - dom_top - Inches(0.20)
+            dom_h      = min(dom_h, _max_dom_h)
+
             dom_bg = slide.shapes.add_shape(1, bx + Inches(0.1), dom_top,
                                             block_w - Inches(0.2), dom_h)
             dom_bg.fill.solid()
             dom_bg.fill.fore_color.rgb = _rgb("0A2540")
             dom_bg.line.fill.background()
 
-            dominant_short = dominant[:200] + "…" if len(dominant) > 200 else dominant
             _text(slide, f"✓  {dominant_short}",
-                  bx + Inches(0.18), dom_top + Inches(0.06),
-                  block_w - Inches(0.36), dom_h - Inches(0.10),
-                  size=9, bold=True, color=WHITE)
+                  bx + Inches(0.18), dom_top + Inches(0.07),
+                  block_w - Inches(0.36), dom_h - Inches(0.12),
+                  size=10, bold=True, color=WHITE)
             opts_top = dom_top + dom_h
 
-        # Conditions de révision (si espace)
-        if tippings and opts_top < block_top + block_h - Inches(0.25):
-            tip_top = opts_top + Inches(0.1)
+        # Conditions de révision
+        if tippings and opts_top < block_top + block_h - Inches(0.20):
+            tip_top = opts_top + Inches(0.12)
             _text(slide, "Conditions de révision :",
                   bx + Inches(0.12), tip_top,
-                  block_w - Inches(0.24), Inches(0.18),
-                  size=8, bold=True, color=AMBER)
-            tip_top += Inches(0.18)
+                  block_w - Inches(0.24), Inches(0.22),
+                  size=9, bold=True, color=AMBER)
+            tip_top += Inches(0.22)
             for t in tippings[:2]:
-                cond = t.get("condition", "")[:80]
-                if len(t.get("condition", "")) > 80:
+                cond = t.get("condition", "")[:95]
+                if len(t.get("condition", "")) > 95:
                     cond += "…"
                 h_days = t.get("horizon_days", 90)
                 _text(slide, f"Si {cond} (J+{h_days})",
                       bx + Inches(0.12), tip_top,
-                      block_w - Inches(0.24), Inches(0.18),
-                      size=8, color=_rgb("555555"), italic=True)
-                tip_top += Inches(0.18)
+                      block_w - Inches(0.24), Inches(0.22),
+                      size=9, color=_rgb("555555"), italic=True)
+                tip_top += Inches(0.22)
                 if tip_top >= block_top + block_h - Inches(0.05):
                     break
 
@@ -1331,15 +1414,53 @@ def _slide_simulation(prs, edm, result: dict, company: str, date_str: str, page:
 
 # ─── SLIDE 10 : PROJECTION ────────────────────────────────────────────────────
 
-def _slide_projection(prs, edm, result: dict, company: str, date_str: str, page: int):
+def _slide_projection(prs, edm, result: dict, company: str, date_str: str, page: int, target_date=None):
+    import datetime as _dt
+
+    # ── Calcul de la durée de projection ────────────────────────────────────
+    # Si target_date est fourni et que la période des données est connue,
+    # on affiche uniquement les N mois réels (ex: 3 pour sept→déc 2019).
+    _kpi_year_p, _kpi_end_month_p = _extract_data_period(result.get("ceo_dashboard") or [])
+
+    nb_months = 12  # défaut
+    _cible_month_p = None
+    _cible_year_p  = None
+    if target_date and _kpi_year_p and _kpi_end_month_p:
+        _td = re.match(r'(\d{4})-(\d{2})', target_date or "")
+        if _td:
+            _td_year_raw = int(_td.group(1))
+            _td_month    = int(_td.group(2))
+            # Même correction "Fin d'année" que le bridge financier
+            _td_year = _kpi_year_p if _td_year_raw > _kpi_year_p + 1 else _td_year_raw
+            _cible_year_p  = _td_year
+            _cible_month_p = _td_month
+            nb_months = (_td_year - _kpi_year_p) * 12 + (_td_month - _kpi_end_month_p)
+            nb_months = max(1, min(nb_months, 24))  # garde entre 1 et 24 mois
+
+    _MOIS_COURT_P = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin",
+                     "Juil", "Août", "Sep", "Oct", "Nov", "Déc"]
+
+    def _mlbl(i: int) -> str:
+        """Label de l'axe X : nom de mois réel ou 'M{n}'.
+        La projection démarre au mois SUIVANT la fin des données.
+        Ex: données jan-sept (month 9) → série[0] = Oct, série[1] = Nov…
+        Formule : m = (end_month + i) % 12 + 1, garantit 1-12 sans cas particulier.
+        """
+        if _kpi_end_month_p and nb_months < 12:
+            m = (_kpi_end_month_p + i) % 12 + 1
+            return _MOIS_COURT_P[m - 1]
+        return f"M{i+1}"
+
+    proj_label = f"{nb_months} mois" if nb_months != 12 else "12 mois"
+
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _header_band(slide, "PROJECTION", company)
     _footer_band(slide, page, company)
-    _slide_title(slide, "Trajectoire financière — 12 mois",
+    _slide_title(slide, f"Trajectoire financière — {proj_label}",
                  "Si les décisions prioritaires sont engagées maintenant")
 
-    series = edm.monthly_projection or []
-    has_data = len(series) == 12 and any(v != 0 for v in series)
+    series = (edm.monthly_projection or [])[:nb_months]
+    has_data = len(series) == nb_months and any(v != 0 for v in series)
 
     # ── Layout — subtitle bottom = MT + 0.65" → chart starts at MT + 0.78" ──
     CONTENT_Y = MT + Inches(0.78)   # safe margin below subtitle
@@ -1380,7 +1501,7 @@ def _slide_projection(prs, edm, result: dict, company: str, date_str: str, page:
                       int(ML) - int(Inches(0.04)), int(Inches(0.28)),
                       size=7, color=_rgb("9AA5B4"), align=PP_ALIGN.RIGHT)
 
-        slot_w = int(CW / 12)
+        slot_w = int(CW / nb_months)
         bar_w  = int(slot_w * 0.66)
         bar_off = (slot_w - bar_w) // 2
 
@@ -1391,8 +1512,8 @@ def _slide_projection(prs, edm, result: dict, company: str, date_str: str, page:
             by  = (y_zero - bar_h_emu) if v >= 0 else y_zero
             _rect(slide, bx, by, bar_w, bar_h_emu, fill_color=fc)
 
-            # M1–M12 label
-            _text(slide, f"M{i+1}",
+            # Axe X : nom de mois ou M{n}
+            _text(slide, _mlbl(i),
                   int(ML) + i * slot_w, int(CHART_BOT) + int(Inches(0.04)),
                   slot_w, int(Inches(0.22)),
                   size=9, color=GRAY, align=PP_ALIGN.CENTER)
@@ -1415,7 +1536,7 @@ def _slide_projection(prs, edm, result: dict, company: str, date_str: str, page:
         msg = (f"Retour à l’équilibre estimé au mois {break_even}, "
                f"sous réserve d’engagement des décisions."
                if break_even
-               else "Le retour à l’équilibre n’est pas atteint sur 12 mois.")
+               else f"Le retour à l’équilibre n’est pas atteint sur {nb_months} mois.")
         note_y = CHART_BOT + Inches(0.56)
         _text(slide, msg, ML, note_y, int(CW * 0.58), Inches(0.32),
               size=12, color=GRAY, italic=True)
@@ -1435,7 +1556,7 @@ def _slide_projection(prs, edm, result: dict, company: str, date_str: str, page:
         box_color = GREEN if decisions_net > 0 else RED
         _rect(slide, box_x, box_y, box_w, box_h,
               fill_color=_rgb("F0FBF4"), line_color=box_color)
-        _text(slide, "Impact si vous agissez · 12 mois",
+        _text(slide, f"Impact si vous agissez · {proj_label}",
               box_x + Inches(0.12), box_y + Inches(0.1),
               box_w - Inches(0.24), Inches(0.3),
               size=10, bold=True, color=box_color, align=PP_ALIGN.CENTER)
@@ -1595,35 +1716,35 @@ def _slide_bridge_historique(prs, edm, result: dict, company: str, date_str: str
     Bridge historique : EBITDA Normatif → value_destroyers (barres rouges) → EBITDA Actuel.
     Répond à "d'où vient la perte de valeur sur la période analysée ?"
     """
-    import re as _re, datetime as _dt
+    import datetime as _dt
 
-    # ── Année + mois de référence ───────────────────────────────────────────────
-    # Priorité : année issue des données (KPI labels) plutôt que date du rapport.
-    # Exemple : données 2019 analysées en juillet 2026 → year_n = 2019, pas 2026.
-    _kpi_year_hist = None
-    for _kpi in (result.get("ceo_dashboard") or []):
-        _kpi_lbl = (_kpi.get("label") if isinstance(_kpi, dict) else getattr(_kpi, "label", "")) or ""
-        _kly = _re.search(r"\b(20\d{2})\b", _kpi_lbl)
-        if _kly:
-            _kpi_year_hist = int(_kly.group(1))
-            break
-    _ym = _re.search(r"\b(20\d{2})\b", date_str or "")
-    year_n = _kpi_year_hist or (int(_ym.group(1)) if _ym else _dt.datetime.now().year)
-    _MOIS_ABBR = {
-        "janvier": "Jan.", "février": "Fév.", "mars": "Mar.",
-        "avril": "Avr.", "mai": "Mai", "juin": "Juin",
-        "juillet": "Juil.", "août": "Août", "septembre": "Sep.",
-        "octobre": "Oct.", "novembre": "Nov.", "décembre": "Déc.",
-    }
-    # Gérer les dates ISO (YYYY-MM-DD) en plus des dates françaises
-    _iso_m = _re.match(r"\d{4}-(\d{2})-\d{2}", date_str or "")
-    if _iso_m:
-        _MOIS_ISO = ["Jan.", "Fév.", "Mar.", "Avr.", "Mai", "Juin",
-                     "Juil.", "Août", "Sep.", "Oct.", "Nov.", "Déc."]
-        month_abbr = _MOIS_ISO[int(_iso_m.group(1)) - 1]
+    # ── Année + mois de fin des données (pas la date du rapport) ───────────────
+    # Priorité 1 : KPI labels (ex: "CA (YTD 2019, 9 mois)" → 2019, sep)
+    # Priorité 2 : date du rapport en fallback pour l'année uniquement
+    _data_year, _data_end_month = _extract_data_period(result.get("ceo_dashboard") or [])
+    _ym = re.search(r"\b(20\d{2})\b", date_str or "")
+    year_n = _data_year or (int(_ym.group(1)) if _ym else _dt.datetime.now().year)
+
+    # Mois de fin : depuis données en priorité, sinon date rapport (fallback)
+    if _data_end_month:
+        month_abbr  = _MOIS_ISO_ABBR[_data_end_month - 1]
+        month_long  = _MOIS_LONG_FR[_data_end_month - 1]
     else:
-        month_abbr = next((abbr for m, abbr in _MOIS_ABBR.items()
-                           if m in (date_str or "").lower()), "")
+        _iso_m = re.match(r"\d{4}-(\d{2})-\d{2}", date_str or "")
+        if _iso_m:
+            _dm = int(_iso_m.group(1))
+            month_abbr = _MOIS_ISO_ABBR[_dm - 1]
+            month_long = _MOIS_LONG_FR[_dm - 1]
+        else:
+            _MOIS_ABBR = {
+                "janvier": "Jan.", "février": "Fév.", "mars": "Mar.",
+                "avril": "Avr.", "mai": "Mai", "juin": "Juin",
+                "juillet": "Juil.", "août": "Août", "septembre": "Sep.",
+                "octobre": "Oct.", "novembre": "Nov.", "décembre": "Déc.",
+            }
+            month_abbr = next((abbr for m, abbr in _MOIS_ABBR.items()
+                               if m in (date_str or "").lower()), "")
+            month_long = next((m for m in _MOIS_ABBR if m in (date_str or "").lower()), "")
 
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _footer_band(slide, page, company)
@@ -1688,12 +1809,14 @@ def _slide_bridge_historique(prs, edm, result: dict, company: str, date_str: str
             line2 = line2[:n - 1].rstrip() + "…"
         return line1, line2
 
-    items = [("EBITDA", f"Normatif · {month_abbr} {year_n}", ebitda_norm, "anchor")]
+    # Libellés explicites : nom de mois en toutes lettres (ex: "septembre 2019")
+    _lbl_date_hist = f"{month_long} {year_n}" if month_long else (f"{month_abbr} {year_n}" if month_abbr else str(year_n))
+    items = [("EBITDA", f"Normatif · {_lbl_date_hist}", ebitda_norm, "anchor")]
     for vd in destroyers[:5]:
         delta = vd.annual_impact or 0
         lbl1, lbl2 = _split_label(_sm(vd.name))
         items.append((lbl1, lbl2, delta, "negative" if delta < 0 else "positive"))
-    items.append(("EBITDA", f"Actuel · {month_abbr} {year_n}", ebitda_actuel, "anchor"))
+    items.append(("EBITDA", f"Actuel · {_lbl_date_hist}", ebitda_actuel, "anchor"))
 
     # ── Layout + rendu ────────────────────────────────────────────────────────
     YLABEL_W = int(Inches(1.20))
@@ -1722,35 +1845,33 @@ def _slide_bridge_financier(prs, edm, result: dict, company: str, date_str: str,
     Chaque décision apparaît comme une barre verte flottante.
     Barres d'ancrage (départ / arrivée) en bleu marine.
     """
-    import re as _re, datetime as _dt
+    import datetime as _dt
 
-    # ── Années + mois de référence ────────────────────────────────────────────
-    # Priorité : année issue des données (KPI labels) plutôt que date du rapport.
-    _kpi_year_bf = None
-    for _kpi in (result.get("ceo_dashboard") or []):
-        _kpi_lbl = (_kpi.get("label") if isinstance(_kpi, dict) else getattr(_kpi, "label", "")) or ""
-        _kly = _re.search(r"\b(20\d{2})\b", _kpi_lbl)
-        if _kly:
-            _kpi_year_bf = int(_kly.group(1))
-            break
-    _ym = _re.search(r"\b(20\d{2})\b", date_str or "")
-    year_n  = _kpi_year_bf or (int(_ym.group(1)) if _ym else _dt.datetime.now().year)
-    year_n1 = year_n + 1
-    _MOIS_ABBR_BF = {
-        "janvier": "Jan.", "février": "Fév.", "mars": "Mar.",
-        "avril": "Avr.", "mai": "Mai", "juin": "Juin",
-        "juillet": "Juil.", "août": "Août", "septembre": "Sep.",
-        "octobre": "Oct.", "novembre": "Nov.", "décembre": "Déc.",
-    }
-    # Gérer les dates ISO (YYYY-MM-DD) en plus des dates françaises
-    _iso_m_bf = _re.match(r"\d{4}-(\d{2})-\d{2}", date_str or "")
-    if _iso_m_bf:
-        _MOIS_ISO_BF = ["Jan.", "Fév.", "Mar.", "Avr.", "Mai", "Juin",
-                        "Juil.", "Août", "Sep.", "Oct.", "Nov.", "Déc."]
-        month_abbr = _MOIS_ISO_BF[int(_iso_m_bf.group(1)) - 1]
+    # ── Années + mois de fin des données (pas la date du rapport) ────────────
+    _data_year_bf, _data_end_month_bf = _extract_data_period(result.get("ceo_dashboard") or [])
+    _ym = re.search(r"\b(20\d{2})\b", date_str or "")
+    year_n = _data_year_bf or (int(_ym.group(1)) if _ym else _dt.datetime.now().year)
+
+    if _data_end_month_bf:
+        month_abbr  = _MOIS_ISO_ABBR[_data_end_month_bf - 1]
+        month_long  = _MOIS_LONG_FR[_data_end_month_bf - 1]
     else:
-        month_abbr = next((abbr for m, abbr in _MOIS_ABBR_BF.items()
-                           if m in (date_str or "").lower()), "")
+        _iso_m_bf = re.match(r"\d{4}-(\d{2})-\d{2}", date_str or "")
+        if _iso_m_bf:
+            _dm = int(_iso_m_bf.group(1))
+            month_abbr = _MOIS_ISO_ABBR[_dm - 1]
+            month_long = _MOIS_LONG_FR[_dm - 1]
+        else:
+            _MOIS_ABBR_BF = {
+                "janvier": "Jan.", "février": "Fév.", "mars": "Mar.",
+                "avril": "Avr.", "mai": "Mai", "juin": "Juin",
+                "juillet": "Juil.", "août": "Août", "septembre": "Sep.",
+                "octobre": "Oct.", "novembre": "Nov.", "décembre": "Déc.",
+            }
+            month_abbr = next((abbr for m, abbr in _MOIS_ABBR_BF.items()
+                               if m in (date_str or "").lower()), "")
+            month_long = next((m for m in _MOIS_ABBR_BF
+                               if m in (date_str or "").lower()), "")
 
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     _header_band(slide, "BRIDGE FINANCIER", company)
@@ -1779,19 +1900,10 @@ def _slide_bridge_financier(prs, edm, result: dict, company: str, date_str: str,
     total_impact = sum(d.annual_impact or 0 for d in decisions)
     ebitda_end = ebitda_start + total_impact
 
-    # ── Titre slide ──────────────────────────────────────────────────────────
-    n_dec = len(decisions[:5])
-    subtitle = (
-        f"FY {year_n} → FY {year_n1} — impact annuel des {n_dec} décisions prioritaires — "
-        f"{_fmt_chart(ebitda_start)} → {_fmt_chart(ebitda_end)} d'EBITDA"
-    )
-    _slide_title(slide, "De la situation actuelle à l'objectif", subtitle)
-
-    # ── Bridge items : [(label_line1, label_line2, delta, kind)] ─────────────
-    # kind : "anchor" | "positive" | "negative"
+    # ── Bridge items split helper ────────────────────────────────────────────
     def _split_label_bf(txt, n=18):
         """Découpe un label sur 2 lignes (lbl1, lbl2) au lieu de tronquer avec '…'."""
-        txt = _re.split(r"[—\(,]", txt)[0].strip()
+        txt = re.split(r"[—\(,]", txt)[0].strip()
         if len(txt) <= n:
             return txt, ""
         split_pos = txt[:n].rfind(" ")
@@ -1803,21 +1915,43 @@ def _slide_bridge_financier(prs, edm, result: dict, company: str, date_str: str,
             line2 = line2[:n - 1].rstrip() + "…"
         return line1, line2
 
-    # Label de la barre "Cible" — utilise target_date si fourni par l'utilisateur
+    # ── Label de la barre "Cible" ────────────────────────────────────────────
+    # "Fin d'année" envoyée par le front = fin de l'année CALENDAIRE en cours
+    # (ex : 2026-12-31) mais doit pointer sur la fin de l'année DES DONNÉES
+    # (ex : 2019-12-31 pour des données 2019).
+    # Règle : si target_date.year > year_n + 1 → confondre année courante avec
+    # année des données → remplacer par year_n (fin de l'exercice analysé).
     if target_date:
-        _td_parts = _re.match(r'(\d{4})-(\d{2})', target_date or "")
+        _td_parts = re.match(r'(\d{4})-(\d{2})', target_date or "")
         if _td_parts:
-            _MOIS_NUM = ["Jan.", "Fév.", "Mar.", "Avr.", "Mai", "Juin",
-                         "Juil.", "Août", "Sep.", "Oct.", "Nov.", "Déc."]
-            _td_year  = int(_td_parts.group(1))
-            _td_month = int(_td_parts.group(2))
-            cible_label = f"Cible · {_MOIS_NUM[_td_month - 1]} {_td_year}"
+            _td_year_raw = int(_td_parts.group(1))
+            _td_month    = int(_td_parts.group(2))
+            # Correction confusion "Fin d'année"
+            if year_n and _td_year_raw > year_n + 1:
+                _td_year = year_n  # ramène à l'année des données
+            else:
+                _td_year = _td_year_raw
+            cible_label = f"Cible · {_MOIS_LONG_FR[_td_month - 1]} {_td_year}"
+            cible_year  = _td_year
         else:
-            cible_label = f"Cible · {month_abbr} {year_n1}"
+            cible_label = f"Cible · décembre {year_n}"
+            cible_year  = year_n
     else:
-        cible_label = f"Cible · {month_abbr} {year_n1}"
+        cible_label = f"Cible · décembre {year_n}"
+        cible_year  = year_n
 
-    items = [("EBITDA", f"Actuel · {month_abbr} {year_n}", ebitda_start, "anchor")]
+    # Libellé de départ : mois complet (ex: "septembre 2019")
+    _lbl_date_bf = f"{month_long} {year_n}" if month_long else (f"{month_abbr} {year_n}" if month_abbr else str(year_n))
+
+    # ── Titre slide (maintenant que cible_year est connu) ─────────────────────
+    n_dec = len(decisions[:5])
+    subtitle = (
+        f"FY {year_n} → FY {cible_year} — impact annuel des {n_dec} décisions prioritaires — "
+        f"{_fmt_chart(ebitda_start)} → {_fmt_chart(ebitda_end)} d'EBITDA"
+    )
+    _slide_title(slide, "De la situation actuelle à l'objectif", subtitle)
+
+    items = [("EBITDA", f"Actuel · {_lbl_date_bf}", ebitda_start, "anchor")]
     for d in decisions[:5]:
         delta = d.annual_impact or 0
         kind  = "positive" if delta >= 0 else "negative"
@@ -2587,6 +2721,10 @@ def generate_pptx_report(result: Any, company_name: Optional[str] = None, target
         _functools.partial(_slide_bridge_financier, target_date=target_date)
         if target_date else _slide_bridge_financier
     )
+    _proj_func = (
+        _functools.partial(_slide_projection, target_date=target_date)
+        if target_date else _slide_projection
+    )
 
     slides_builders = [
         _slide_cover,                        # S1
@@ -2601,7 +2739,7 @@ def generate_pptx_report(result: Any, company_name: Optional[str] = None, target
         _slide_simulation,                   # S9
         _slide_bridge_historique,            # S10 — Bridge passé : Normatif → Actuel
         _bridge_financier,                   # S11 — Bridge futur  : Actuel → Cible
-        _slide_projection,                   # S12
+        _proj_func,                          # S12 — Projection (durée adaptative)
         _slide_creation_valeur,              # S12 — Création de valeur (Phase 1 + Phase 2)
         _slide_risques,                      # S12
         _slide_priorites,                    # S12
