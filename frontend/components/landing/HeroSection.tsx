@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 /* ─────────────────────────────────────────────────────────────────────────
    HERO SECTION
@@ -77,50 +78,18 @@ export function HeroSection() {
           </div>
 
           {/* ╔══════════════════════╗
-              ║  RIGHT — mockup      ║
+              ║  RIGHT — illustration ║
               ╚══════════════════════╝ */}
-          <div className="relative lg:overflow-visible flex items-start justify-center lg:justify-end pb-16 lg:pb-20">
-
-            {/* Wrapper — ghost card + main image */}
-            <div className="relative w-full lg:w-[720px] lg:flex-shrink-0">
-
-              {/* ── Ghost card behind ── */}
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                background: '#ffffff',
-                border: '1px solid rgba(200,218,238,0.55)',
-                borderRadius: 22,
-                transform: 'rotate(5deg) translateX(16px) translateY(-24px)',
-                transformOrigin: 'center top',
-                zIndex: 0,
-                opacity: 0.7,
-                boxShadow: '0 8px 32px rgba(27,115,232,0.07)',
-              }} />
-
-              {/* ── Main image card ── */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/hero-mockup.jpg"
-                alt="Pepperyn — dashboard d'analyse financière"
-                className="w-full rounded-[22px] block"
-                style={{
-                  position: 'relative',
-                  zIndex: 1,
-                  border: '1px solid rgba(27,115,232,0.13)',
-                  boxShadow: [
-                    'inset 0 1.5px 0 rgba(255,255,255,0.95)',
-                    '0 0 0 5px rgba(27,115,232,0.04)',
-                    '0 4px 12px rgba(0,0,0,0.07)',
-                    '0 18px 56px -8px rgba(27,115,232,0.22)',
-                    '0 40px 100px -20px rgba(27,115,232,0.13)',
-                  ].join(', '),
-                  transform: 'rotate(1.5deg) translateY(-10px)',
-                  transformOrigin: 'center top',
-                }}
-              />
-            </div>{/* end wrapper */}
-          </div>{/* end right col */}
+          <div className="flex items-center justify-center lg:justify-end">
+            <Image
+              src="/hero-mockup.jpg"
+              alt="Pepperyn — dashboard d'analyse financière"
+              width={886}
+              height={740}
+              priority
+              className="w-full max-w-[720px] h-auto"
+            />
+          </div>
         </div>{/* end grid */}
 
         {/* ╔══════════════════════════════════════════════════╗
