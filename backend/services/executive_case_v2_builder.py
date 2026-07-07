@@ -34,9 +34,7 @@ _SACRED_SENTENCE = "Aucune question n'est trop simple."
 _DEFAULT_QUICK_PROMPTS = [
     "Je ne suis pas financier. Expliquez-moi simplement ce que je dois comprendre et faire.",
     "Expliquez-moi ce rapport en 2 minutes.",
-    "Que dois-je faire lundi matin ?",
     "Quels sont les risques et opportunités les plus importants ?",
-    "Expliquez-moi l'EBITDA simplement.",
     "Mon fichier semble incomplet — comment bien le structurer ?",
 ]
 
@@ -487,7 +485,7 @@ def _run_test() -> None:
     assert var["annual"] >= 0, f"VAR négatif : {var['annual']}"
     assert vco["annual"] >= 0, f"VCO négatif : {vco['annual']}"
     assert case.conversation_engine.sacred_sentence == _SACRED_SENTENCE
-    assert 4 <= len(case.conversation_engine.suggested_quick_prompts) <= 7
+    assert 4 <= len(case.conversation_engine.suggested_quick_prompts) <= 6
     assert case.metadata["company_name"] == "Acme SAS"
 
     print("✓ build_executive_case_v2 — validation Pydantic OK")
