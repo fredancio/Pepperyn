@@ -292,7 +292,7 @@ export function DeliverablesSection() {
         {/* Scroll hint removed */}
 
         {/* Bridge dots */}
-        <div className="relative w-full mb-3">
+        <div className="relative w-full mt-8 mb-8">
           <div className="absolute top-3.5 left-[16.66%] right-[16.66%] h-px opacity-20" style={{ background: 'linear-gradient(90deg,#c0392b 0%,#c0392b 33.3%,#e07b2a 33.3%,#e07b2a 66.6%,#1B73E8 66.6%,#1B73E8 100%)' }} />
           <div className="grid grid-cols-3 relative z-10">
             {[
