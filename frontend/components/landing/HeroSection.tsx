@@ -59,13 +59,22 @@ export function HeroSection() {
           COLONNE GAUCHE — fond bleu-gris clair, contenu texte
       ═══════════════════════════════════════════════════════════════ */}
       <div
-        className="flex flex-col justify-center w-full lg:w-[54%]
+        className="relative flex flex-col justify-center w-full lg:w-[54%]
                    px-8 sm:px-14 lg:pl-20 xl:pl-28 lg:pr-12
                    py-16 lg:py-24"
         style={{
           background: 'linear-gradient(160deg, #ccd9eb 0%, #d8e8f5 25%, #e5f0f9 55%, #f2f8fd 100%)',
         }}
       >
+        {/* ── Fondu bord droit → fond sombre de la colonne image (desktop) ── */}
+        <div
+          className="hidden lg:block absolute right-0 top-0 h-full pointer-events-none"
+          style={{
+            width: '90px',
+            background: 'linear-gradient(to right, transparent 0%, #0A1528 100%)',
+            zIndex: 1,
+          }}
+        />
 
         {/* ── Badge ── */}
         <div
@@ -210,7 +219,7 @@ export function HeroSection() {
           style={{
             width: '100%',
             height: '100%',
-            objectFit: 'contain',
+            objectFit: 'cover',
             objectPosition: 'center',
             display: 'block',
           }}
