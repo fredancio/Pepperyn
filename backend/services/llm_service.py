@@ -521,7 +521,7 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 💵 Chiffre d'affaires total : [montant€ ou "Données insuffisantes"]
 💰 Cash disponible : [montant€ ou "Données insuffisantes"]
 📈 EBITDA : CALCULE depuis le P&L si les charges sont disponibles (Résultat d'exploitation + Dotations amortissements/dépréciations, ou CA − charges d'exploitation hors amortissements). Si les charges globales figurent dans le fichier, donne le montant calculé — "Données insuffisantes" SEULEMENT si le compte de résultat est totalement absent ou que seul le CA est visible sans aucune charge
-📊 Marge : [% ou "Données insuffisantes"]
+📊 Marge brute : [marge brute% = (CA − coût des ventes ou charges variables) / CA — si non distinguable, calcule la marge sur coût total ; précise toujours de quelle marge il s'agit dans le label (ex: "Marge brute", "Marge opérationnelle") — "Données insuffisantes" si aucune charge n'est détaillée]
 ⏳ Runway : [nombre de mois ou "Non applicable" ou "Données insuffisantes"]
 🏦 Dette : [montant€ ou "Données insuffisantes"]
 🚀 Croissance : [% vs période précédente ou "Données insuffisantes"]

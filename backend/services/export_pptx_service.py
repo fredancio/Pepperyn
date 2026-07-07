@@ -626,6 +626,10 @@ def _slide_dashboard(prs, edm, result: dict, company: str, date_str: str, page: 
         border_c = LGRAY if is_missing else BLUE
         val_c = GRAY if is_missing else RED
         val = _sm(str(item.get("value", "—")))
+        # Tronque les explications verbales après "Données insuffisantes"
+        # (ex: "Données insuffisantes (ventilation charges incomplète)" → "Données insuffisantes")
+        if "données insuf" in val.lower():
+            val = "Données insuffisantes"
         lbl = _sm(str(item.get("label", "")))
         _rect(slide, lx, ly, card_w, card_h, fill_color=_rgb("F5F8FF"), line_color=border_c)
         val_size = 24 if len(val) <= 22 else (18 if len(val) <= 45 else 13)
