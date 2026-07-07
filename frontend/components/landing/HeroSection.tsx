@@ -2,8 +2,11 @@ import Link from 'next/link';
 
 /* ─────────────────────────────────────────────────────────────────────────
    HERO SECTION — deux colonnes (texte gauche / image droite)
-   Le gradient de la <section> coule de gauche à droite sur toute la largeur.
-   Les colonnes sont transparentes → aucune frontière visible entre elles.
+   Stratégie anti-démarcation :
+   - Colonne gauche : fond dégradé opaque, overflow-hidden
+   - Colonne droite : fond sombre + image cover + overlay 280px à gauche
+     dont la couleur (#D5E5F3→transparent) correspond au bord droit de la
+     colonne gauche (calculé d'après le dégradé 160deg)
 ───────────────────────────────────────────────────────────────────────── */
 
 const FEATURES = [
@@ -51,30 +54,20 @@ const FEATURES = [
 
 export function HeroSection() {
   return (
-    /*
-      Gradient unique sur la section — coule de gauche (bleu-gris clair)
-      vers la droite (bleu nuit). Les colonnes sont transparentes sur desktop :
-      aucune jointure entre deux fonds différents, donc aucune séparation visible.
-      Sur mobile (flex-col), chaque colonne garde son propre fond via les classes.
-    */
     <section
       className="flex flex-col lg:flex-row w-full overflow-hidden"
-      style={{
-        minHeight: 'calc(100vh - 64px)',
-        background: 'linear-gradient(to right, #ccd9eb 0%, #d8e8f5 35%, #9ab8d0 41%, #1a3555 47%, #0A1528 55%, #0A1528 100%)',
-      }}
+      style={{ minHeight: 'calc(100vh - 64px)' }}
     >
       {/* ═══════════════════════════════════════════════════════════════
-          COLONNE GAUCHE
-          Mobile   : fond dégradé clair propre (classes Tailwind)
-          Desktop  : fond transparent → gradient section visible dessous
+          COLONNE GAUCHE — fond dégradé clair, overflow-hidden
       ═══════════════════════════════════════════════════════════════ */}
       <div
-        className="flex flex-col justify-center w-full lg:w-[40%]
+        className="flex flex-col justify-center overflow-hidden w-full lg:w-[40%]
                    px-8 sm:px-14 lg:pl-20 xl:pl-28 lg:pr-10
-                   py-16 lg:py-24
-                   bg-gradient-to-br from-[#ccd9eb] to-[#f2f8fd]
-                   lg:bg-none"
+                   py-16 lg:py-24"
+        style={{
+          background: 'linear-gradient(160deg, #ccd9eb 0%, #d8e8f5 25%, #e5f0f9 55%, #f2f8fd 100%)',
+        }}
       >
 
         {/* ── Badge ── */}
@@ -86,11 +79,8 @@ export function HeroSection() {
             backdropFilter: 'blur(4px)',
           }}
         >
-          <svg
-            className="w-3.5 h-3.5 flex-shrink-0"
-            style={{ color: '#1B73E8' }}
-            fill="none" viewBox="0 0 24 24" stroke="currentColor"
-          >
+          <svg className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#1B73E8' }}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
             />
@@ -101,75 +91,50 @@ export function HeroSection() {
         </div>
 
         {/* ── H1 ── */}
-        <h1
-          className="mb-6"
-          style={{
-            fontSize: 'clamp(40px, 4vw, 60px)',
-            fontWeight: 900,
-            lineHeight: 1.06,
-            letterSpacing: '-0.028em',
-            color: '#0A1628',
-          }}
-        >
+        <h1 className="mb-6" style={{
+          fontSize: 'clamp(40px, 4vw, 60px)', fontWeight: 900,
+          lineHeight: 1.06, letterSpacing: '-0.028em', color: '#0A1628',
+        }}>
           Ne prenez plus seul vos{' '}
-          <span
-            style={{
-              color: '#1B73E8',
-              textDecoration: 'underline',
-              textDecorationColor: '#1B73E8',
-              textDecorationThickness: '3px',
-              textUnderlineOffset: '8px',
-            }}
-          >
+          <span style={{
+            color: '#1B73E8', textDecoration: 'underline',
+            textDecorationColor: '#1B73E8', textDecorationThickness: '3px',
+            textUnderlineOffset: '8px',
+          }}>
             décisions
           </span>
           {' '}financières.
         </h1>
 
         {/* ── Paragraphe ── */}
-        <p
-          className="mb-9"
-          style={{
-            fontSize: 'clamp(16px, 1.1vw, 18px)',
-            lineHeight: 1.65,
-            color: '#334155',
-            maxWidth: 460,
-          }}
-        >
+        <p className="mb-9" style={{
+          fontSize: 'clamp(16px, 1.1vw, 18px)', lineHeight: 1.65,
+          color: '#334155', maxWidth: 460,
+        }}>
           Pepperyn transforme un simple fichier Excel en{' '}
-          <strong style={{ fontWeight: 700, color: '#1B73E8' }}>
-            décisions exécutives
-          </strong>
+          <strong style={{ fontWeight: 700, color: '#1B73E8' }}>décisions exécutives</strong>
           , rapports de direction et plans d&apos;action priorisés en quelques minutes.
         </p>
 
-        {/* ── Feature icons — 4 colonnes ── */}
+        {/* ── Feature icons ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-6 mb-10">
           {FEATURES.map((f) => (
             <div key={f.title} className="flex flex-col gap-1.5">
               <div style={{ color: '#1B73E8' }}>{f.icon}</div>
-              <p style={{ fontSize: 12, fontWeight: 700, color: '#0A1628', lineHeight: 1.3 }}>
-                {f.title}
-              </p>
-              <p style={{ fontSize: 11, color: '#5f7a8f', lineHeight: 1.3 }}>
-                {f.desc}
-              </p>
+              <p style={{ fontSize: 12, fontWeight: 700, color: '#0A1628', lineHeight: 1.3 }}>{f.title}</p>
+              <p style={{ fontSize: 11, color: '#5f7a8f', lineHeight: 1.3 }}>{f.desc}</p>
             </div>
           ))}
         </div>
 
-        {/* ── CTA buttons — toujours empilés (colonne trop étroite pour côte-à-côte) ── */}
+        {/* ── CTA — empilés (colonne 40% trop étroite pour côte-à-côte) ── */}
         <div className="flex flex-col gap-3 mb-7">
           <Link
             href="/register"
             className="inline-flex items-center justify-center gap-2.5
-                       bg-[#1B73E8] text-white font-semibold rounded-[14px] px-6
+                       bg-[#1B73E8] text-white font-semibold rounded-[14px] px-6 w-fit
                        hover:bg-[#0D47A1] transition-all duration-200"
-            style={{
-              height: 56,
-              fontSize: 15,
-              boxShadow: '0 4px 20px rgba(27,115,232,0.42)',
-            }}
+            style={{ height: 56, fontSize: 15, boxShadow: '0 4px 20px rgba(27,115,232,0.42)' }}
           >
             Analyser mon premier fichier gratuitement
             <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -178,13 +143,10 @@ export function HeroSection() {
           </Link>
           <Link
             href="#livrables"
-            className="inline-flex items-center justify-center px-6
-                       font-semibold rounded-[14px]
-                       hover:bg-white/60 transition-all duration-200"
+            className="inline-flex items-center justify-center px-6 w-fit
+                       font-semibold rounded-[14px] hover:bg-white/60 transition-all duration-200"
             style={{
-              height: 52,
-              fontSize: 15,
-              color: '#0A1628',
+              height: 52, fontSize: 15, color: '#0A1628',
               border: '1.5px solid rgba(10,22,40,0.20)',
               background: 'rgba(255,255,255,0.45)',
             }}
@@ -193,7 +155,7 @@ export function HeroSection() {
           </Link>
         </div>
 
-        {/* ── Ligne de réassurance ── */}
+        {/* ── Réassurance ── */}
         <div className="flex items-center gap-2" style={{ fontSize: 13, color: '#6b8099' }}>
           <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -206,11 +168,28 @@ export function HeroSection() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          COLONNE DROITE — image PNG officielle
-          Mobile   : fond sombre explicite
-          Desktop  : transparent → gradient section (dark) visible dessous
+          COLONNE DROITE — fond sombre + image + fondu gauche (280px)
+          Couleur du fondu : ~#D5E5F3, bord droit de la colonne gauche
+          calculé d'après linear-gradient(160deg) à ~20% (coin haut-droit).
+          La zone de 280px efface optiquement la frontière entre colonnes.
       ═══════════════════════════════════════════════════════════════ */}
-      <div className="flex-1 w-full min-h-[400px] lg:min-h-0 bg-[#0A1528] lg:bg-transparent">
+      <div
+        className="relative flex-1 w-full min-h-[400px] lg:min-h-0"
+        style={{ background: '#0A1528' }}
+      >
+        {/* Fondu gauche — large zone pour effacer la frontière */}
+        <div
+          className="hidden lg:block absolute inset-y-0 left-0 pointer-events-none"
+          style={{
+            width: '280px',
+            /* Gradient vertical pour coller aux deux teintes du bord gauche :
+               haut (#D5E5F3, ~20% du dégradé 160deg) → bas (#EBF3F9, ~60%) */
+            background: `linear-gradient(to right,
+              #d5e5f3 0%,
+              rgba(213,229,243,0) 100%)`,
+            zIndex: 1,
+          }}
+        />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/hero/hero-image.png"
