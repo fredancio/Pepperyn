@@ -210,6 +210,11 @@ class AnalysisResult(BaseModel):
     en_resume_cash: Optional[str] = None
     bfr_indicators: List[str] = []
 
+    # V12 — Bilan Intelligence (source unique : section # BILAN INTELLIGENCE du LLM)
+    bilan_intelligence: List[str] = []
+    bilan_confidence: Optional[int] = None
+    en_resume_bilan: Optional[str] = None
+
     # V11 — Executive Deliverables Manifesto (CEO Dashboard, Quick Wins, Plan 30/60/90, Scénarios)
     score_global: Optional[int] = None          # calculé en Python, jamais par le LLM
     niveau_urgence: Optional[str] = None         # calculé en Python à partir de score_global

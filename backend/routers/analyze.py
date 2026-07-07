@@ -960,6 +960,38 @@ async def chat_with_analysis(
     )
 
 
+def _resolve_entity_name(analyse_id: str) -> Optional[str]:
+    """
+    Retourne le nom de l'entité liée à cette analyse (filiale ou client),
+    ou None si aucune entité n'est associée.
+    Priorité sur le nom du compte utilisateur dans les en-têtes de rapports.
+    """
+    try:
+        from main import get_supabase_service as _gsvc
+        _sb = _gsvc()
+        _row = (
+            _sb.from_("analyses")
+            .select("entity_id")
+            .eq("id", analyse_id)
+            .single()
+            .execute()
+        )
+        if _row.data and _row.data.get("entity_id"):
+            _eid = _row.data["entity_id"]
+            _ent = (
+                _sb.from_("entities")
+                .select("name")
+                .eq("id", _eid)
+                .single()
+                .execute()
+            )
+            if _ent.data and _ent.data.get("name"):
+                return _ent.data["name"]
+    except Exception:
+        pass
+    return None
+
+
 def _verify_export_access(analyse_id: str, company_id: str) -> None:
     """
     Vérifie que l'analyse demandée appartient bien à la company authentifiée
@@ -1211,8 +1243,9 @@ async def download_pdf(
     # Enforce one-format rule (bypassé pour PRO / POWER / SCALE)
     _check_and_lock_format(analyse_id, "pdf", plan)
 
-    # Nom de la société, pour personnaliser la page de couverture du rapport
-    # (page de garde) — simple lecture, aucune nouvelle logique métier.
+    # Nom pour la couverture du rapport :
+    # 1. Nom du compte (fallback)
+    # 2. Nom de l'entité analysée si filiale/client sélectionné (priorité)
     company_name = None
     try:
         from main import get_supabase_service
@@ -1224,6 +1257,9 @@ async def download_pdf(
             company_name = company_row.data.get("name")
     except Exception:
         pass
+    entity_name = _resolve_entity_name(analyse_id)
+    if entity_name:
+        company_name = entity_name
 
     # Track export event (Supabase + Airtable)
     _usage_service.track_activity(company_id, "export_generated", {
@@ -1303,8 +1339,9 @@ async def download_pptx(
     # Enforce one-format rule (bypassé pour PRO / POWER / SCALE)
     _check_and_lock_format(analyse_id, "pptx", plan)
 
-    # Nom de la société — pour personnaliser la couverture du Board Deck
-    # (simple lecture, aucune logique métier).
+    # Nom pour la couverture du Board Deck :
+    # 1. Nom du compte (fallback)
+    # 2. Nom de l'entité analysée si filiale/client sélectionné (priorité)
     company_name = None
     try:
         from main import get_supabase_service
@@ -1316,6 +1353,9 @@ async def download_pptx(
             company_name = company_row.data.get("name")
     except Exception:
         pass
+    entity_name = _resolve_entity_name(analyse_id)
+    if entity_name:
+        company_name = entity_name
 
     # Track export event (Supabase + Airtable)
     _usage_service.track_activity(company_id, "export_generated", {
