@@ -82,26 +82,13 @@ html, body {
 .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
 /* ── Hero Section : fond unifié blanc → navy (desktop uniquement) ────────
-   Inline styles ont une spécificité haute → on utilise !important ici.
-   Sur mobile : chaque colonne garde son propre fond (via inline style).
+   !important override les inline styles React qui ont une spécificité haute.
+   Sur mobile : chaque colonne garde son propre fond (via inline style JSX).
 ──────────────────────────────────────────────────────────────────────── */
 @media (min-width: 1024px) {
   .hero-section {
-    background: linear-gradient(
-      to right,
-      #ffffff   0%,
-      #f3f8fd  10%,
-      #e0eef8  22%,
-      #cadef0  33%,
-      #aecde7  40%,   /* couleur à la frontière des colonnes */
-      #5595c2  48%,
-      #174b78  56%,
-      #091e3a  63%,
-      #0A1528  70%,
-      #0A1528 100%
-    ) !important;
+    background: linear-gradient(to right, #ffffff 0%, #f3f8fd 10%, #e0eef8 22%, #cadef0 33%, #aecde7 40%, #5595c2 48%, #174b78 56%, #091e3a 63%, #0A1528 70%, #0A1528 100%) !important;
   }
-  /* Les deux colonnes deviennent transparentes → gradient section visible */
   .hero-left-col,
   .hero-right-col {
     background: transparent !important;
