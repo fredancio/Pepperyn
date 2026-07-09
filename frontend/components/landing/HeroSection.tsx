@@ -201,23 +201,26 @@ export function HeroSection() {
           l'image (top #C9D9E1 / center #EAEFF7 / bottom #E2E8F3 ≠ #DCE5EE).
           absolute + inset-y-0 = s'étire sur toute la hauteur sans height:100%.
         */}
-        {/* Overlay gauche 220px — même couleur que le bord droit du gradient
-            de la colonne gauche (#e3e2e6), lisse les variations verticales */}
+        {/* ── Overlay gauche 400px (horizontal) ──────────────────────────────
+            Paliers multiples pour simuler un fondu en courbe (css gradient
+            ne supporte pas l'easing natif). Reste opaque longtemps puis
+            s'efface vite à la fin — la zone de contenu reste lisible. */}
         <div
           className="hidden lg:block absolute inset-y-0 left-0 pointer-events-none"
           style={{
-            width: '220px',
-            background: 'linear-gradient(to right, rgba(227,226,230,0.72) 0%, rgba(227,226,230,0) 100%)',
+            width: '400px',
+            background: 'linear-gradient(to right, rgba(227,226,230,0.88) 0%, rgba(227,226,230,0.70) 20%, rgba(227,226,230,0.42) 50%, rgba(227,226,230,0.15) 75%, rgba(227,226,230,0) 100%)',
             zIndex: 2,
           }}
         />
-        {/* Overlay haut — masque les 2 lignes noires (#1e2023) mesurées
-            en haut de hero-image.png. Fondu de 90px vers le bas. */}
+        {/* ── Overlay haut 180px (vertical) ───────────────────────────────
+            Masque les pixels noirs en haut de l'image ET le coin dark en
+            haut à droite de la colonne (au-delà des 400px gauche). */}
         <div
           className="absolute inset-x-0 top-0 pointer-events-none"
           style={{
-            height: '90px',
-            background: 'linear-gradient(to bottom, rgba(232,234,237,0.92) 0%, rgba(232,234,237,0) 100%)',
+            height: '180px',
+            background: 'linear-gradient(to bottom, rgba(227,226,230,0.97) 0%, rgba(227,226,230,0.75) 25%, rgba(227,226,230,0.35) 60%, rgba(227,226,230,0) 100%)',
             zIndex: 3,
           }}
         />
