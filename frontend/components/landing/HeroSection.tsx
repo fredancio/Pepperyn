@@ -177,54 +177,25 @@ export function HeroSection() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          COLONNE DROITE — image produit via background-image CSS
-          Approche background-image : aucun problème de résolution de hauteur
-          (contrairement à <img height:100%> ou position:absolute qui dépendent
-          d'une hauteur explicite sur le parent — non garantie en flex layout).
-          Le div remplit son espace flex naturellement ; background-size:cover
-          fait le reste. Fallback fond #0A1528 si l'image ne charge pas.
+          COLONNE DROITE — image avec transparence baked-in
+          hero-image.png a été modifié avec Pillow : dégradé ease-in²
+          de transparence sur 350px (gauche) et 160px (haut).
+          backgroundColor: #e3e2e6 = bord droit exact de la col. gauche
+          → les zones transparentes révèlent cette couleur → jonction invisible.
+          Aucun overlay CSS nécessaire.
       ═══════════════════════════════════════════════════════════════ */}
       <div
-        className="relative flex-1 w-full min-h-[400px] lg:min-h-0"
+        className="flex-1 w-full min-h-[400px] lg:min-h-0"
         role="img"
         aria-label="Illustration produit Pepperyn"
         style={{
-          backgroundColor: '#0A1528',
+          backgroundColor: '#e3e2e6',
           backgroundImage: "url('/hero/hero-image.png')",
           backgroundSize: 'cover',
-          backgroundPosition: 'left center',
+          backgroundPosition: 'left top',
           backgroundRepeat: 'no-repeat',
         }}
-      >
-        {/*
-          Overlay 120px : lisse les variations verticales du bord gauche de
-          l'image (top #C9D9E1 / center #EAEFF7 / bottom #E2E8F3 ≠ #DCE5EE).
-          absolute + inset-y-0 = s'étire sur toute la hauteur sans height:100%.
-        */}
-        {/* ── Overlay gauche 400px (horizontal) ──────────────────────────────
-            Paliers multiples pour simuler un fondu en courbe (css gradient
-            ne supporte pas l'easing natif). Reste opaque longtemps puis
-            s'efface vite à la fin — la zone de contenu reste lisible. */}
-        <div
-          className="hidden lg:block absolute inset-y-0 left-0 pointer-events-none"
-          style={{
-            width: '400px',
-            background: 'linear-gradient(to right, rgba(227,226,230,0.88) 0%, rgba(227,226,230,0.70) 20%, rgba(227,226,230,0.42) 50%, rgba(227,226,230,0.15) 75%, rgba(227,226,230,0) 100%)',
-            zIndex: 2,
-          }}
-        />
-        {/* ── Overlay haut 180px (vertical) ───────────────────────────────
-            Masque les pixels noirs en haut de l'image ET le coin dark en
-            haut à droite de la colonne (au-delà des 400px gauche). */}
-        <div
-          className="absolute inset-x-0 top-0 pointer-events-none"
-          style={{
-            height: '180px',
-            background: 'linear-gradient(to bottom, rgba(227,226,230,0.97) 0%, rgba(227,226,230,0.75) 25%, rgba(227,226,230,0.35) 60%, rgba(227,226,230,0) 100%)',
-            zIndex: 3,
-          }}
-        />
-      </div>
+      />
 
     </section>
   );
