@@ -70,7 +70,10 @@ export function HeroSection() {
                    px-8 sm:px-14 lg:pl-20 xl:pl-28 lg:pr-10
                    py-16 lg:py-24"
         style={{
-          background: 'linear-gradient(to right, #f8fafc 0%, #eaf3fb 50%, #dce5ee 100%)',
+          /* Gradient calibré sur la couleur mesurée du bord gauche de l'image :
+             x=0→20 de hero-image.png = #e3e2e6 (gris neutre).
+             Le gradient se termine sur cette couleur exacte → jonction invisible. */
+          background: 'linear-gradient(to right, #f8fafc 0%, #eaf3fb 45%, #e3e2e6 100%)',
         }}
       >
 
@@ -198,11 +201,14 @@ export function HeroSection() {
           l'image (top #C9D9E1 / center #EAEFF7 / bottom #E2E8F3 ≠ #DCE5EE).
           absolute + inset-y-0 = s'étire sur toute la hauteur sans height:100%.
         */}
+        {/* Overlay 220px — même couleur que le bord droit du gradient gauche (#e3e2e6)
+            + légère opacité pour lisser les variations verticales de l'image
+            (bord varie de #d4d5dd en haut à #eceaec au centre) */}
         <div
           className="hidden lg:block absolute inset-y-0 left-0 pointer-events-none"
           style={{
-            width: '120px',
-            background: 'linear-gradient(to right, rgba(220,229,238,0.65) 0%, rgba(220,229,238,0) 100%)',
+            width: '220px',
+            background: 'linear-gradient(to right, rgba(227,226,230,0.72) 0%, rgba(227,226,230,0) 100%)',
             zIndex: 2,
           }}
         />
