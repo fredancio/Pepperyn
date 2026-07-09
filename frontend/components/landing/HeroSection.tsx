@@ -201,15 +201,24 @@ export function HeroSection() {
           l'image (top #C9D9E1 / center #EAEFF7 / bottom #E2E8F3 ≠ #DCE5EE).
           absolute + inset-y-0 = s'étire sur toute la hauteur sans height:100%.
         */}
-        {/* Overlay 220px — même couleur que le bord droit du gradient gauche (#e3e2e6)
-            + légère opacité pour lisser les variations verticales de l'image
-            (bord varie de #d4d5dd en haut à #eceaec au centre) */}
+        {/* Overlay gauche 220px — même couleur que le bord droit du gradient
+            de la colonne gauche (#e3e2e6), lisse les variations verticales */}
         <div
           className="hidden lg:block absolute inset-y-0 left-0 pointer-events-none"
           style={{
             width: '220px',
             background: 'linear-gradient(to right, rgba(227,226,230,0.72) 0%, rgba(227,226,230,0) 100%)',
             zIndex: 2,
+          }}
+        />
+        {/* Overlay haut — masque les 2 lignes noires (#1e2023) mesurées
+            en haut de hero-image.png. Fondu de 90px vers le bas. */}
+        <div
+          className="absolute inset-x-0 top-0 pointer-events-none"
+          style={{
+            height: '90px',
+            background: 'linear-gradient(to bottom, rgba(232,234,237,0.92) 0%, rgba(232,234,237,0) 100%)',
+            zIndex: 3,
           }}
         />
       </div>
