@@ -35,6 +35,28 @@ from models.schemas import AnalysisResult
 
 logger = logging.getLogger(__name__)
 
+# ─── Modèles disponibles ─────────────────────────────────────────────────────
+# IMPORTANT : ces constantes DOIVENT être définies AVANT toute fonction qui les
+# utilise comme valeur par défaut d'argument (Python évalue les defaults à l'import).
+
+MODEL_HAIKU  = "claude-haiku-4-5-20251001"
+MODEL_SONNET = "claude-sonnet-4-6"
+MODEL_OPUS   = "claude-opus-4-6"
+
+# Plans qui reçoivent systématiquement Opus (quelle que soit la taille des données)
+_OPUS_PLANS = {"scale"}
+
+# Seuil de volume de données déclenchant l'escalade Opus (caractères JSON)
+_OPUS_DATA_THRESHOLD = 10_000
+
+# Tarifs tokens ($/M) — pour le calcul de coût
+_PRICE_IN  = {MODEL_HAIKU: 0.25,  MODEL_SONNET: 3.0,  MODEL_OPUS: 15.0}
+_PRICE_OUT = {MODEL_HAIKU: 1.25,  MODEL_SONNET: 15.0, MODEL_OPUS: 75.0}
+
+# Paramètres fixes Call 1 / Call 2
+CALL_1_BASE = {"temperature": 0.2, "max_tokens": 5500}
+CALL_2_BASE = {"temperature": 0.2, "max_tokens": 4000}
+
 
 # ─── Termes interdits — RÈGLE ABSOLUE N°4 ────────────────────────────────────
 # Chaque clé = terme interdit. Valeur = remplacement démontrable.
@@ -499,29 +521,6 @@ def _format_evidence_graph_for_audit(evidence_graph: dict[str, Any]) -> str:
             " c'est une erreur — corriger."
         )
     return "\n".join(lines)
-
-
-# ─── Modèles disponibles ─────────────────────────────────────────────────────
-
-MODEL_HAIKU  = "claude-haiku-4-5-20251001"
-MODEL_SONNET = "claude-sonnet-4-6"
-MODEL_OPUS   = "claude-opus-4-6"
-
-# Plans qui reçoivent systématiquement Opus (quelle que soit la taille des données)
-_OPUS_PLANS = {"scale"}
-
-# Seuil de volume de données déclenchant l'escalade Opus (caractères JSON)
-_OPUS_DATA_THRESHOLD = 10_000
-
-# Tarifs tokens ($/M) — pour le calcul de coût
-_PRICE_IN  = {MODEL_HAIKU: 0.25,  MODEL_SONNET: 3.0,  MODEL_OPUS: 15.0}
-_PRICE_OUT = {MODEL_HAIKU: 1.25,  MODEL_SONNET: 15.0, MODEL_OPUS: 75.0}
-
-# ─── LLM params v4 ───────────────────────────────────────────────────────────
-
-# Paramètres fixes (modèle injecté dynamiquement)
-CALL_1_BASE = {"temperature": 0.2, "max_tokens": 5500}
-CALL_2_BASE = {"temperature": 0.2, "max_tokens": 4000}
 
 
 def _select_analysis_model(plan_tier: str, parsed_data: dict) -> str:
