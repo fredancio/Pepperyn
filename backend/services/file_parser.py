@@ -177,6 +177,65 @@ def _extract_bfr_summary(sheets_data: list[dict[str, Any]]) -> dict[str, Any]:
     return found
 
 
+def _extract_bilan_summary(sheets_data: list[dict[str, Any]]) -> dict[str, Any]:
+    """
+    Proactively extract key balance-sheet (bilan) indicators from all parsed sheets.
+
+    Placed at the TOP of the LLM JSON payload (like bfr_summary) so bilan data
+    is never lost due to the 14 000-char truncation in llm_service.py.
+    Scans every row of every sheet for actif / passif / capitaux keywords and
+    picks the first adjacent non-zero numeric value.
+    """
+    BILAN_PATTERNS = {
+        "total_actif":           ["total actif", "total de l'actif", "total assets"],
+        "actifs_immobilises":    ["actifs immobilisés", "actif immobilisé", "immobilisations nettes",
+                                  "total immobilisations"],
+        "actifs_circulants":     ["actif circulant", "actifs circulants", "total actif circulant",
+                                  "current assets"],
+        "creances_clients":      ["créances clients", "creances clients", "clients et comptes",
+                                  "accounts receivable"],
+        "stocks":                ["stocks", "stock total", "inventaires"],
+        "tresorerie_actif":      ["trésorerie actif", "tresorerie actif", "disponibilités",
+                                  "valeurs mobilières", "cash and cash equivalents"],
+        "total_passif":          ["total passif", "total du passif", "total liabilities"],
+        "capitaux_propres":      ["capitaux propres", "fonds propres", "total capitaux propres",
+                                  "shareholders equity", "equity"],
+        "dettes_financieres_lt": ["dettes financières", "emprunts", "dettes à long", "dettes lt",
+                                  "long term debt"],
+        "dettes_fournisseurs":   ["dettes fournisseurs", "fournisseurs et comptes",
+                                  "accounts payable"],
+        "autres_dettes_ct":      ["autres dettes court terme", "dettes à court terme",
+                                  "current liabilities"],
+    }
+
+    found: dict[str, Any] = {}
+
+    for sheet in sheets_data:
+        rows = sheet.get("full_table") or sheet.get("sample_rows") or []
+        sheet_name = sheet.get("sheet_name", "")
+        for row in rows:
+            for cell_val in row.values():
+                if not isinstance(cell_val, str):
+                    continue
+                cell_lower = cell_val.lower().strip()
+                for kpi, patterns in BILAN_PATTERNS.items():
+                    if kpi in found:
+                        continue
+                    if any(pat in cell_lower for pat in patterns):
+                        nums = [
+                            v for v in row.values()
+                            if isinstance(v, (int, float)) and v not in (0, 0.0)
+                        ]
+                        if nums:
+                            found[kpi] = {
+                                "label": cell_val[:80],
+                                "value": nums[0],
+                                "sheet": sheet_name,
+                            }
+
+    return found
+
+
 def _build_excel_result(
     filename: str, sheet_names: list[str], sheets_data: list[dict[str, Any]]
 ) -> dict[str, Any]:
@@ -190,6 +249,13 @@ def _build_excel_result(
     bfr_summary = _extract_bfr_summary(sheets_data)
     if bfr_summary:
         result["bfr_summary"] = bfr_summary
+
+    # Bilan summary injected at the TOP — key balance-sheet lines are
+    # extracted proactively and placed before the full sheets JSON so they
+    # survive the 14 000-char truncation even if the bilan sheet appears later.
+    bilan_summary = _extract_bilan_summary(sheets_data)
+    if bilan_summary:
+        result["bilan_summary"] = bilan_summary
 
     # ── RÈGLE ABSOLUE N°10 : manifeste complet de toutes les feuilles ────────
     # Injecté dans le contexte LLM AVANT les données.
@@ -294,22 +360,30 @@ def _parse_excel_pandas(file_bytes: bytes, filename: str) -> dict[str, Any]:
         parsed_names.add(sheet_name)
 
     not_parsed = [n for n in all_sheet_names if n not in parsed_names]
-    return {
+    result_pandas: dict[str, Any] = {
         "filename": filename,
         "format": "excel",
         "sheets_count": len(all_sheet_names),
-        "sheets": sheets_data,
         "total_rows": sum(s.get("rows", 0) for s in sheets_data),
-        "all_sheets_manifest": {
-            "total_sheets_in_workbook": len(all_sheet_names),
-            "sheets_parsed_in_detail": list(parsed_names),
-            "sheets_present_but_not_parsed": not_parsed,
-            "audit_note": (
-                f"ATTENTION : {len(not_parsed)} feuille(s) non analysée(s) : {not_parsed}. "
-                "Vérifier avant de déclarer une donnée absente."
-            ) if not_parsed else "Toutes les feuilles ont été analysées.",
-        },
     }
+    # BFR + bilan summaries injected FIRST (before sheets) to survive 14 000-char truncation
+    bfr_s = _extract_bfr_summary(sheets_data)
+    if bfr_s:
+        result_pandas["bfr_summary"] = bfr_s
+    bilan_s = _extract_bilan_summary(sheets_data)
+    if bilan_s:
+        result_pandas["bilan_summary"] = bilan_s
+    result_pandas["all_sheets_manifest"] = {
+        "total_sheets_in_workbook": len(all_sheet_names),
+        "sheets_parsed_in_detail": list(parsed_names),
+        "sheets_present_but_not_parsed": not_parsed,
+        "audit_note": (
+            f"ATTENTION : {len(not_parsed)} feuille(s) non analysée(s) : {not_parsed}. "
+            "Vérifier avant de déclarer une donnée absente."
+        ) if not_parsed else "Toutes les feuilles ont été analysées.",
+    }
+    result_pandas["sheets"] = sheets_data
+    return result_pandas
 
 
 def _detect_header_row(xl: pd.ExcelFile, sheet_name: str, max_scan: int = 6) -> int:
@@ -418,16 +492,30 @@ def _analyze_dataframe(df: pd.DataFrame, sheet_name: str) -> dict[str, Any]:
 
     numeric_cols = df.select_dtypes(include=['number']).columns
     is_pl_format = _is_pl_format(df)
+    is_bilan_format = _is_bilan_format(df)
 
-    # ── Full table for P&L / small structured datasets ────────────────────────
-    if is_pl_format or (len(df) <= 60 and len(df.columns) <= 20):
+    # ── Full table for P&L / bilan / small structured datasets ───────────────
+    # Les feuilles bilan (≤120 lignes) sont transmises en intégralité pour que le
+    # LLM dispose de toutes les lignes actif/passif/capitaux — même si elles
+    # dépassent les 60 lignes du seuil générique.
+    send_full = (
+        is_pl_format
+        or (is_bilan_format and len(df) <= 120)
+        or (len(df) <= 60 and len(df.columns) <= 20)
+    )
+    if send_full:
         full_rows = []
         for _, row in df.iterrows():
             row_dict = {str(k): _serialize_value(v) for k, v in row.items()}
             if any(v is not None for v in row_dict.values()):
                 full_rows.append(row_dict)
         summary["full_table"] = full_rows
-        summary["format_hint"] = "pl_mensuel" if is_pl_format else "structured"
+        if is_pl_format:
+            summary["format_hint"] = "pl_mensuel"
+        elif is_bilan_format:
+            summary["format_hint"] = "bilan"
+        else:
+            summary["format_hint"] = "structured"
     else:
         # ── Stats for larger datasets ──────────────────────────────────────────
         if len(numeric_cols) > 0:
@@ -515,6 +603,23 @@ def _is_pl_format(df: pd.DataFrame) -> bool:
     has_pl_rows = any(any(kw in v for kw in pl_keywords) for v in first_col_values)
 
     return has_month_cols or has_pl_rows
+
+
+def _is_bilan_format(df: pd.DataFrame) -> bool:
+    """
+    Detect if the dataframe looks like a balance sheet (bilan).
+    Heuristic: first column contains bilan-specific keywords.
+    """
+    bilan_keywords = {
+        "actif", "passif", "capitaux", "immobilisation", "créance", "creance",
+        "dettes", "dette", "fonds propres", "patrimoine", "bfr",
+        "fonds de roulement", "total actif", "total passif", "trésorerie",
+        "tresorerie", "stock", "disponibilit",
+    }
+    first_col_values: set[str] = set()
+    if len(df.columns) > 0:
+        first_col_values = {str(v).lower() for v in df.iloc[:, 0].dropna().head(30)}
+    return any(any(kw in v for kw in bilan_keywords) for v in first_col_values)
 
 
 def _detect_financial_columns(columns: list[str]) -> dict[str, list[str]]:

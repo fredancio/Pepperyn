@@ -831,12 +831,26 @@ def _build_user_prompt_call1(
                 f" dans les feuilles non parsées : {not_parsed}\n"
             )
 
+    # ── Note bilan_summary ────────────────────────────────────────────────────
+    bilan_note = ""
+    bilan_summary = parsed_data.get("bilan_summary", {})
+    if bilan_summary:
+        lines = [
+            f"  → {kpi.replace('_', ' ').title()} : {v['value']:,.0f} € (feuille « {v['sheet']} »)"
+            for kpi, v in bilan_summary.items()
+        ]
+        bilan_note = (
+            "\n📊 BILAN — DONNÉES EXTRAITES DIRECTEMENT DU FICHIER :\n"
+            + "\n".join(lines)
+            + "\nCes valeurs sont GARANTIES par extraction directe. Utilise-les pour la section # BILAN INTELLIGENCE.\n"
+        )
+
     prompt = f"""Voici des données financières extraites d'un fichier utilisateur :
 
 CONTEXTE BUSINESS
 - Secteur : {industry or 'Non précisé'}
 - Modèle : {business_model or 'Non précisé'}
-{manifest_note}
+{manifest_note}{bilan_note}
 DONNÉES ACTUELLES
 {data_summary}
 """
