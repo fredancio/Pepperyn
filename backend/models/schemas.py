@@ -134,6 +134,9 @@ class ScenarioCase(BaseModel):
 class DataQualityInfo(BaseModel):
     """Section fiabilité des données injectée dans chaque rapport."""
     score_data: int = Field(default=70, ge=0, le=100)
+    # RÈGLE N°9 — 3 scores distincts (cohérence PDF/PPTX/Web)
+    score_completude: int = Field(default=-1, ge=-1, le=100)             # -1 = non calculé
+    score_confiance_conclusions: int = Field(default=-1, ge=-1, le=100)  # -1 = non calculé
     status: str = "ok"           # "ok" | "warning" | "blocked"
     document_format: str = "unknown"
     mapping_summary: List[str] = []

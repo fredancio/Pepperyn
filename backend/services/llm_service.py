@@ -1195,6 +1195,35 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
     plan_30_60_90_raw = extract_section("PLAN 30 60 90")
     scenarios_raw = extract_section("SCENARIOS")
 
+    # ── RÈGLE N°9 — Parse "# FIABILITÉ ANALYSE" (3 scores distincts) ────────
+    fiabilite_raw = extract_section("FIABILITÉ ANALYSE")
+    score_qualite_technique_llm: int = -1
+    score_completude_llm: int = -1
+    score_confiance_llm: int = -1
+
+    def _extract_score_from_line(raw_section: str, keyword: str) -> int:
+        """Extrait un entier X depuis 'keyword : X/100' ou 'keyword : [X/100]'."""
+        for line in raw_section.splitlines():
+            if keyword.lower() in line.lower():
+                m = re.search(r"\[?(\d{1,3})/100\]?", line)
+                if m:
+                    return min(100, max(0, int(m.group(1))))
+        return -1
+
+    if fiabilite_raw:
+        score_qualite_technique_llm = _extract_score_from_line(fiabilite_raw, "qualité technique")
+        score_completude_llm        = _extract_score_from_line(fiabilite_raw, "complétude données")
+        score_confiance_llm         = _extract_score_from_line(fiabilite_raw, "confiance conclusions")
+        # RÈGLE N°9 : Confiance ≤ min(Qualité, Complétude) — corrige si le LLM a dépassé
+        if score_qualite_technique_llm >= 0 and score_completude_llm >= 0 and score_confiance_llm >= 0:
+            max_allowed = min(score_qualite_technique_llm, score_completude_llm)
+            if score_confiance_llm > max_allowed:
+                score_confiance_llm = max_allowed
+        # Remplace le score_confiance initial (= confiance de classification) par
+        # la confiance de l'analyse générée par le LLM, si disponible
+        if score_confiance_llm >= 0:
+            score_confiance = score_confiance_llm
+
     # ── Parse diagnostic lines ───────────────────────────────────────────────
     diag_revenus = diag_couts = diag_marges = ""
     for line in diagnostic_raw.splitlines():
@@ -1684,7 +1713,11 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
 
     return {
         "type_document": doc_type,
-        "score_confiance": score_confiance,
+        "score_confiance": score_confiance,  # = LLM confidence conclusions si parsé, sinon classification
+        # RÈGLE N°9 — 3 scores distincts (accessibles par les exports si besoin)
+        "score_qualite_technique": score_qualite_technique_llm,
+        "score_completude_llm": score_completude_llm,
+        "score_confiance_conclusions_llm": score_confiance_llm,
         "resume_executif": resume,
         "diagnostic_revenus": diag_revenus,
         "diagnostic_couts": diag_couts,

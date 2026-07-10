@@ -394,6 +394,22 @@ def _validate_structural(raw_sheets: dict) -> QualityGateResult:
         completude += 5
     completude = min(100, completude)
 
+    # ── Anomalie complétude (empêche "Aucune anomalie" quand données incomplètes) ─
+    if completude < 60:
+        missing_items: list[str] = []
+        if not any(kw in all_mapping_text for kw in ["bilan", "actif", "passif", "capitaux"]):
+            missing_items.append("bilan")
+        if not any(kw in all_mapping_text for kw in ["trésorerie", "tresorerie", "flux", "cash"]):
+            missing_items.append("trésorerie / flux")
+        if not any(kw in all_mapping_text for kw in ["chiffre d'affaires", "ca ", "total produits", "revenue"]):
+            missing_items.append("chiffre d'affaires")
+        if missing_items:
+            anomalies.append(
+                f"Données partielles ({completude}% de complétude) — "
+                f"informations manquantes : {', '.join(missing_items)}. "
+                "Les conclusions sont limitées aux données disponibles."
+            )
+
     return QualityGateResult(
         can_analyze=can_analyze,
         status=status,
@@ -465,6 +481,19 @@ def _validate_erp(tables: dict, mapping: dict, quality_report) -> QualityGateRes
     if has_cash:   erp_completude += 20
     if has_budget: erp_completude += 10
     erp_completude = min(100, erp_completude)
+
+    # ── Anomalie complétude ERP (empêche "Aucune anomalie" quand données incomplètes) ─
+    if erp_completude < 60:
+        missing_tables: list[str] = []
+        if not has_sales:   missing_tables.append("ventes")
+        if not has_cash:    missing_tables.append("trésorerie")
+        if not has_budget:  missing_tables.append("budget / prévisions")
+        if missing_tables:
+            anomalies.append(
+                f"Données partielles ({erp_completude}% de complétude) — "
+                f"tables absentes : {', '.join(missing_tables)}. "
+                "Les conclusions sont limitées aux données disponibles."
+            )
 
     return QualityGateResult(
         can_analyze=True,

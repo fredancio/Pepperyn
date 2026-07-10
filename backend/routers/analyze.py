@@ -338,6 +338,8 @@ async def analyze_file(
             coaching_issues=quality_gate.anomalies or [],
             data_quality=DataQualityInfo(
                 score_data=quality_gate.score_data,
+                score_completude=quality_gate.score_completude,
+                score_confiance_conclusions=quality_gate.score_confiance,
                 status="blocked",
                 document_format=quality_gate.document_format,
                 mapping_summary=quality_gate.mapping_summary,
@@ -596,15 +598,24 @@ async def _run_analysis_pipeline(
     except Exception:
         pass  # non-bloquant — le plan d'action LLM original reste en fallback
 
-    # Attach data quality info to result
+    # Attach data quality info to result (RÈGLE N°9 : 3 scores distincts)
     analysis_result.data_quality = DataQualityInfo(
         score_data=quality_gate.score_data,
+        score_completude=quality_gate.score_completude,
+        score_confiance_conclusions=quality_gate.score_confiance,
         status=quality_gate.status,
         document_format=quality_gate.document_format,
         mapping_summary=quality_gate.mapping_summary,
         anomalies=quality_gate.anomalies,
         assumptions=quality_gate.assumptions,
         sheets_detected=quality_gate.sheets_detected,
+    )
+    # RÈGLE N°9 — quality_gate.score_confiance est un PLAFOND dur sur la confiance.
+    # Si le LLM a déjà parsé un score depuis "# FIABILITÉ ANALYSE" (< 70 par défaut),
+    # on conserve le minimum entre les deux pour éviter toute sur-confiance.
+    analysis_result.score_confiance = min(
+        analysis_result.score_confiance,
+        quality_gate.score_confiance,
     )
 
     # Pour les fichiers en warning : attacher la note coaching + prompt Copilot
