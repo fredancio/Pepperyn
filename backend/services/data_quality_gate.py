@@ -51,10 +51,27 @@ _STRUCTURAL_KEYWORDS_EN = [
 
 @dataclass
 class QualityGateResult:
-    """Résultat unifié du gate de qualité des données."""
+    """Résultat unifié du gate de qualité des données.
+
+    RÈGLE ABSOLUE N°9 — Trois scores distincts, jamais confondus :
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ score_data       : Qualité TECHNIQUE  — Le fichier est-il       │
+    │                    lisible et structuré ?                        │
+    │ score_completude : Complétude données — Dispose-t-on de TOUTES  │
+    │                    les infos nécessaires à une analyse complète ?│
+    │ score_confiance  : Confiance conclusions — Compte tenu des deux  │
+    │                    scores ci-dessus, quelle confiance accorder   │
+    │                    aux recommandations générées ?                 │
+    │                    CONTRAINTE : score_confiance ≤               │
+    │                    min(score_data, score_completude)             │
+    └─────────────────────────────────────────────────────────────────┘
+    """
     can_analyze: bool
-    status: str                   # "ok" | "warning" | "blocked"
-    score_data: int               # Score fiabilité données (0-100)
+    status: str                    # "ok" | "warning" | "blocked"
+    score_data: int                # Qualité technique (0-100) — backward compat
+    # ── Scores additionnels (RÈGLE N°9) ──────────────────────────────────────
+    score_completude: int = -1     # -1 = non calculé
+    score_confiance: int = -1      # -1 = non calculé ; contrainte : ≤ min(score_data, score_completude)
     document_format: str = "unknown"   # "erp_transactional" | "structural_pl" | "unknown"
     mapping_summary: List[str] = field(default_factory=list)
     anomalies: List[str] = field(default_factory=list)
@@ -62,21 +79,61 @@ class QualityGateResult:
     blocking_reason: Optional[str] = None
     sheets_detected: List[str] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        """Calcule score_confiance si non fourni.
+        CONTRAINTE logique : confiance ≤ min(qualité technique, complétude).
+        Exemple : qualité=100, complétude=25 → confiance ne peut dépasser 25.
+        """
+        if self.score_completude == -1:
+            # Pas de complétude calculée → on l'estime = score_data (conservateur)
+            self.score_completude = self.score_data
+        if self.score_confiance == -1:
+            # Confiance = min des deux autres − malus si warning
+            malus = 10 if self.status == "warning" else 0
+            self.score_confiance = max(0, min(self.score_data, self.score_completude) - malus)
+
     def to_prompt_section(self) -> str:
-        """Injecte le contexte qualité dans le prompt LLM Claude."""
+        """Injecte le contexte qualité dans le prompt LLM Claude.
+
+        RÈGLE N°9 : Les 3 scores sont présentés séparément, jamais confondus.
+        Si score_confiance < min(score_data, score_completude), une explication est fournie.
+        """
         icon = {"ok": "✅", "warning": "⚠️", "blocked": "🚫"}.get(self.status, "ℹ️")
         lines = [
-            "═══ FIABILITÉ DES DONNÉES SOURCE ═══",
-            f"{icon} Statut qualité : {self.status.upper()} | Score : {self.score_data}/100",
-            f"Format détecté : {self.document_format}",
+            "═══ FIABILITÉ DES DONNÉES SOURCE (RÈGLE ABSOLUE N°9) ═══",
+            f"{icon} Statut : {self.status.upper()} | Format : {self.document_format}",
+            "",
+            "SCORES DE FIABILITÉ — 3 scores distincts, ne jamais les confondre :",
+            f"  📊 Qualité technique    : {self.score_data}/100"
+            f"  — Le fichier est-il lisible et bien structuré ?",
+            f"  📋 Complétude données   : {self.score_completude}/100"
+            f"  — Dispose-t-on de toutes les infos nécessaires ?",
+            f"  🎯 Confiance conclusions: {self.score_confiance}/100"
+            f"  — Confiance accordée aux recommandations (≤ min des 2 scores ci-dessus).",
         ]
+
+        # Explication obligatoire des écarts significatifs (RÈGLE N°9)
+        min_two = min(self.score_data, self.score_completude)
+        if self.score_confiance < min_two - 5:
+            lines.append(
+                f"  ⚠️ Écart expliqué : la confiance ({self.score_confiance}) est inférieure"
+                f" au minimum technique/complétude ({min_two}) en raison du statut '{self.status}'."
+            )
+        if self.score_completude < self.score_data - 20:
+            lines.append(
+                f"  ⚠️ Données incomplètes : qualité technique = {self.score_data} mais complétude"
+                f" = {self.score_completude}. Des sections de l'analyse seront limitées."
+            )
+
         if self.mapping_summary:
+            lines.append("")
             lines.append("Mapping détecté : " + " | ".join(self.mapping_summary[:4]))
         if self.anomalies:
             lines.append("Anomalies : " + " ; ".join(self.anomalies[:4]))
         if self.assumptions:
             lines.append("Hypothèses retenues : " + " ; ".join(self.assumptions[:3]))
         if self.status == "warning":
+            lines.append("")
             lines.append(
                 "IMPORTANT : Ces données sont partiellement fiables. "
                 "Tu DOIS mentionner explicitement les limites identifiées dans ton analyse. "
@@ -181,6 +238,7 @@ class QualityGateResult:
     def to_report_section(self) -> dict:
         """Dictionnaire prêt pour injection dans PDF / Excel / PPTX."""
         return {
+            # Backward compat
             "score_data": self.score_data,
             "status": self.status,
             "document_format": self.document_format,
@@ -189,6 +247,10 @@ class QualityGateResult:
             "assumptions": self.assumptions,
             "blocking_reason": self.blocking_reason,
             "sheets_detected": self.sheets_detected,
+            # RÈGLE N°9 — 3 scores distincts
+            "score_qualite_technique": self.score_data,
+            "score_completude_donnees": self.score_completude,
+            "score_confiance_conclusions": self.score_confiance,
         }
 
 
@@ -318,10 +380,25 @@ def _validate_structural(raw_sheets: dict) -> QualityGateResult:
         anomalies.append("Structure du fichier partiellement reconnue — l'analyse peut être incomplète.")
         assumptions.append("Analyse effectuée sur données partielles. Résultats à valider.")
 
+    # ── RÈGLE N°9 : score_completude basé sur ce qu'on a détecté ────────────
+    # P&L seul → 50% | + bilan → +20% | + trésorerie → +15% | + budget → +10%
+    all_mapping_text = " ".join(mapping_summary).lower()
+    completude = 45  # base si on a au moins des données numériques
+    if any(kw in all_mapping_text for kw in ["chiffre d'affaires", "ca ", "total produits", "revenue"]):
+        completude += 15
+    if any(kw in all_mapping_text for kw in ["bilan", "actif", "passif", "capitaux"]):
+        completude += 20
+    if any(kw in all_mapping_text for kw in ["trésorerie", "tresorerie", "flux", "cash"]):
+        completude += 15
+    if any(kw in all_mapping_text for kw in ["budget", "prévision", "prevision"]):
+        completude += 5
+    completude = min(100, completude)
+
     return QualityGateResult(
         can_analyze=can_analyze,
         status=status,
         score_data=score,
+        score_completude=completude,
         document_format="structural_pl",
         mapping_summary=mapping_summary,
         anomalies=anomalies,
@@ -379,10 +456,21 @@ def _validate_erp(tables: dict, mapping: dict, quality_report) -> QualityGateRes
             "Vérifiez les données sources avant de prendre une décision."
         )
 
+    # ── RÈGLE N°9 : score_completude ERP basé sur les tables détectées ───────
+    has_sales   = "sales"  in tables
+    has_cash    = "cash"   in tables
+    has_budget  = "budget" in tables
+    erp_completude = 40
+    if has_sales:  erp_completude += 25
+    if has_cash:   erp_completude += 20
+    if has_budget: erp_completude += 10
+    erp_completude = min(100, erp_completude)
+
     return QualityGateResult(
         can_analyze=True,
         status=status,
         score_data=score,
+        score_completude=erp_completude,
         document_format="erp_transactional",
         mapping_summary=mapping_summary,
         anomalies=anomalies,

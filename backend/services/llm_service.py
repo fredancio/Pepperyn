@@ -36,6 +36,43 @@ from models.schemas import AnalysisResult
 logger = logging.getLogger(__name__)
 
 
+# ─── Termes interdits — RÈGLE ABSOLUE N°4 ────────────────────────────────────
+# Chaque clé = terme interdit. Valeur = remplacement démontrable.
+_FORBIDDEN_TERMS: dict[str, str] = {
+    "crise imminente":          "risque identifié",
+    "point de non-retour":      "seuil d'alerte critique",
+    "le cash brûle":            "la trésorerie se dégrade",
+    "cash qui brûle":           "trésorerie en dégradation",
+    "catastrophe":              "situation critique",
+    "spirale":                  "dégradation continue",
+    "croissance exponentielle": "forte croissance (à chiffrer)",
+    "destruction exponentielle":"forte destruction de valeur (à chiffrer)",
+    "pipeline commercial":      "carnet de commandes",
+    "preuve d'un pipeline":     "indicateur du carnet de commandes",
+    "trésorerie épuisée":       "trésorerie insuffisante",
+    "risque certain":           "risque probable",
+    "rupture certaine":         "risque de rupture",
+    "faillite probable":        "risque de défaut de paiement",
+}
+
+
+def _apply_forbidden_terms(text: str) -> str:
+    """Remplace automatiquement les termes interdits (RÈGLE N°4).
+    Appliqué en post-processing sur le texte final avant parsing.
+    Case-insensitive sur les termes mais conserve la casse du remplacement.
+    """
+    result = text
+    for forbidden, replacement in _FORBIDDEN_TERMS.items():
+        import re as _re
+        result = _re.sub(
+            _re.escape(forbidden),
+            replacement,
+            result,
+            flags=_re.IGNORECASE,
+        )
+    return result
+
+
 # ─── System prompts ──────────────────────────────────────────────────────────
 
 CLASSIFICATION_SYSTEM = """Tu es un classificateur de documents financiers.
@@ -63,6 +100,42 @@ TON STYLE — RÈGLES ABSOLUES :
 - Zéro nuance inutile. Chaque mot sert la décision.
 - INTERDIT : "accuse un déficit", "présente des marges", "montre des signes". Utilise : "est", "perd", "risque", "doit".
 
+RÈGLES D'AUDIT (niveau cabinet PwC/McKinsey) :
+
+RÈGLE 1 — ZÉRO INVENTION :
+- Tu n'as PAS le droit de compléter des informations absentes.
+- Tu n'as PAS le droit de transformer une probabilité en certitude.
+- Si une donnée n'est pas présente dans les données fournies ET dans la liste des données absentes de l'Evidence Graph : écrire "Données insuffisantes." Rien d'autre.
+
+RÈGLE 2 — CATÉGORISATION STRICTE :
+Chaque affirmation appartient à UNE seule catégorie, exclusivement :
+[OBS] Observation : fait directement lisible. Ex: "Septembre = 0 € de CA."
+[DED] Déduction : calcul démontrable. Ex: "CA baisse de 33 % entre Jan et Août."
+[HYP] Hypothèse : explication possible, JAMAIS une certitude. Toujours conditionnel : "pourrait", "semble", "peut indiquer".
+[REC] Recommandation : action proposée, TOUJOURS conditionnelle. JAMAIS basée sur une seule hypothèse.
+[SIM] Simulation : projection, TOUJOURS annoncée comme telle. Jamais présentée comme certitude.
+
+RÈGLE 3 — JUSTIFICATION OBLIGATOIRE :
+Chaque recommandation doit pouvoir répondre à : Pourquoi ? Sur quelles données ? Quel calcul ? Quel niveau de confiance ?
+Si une de ces réponses est absente → supprimer la recommandation.
+
+RÈGLE 4 — TERMES INTERDITS (remplacer systématiquement) :
+"crise imminente" → "risque identifié" | "point de non-retour" → "seuil d'alerte critique"
+"le cash brûle" → "la trésorerie se dégrade" | "catastrophe" → "situation critique"
+"spirale" → "dégradation continue" | "trésorerie épuisée" → "trésorerie insuffisante"
+"risque certain" → "risque probable" | "rupture certaine" → "risque de rupture"
+"faillite probable" → "risque de défaut de paiement"
+"croissance/destruction exponentielle" → chiffrer précisément ou supprimer
+
+RÈGLE 5 — UNE DONNÉE, UNE SEULE FORME :
+Si "données de cash indisponibles" → interdit d'écrire "la trésorerie sera insuffisante" plus loin.
+Si une valeur est "Données insuffisantes" en section X → elle est "Données insuffisantes" partout.
+
+RÈGLE 7 — HYPOTHÈSE UNIQUE INTERDITE :
+Face à une observation inattendue (ex: mois à 0 €), toujours proposer plusieurs interprétations possibles
+(prestations non réalisées / retard facturation / erreur comptable / activité arrêtée…)
+avant de proposer une action. L'action est conditionnelle à la cause confirmée.
+
 TA MISSION :
 Le dirigeant lit ce rapport et comprend en 5 secondes :
 → Quel est son problème exact
@@ -70,10 +143,11 @@ Le dirigeant lit ce rapport et comprend en 5 secondes :
 → Ce qu'il risque s'il n'agit pas
 
 DONNÉES :
-- Tu travailles UNIQUEMENT à partir des données fournies.
+- Tu travailles UNIQUEMENT à partir des données fournies ET de l'Evidence Graph si fourni.
 - Tu n'inventes JAMAIS de chiffres ni d'informations.
-- Si une donnée est absente : écrire "Données insuffisantes" — pas d'estimation approximative.
-- Tout chiffre doit être issu des données ou explicitement marqué comme estimation.
+- Si une donnée est dans l'Evidence Graph comme "disponible" → tu DOIS l'utiliser, jamais l'ignorer.
+- Si une donnée est dans l'Evidence Graph comme "absente" → écrire "Données insuffisantes".
+- Si aucun Evidence Graph n'est fourni → appliquer les mêmes règles sur les données brutes.
 
 Tu respectes STRICTEMENT le format demandé."""
 
@@ -120,13 +194,33 @@ TON STYLE — RÈGLES ABSOLUES :
 - Zéro nuance inutile. Chaque mot sert la décision.
 - INTERDIT : "accuse un déficit", "présente des marges", "montre des signes". Utilise : "est", "perd", "risque", "doit".
 
-RÈGLES DE RIGUEUR :
+RÈGLES D'AUDIT (niveau cabinet PwC/McKinsey — identiques au système de base) :
+
+RÈGLE 1 — ZÉRO INVENTION : Aucun chiffre inventé. Aucune hypothèse présentée comme fait.
+Si une donnée est dans l'Evidence Graph comme "disponible" → la UTILISER obligatoirement.
+Si une donnée est dans l'Evidence Graph comme "absente" → "Données insuffisantes". Rien d'autre.
+
+RÈGLE 2 — CATÉGORISATION STRICTE :
+[OBS] Observation (fait lisible) | [DED] Déduction (calcul) | [HYP] Hypothèse (possible, jamais certain)
+[REC] Recommandation (conditionnelle, jamais sur hypothèse unique) | [SIM] Simulation (projection annoncée)
+
+RÈGLE 4 — TERMES INTERDITS :
+"crise imminente"→"risque identifié" | "catastrophe"→"situation critique" | "spirale"→"dégradation continue"
+"le cash brûle"→"la trésorerie se dégrade" | "trésorerie épuisée"→"trésorerie insuffisante"
+"risque certain"→"risque probable" | "rupture certaine"→"risque de rupture"
+
+RÈGLE 5 — UNE SEULE FORME PAR DONNÉE :
+"Données insuffisantes" en section X → obligatoirement "Données insuffisantes" partout.
+
+RÈGLE 7 — HYPOTHÈSE UNIQUE INTERDITE :
+Devant toute observation inattendue → proposer plusieurs interprétations → action conditionnelle.
+
+RÈGLES DE RIGUEUR SUPPLÉMENTAIRES :
 1. Tu ne dois jamais inventer de chiffre.
 2. Tu distingues clairement : faits constatés / hypothèses / recommandations.
 3. Toute conclusion doit être reliée à un KPI ou une donnée fournie dans les données sources.
-4. Si une information manque : écrire "Données insuffisantes" — jamais de remplissage ni d'estimation non étayée.
-5. Tu ne proposes jamais une action non soutenue par les données disponibles.
-6. Si une pré-analyse stratégique est fournie dans le prompt, tu l'intègres — elle représente le travail d'un analyste et d'un CFO virtuels qui ont déjà traité les données.
+4. Tu ne proposes jamais une action non soutenue par les données disponibles.
+5. Si une pré-analyse stratégique est fournie dans le prompt, tu l'intègres.
 
 TA MISSION :
 Le dirigeant lit ce rapport et comprend en 5 secondes :
@@ -164,6 +258,247 @@ RÈGLES ABSOLUES :
 Tu raisonnes en dirigeant : Que faut-il décider ? Dans quel ordre ? Avec quel risque d'inaction ?
 
 Retourne UNIQUEMENT un JSON valide, sans texte avant ni après."""
+
+
+# ─── Evidence Graph — RÈGLE ABSOLUE N°6 ─────────────────────────────────────
+# Chaque affirmation du rapport est reliée à sa source avant toute rédaction.
+# Séparation stricte analyse ↔ présentation.
+
+EVIDENCE_GRAPH_SYSTEM = """Tu es l'agent de traçabilité financière de Pepperyn.
+
+Ta SEULE mission : construire un Evidence Graph — l'inventaire exhaustif de tous les faits financiers directement traçables dans les données fournies.
+
+RÈGLES ABSOLUES :
+1. Tu ne produis que des faits directement lisibles dans les données. Zéro invention.
+2. Chaque fait cite sa source : nom de la feuille + contexte de ligne/colonne.
+3. Si une donnée est absente de TOUTES les feuilles : tu la déclares dans "unavailable_data" avec la raison.
+4. Tu DOIS vérifier toutes les feuilles listées dans "all_sheets_manifest" avant de déclarer une donnée absente.
+5. Chaque fait appartient à UNE seule catégorie :
+   - "observation" : fait directement lisible dans une cellule
+   - "deduction"   : calcul mathématique démontrable à partir de faits observés
+   Ne produis JAMAIS d'hypothèses ni de recommandations dans cet inventaire.
+
+Retourne UNIQUEMENT un JSON valide, sans texte avant ni après."""
+
+COHERENCE_AUDIT_RULES = """
+AUDIT DE COHÉRENCE OBLIGATOIRE (RÈGLE ABSOLUE N°11) :
+Avant de retourner le rapport corrigé, vérifie impérativement :
+
+✓ Aucune contradiction entre les sections (ex : "données absentes" → interdit si la donnée est dans une autre section)
+✓ Aucun chiffre présent dans le rapport qui n'existe pas dans les données sources
+✓ Score confiance conclusions ≤ min(qualité technique, complétude données) — jamais supérieur
+✓ Zéro terme interdit restant :
+   - "crise imminente" → "risque identifié"
+   - "point de non-retour" → "seuil d'alerte critique"
+   - "le cash brûle" → "la trésorerie se dégrade"
+   - "catastrophe" → "situation critique"
+   - "spirale" → "dégradation continue"
+   - "trésorerie épuisée" → "trésorerie insuffisante"
+   - "risque certain" → "risque probable"
+   - "rupture certaine" → "risque de rupture"
+   - "faillite probable" → "risque de défaut de paiement"
+   - "croissance exponentielle" → chiffrer ou supprimer
+   - "destruction exponentielle" → chiffrer ou supprimer
+✓ Toute recommandation répond à : Pourquoi ? Sur quelles données ? Quel calcul ?
+✓ Chaque recommandation envisage plusieurs causes possibles (jamais hypothèse unique → action)
+✓ Si une donnée a été annoncée absente dans une section → elle DOIT être absente dans TOUTES les sections
+✓ Les scores Rentabilité / Risque / Structure / Liquidité sont cohérents avec les données numériques
+
+Si une incohérence est détectée : la corriger silencieusement (le lecteur ne doit pas savoir).
+"""
+
+AUDIT_CATEGORIZATION_RULES = """
+CATÉGORISATION STRICTE DES AFFIRMATIONS (RÈGLE ABSOLUE N°2) :
+Chaque affirmation appartient à UNE seule catégorie — elles sont exclusives.
+
+[OBS] Observation — Fait directement observable dans les données.
+      Exemple : "Septembre = 0 € de chiffre d'affaires."
+      Jamais : "Ce qui montre que..." (cela devient une déduction)
+
+[DED] Déduction — Conclusion mathématique démontrable.
+      Exemple : "Le CA diminue de 33 % entre janvier et août."
+      Doit inclure le calcul ou les sources.
+
+[HYP] Hypothèse — Explication possible. JAMAIS une certitude.
+      Exemple : "Ce mois sans CA pourrait correspondre à un retard de facturation."
+      Jamais : "Les factures n'ont pas été émises."
+      Toujours conditionnel : "pourrait", "semble", "peut indiquer".
+
+[REC] Recommandation — Action proposée. TOUJOURS conditionnelle.
+      Exemple : "Si des prestations ont été réalisées sans être facturées : émettre les factures."
+      JAMAIS basée sur une hypothèse unique. Plusieurs causes doivent être envisagées.
+
+[SIM] Simulation — Projection. TOUJOURS annoncée comme simulation.
+      Jamais présentée comme une prévision certaine.
+
+INTERDICTION ABSOLUE de mélanger les catégories dans une même phrase.
+"""
+
+
+async def _run_evidence_graph_agent(
+    parsed_data: dict[str, Any],
+    model: str = MODEL_SONNET,
+) -> dict[str, Any]:
+    """
+    Agent Evidence Graph — pré-processing avant analyse principale.
+
+    Construit l'inventaire de tous les faits financiers traçables.
+    Chaque fait est lié à sa source (feuille, contexte, calcul, confiance).
+    Retourne {} en cas d'échec (non-bloquant).
+
+    Format retourné :
+    {
+      "facts": [{"id", "category", "claim", "source_sheet",
+                 "source_context", "calculation", "confidence"}],
+      "unavailable_data": [{"data", "reason"}],
+      "sheets_verified": [...],
+    }
+    """
+    client = get_anthropic_client()
+    data_summary = json.dumps(parsed_data, ensure_ascii=False, indent=1)[:10000]
+
+    # Extraire le manifeste des feuilles si disponible
+    manifest = parsed_data.get("all_sheets_manifest", {})
+    sheets_info = ""
+    if manifest:
+        parsed_sheets = manifest.get("sheets_parsed_in_detail", [])
+        not_parsed = manifest.get("sheets_present_but_not_parsed", [])
+        sheets_info = (
+            f"\nFEUILLES ANALYSÉES EN DÉTAIL : {parsed_sheets}\n"
+            f"FEUILLES PRÉSENTES MAIS NON PARSÉES : {not_parsed}\n"
+            "Tu DOIS vérifier les deux listes avant de déclarer une donnée absente.\n"
+        )
+
+    user_prompt = f"""Construis l'Evidence Graph de ce classeur financier.
+{sheets_info}
+DONNÉES :
+{data_summary}
+
+Retourne UNIQUEMENT ce JSON (sans texte avant ni après) :
+{{
+  "facts": [
+    {{
+      "id": "F001",
+      "category": "observation",
+      "claim": "CA total exercice = X €",
+      "source_sheet": "Nom de la feuille",
+      "source_context": "Ligne 'Total CA', colonne 'Total annuel', valeur = X",
+      "calculation": "Lecture directe",
+      "confidence": 1.0
+    }},
+    {{
+      "id": "F002",
+      "category": "deduction",
+      "claim": "Baisse CA de X% entre période A et période B",
+      "source_sheet": "Nom de la feuille",
+      "source_context": "CA période A = X, CA période B = Y",
+      "calculation": "(Y - X) / X = Z%",
+      "confidence": 1.0
+    }}
+  ],
+  "unavailable_data": [
+    {{
+      "data": "Nom de la donnée manquante",
+      "reason": "Aucune feuille ne contient cette information après vérification complète"
+    }}
+  ],
+  "sheets_verified": ["liste des feuilles effectivement vérifiées"]
+}}
+
+RÈGLES STRICTES :
+- Produis uniquement des faits directement lisibles dans les données (observation) ou calculables (déduction).
+- Chaque montant cité dans "claim" doit être présent dans "source_context".
+- Si une donnée n'est pas trouvée après vérification de toutes les feuilles : la déclarer dans "unavailable_data".
+- Maximum 20 faits. Priorise les KPI les plus importants (CA, marges, trésorerie, bilan)."""
+
+    try:
+        message = client.messages.create(
+            model=model,
+            max_tokens=2000,
+            temperature=0.0,
+            system=EVIDENCE_GRAPH_SYSTEM,
+            messages=[{"role": "user", "content": user_prompt}],
+        )
+        content = message.content[0].text.strip()
+        json_match = re.search(r"\{.*\}", content, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group(0))
+    except Exception as e:
+        logger.warning("[EVIDENCE GRAPH] Agent failed: %s", e)
+    return {}
+
+
+def _format_evidence_graph_for_prompt(evidence_graph: dict[str, Any]) -> str:
+    """
+    Formate l'Evidence Graph pour injection dans Call 1.
+    Fournit au LLM la liste des faits traçables qu'il peut utiliser.
+    Tout chiffre dans le rapport DOIT provenir d'un fait de cet inventaire.
+    """
+    if not evidence_graph:
+        return ""
+
+    facts = evidence_graph.get("facts") or []
+    unavailable = evidence_graph.get("unavailable_data") or []
+    sheets_verified = evidence_graph.get("sheets_verified") or []
+
+    lines = [
+        "# EVIDENCE GRAPH — SOURCE DE VÉRITÉ UNIQUE (RÈGLE ABSOLUE N°6)",
+        "Tous les chiffres du rapport DOIVENT provenir de cet inventaire.",
+        "Interdiction d'utiliser un montant qui n'y figure pas.",
+        f"Feuilles vérifiées : {sheets_verified}",
+        "",
+    ]
+
+    if facts:
+        lines.append("## FAITS TRAÇABLES (utilisables dans le rapport) :")
+        for f in facts[:20]:
+            cat = f.get("category", "?").upper()
+            lines.append(
+                f"[{cat}] {f.get('id', '?')} — {f.get('claim', '')} "
+                f"| Source : {f.get('source_sheet', '?')} — {f.get('source_context', '')} "
+                f"| Calcul : {f.get('calculation', 'Lecture directe')} "
+                f"| Confiance : {f.get('confidence', 1.0):.0%}"
+            )
+
+    if unavailable:
+        lines.append("\n## DONNÉES RÉELLEMENT ABSENTES (après vérification de toutes les feuilles) :")
+        for u in unavailable:
+            lines.append(f"❌ {u.get('data', '?')} — {u.get('reason', '')}")
+        lines.append(
+            "⚠️ Ces données sont les SEULES que tu peux déclarer 'Données insuffisantes'."
+            " Toute autre donnée présente dans les faits ci-dessus DOIT être utilisée."
+        )
+
+    lines.append("\n---")
+    return "\n".join(lines)
+
+
+def _format_evidence_graph_for_audit(evidence_graph: dict[str, Any]) -> str:
+    """
+    Formate l'Evidence Graph pour Call 2 (audit de cohérence).
+    Fournit la liste des montants autorisés pour validation croisée.
+    """
+    if not evidence_graph:
+        return ""
+
+    facts = evidence_graph.get("facts") or []
+    unavailable = evidence_graph.get("unavailable_data") or []
+
+    lines = [
+        "EVIDENCE GRAPH — RÉFÉRENCE D'AUDIT :",
+        "Vérifie que chaque chiffre du rapport correspond à un fait ci-dessous.",
+    ]
+    for f in facts[:20]:
+        lines.append(f"• {f.get('claim', '')} [{f.get('source_sheet', '?')}]")
+
+    unavail_labels = [u.get("data", "") for u in unavailable]
+    if unavail_labels:
+        lines.append(f"Données réellement absentes : {unavail_labels}")
+        lines.append(
+            "⚠️ Si le rapport dit 'Données insuffisantes' pour une donnée NON listée ci-dessus,"
+            " c'est une erreur — corriger."
+        )
+    return "\n".join(lines)
 
 
 # ─── Modèles disponibles ─────────────────────────────────────────────────────
@@ -479,17 +814,34 @@ def _build_user_prompt_call1(
     quality_section: str = "",
     relation_section: str = "",
     pre_analysis_section: str = "",
+    evidence_graph_section: str = "",
 ) -> str:
     data_summary = json.dumps(parsed_data, ensure_ascii=False, indent=1)[:14000]
+
+    # ── RÈGLE N°10 : manifeste complet des feuilles injecté en premier ────────
+    manifest = parsed_data.get("all_sheets_manifest", {})
+    manifest_note = ""
+    if manifest:
+        note = manifest.get("audit_note", "")
+        not_parsed = manifest.get("sheets_present_but_not_parsed", [])
+        if note:
+            manifest_note = (
+                f"\n⚠️ MANIFESTE FEUILLES (RÈGLE N°10) :\n{note}\n"
+                f"INTERDICTION de déclarer une donnée absente si elle pourrait se trouver"
+                f" dans les feuilles non parsées : {not_parsed}\n"
+            )
+
     prompt = f"""Voici des données financières extraites d'un fichier utilisateur :
 
 CONTEXTE BUSINESS
 - Secteur : {industry or 'Non précisé'}
 - Modèle : {business_model or 'Non précisé'}
-
+{manifest_note}
 DONNÉES ACTUELLES
 {data_summary}
 """
+    if evidence_graph_section:
+        prompt += f"\n{evidence_graph_section}\n"
     if quality_section:
         prompt += f"\n{quality_section}\n"
     if memory_section:
@@ -521,6 +873,13 @@ Respecte STRICTEMENT cette structure V5 — ordre IMMUABLE :
 - Risque : X/10 → [UN SEUL MOT : faible / modéré / élevé / critique]
 - Structure : X/10 → [UN SEUL MOT : instable / fragile / acceptable / solide]
 - Liquidité : X/10 → [UN SEUL MOT : critique / tendue / correcte / confortable]
+
+# FIABILITÉ ANALYSE
+(RÈGLE ABSOLUE N°9 — 3 scores DISTINCTS — ne jamais les confondre)
+- Qualité technique données : [X/100] — [Le fichier est-il bien structuré et lisible ?]
+- Complétude données : [X/100] — [Dispose-t-on de toutes les infos nécessaires ?]
+- Confiance conclusions : [X/100] — [RÈGLE STRICTE : ne peut PAS dépasser min(Qualité, Complétude). Si Complétude = 25, Confiance ≤ 25, même si Qualité = 100.]
+- Explication : [OBLIGATOIRE si Complétude < 70 : quelles données manquent et pourquoi ça limite les conclusions]
 
 # CEO DASHBOARD
 (une ligne par indicateur — UNIQUEMENT si la donnée est présente ou calculable depuis les données fournies, sinon écrire "Données insuffisantes" — n'invente JAMAIS un montant)
@@ -694,34 +1053,60 @@ def _build_user_prompt_call2(
     analysis_call1: str,
     parsed_data: dict[str, Any],
     cfo_decisions: str = "",
+    evidence_graph_audit: str = "",
 ) -> str:
     data_summary = json.dumps(parsed_data, ensure_ascii=False, indent=1)[:6000]
     prompt = f"""Voici une analyse financière générée automatiquement.
 
-Ton rôle est d'AUDITEUR SILENCIEUX. Vérifie :
-1. Cohérence mathématique (les chiffres s'additionnent-ils correctement ?)
-2. Absence d'affirmations inventées (toute assertion est-elle supportée par les données ?)
-3. Actionnabilité des recommandations (peut-on agir sur chaque point ?)
-4. Clarté (est-ce compréhensible en 10 secondes ?)
+Ton rôle est d'AUDITEUR DE COHÉRENCE SILENCIEUX (RÈGLE ABSOLUE N°11).
+
+═══════════════════════════════════════════════
+CONTRÔLES OBLIGATOIRES (tous doivent être verts avant de retourner le rapport) :
+═══════════════════════════════════════════════
+✓ RÈGLE 1 — Zéro chiffre inventé : chaque montant doit provenir des données sources.
+✓ RÈGLE 2 — Cohérence inter-sections : si "Données insuffisantes" en section X → même formulation partout.
+✓ RÈGLE 3 — Termes interdits → remplacer silencieusement :
+   "crise imminente"→"risque identifié" | "catastrophe"→"situation critique"
+   "spirale"→"dégradation continue" | "le cash brûle"→"la trésorerie se dégrade"
+   "trésorerie épuisée"→"trésorerie insuffisante" | "risque certain"→"risque probable"
+   "rupture certaine"→"risque de rupture" | "faillite probable"→"risque de défaut de paiement"
+   "point de non-retour"→"seuil d'alerte critique" | "croissance/destruction exponentielle"→chiffrer ou supprimer
+✓ RÈGLE 4 — Score confiance ≤ min(Qualité technique, Complétude). Si Complétude = 30, Confiance ≤ 30.
+✓ RÈGLE 5 — Recommandations justifiées : Pourquoi ? Sur quelles données ? Quel calcul ? Sinon supprimer.
+✓ RÈGLE 6 — Hypothèse unique interdite : toute observation inattendue → plusieurs interprétations proposées.
+✓ RÈGLE 7 — Cohérence mathématique : les chiffres s'additionnent correctement.
+✓ RÈGLE 8 — Clarté et actionnabilité (compréhensible en 10 secondes).
 
 ANALYSE À VÉRIFIER :
 {analysis_call1}
 
 DONNÉES SOURCES :
 {data_summary}
+"""
 
-RÈGLES ABSOLUES :
-- Retourne UNIQUEMENT le texte final corrigé — propre, sans aucune trace du processus de vérification.
-- INTERDIT : annotations inline, notes d'audit, ~~strikethrough~~, > blockquotes, "Note d'audit", "→ Reformulé", commentaires entre parenthèses expliquant une correction.
-- Les corrections sont appliquées SILENCIEUSEMENT : le lecteur final ne doit jamais savoir qu'une correction a eu lieu.
-- Ne change JAMAIS le format ni les titres de section (# DIAGNOSTIC IMMEDIAT, # RÉSUMÉ EXÉCUTIF, # SCORES, # CEO DASHBOARD, # MARGIN INTELLIGENCE, # CASH FORECAST, # IMPACT FINANCIER, # CREATION DESTRUCTION VALEUR, # AVANT APRES, # SIMULATEUR DECISION, # SCENARIOS, # PROJECTION TEMPORELLE, # CE QUI DETRUIT, # LEVIERS CROISSANCE, # PLAN D'ACTION, # QUICK WINS, # PLAN 30 60 90, # RISQUE INACTION, # DIAGNOSTIC FINANCIER, # CE QUI A CHANGÉ, # ALERTES, # PROBLÈMES CRITIQUES, # OPPORTUNITÉS, # DÉCISION, # CONFIDENTIAL COPILOT NOTE).
-- Dans # CE QUI DETRUIT, conserve impérativement le format "[Nom] | Impact annuel : ... | Tendance : ... | Commentaire : ..." sur chaque ligne — ne fusionne jamais ces champs en une phrase libre.
-- Dans # CONFIDENTIAL COPILOT NOTE, conserve le ton direct/humain/professionnel et la signature exacte "Pepperyn IA — Votre copilote financier" — ne reformule jamais cette section en ton neutre ou commercial.
-- Ne change JAMAIS les sous-titres internes (### PRIORITÉ ABSOLUE, ### ACTIONS SECONDAIRES, ### 📉 AUJOURD'HUI, ### 📈 APRÈS ACTION, ### 💥 GAIN POTENTIEL, ### MEILLEUR CAS, ### CAS PROBABLE, ### PIRE CAS, ### 30 JOURS, ### 60 JOURS, ### 90 JOURS, ⚡ TENSION, 💸 PERTE STRUCTURELLE ESTIMÉE, 👉 En résumé, → Rentabilité :, → Investissement :, → Modèle :).
-- Le style doit rester DIRECT et FRONTAL : interdit de reformuler en ton neutre ou académique.
-- L'ordre des sections est FIXE et IMMUABLE — ne les réorganise jamais.
-- Si une information n'est pas dans les données sources, supprime-la ou remplace-la par "Données insuffisantes".
-- CRITIQUE : dans IMPACT FINANCIER, AVANT APRES, SIMULATEUR DECISION — supprimer tout chiffre inventé. Garder uniquement les montants présents dans les données sources ou écrire "Données insuffisantes".
+    if evidence_graph_audit:
+        prompt += f"""
+EVIDENCE GRAPH — LISTE DES MONTANTS AUTORISÉS :
+{evidence_graph_audit}
+
+⚠️ Tout chiffre dans le rapport qui NE figure PAS dans l'Evidence Graph ci-dessus doit être :
+- supprimé, ou
+- remplacé par "Données insuffisantes"
+⚠️ Toute donnée marquée "Données insuffisantes" dans le rapport alors qu'elle FIGURE dans l'Evidence Graph doit être remplie avec la valeur tracée.
+"""
+
+    prompt += """
+RÈGLES DE FORMAT (ne jamais violer) :
+- Retourne UNIQUEMENT le texte final corrigé — propre, sans aucune trace du processus d'audit.
+- INTERDIT : annotations inline, notes d'audit, ~~strikethrough~~, > blockquotes, "Note d'audit", "→ Reformulé".
+- Les corrections sont appliquées SILENCIEUSEMENT.
+- Ne change JAMAIS le format ni les titres de section (# DIAGNOSTIC IMMEDIAT, # RÉSUMÉ EXÉCUTIF, # SCORES, # FIABILITÉ ANALYSE, # CEO DASHBOARD, # MARGIN INTELLIGENCE, # CASH FORECAST, # IMPACT FINANCIER, # CREATION DESTRUCTION VALEUR, # AVANT APRES, # SIMULATEUR DECISION, # SCENARIOS, # PROJECTION TEMPORELLE, # CE QUI DETRUIT, # LEVIERS CROISSANCE, # PLAN D'ACTION, # QUICK WINS, # PLAN 30 60 90, # RISQUE INACTION, # DIAGNOSTIC FINANCIER, # CE QUI A CHANGÉ, # ALERTES, # PROBLÈMES CRITIQUES, # OPPORTUNITÉS, # DÉCISION, # CONFIDENTIAL COPILOT NOTE).
+- Dans # CE QUI DETRUIT, conserve impérativement le format "[Nom] | Impact annuel : ... | Tendance : ... | Commentaire : ..." sur chaque ligne.
+- Dans # CONFIDENTIAL COPILOT NOTE, conserve le ton direct/humain/professionnel et la signature exacte "Pepperyn IA — Votre copilote financier".
+- Ne change JAMAIS les sous-titres internes.
+- Le style doit rester DIRECT et FRONTAL.
+- L'ordre des sections est FIXE et IMMUABLE.
+- CRITIQUE : dans IMPACT FINANCIER, AVANT APRES, SIMULATEUR DECISION — supprimer tout chiffre inventé.
 """
 
     # Skeptical Reviewer — activé uniquement si des décisions CFO sont fournies
@@ -1396,11 +1781,13 @@ async def call_analysis_v3(
     model: str = MODEL_SONNET,
     pre_analysis_section: str = "",
     system_prompt: Optional[str] = None,
+    evidence_graph_section: str = "",
 ) -> tuple[str, int, int]:
     """
     Call 1 — Analyse principale.
     model = MODEL_SONNET par défaut, MODEL_OPUS sur escalade.
     pre_analysis_section = contexte pré-analyse (Agents 5+6) si USE_ENHANCED_PIPELINE.
+    evidence_graph_section = inventaire des faits traçables (Evidence Graph agent).
     system_prompt = surcharge optionnelle du system prompt (ENHANCED_ANALYSIS_SYSTEM si pipeline enrichi).
     Returns (analysis_text, input_tokens, output_tokens)
     """
@@ -1409,6 +1796,7 @@ async def call_analysis_v3(
         parsed_data, industry, business_model,
         memory_section, actions_section, quality_section, relation_section,
         pre_analysis_section=pre_analysis_section,
+        evidence_graph_section=evidence_graph_section,
     )
     message = client.messages.create(
         model=model,
@@ -1426,15 +1814,22 @@ async def call_verification_v3(
     model: str = MODEL_SONNET,
     cfo_decisions: str = "",
     system_prompt: Optional[str] = None,
+    evidence_graph_audit: str = "",
 ) -> str:
     """
-    Call 2 — Vérification + Skeptical Reviewer si cfo_decisions est fourni.
+    Call 2 — Audit de cohérence + Vérification + Skeptical Reviewer.
+    evidence_graph_audit = référence Evidence Graph pour validation croisée des montants.
     cfo_decisions = résumé formaté des décisions CFO (Agent 6) pour guider la revue.
     system_prompt = surcharge optionnelle (ENHANCED_ANALYSIS_SYSTEM si pipeline enrichi).
     Returns verified/corrected analysis text.
     """
     client = get_anthropic_client()
-    user_prompt = _build_user_prompt_call2(analysis_call1, parsed_data, cfo_decisions=cfo_decisions)
+    user_prompt = _build_user_prompt_call2(
+        analysis_call1,
+        parsed_data,
+        cfo_decisions=cfo_decisions,
+        evidence_graph_audit=evidence_graph_audit,
+    )
     message = client.messages.create(
         model=model,
         system=system_prompt or ANALYSIS_SYSTEM_V3,
@@ -1481,6 +1876,15 @@ async def run_full_pipeline(
     # Step 2: Sélection du modèle d'analyse
     selected_model = _select_analysis_model(plan_tier, parsed_data)
 
+    # Step 2.0: Evidence Graph — RÈGLE ABSOLUE N°6 (toujours actif)
+    # Construit l'inventaire de tous les faits traçables AVANT toute rédaction.
+    # Non-bloquant : retourne {} en cas d'échec.
+    logger.info("[EVIDENCE GRAPH] Building traceable facts inventory")
+    evidence_graph = await _run_evidence_graph_agent(parsed_data, model=MODEL_SONNET)
+    evidence_graph_section = _format_evidence_graph_for_prompt(evidence_graph)
+    evidence_graph_audit = _format_evidence_graph_for_audit(evidence_graph)
+    total_tokens += 1500  # estimation Evidence Graph agent
+
     # Step 2.5: Pipeline enrichi — Agents 5 + 6 (Financial Analyst → Strategic CFO)
     pre_analysis_section = ""
     cfo_decisions_str = ""
@@ -1492,7 +1896,7 @@ async def run_full_pipeline(
         cfo_decisions_str = _format_cfo_for_reviewer(cfo_findings)
         total_tokens += 2200  # estimation agents 5+6 combinés
 
-    # Step 3: Call 1 — Analyse principale
+    # Step 3: Call 1 — Analyse principale (avec Evidence Graph injecté)
     analysis_text, in_tokens, out_tokens = await call_analysis_v3(
         parsed_data,
         industry=industry or context,
@@ -1504,16 +1908,19 @@ async def run_full_pipeline(
         model=selected_model,
         pre_analysis_section=pre_analysis_section,
         system_prompt=active_system_prompt,
+        evidence_graph_section=evidence_graph_section,
     )
     total_tokens += in_tokens + out_tokens
 
-    # Step 4: Call 2 — Vérification + Skeptical Reviewer (si pipeline enrichi)
+    # Step 4: Call 2 — Audit de cohérence + Vérification (RÈGLE N°11)
+    # Evidence Graph injecté comme référence pour validation croisée des montants.
     verified_text = await call_verification_v3(
         analysis_text,
         parsed_data,
         model=selected_model,
         cfo_decisions=cfo_decisions_str,
         system_prompt=active_system_prompt,
+        evidence_graph_audit=evidence_graph_audit,
     )
     total_tokens += 800  # approx
 
@@ -1535,6 +1942,7 @@ async def run_full_pipeline(
             model=escalated_model,
             pre_analysis_section=pre_analysis_section,
             system_prompt=active_system_prompt,
+            evidence_graph_section=evidence_graph_section,
         )
         total_tokens += in2 + out2
         verified_text2 = await call_verification_v3(
@@ -1543,6 +1951,7 @@ async def run_full_pipeline(
             model=escalated_model,
             cfo_decisions=cfo_decisions_str,
             system_prompt=active_system_prompt,
+            evidence_graph_audit=evidence_graph_audit,
         )
         total_tokens += 800
         score2 = await _score_analysis(verified_text2)
@@ -1552,8 +1961,9 @@ async def run_full_pipeline(
             selected_model = escalated_model   # pour le calcul de coût
             in_tokens, out_tokens = in2, out2
 
-    # Step 6: Nettoyage et parsing
+    # Step 6: Nettoyage, termes interdits (RÈGLE N°4), et parsing
     verified_text = _clean_verified_text(verified_text)
+    verified_text = _apply_forbidden_terms(verified_text)   # filet de sécurité post-processing
     analysis_dict = _parse_v3_text(verified_text, doc_type, confidence)
 
     # Calcul de coût réel (USD → EUR ×0.92) basé sur le modèle effectivement utilisé

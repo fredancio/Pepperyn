@@ -95,7 +95,10 @@ def _extract_sheets_openpyxl(
     total_cells = 0
     null_cells = 0
 
-    for sheet_name in wb.sheetnames[:5]:
+    # RÈGLE ABSOLUE N°10 : lire jusqu'à 8 feuilles en détail (vs 5 avant).
+    # Le manifeste ALL_SHEETS_MANIFEST listera les feuilles non parsées pour
+    # que le LLM ne déclare jamais une donnée absente sans les avoir vérifiées.
+    for sheet_name in wb.sheetnames[:8]:
         ws = wb[sheet_name]
         rows = list(ws.iter_rows(values_only=True))
 
@@ -187,6 +190,25 @@ def _build_excel_result(
     bfr_summary = _extract_bfr_summary(sheets_data)
     if bfr_summary:
         result["bfr_summary"] = bfr_summary
+
+    # ── RÈGLE ABSOLUE N°10 : manifeste complet de toutes les feuilles ────────
+    # Injecté dans le contexte LLM AVANT les données.
+    # Interdit de déclarer une donnée absente sans avoir vérifié que la feuille
+    # qui pourrait la contenir figure bien dans "sheets_parsed_in_detail".
+    parsed_names: set[str] = {s.get("sheet_name", "") for s in sheets_data}
+    not_parsed: list[str] = [n for n in sheet_names if n not in parsed_names]
+    result["all_sheets_manifest"] = {
+        "total_sheets_in_workbook": len(sheet_names),
+        "sheets_parsed_in_detail": [n for n in sheet_names if n in parsed_names],
+        "sheets_present_but_not_parsed": not_parsed,
+        "audit_note": (
+            f"ATTENTION : {len(not_parsed)} feuille(s) présente(s) dans le classeur "
+            f"n'ont PAS été analysées en détail : {not_parsed}. "
+            "Avant de conclure qu'une donnée est absente (bilan, trésorerie, DSO…), "
+            "vérifier si elle pourrait se trouver dans ces feuilles non parsées."
+        ) if not_parsed else "Toutes les feuilles du classeur ont été analysées en détail.",
+    }
+
     result["sheets"] = sheets_data
     return result
 
@@ -259,21 +281,34 @@ def _convert_with_libreoffice(file_bytes: bytes, filename: str) -> bytes:
 def _parse_excel_pandas(file_bytes: bytes, filename: str) -> dict[str, Any]:
     """Last-resort Excel parsing using pandas (formulas appear as None)."""
     xl = pd.ExcelFile(io.BytesIO(file_bytes))
+    all_sheet_names = xl.sheet_names
     sheets_data = []
+    parsed_names: set[str] = set()
 
-    for sheet_name in xl.sheet_names[:5]:
+    for sheet_name in all_sheet_names[:8]:  # RÈGLE N°10 : 8 feuilles max en détail
         header_row = _detect_header_row(xl, sheet_name)
         df = xl.parse(sheet_name, nrows=MAX_ROWS, header=header_row)
         df = df.loc[:, df.columns[:MAX_COLS]]
         sheet_summary = _analyze_dataframe(df, sheet_name)
         sheets_data.append(sheet_summary)
+        parsed_names.add(sheet_name)
 
+    not_parsed = [n for n in all_sheet_names if n not in parsed_names]
     return {
         "filename": filename,
         "format": "excel",
-        "sheets_count": len(xl.sheet_names),
+        "sheets_count": len(all_sheet_names),
         "sheets": sheets_data,
         "total_rows": sum(s.get("rows", 0) for s in sheets_data),
+        "all_sheets_manifest": {
+            "total_sheets_in_workbook": len(all_sheet_names),
+            "sheets_parsed_in_detail": list(parsed_names),
+            "sheets_present_but_not_parsed": not_parsed,
+            "audit_note": (
+                f"ATTENTION : {len(not_parsed)} feuille(s) non analysée(s) : {not_parsed}. "
+                "Vérifier avant de déclarer une donnée absente."
+            ) if not_parsed else "Toutes les feuilles ont été analysées.",
+        },
     }
 
 
