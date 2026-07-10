@@ -3,7 +3,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Pepperyn — Copilote financier IA',
-  description: 'Analysez vos fichiers Excel et obtenez des analyses financières de niveau consultant en 60 secondes.',
+  description: 'Pepperyn est une IA de décision financière qui permet aux dirigeants de PME d\'améliorer durablement leur rentabilité, leur trésorerie et leur croissance en identifiant et en priorisant les décisions qui créeront ou protégeront le plus de valeur pour leur entreprise.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
