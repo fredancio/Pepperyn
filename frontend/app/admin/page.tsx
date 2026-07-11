@@ -113,12 +113,19 @@ export default function AdminCRMPage() {
             <h1 className="text-2xl font-bold text-[#1A1A2E]">CRM Pepperyn</h1>
             <p className="text-sm text-[#5F6368] mt-0.5">Vue super-admin — toutes les companies</p>
           </div>
-          <button
-            onClick={() => window.location.reload()}
-            className="text-xs text-[#1B73E8] hover:underline"
-          >
-            ↻ Actualiser
-          </button>
+          <div className="flex items-center gap-3">
+            {/* Nav admin */}
+            <div className="flex gap-1 bg-gray-100 rounded-lg p-1 text-sm">
+              <span className="px-3 py-1.5 rounded-md font-medium bg-white text-[#1A1A2E] shadow-sm">CRM</span>
+              <a href="/admin/growth" className="px-3 py-1.5 rounded-md font-medium text-[#5F6368] hover:text-[#1A1A2E] transition-colors">Growth</a>
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className="text-xs text-[#1B73E8] hover:underline"
+            >
+              ↻ Actualiser
+            </button>
+          </div>
         </div>
 
         {/* Summary cards */}
