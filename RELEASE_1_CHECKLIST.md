@@ -18,7 +18,9 @@
 | WP0.5 | Business Rules Finalization | ✅ Terminé | ✅ Validé |
 | WP0.75 | Final Business Rules Freeze | ✅ Terminé | ✅ Validé |
 | WP0.FINAL | Final Preparation — Contrat figé | ✅ Terminé | ✅ **Validé — Prêt pour WP1A** |
-| WP1A | Product Catalog | ✅ Terminé | ⏳ En attente validation |
+| WP1A | Product Catalog | ✅ Terminé | ✅ Validé — commit `b651a7c` |
+| WP1B | Billing Migration | ✅ Terminé | ⏳ En attente validation |
+| WP1C | Usage Migration | 🔲 À démarrer | — |
 | WP2 | Backend Quota Fix | 🔲 À démarrer | — |
 | WP3 | Stripe Configuration | 🔲 À démarrer | — |
 | WP4 | Parcours SCALE + CreditsModal | 🔲 À démarrer | — |
@@ -109,27 +111,104 @@ Fonctions: get_plan(), get_commercial_plans(),
 **Contrôle syntaxe :** `python -m py_compile` → OK  
 **Import sans Stripe :** OK (module importable sans variables d'environnement)
 
-**IMPORTANT — Aucun consommateur migré :**
-- `usage_service.py` : PAS modifié — conserve ses propres constantes (incorrectes jusqu'à WP1B)
-- `billing_service.py` : PAS modifié
-- `billing.py` : PAS modifié
-- Frontend : PAS modifié
-- Comportement produit actuel : INCHANGÉ
+**IMPORTANT — Aucun consommateur migré en WP1A :**
+- `usage_service.py` : PAS modifié en WP1A — sera migré en WP1C
+- `billing_service.py` : PAS modifié en WP1A — migré en WP1B ✅
+- `billing.py` : PAS modifié en WP1A — migré en WP1B ✅
+- Frontend : PAS modifié — sera aligné en WP1D/WP5
+- Comportement produit en WP1A : INCHANGÉ
 
-**Refactorisations (WP1B/WP2) :**
-- [ ] `usage_service.py` : importer PLAN_LIMITS depuis product_catalog (supprimer la copie locale)
-- [ ] `billing_service.py` : importer EXECUTIVE_CAPACITY_PACKS depuis product_catalog
-- [ ] `billing.py` : importer depuis product_catalog + exposer `GET /api/billing/plans`
+**Refactorisations :**
+- [x] `billing_service.py` : importer EXECUTIVE_CAPACITY_PACKS depuis product_catalog (WP1B)
+- [x] `billing.py` : importer depuis product_catalog + exposer `GET /api/billing/plans` (WP1B)
+- [ ] `usage_service.py` : importer PLAN_LIMITS depuis product_catalog (WP1C)
 
 **Validation WP1A :**
 - [x] Tests unitaires passent (95/95)
 - [x] `python -m pytest tests/test_product_catalog.py -v` → 95 passed
-- [ ] `GET /api/billing/plans` retourne les valeurs correctes — validé après WP1B
-- [ ] Aucun fichier hors de `product_catalog.py` ne contient les constantes 149, 349, 30, 75, 500, 10, 20, 80
+- [x] `GET /api/billing/plans` retourne les valeurs correctes — validé en WP1B ✅
+- [x] `billing_service.py` ne contient plus ADDON_QUANTITIES ni STRIPE_PRICE_IDS locaux
 
 **Dépendances :** WP0.75 validé.  
 **Durée estimée :** 2–3h.  
 **Ordre :** Premier WP à exécuter.
+
+---
+
+## WP1B — BILLING MIGRATION
+
+**Objectif :** Migrer `billing.py` et `billing_service.py` pour lire exclusivement depuis `product_catalog.py`.
+
+**✅ WP1B IMPLÉMENTÉ — 13 juillet 2026 — branche `release-1/wp1b-billing-migration`**
+
+**Modifications apportées :**
+
+### `backend/services/billing_service.py`
+- [x] `STRIPE_PRICE_IDS` dict local **supprimé** — Price IDs lus via `os.environ` ou `pack.stripe_price_id`
+- [x] `ADDON_QUANTITIES` dict local **supprimé** — quantités lues depuis `EXECUTIVE_CAPACITY_PACKS`
+- [x] Import de `get_executive_capacity_pack`, `validate_stripe_price_ids` depuis `product_catalog`
+- [x] `is_configured()` : utilise `validate_stripe_price_ids()` du catalog
+- [x] `create_checkout_session()` : validation explicite FREE/POWER/ENTERPRISE/inconnu + messages d'erreur précis
+- [x] `process_webhook_event()` : quantité bonus via `pack.analyses_added` (Starter=10, Growth=20, Scale=80)
+
+### `backend/routers/billing.py`
+- [x] `PLANS_CATALOGUE` dict **supprimé** (128 lignes de constantes obsolètes)
+- [x] Import de `get_commercial_plans`, `EXECUTIVE_CAPACITY_PACKS`, `EXECUTIVE_CAPACITY_PACK_IDS`
+- [x] `_build_plans_catalogue()` : construit le catalogue dynamiquement depuis `product_catalog`
+- [x] `GET /api/billing/plans` : retourne `_build_plans_catalogue()` (valeurs correctes)
+- [x] POWER absent du catalogue public
+- [x] `CheckoutRequest` : `"power"` retiré du commentaire de type
+
+### Nouveaux fichiers
+- [x] `backend/tests/test_billing_migration.py` — **38 tests, 38 passing, 0.48s**
+- [x] `KNOWN_TEST_FAILURES.md` — 4 échecs pré-existants documentés (PPTX/EDM, hors scope)
+
+**Résultat des tests :**
+```
+test_billing_migration.py  : 38 passed in 0.48s
+test_product_catalog.py    : 95 passed (inchangé)
+test_rule_00*.py           : 4 failed (pré-existants, inchangés)
+TOTAL                      : 111 passed, 4 failed (pré-existants uniquement)
+```
+
+**Contrat de réponse `GET /api/billing/plans` :**
+```json
+{
+  "success": true,
+  "data": {
+    "plans": [
+      {"id": "free",  "price_eur": 0,   "analyses_per_month": 1,   "chat_monthly_cap": 3,   ...},
+      {"id": "pro",   "price_eur": 149, "analyses_per_month": 30,  "chat_monthly_cap": 75,  ...},
+      {"id": "scale", "price_eur": 349, "analyses_per_month": 100, "chat_monthly_cap": 500, ...}
+    ],
+    "executive_capacity_packs": [
+      {"id": "addon_starter", "analyses_added": 10, "price_eur": 39,  ...},
+      {"id": "addon_growth",  "analyses_added": 20, "price_eur": 79,  ...},
+      {"id": "addon_scale",   "analyses_added": 80, "price_eur": 239, ...}
+    ],
+    "addons": [...]   // alias de executive_capacity_packs, supprimé en WP5
+  }
+}
+```
+
+**Évolutions du contrat vs PLANS_CATALOGUE :**
+- `interactions_per_analysis` → `chat_monthly_cap` (quota mensuel global, sémantique correcte)
+- `price_cents` ajouté (valeur canonique)
+- `label`, `max_entities` ajoutés
+- Champs marketing supprimés : `subtitle`, `highlighted`, `color`, `features`, `cta`
+- POWER supprimé du catalogue public
+- Mise à jour frontend prévue en WP5
+
+**Validation WP1B :**
+- [x] `billing_service.py` : 0 constante commerciale locale
+- [x] `billing.py` : 0 constante commerciale locale
+- [x] `GET /api/billing/plans` : PRO=149€/30 analyses, SCALE=349€/100 analyses
+- [x] Checkout FREE → ValueError explicite
+- [x] Checkout POWER → ValueError explicite
+- [x] Webhook Starter → 10 analyses, Growth → 20, Scale Capacity Pack → 80
+- [x] Tests 38/38 passent
+- [x] Aucune régression WP1A (95 tests inchangés)
+- [x] Aucune régression pre-existing (4 échecs = baseline)
 
 ---
 

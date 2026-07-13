@@ -1,6 +1,10 @@
 """
-billing_service.py — Pepperyn
+billing_service.py — Pepperyn Release 1.0
 Facturation Stripe : Checkout, Portal, Webhook.
+
+Données commerciales (plans, quantités packs, Price IDs) :
+  → lues exclusivement depuis config/product_catalog.py
+  → aucune constante commerciale locale dans ce fichier
 """
 from __future__ import annotations
 
@@ -10,24 +14,27 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# ── Config ───────────────────────────────────────────────────────────────────
+# ── Config infrastructure ─────────────────────────────────────────────────────
 
 STRIPE_SECRET_KEY     = os.getenv("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
 FRONTEND_URL          = os.getenv("FRONTEND_URL", "https://www.pepperyn.com")
 
-STRIPE_PRICE_IDS: dict[str, str] = {
-    "pro":           os.getenv("STRIPE_PRICE_PRO",          ""),
-    "scale":         os.getenv("STRIPE_PRICE_SCALE",        ""),
-    "addon_starter": os.getenv("STRIPE_PRICE_ADDON_STARTER",""),
-    "addon_growth":  os.getenv("STRIPE_PRICE_ADDON_GROWTH", ""),
-    "addon_scale":   os.getenv("STRIPE_PRICE_ADDON_SCALE",  ""),
-}
+# ── Catalogue commercial — source unique de vérité ────────────────────────────
+# STRIPE_PRICE_IDS et ADDON_QUANTITIES sont supprimés.
+# Les données commerciales sont lues depuis config/product_catalog.py.
 
-ADDON_QUANTITIES: dict[str, int] = {
-    "addon_starter": 10,
-    "addon_growth":  50,
-    "addon_scale":   200,
+from config.product_catalog import (
+    get_executive_capacity_pack,
+    validate_stripe_price_ids,
+)
+
+# Plans commandables via Stripe Checkout.
+# FREE est exclu : l'inscription FREE est directe, sans checkout.
+# POWER et ENTERPRISE sont exclus : non commercialisés publiquement.
+_ORDERABLE_PLAN_ENV: dict[str, str] = {
+    "pro":   "STRIPE_PRICE_PRO",
+    "scale": "STRIPE_PRICE_SCALE",
 }
 
 
@@ -39,7 +46,9 @@ class BillingService:
         return stripe
 
     def is_configured(self) -> bool:
-        return bool(STRIPE_SECRET_KEY and STRIPE_PRICE_IDS.get("pro"))
+        """Retourne True si la clé Stripe et le Price ID PRO sont configurés."""
+        price_ids_ok = validate_stripe_price_ids()
+        return bool(STRIPE_SECRET_KEY and price_ids_ok.get("pro"))
 
     # ── Checkout ─────────────────────────────────────────────────────────────
 
@@ -51,26 +60,81 @@ class BillingService:
         success_url: Optional[str] = None,
         cancel_url: Optional[str] = None,
     ) -> dict:
-        price_id = STRIPE_PRICE_IDS.get(plan_or_addon)
-        if not price_id:
-            raise ValueError(f"Plan ou add-on inconnu : {plan_or_addon}")
+        """
+        Crée une session Stripe Checkout pour un Plan payant ou un Executive Capacity Pack.
 
-        is_addon  = plan_or_addon.startswith("addon_")
-        _success  = (success_url or f"{FRONTEND_URL}/app/billing/success") + f"?plan={plan_or_addon}&session_id={{CHECKOUT_SESSION_ID}}"
-        _cancel   = cancel_url or f"{FRONTEND_URL}/upgrade"
+        Règles métier :
+        - FREE ne peut jamais déclencher un checkout (inscription directe).
+        - POWER et ENTERPRISE ne sont pas commandables publiquement.
+        - Seuls 'pro', 'scale' et les trois packs officiels sont acceptés.
+        - Un Price ID absent de l'environnement provoque une erreur explicite.
+        """
+        # ── 1. Bloquer FREE ───────────────────────────────────────────────────
+        if plan_or_addon == "free":
+            raise ValueError(
+                "FREE ne nécessite pas de checkout Stripe. "
+                "L'inscription FREE est directe."
+            )
+
+        is_pack = plan_or_addon.startswith("addon_")
+
+        if is_pack:
+            # ── 2a. Executive Capacity Pack ───────────────────────────────────
+            try:
+                pack = get_executive_capacity_pack(plan_or_addon)
+            except KeyError:
+                raise ValueError(
+                    f"Executive Capacity Pack inconnu : '{plan_or_addon}'. "
+                    f"Packs valides : addon_starter, addon_growth, addon_scale."
+                )
+
+            price_id = pack.stripe_price_id   # property — lit depuis l'env à l'appel
+            if price_id is None:
+                raise ValueError(
+                    f"Stripe Price ID manquant pour '{plan_or_addon}'. "
+                    f"Configurer la variable d'environnement '{pack.stripe_price_id_env}'."
+                )
+            mode = "payment"
+
+        else:
+            # ── 2b. Plan payant (PRO ou SCALE uniquement) ─────────────────────
+            if plan_or_addon not in _ORDERABLE_PLAN_ENV:
+                raise ValueError(
+                    f"Plan non commandable via Stripe : '{plan_or_addon}'. "
+                    f"Plans commandables : {sorted(_ORDERABLE_PLAN_ENV.keys())}. "
+                    f"POWER et ENTERPRISE ne sont pas commercialisés publiquement."
+                )
+
+            env_var  = _ORDERABLE_PLAN_ENV[plan_or_addon]
+            price_id = os.environ.get(env_var)
+            if not price_id:
+                raise ValueError(
+                    f"Stripe Price ID manquant pour Plan '{plan_or_addon}'. "
+                    f"Configurer la variable d'environnement '{env_var}'."
+                )
+            mode = "subscription"
+
+        _success = (
+            (success_url or f"{FRONTEND_URL}/app/billing/success")
+            + f"?plan={plan_or_addon}&session_id={{CHECKOUT_SESSION_ID}}"
+        )
+        _cancel = cancel_url or f"{FRONTEND_URL}/upgrade"
 
         stripe = self._stripe()
         session = stripe.checkout.Session.create(
             payment_method_types=["card"],
             line_items=[{"price": price_id, "quantity": 1}],
-            mode="payment" if is_addon else "subscription",
+            mode=mode,
             success_url=_success,
             cancel_url=_cancel,
             customer_email=customer_email,
             metadata={"company_id": company_id, "plan_or_addon": plan_or_addon},
             allow_promotion_codes=True,
         )
-        logger.info(f"[BILLING] Checkout session créée : {session.id} pour {company_id} ({plan_or_addon})")
+        logger.info(
+            f"[BILLING] Checkout créé : {session.id} "
+            f"— company={company_id} — produit={plan_or_addon} — mode={mode}"
+        )
         return {"checkout_url": session.url, "session_id": session.id}
 
     # ── Portal ───────────────────────────────────────────────────────────────
@@ -116,7 +180,16 @@ class BillingService:
             customer_id   = session["customer"] if "customer" in session else None
 
             if plan_or_addon.startswith("addon_"):
-                qty = ADDON_QUANTITIES.get(plan_or_addon, 0)
+                # Quantité lue depuis product_catalog (source unique de vérité).
+                # Ne jamais utiliser de constante locale ADDON_QUANTITIES.
+                try:
+                    qty = get_executive_capacity_pack(plan_or_addon).analyses_added
+                except KeyError:
+                    logger.error(
+                        f"[WEBHOOK] Executive Capacity Pack inconnu dans metadata : "
+                        f"'{plan_or_addon}'. Quantité 0 appliquée — vérifier les données Stripe."
+                    )
+                    qty = 0
                 return {
                     "action": "add_bonus",
                     "company_id": company_id,

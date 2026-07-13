@@ -1,16 +1,17 @@
 """
-routers/billing.py — Pepperyn V11
+routers/billing.py — Pepperyn Release 1.0
 Endpoints de facturation (Stripe Checkout, Portal, Webhook, Quota).
 
-⚠️  Stripe non encore branché — les endpoints /checkout et /portal
-     retournent des placeholders jusqu'à demain.
+Données commerciales (plans, quantités, prix) :
+  → lues exclusivement depuis config/product_catalog.py
+  → aucun catalogue commercial local dans ce fichier
 
 Endpoints :
+  GET  /api/billing/plans          → catalogue plans + Executive Capacity Packs
   GET  /api/billing/usage          → quota du mois (pour la sidebar frontend)
-  POST /api/billing/checkout       → créer session Checkout (plan ou add-on)
-  POST /api/billing/portal         → ouvrir Billing Portal
+  POST /api/billing/checkout       → créer session Checkout (plan ou pack)
+  POST /api/billing/portal         → ouvrir Billing Portal Stripe
   POST /api/billing/webhook        → webhook Stripe (mettre à jour plan/crédits)
-  GET  /api/billing/plans          → liste plans + add-ons + prix (pour /upgrade)
 """
 from __future__ import annotations
 
@@ -19,6 +20,12 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Header, Request
 from pydantic import BaseModel
+
+from config.product_catalog import (
+    get_commercial_plans,
+    EXECUTIVE_CAPACITY_PACKS,
+    EXECUTIVE_CAPACITY_PACK_IDS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -82,144 +89,77 @@ async def _resolve_auth(authorization: Optional[str]) -> tuple[str, str]:
     raise HTTPException(status_code=401, detail="Token invalide")
 
 
-# ── Plans catalogue (source unique de vérité pour le frontend) ───────────────
+# ── Catalogue commercial dynamique ───────────────────────────────────────────
+#
+# PLANS_CATALOGUE est supprimé.
+# Le catalogue est construit à la demande depuis product_catalog.py.
+#
+# Évolutions du contrat de réponse par rapport à l'ancien PLANS_CATALOGUE :
+#   - Champs supprimés : subtitle, highlighted, badge, color, features, cta
+#     (données marketing — appartiennent au frontend, pas à l'API)
+#   - 'interactions_per_analysis' → 'chat_monthly_cap' (quota mensuel global,
+#     sémantique correcte — il n'existe pas de limite par analyse)
+#   - 'price_cents' ajouté (valeur canonique en centimes)
+#   - 'label', 'max_entities' ajoutés
+#   - POWER supprimé (non commercialisé publiquement)
+#   - prix corrects : PRO=149€/30 analyses, SCALE=349€/100 analyses
+#   - packs corrects : Starter=10/39€, Growth=20/79€, Scale=80/239€
+#   - 'addons' conservé comme alias de 'executive_capacity_packs' (compat WP5)
+#   - Mise à jour frontale prévue en WP5
 
-PLANS_CATALOGUE = {
-    "plans": [
-        {
-            "id": "free",
-            "name": "FREE",
-            "subtitle": "Découvrez Pepperyn",
-            "price_eur": 0,
-            "period": "",
-            "analyses_per_month": 1,
-            "interactions_per_analysis": 3,
-            "highlighted": False,
-            "color": "green",
-            "features": [
-                "1 analyse / mois",
-                "Export PDF",
-                "Mémoire légère",
-                "Données anonymisées",
-                "3 interactions contextuelles incluses",
-            ],
-            "stripe_price_id": None,
-            "cta": "Commencer gratuitement",
-        },
-        {
-            "id": "pro",
-            "name": "PRO",
-            "subtitle": "Pour dirigeants de PME",
-            "price_eur": 59,
-            "period": "/mois",
-            "analyses_per_month": 15,
-            "interactions_per_analysis": None,  # illimité
-            "highlighted": False,
-            "color": "blue",
-            "features": [
-                "15 analyses / mois",
-                "Usage conversationnel inclus",
-                "Exports Excel, PDF et PowerPoint",
-                "Mémoire persistante",
-                "Suivi des tendances financières",
-                "Alertes et dérives détectées automatiquement",
-                "Analyse multi-périodes",
-                "Projections simples",
-                "Priorisation intelligente",
-            ],
-            "stripe_price_id": "price_TODO_pro",
-            "cta": "Commencer",
-        },
-        {
-            "id": "power",
-            "name": "POWER",
-            "subtitle": "Pour CFO, consultants et experts-comptables",
-            "price_eur": 129,
-            "period": "/mois",
-            "analyses_per_month": 75,
-            "interactions_per_analysis": None,
-            "highlighted": True,
-            "badge": "⭐ LE PLUS UTILISÉ",
-            "color": "red",
-            "features": [
-                "75 analyses / mois",
-                "Usage avancé inclus",
-                "Multi-entités",
-                "Mémoire persistante par entité",
-                "Simulateur de décisions",
-                "Projections avancées",
-                "Comparaison périodes",
-                "Analyse comparative",
-                "Exports premium",
-                "Historique enrichi",
-                "Détection des tendances récurrentes",
-            ],
-            "stripe_price_id": "price_TODO_power",
-            "cta": "Passer à Power",
-        },
-        {
-            "id": "scale",
-            "name": "SCALE",
-            "subtitle": "Pour départements financiers et cabinets",
-            "price_eur": 349,
-            "period": "/mois",
-            "analyses_per_month": 250,
-            "interactions_per_analysis": None,
-            "highlighted": False,
-            "color": "purple",
-            "features": [
-                "250 analyses / mois",
-                "Usage intensif inclus",
-                "Multi-users",
-                "Multi-entités avancé",
-                "Permissions utilisateurs",
-                "Workspace collaboratif",
-                "Historique avancé",
-                "Gouvernance des analyses",
-                "Support prioritaire",
-                "Collaboration équipe finance",
-                "Gestion avancée des entités",
-            ],
-            "stripe_price_id": "price_TODO_scale",
-            "cta": "Passer à Scale",
-        },
-    ],
-    "addons": [
-        {
-            "id": "addon_starter",
-            "name": "Starter Pack",
-            "analyses": 10,
-            "price_eur": 19,
-            "description": "+10 analyses supplémentaires",
-            "stripe_price_id": "price_TODO_addon_starter",
-        },
-        {
-            "id": "addon_growth",
-            "name": "Growth Pack",
-            "analyses": 50,
-            "price_eur": 69,
-            "description": "+50 analyses supplémentaires",
-            "stripe_price_id": "price_TODO_addon_growth",
-        },
-        {
-            "id": "addon_scale",
-            "name": "Scale Pack",
-            "analyses": 200,
-            "price_eur": 199,
-            "description": "+200 analyses supplémentaires",
-            "stripe_price_id": "price_TODO_addon_scale",
-        },
-    ],
-    "microcopy": "Conçu pour absorber les pics d'activité sans interruption.",
-}
+
+def _build_plans_catalogue() -> dict:
+    """
+    Construit le catalogue Plans + Executive Capacity Packs depuis product_catalog.py.
+    Appelé à chaque requête GET /api/billing/plans afin de refléter l'état courant
+    des variables d'environnement (Price IDs Stripe).
+    """
+    # ── Plans FREE / PRO / SCALE ──────────────────────────────────────────────
+    plans_out = []
+    for p in get_commercial_plans():
+        plans_out.append({
+            "id":                 p["id"],
+            "name":               p["name"],
+            "label":              p["label"],
+            "price_cents":        p["price_cents"],
+            "price_eur":          p["price_cents"] // 100,
+            "period":             "" if p["id"] == "free" else "/mois",
+            "analyses_per_month": p["analyses_per_month"],
+            "chat_monthly_cap":   p["chat_per_month"],
+            "max_entities":       p["max_entities"],
+            "stripe_price_id":    p["stripe_price_id"],
+        })
+
+    # ── Executive Capacity Packs ──────────────────────────────────────────────
+    packs_out = []
+    for pack_id in EXECUTIVE_CAPACITY_PACK_IDS:
+        pack = EXECUTIVE_CAPACITY_PACKS[pack_id]
+        packs_out.append({
+            "id":             pack.pack_id,
+            "name":           pack.display_name,
+            "analyses_added": pack.analyses_added,
+            "analyses":       pack.analyses_added,   # alias compat — supprimé en WP5
+            "price_cents":    pack.price_cents,
+            "price_eur":      pack.price_cents // 100,
+            "stripe_price_id": pack.stripe_price_id,
+        })
+
+    return {
+        "plans":                    plans_out,
+        "executive_capacity_packs": packs_out,
+        "addons":                   packs_out,   # alias compat — supprimé en WP5
+    }
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 
 @router.get("/plans")
 async def get_plans():
-    """Retourne le catalogue des plans et add-ons (public, sans auth)."""
-    return {"success": True, "data": PLANS_CATALOGUE}
+    """
+    Retourne le catalogue des Plans et Executive Capacity Packs (public, sans auth).
+    Données issues exclusivement de config/product_catalog.py.
+    """
+    return {"success": True, "data": _build_plans_catalogue()}
 
 
 @router.get("/usage")
@@ -236,7 +176,7 @@ async def get_usage(
 
 
 class CheckoutRequest(BaseModel):
-    plan_or_addon: str  # "pro" | "power" | "scale" | "addon_starter" | "addon_growth" | "addon_scale"
+    plan_or_addon: str  # "pro" | "scale" | "addon_starter" | "addon_growth" | "addon_scale"
     customer_email: Optional[str] = None
     success_url: Optional[str] = None
     cancel_url: Optional[str] = None
