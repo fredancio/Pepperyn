@@ -25,8 +25,9 @@
 | WP1B.3 | Idempotence webhook — correctif | ✅ Terminé | ⏳ En attente validation |
 | WP1B.3.1 | SQL Security Hardening | ✅ Terminé | ✅ Validé — migration appliquée |
 | WP1B.3.2 | Migration Stripe — Application & Validation | ✅ Terminé | ✅ **WP1B VALIDÉ** |
-| WP1C | Usage Migration | ✅ Terminé | ⏳ En attente validation |
-| WP1C.1 | Correction stock Capacity Packs | ✅ Terminé | ⏳ En attente validation — commit `ad437a7` |
+| WP1C | Usage Migration (Product Catalog) | ✅ Terminé | ✅ **Validé — commit `9b1ef5d`** |
+| WP1C.1 | Option A (abandonnée) — revertée | ✅ Revertée | ✅ Revert `208af2f` — Option B adoptée |
+| WP1C.2 | Executive Capacity Packs — Option B | ✅ Terminé | ✅ **Validé — commits `2471861` + `2a46f4f`** |
 | WP2 | Backend Quota Fix | 🔲 À démarrer | — |
 | WP3 | Stripe Configuration | 🔲 À démarrer | — |
 | WP4 | Parcours SCALE + CreditsModal | 🔲 À démarrer | — |
@@ -749,7 +750,7 @@ Résultats dans les fichiers sources (hors tests) :
 
 ```
 ╔══════════════════════════════════════════════════════════════════════╗
-║  WP1C — VERDICT : ✅ TERMINÉ — EN ATTENTE VALIDATION               ║
+║  WP1C — VERDICT : ✅ VALIDÉ                                         ║
 ║                                                                      ║
 ║  Branche : release-1/wp1b-billing-migration                         ║
 ║  Date : 2026-07-13                                                  ║
@@ -760,6 +761,146 @@ Résultats dans les fichiers sources (hors tests) :
 ║  54 tests WP1C → 54/54 PASSED ✅                                   ║
 ║  75 tests WP1B → 75/75 PASSED (zéro régression) ✅                 ║
 ║  Signatures analyze.py → préservées ✅                              ║
+╚══════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+## WP1C.2 — EXECUTIVE CAPACITY PACKS — ARCHITECTURE OPTION B ✅ VALIDÉ
+
+**Objectif :** Remplacer l'Option A (stock bonus mensuel dans `usage_limits`) par l'Option B
+(stock bonus permanent dans `companies.bonus_analyses_remaining`).
+Corriger les bugs identifiés en WP1C.1 : suspension FREE non appliquée, décrémentation absente, race condition mensuelle.
+
+**Statut :** ✅ **Validé — 2026-07-13 — Post-migration audit concluant**
+
+---
+
+### Décision architecturale
+
+**Option A (abandonnée) — commit `ad437a7` revert `208af2f` :**
+- Bonus dans `usage_limits.bonus_analyses` (mensuel)
+- Carry-forward entre mois
+- Bug : FREE pouvait consommer le bonus
+- Bug : décrémentation jamais réelle (comparaison, pas UPDATE)
+- Bug : race condition analyses_count (Python-side arithmetic)
+
+**Option B (adoptée) :**
+- Bonus dans `companies.bonus_analyses_remaining` (permanent, jamais remis à zéro)
+- `usage_limits` = compteurs mensuels uniquement
+- FREE : bonus suspendu, conservé en base, réactivé au passage PRO/SCALE
+- Décrémentation : verrou optimiste `UPDATE WHERE bonus_analyses_remaining = N`
+- Mensuel : verrou optimiste `UPDATE WHERE analyses_count = M`, retry ×3
+
+---
+
+### Fichiers modifiés / créés
+
+| Fichier | Action | Description |
+|---|---|---|
+| `backend/migrations/v11_option_b_executive_capacity_packs.sql` | ✅ Créé + appliqué | `ADD COLUMN bonus_analyses_remaining INT NOT NULL DEFAULT 0` sur `companies` |
+| `backend/migrations/v11b_stripe_rpc_add_bonus_option_b.sql` | ✅ Créé + appliqué | `CREATE OR REPLACE FUNCTION apply_stripe_webhook` — bloc `add_bonus` cible `companies` |
+| `backend/services/usage_service.py` | ✅ Réécrit | Option B — `_BONUS_ELIGIBLE_PLANS`, verrous optimistes, suspension FREE |
+| `backend/tests/test_usage_service.py` | ✅ Réécrit | 66 tests, 10 scénarios métier (consommation, accumulation, suspension, réactivation, mois, concurrence, duplication, perte, stock, quota) |
+| `backend/tests/test_billing_migration.py` | ✅ Augmenté | +12 tests `TestV11bRPCOptionB` (Groupe 8) |
+
+---
+
+### Schéma final (production)
+
+| Table | Colonne | Type | Rôle |
+|---|---|---|---|
+| `companies` | `bonus_analyses_remaining` | `INT NOT NULL DEFAULT 0` | Stock permanent Executive Capacity Packs |
+| `usage_limits` | `analyses_count` | `INT DEFAULT 0` | Compteur mensuel analyses |
+| `usage_limits` | `chat_count` | `INT DEFAULT 0` | Compteur mensuel interactions |
+| `usage_limits` | `bonus_analyses` | `INT DEFAULT 0` | **LEGACY** — non lu, non écrit — suppression prévue en WP1E |
+
+---
+
+### Plans éligibles à la consommation bonus
+
+```python
+_BONUS_ELIGIBLE_PLANS = frozenset({
+    "pro", "scale", "enterprise",
+    "standard", "standard_beta", "premium",
+})
+# "free" exclu : bonus suspendu (conservé, non consommable)
+```
+
+---
+
+### Atomicité garantie
+
+| Opération | Mécanisme |
+|---|---|
+| Décrémentation bonus | `UPDATE companies SET bonus_analyses_remaining = N-1 WHERE id = X AND bonus_analyses_remaining = N` |
+| Incrémentation mensuelle | `UPDATE usage_limits SET analyses_count = M+1 WHERE company_id = X AND year_month = Y AND analyses_count = M` |
+| Crédit Stripe (RPC) | `UPDATE companies SET bonus_analyses_remaining = COALESCE(...) + p_quantity WHERE id = X` (atomique SQL) |
+
+---
+
+### RPC `apply_stripe_webhook` après v11b
+
+| Vérification | Résultat |
+|---|---|
+| Cible `companies.bonus_analyses_remaining` | ✅ |
+| Ne fait plus `INSERT INTO usage_limits` | ✅ |
+| Incrément atomique `COALESCE(...) + p_quantity` | ✅ |
+| Whitelist quantités (10, 20, 80) | ✅ |
+| Idempotence `ON CONFLICT DO NOTHING` | ✅ |
+| `SECURITY DEFINER` + `SET search_path` | ✅ |
+| `service_role` only (anon/authenticated révoqués) | ✅ |
+
+---
+
+### Post-migration data preservation audit
+
+| Métrique `usage_limits.bonus_analyses` | Valeur |
+|---|---|
+| Total lignes | 8 |
+| Lignes NULL | 0 |
+| Lignes = 0 | 8 |
+| Lignes > 0 | 0 |
+| Somme totale | 0 |
+| Companies avec ancien solde positif | 0 |
+| Divergences avec `bonus_analyses_remaining` | 0 |
+
+**Conclusion :** Aucune perte de données. Aucun backfill requis.
+
+---
+
+### Résultats tests WP1C.2
+
+```
+tests/test_usage_service.py      — 66 tests  — ✅ 66/66 PASSED
+tests/test_billing_migration.py  — 182 tests — ✅ 182/182 PASSED (dont 12 nouveaux Groupe 8)
+tests/test_product_catalog.py    — 95 tests  — ✅ 95/95 PASSED (zéro régression)
+TOTAL                            — 248 tests — ✅ 248/248 PASSED
+```
+
+---
+
+### Colonne legacy `usage_limits.bonus_analyses`
+
+- Lue par du code actif : **NON**
+- Écrite par du code actif : **NON**
+- Écrite par la RPC : **NON** (v11b appliquée)
+- Suppression prévue : **WP1E** (après confirmation aucun consommateur résiduel)
+
+---
+
+```
+╔══════════════════════════════════════════════════════════════════════╗
+║  WP1C.2 — VERDICT : ✅ VALIDÉ — AUCUNE PERTE                        ║
+║                                                                      ║
+║  Branche : release-1/wp1b-billing-migration                         ║
+║  Date : 2026-07-13                                                  ║
+║  Migration v11 appliquée sur Supabase ✅                            ║
+║  Migration v11b appliquée sur Supabase ✅                           ║
+║  Architecture Option B opérationnelle ✅                            ║
+║  Audit post-migration : aucune perte, aucun backfill ✅             ║
+║  248 tests → 248/248 PASSED ✅                                      ║
+║  WP1C officiellement VALIDÉ ✅                                      ║
 ╚══════════════════════════════════════════════════════════════════════╝
 ```
 
