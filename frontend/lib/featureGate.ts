@@ -249,16 +249,19 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
 };
 
 // ── Quota analyses par plan ──────────────────────────────────────────────────
+// Valeurs alignées sur config/product_catalog.py (WP1A).
+// Utilisées UNIQUEMENT comme fallback si l'API /billing/usage est indisponible.
+// La source de vérité reste toujours le backend (BillingUsage.analyses_limit).
 export const PLAN_QUOTA: Record<string, number> = {
   free:          1,
-  pro:           15,
-  power:         75,
-  scale:         250,
+  pro:           30,
+  power:         100,   // alias SCALE — plan supprimé du catalogue public
+  scale:         100,
   enterprise:    9999,
-  // Legacy
-  standard_beta: 15,
-  standard:      15,
-  premium:       75,
+  // Legacy aliases
+  standard_beta: 30,
+  standard:      30,
+  premium:       100,   // alias POWER → SCALE
 };
 
 export function getQuota(plan: string): number {

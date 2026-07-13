@@ -468,55 +468,153 @@ export function ChatContainer() {
             {/* Sidebar content */}
             <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-4">
 
-              {/* ── Quota analyses ─────────────────────────────────────── */}
+              {/* ── Quota analyses + Executive Capacity Pack ───────────── */}
               {(() => {
-                const used    = usageData?.analyses_used    ?? sessions.length;
-                const limit   = usageData?.total_allowed    ?? getQuota(plan);
-                const bonus   = usageData?.bonus_analyses   ?? 0;
-                const pct     = limit > 0 ? Math.min(100, (used / limit) * 100) : 100;
-                const isOver  = used >= limit;
-                const isWarn  = pct >= 70 && !isOver;
+                // WP1D — Option B : toutes les valeurs viennent directement du backend.
+                // Le frontend n'effectue aucun calcul métier.
+                const monthlyUsed      = usageData?.analyses_monthly_used      ?? usageData?.analyses_used ?? sessions.length;
+                const monthlyLimit     = usageData?.analyses_limit             ?? getQuota(plan);
+                const monthlyRemaining = usageData?.analyses_monthly_remaining ?? null;
+                const execPack         = usageData?.analyses_bonus_remaining   ?? 0;
+                const execSuspended    = usageData?.analyses_bonus_suspended   ?? false;
+                const totalRemaining   = usageData?.analyses_remaining         ?? null;
+                const renewalDate      = usageData?.renewal_date               ?? null;
+                const interactionsUsed = usageData?.interactions_used          ?? null;
+                const interactionsLimit= usageData?.interactions_limit         ?? null;
+                const interactionsLeft = usageData?.interactions_remaining     ?? null;
+
+                // Calculs purement visuels (rendu de la barre, couleurs)
+                const pct    = monthlyLimit > 0 ? Math.min(100, (monthlyUsed / monthlyLimit) * 100) : 100;
+                const isOver = monthlyRemaining !== null ? monthlyRemaining <= 0 : monthlyUsed >= monthlyLimit;
+                const isWarn = pct >= 70 && !isOver;
+
+                const renewalLabel = renewalDate
+                  ? new Date(renewalDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })
+                  : null;
+
+                const hasExecPack = execPack > 0;
+                const hasInteractions = interactionsLimit !== null && interactionsLimit > 0;
+
                 return (
-                  <div className={`rounded-xl p-3 border ${
-                    isOver ? 'bg-red-50 border-red-100' : isWarn ? 'bg-amber-50 border-amber-100' : 'bg-[#EFF6FF] border-blue-100'
-                  }`}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-semibold text-[#1A1A2E]">Analyses ce mois</span>
-                      <span className={`text-xs font-bold ${
-                        isOver ? 'text-red-600' : isWarn ? 'text-amber-600' : 'text-[#1B73E8]'
-                      }`}>
-                        {used}/{limit}
-                        {bonus > 0 && <span className="ml-1 text-green-600">(+{bonus} bonus)</span>}
-                      </span>
-                    </div>
-                    {/* Progress bar */}
-                    <div className="h-1.5 bg-white/60 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          isOver ? 'bg-red-500' : isWarn ? 'bg-amber-400' : 'bg-[#1B73E8]'
-                        }`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    {/* CTAs */}
-                    <div className="mt-2 flex flex-col gap-1">
-                      <button
-                        onClick={() => setShowCreditsModal(true)}
-                        className={`w-full text-xs font-semibold hover:underline text-left ${
-                          isOver ? 'text-red-600' : 'text-[#1B73E8]'
-                        }`}
-                      >
-                        {isOver ? '⚠️ Quota épuisé — Acheter des crédits →' : '💳 Acheter des crédits supplémentaires →'}
-                      </button>
-                      {!canAccess(plan, 'export_excel') && (
+                  <div className="flex flex-col gap-2">
+
+                    {/* ── Bloc principal : quota mensuel ──────────────────── */}
+                    <div className={`rounded-xl p-3 border ${
+                      isOver ? 'bg-red-50 border-red-100' : isWarn ? 'bg-amber-50 border-amber-100' : 'bg-[#EFF6FF] border-blue-100'
+                    }`}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-semibold text-[#1A1A2E]">Analyses ce mois</span>
+                        <span className={`text-xs font-bold ${
+                          isOver ? 'text-red-600' : isWarn ? 'text-amber-600' : 'text-[#1B73E8]'
+                        }`}>
+                          {monthlyUsed} / {monthlyLimit}
+                        </span>
+                      </div>
+                      {/* Barre de progression quota mensuel */}
+                      <div className="h-1.5 bg-white/60 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            isOver ? 'bg-red-500' : isWarn ? 'bg-amber-400' : 'bg-[#1B73E8]'
+                          }`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      {/* Légende */}
+                      <div className="mt-1.5 flex flex-col gap-0.5">
+                        {isOver ? (
+                          <p className="text-xs text-red-600 font-medium">⚠️ Quota mensuel épuisé</p>
+                        ) : (
+                          monthlyRemaining !== null && (
+                            <p className="text-xs text-[#5F6368]">
+                              {monthlyRemaining} analyse{monthlyRemaining > 1 ? 's' : ''} restante{monthlyRemaining > 1 ? 's' : ''}
+                            </p>
+                          )
+                        )}
+                        {renewalLabel && (
+                          <p className="text-xs text-[#5F6368]">Renouvellement le {renewalLabel}</p>
+                        )}
+                      </div>
+                      {/* CTAs */}
+                      <div className="mt-2 flex flex-col gap-1">
                         <button
-                          onClick={() => setUpgradeFeature('entities')}
-                          className="w-full text-xs text-amber-700 font-semibold hover:underline text-left"
+                          onClick={() => setShowCreditsModal(true)}
+                          className={`w-full text-xs font-semibold hover:underline text-left ${
+                            isOver ? 'text-red-600' : 'text-[#1B73E8]'
+                          }`}
                         >
-                          Passer à PRO → 15 analyses/mois
+                          {isOver ? '⚠️ Quota épuisé — Augmenter ma capacité →' : '⚡ Augmenter ma capacité →'}
                         </button>
-                      )}
+                        {!canAccess(plan, 'export_excel') && (
+                          <button
+                            onClick={() => setUpgradeFeature('entities')}
+                            className="w-full text-xs text-amber-700 font-semibold hover:underline text-left"
+                          >
+                            Passer à PRO → {getQuota('pro')} analyses/mois
+                          </button>
+                        )}
+                      </div>
                     </div>
+
+                    {/* ── Bloc secondaire : Executive Capacity Pack ────────── */}
+                    {hasExecPack && (
+                      execSuspended ? (
+                        /* Plan FREE — pack suspendu */
+                        <div className="rounded-xl p-3 border border-amber-100 bg-amber-50">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="text-xs">⏸</span>
+                            <span className="text-xs font-semibold text-amber-800">Executive Capacity Pack</span>
+                          </div>
+                          <p className="text-xs text-amber-700 font-bold">{execPack} analyses disponibles</p>
+                          <p className="text-xs text-amber-700 mt-0.5">Conservées tant qu&apos;elles ne sont pas utilisées.</p>
+                          <p className="text-xs text-amber-600 mt-0.5">Suspendues sur plan FREE. Aucune analyse ne sera perdue.</p>
+                          <p className="text-xs text-amber-600">Réactivées automatiquement dès le passage à PRO ou SCALE.</p>
+                        </div>
+                      ) : (
+                        /* Plan éligible — pack actif */
+                        <div className="rounded-xl p-3 border border-green-100 bg-green-50">
+                          <div className="flex items-center gap-1.5 mb-1">
+                            <span className="text-xs">♾️</span>
+                            <span className="text-xs font-semibold text-green-800">Executive Capacity Pack</span>
+                          </div>
+                          <p className="text-xs text-green-700 font-bold">{execPack} analyses disponibles</p>
+                          <p className="text-xs text-green-600 mt-0.5">Conservées tant qu&apos;elles ne sont pas utilisées.</p>
+                          <p className="text-xs text-green-600">Consommées en priorité avant le quota mensuel.</p>
+                          {totalRemaining !== null && (
+                            <p className="text-xs text-green-700 font-semibold mt-1.5">
+                              {totalRemaining} analyse{totalRemaining > 1 ? 's' : ''} disponible{totalRemaining > 1 ? 's' : ''} au total
+                            </p>
+                          )}
+                        </div>
+                      )
+                    )}
+
+                    {/* ── Bloc interactions ────────────────────────────────── */}
+                    {hasInteractions && (
+                      <div className="rounded-xl p-3 border border-blue-100 bg-[#EFF6FF]">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-semibold text-[#1A1A2E]">Échanges de suivi ce mois</span>
+                          <span className="text-xs font-bold text-[#1B73E8]">
+                            {interactionsUsed} / {interactionsLimit}
+                          </span>
+                        </div>
+                        {/* Barre de progression interactions */}
+                        <div className="h-1.5 bg-white/60 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all bg-[#1B73E8]"
+                            style={{ width: `${interactionsLimit! > 0 ? Math.min(100, (interactionsUsed! / interactionsLimit!) * 100) : 0}%` }}
+                          />
+                        </div>
+                        {interactionsLeft !== null && (
+                          <p className="text-xs text-[#5F6368] mt-1">
+                            {interactionsLeft} échange{interactionsLeft > 1 ? 's' : ''} restant{interactionsLeft > 1 ? 's' : ''}
+                          </p>
+                        )}
+                        <p className="text-xs text-[#5F6368] mt-0.5">
+                          Budget mensuel partagé entre toutes vos analyses — aucune limite par analyse
+                        </p>
+                      </div>
+                    )}
+
                   </div>
                 );
               })()}
@@ -969,12 +1067,16 @@ export function ChatContainer() {
         />
       )}
 
-      {/* Credits modal */}
+      {/* Credits modal — WP1D : valeurs directement depuis BillingUsage, zéro recalcul */}
       {showCreditsModal && (
         <CreditsModal
           plan={plan}
-          analysesUsed={usageData?.analyses_used ?? sessions.length}
-          analysesLimit={usageData?.total_allowed ?? getQuota(plan)}
+          analysesUsed={usageData?.analyses_monthly_used ?? usageData?.analyses_used ?? sessions.length}
+          analysesLimit={usageData?.analyses_limit ?? getQuota(plan)}
+          analysesRemaining={usageData?.analyses_monthly_remaining ?? null}
+          bonusRemaining={usageData?.analyses_bonus_remaining ?? 0}
+          bonusSuspended={usageData?.analyses_bonus_suspended ?? false}
+          renewalDate={usageData?.renewal_date ?? null}
           onClose={() => setShowCreditsModal(false)}
         />
       )}
