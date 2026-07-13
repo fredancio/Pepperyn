@@ -1377,6 +1377,150 @@ class TestSQLHardening(unittest.TestCase):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# GROUPE 8 — SQL Option B : RPC add_bonus cible companies  (WP1C.2)
+#
+# Vérifie la migration v11b_stripe_rpc_add_bonus_option_b.sql.
+# Garantit que l'action 'add_bonus' écrit dans companies.bonus_analyses_remaining
+# (stock permanent) et non dans usage_limits.bonus_analyses (Option A vestige).
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestV11bRPCOptionB(unittest.TestCase):
+    """
+    WP1C.2 — Tests structurels de la migration v11b.
+
+    Ces tests inspectent le code SQL source sans connexion Supabase.
+    Ils constituent le filet de sécurité vérifiant que :
+      - L'action 'add_bonus' écrit dans companies.bonus_analyses_remaining.
+      - La table usage_limits n'est plus touchée par 'add_bonus'.
+      - Les protections de sécurité (SECURITY DEFINER, search_path, REVOKE/GRANT)
+        sont ré-appliquées dans la migration.
+      - La whitelist des quantités (10, 20, 80) reste en vigueur.
+    """
+
+    def _v11b_content(self) -> str:
+        migration_path = os.path.join(
+            os.path.dirname(__file__), "..", "migrations",
+            "v11b_stripe_rpc_add_bonus_option_b.sql"
+        )
+        with open(migration_path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    # V11B-01 ─────────────────────────────────────────────────────────────────
+    def test_v11b_01_fichier_existe(self):
+        """La migration v11b existe dans le répertoire migrations/."""
+        migrations_dir = os.path.join(os.path.dirname(__file__), "..", "migrations")
+        self.assertIn(
+            "v11b_stripe_rpc_add_bonus_option_b.sql",
+            os.listdir(migrations_dir),
+            "v11b_stripe_rpc_add_bonus_option_b.sql absent du répertoire migrations/"
+        )
+
+    # V11B-02 ─────────────────────────────────────────────────────────────────
+    def test_v11b_02_add_bonus_ecrit_dans_companies(self):
+        """add_bonus Option B : UPDATE sur companies (stock permanent)."""
+        content = self._v11b_content()
+        self.assertIn(
+            "bonus_analyses_remaining",
+            content,
+            "v11b doit mettre à jour companies.bonus_analyses_remaining"
+        )
+        self.assertIn(
+            "public.companies",
+            content,
+            "v11b doit cibler public.companies dans le bloc add_bonus"
+        )
+
+    # V11B-03 ─────────────────────────────────────────────────────────────────
+    def test_v11b_03_add_bonus_nexcrit_pas_dans_usage_limits(self):
+        """add_bonus Option B : aucun INSERT/UPDATE sur usage_limits.bonus_analyses."""
+        content = self._v11b_content()
+        # La nouvelle version ne doit pas insérer dans usage_limits pour add_bonus
+        self.assertNotIn(
+            "INSERT INTO public.usage_limits",
+            content,
+            "v11b ne doit plus insérer dans usage_limits (Option A supprimée)"
+        )
+
+    # V11B-04 ─────────────────────────────────────────────────────────────────
+    def test_v11b_04_increments_bonus_remaining(self):
+        """add_bonus Option B : incrément atomique COALESCE(bonus_analyses_remaining, 0) + p_quantity."""
+        content = self._v11b_content()
+        self.assertIn(
+            "COALESCE(bonus_analyses_remaining, 0) + p_quantity",
+            content,
+            "v11b doit utiliser l'incrément atomique COALESCE(...) + p_quantity"
+        )
+
+    # V11B-05 ─────────────────────────────────────────────────────────────────
+    def test_v11b_05_create_or_replace_function(self):
+        """v11b utilise CREATE OR REPLACE FUNCTION apply_stripe_webhook."""
+        content = self._v11b_content()
+        self.assertIn(
+            "CREATE OR REPLACE FUNCTION public.apply_stripe_webhook",
+            content,
+            "v11b doit utiliser CREATE OR REPLACE FUNCTION apply_stripe_webhook"
+        )
+
+    # V11B-06 ─────────────────────────────────────────────────────────────────
+    def test_v11b_06_security_definer_conserve(self):
+        """v11b conserve SECURITY DEFINER (requis pour le modèle de permission)."""
+        content = self._v11b_content()
+        self.assertIn("SECURITY DEFINER", content)
+
+    # V11B-07 ─────────────────────────────────────────────────────────────────
+    def test_v11b_07_search_path_conserve(self):
+        """v11b conserve SET search_path (prévient le schema shadowing)."""
+        content = self._v11b_content()
+        self.assertIn("SET search_path", content)
+
+    # V11B-08 ─────────────────────────────────────────────────────────────────
+    def test_v11b_08_revoke_grant_reappliques(self):
+        """v11b ré-applique REVOKE/GRANT après CREATE OR REPLACE."""
+        content = self._v11b_content()
+        self.assertRegex(
+            content,
+            r"REVOKE\s+ALL\s+ON\s+FUNCTION\s+.*apply_stripe_webhook.*FROM\s+anon",
+        )
+        self.assertRegex(
+            content,
+            r"GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+.*apply_stripe_webhook.*TO\s+service_role",
+        )
+
+    # V11B-09 ─────────────────────────────────────────────────────────────────
+    def test_v11b_09_whitelist_quantites_conservee(self):
+        """v11b conserve la whitelist des quantités autorisées (10, 20, 80)."""
+        content = self._v11b_content()
+        self.assertIn("p_quantity NOT IN", content)
+        for qty in ("10", "20", "80"):
+            self.assertIn(qty, content, f"Quantité {qty} absente de la whitelist v11b")
+
+    # V11B-10 ─────────────────────────────────────────────────────────────────
+    def test_v11b_10_whitelist_actions_conservee(self):
+        """v11b conserve la whitelist des actions (update_plan, add_bonus, etc.)."""
+        content = self._v11b_content()
+        self.assertIn("p_action NOT IN", content)
+        for action in ("'update_plan'", "'add_bonus'", "'downgrade_free'"):
+            self.assertIn(action, content, f"Action {action} absente de la whitelist v11b")
+
+    # V11B-11 ─────────────────────────────────────────────────────────────────
+    def test_v11b_11_idempotence_conservee(self):
+        """v11b conserve le registre d'idempotence (INSERT ON CONFLICT DO NOTHING)."""
+        content = self._v11b_content()
+        self.assertIn("ON CONFLICT (stripe_event_id) DO NOTHING", content)
+        self.assertIn("stripe_webhook_events", content)
+
+    # V11B-12 ─────────────────────────────────────────────────────────────────
+    def test_v11b_12_v_year_month_supprime(self):
+        """v11b ne déclare plus v_year_month (plus utilisé après Option B)."""
+        content = self._v11b_content()
+        self.assertNotIn(
+            "v_year_month",
+            content,
+            "v_year_month ne doit plus figurer dans le DECLARE de v11b (Option B)"
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
