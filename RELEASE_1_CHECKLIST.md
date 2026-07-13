@@ -20,6 +20,9 @@
 | WP0.FINAL | Final Preparation — Contrat figé | ✅ Terminé | ✅ **Validé — Prêt pour WP1A** |
 | WP1A | Product Catalog | ✅ Terminé | ✅ Validé — commit `b651a7c` |
 | WP1B | Billing Migration | ✅ Terminé | ⏳ En attente validation |
+| WP1B.1 | Webhook Hardening | ✅ Terminé | ⏳ En attente validation |
+| WP1B.2 | Diagnostic idempotence | ✅ Terminé | ⏳ En attente validation |
+| WP1B.3 | Idempotence webhook — correctif | 🚫 **BLOQUANT avant prod** | — |
 | WP1C | Usage Migration | 🔲 À démarrer | — |
 | WP2 | Backend Quota Fix | 🔲 À démarrer | — |
 | WP3 | Stripe Configuration | 🔲 À démarrer | — |
@@ -209,6 +212,172 @@ TOTAL                      : 111 passed, 4 failed (pré-existants uniquement)
 - [x] Tests 38/38 passent
 - [x] Aucune régression WP1A (95 tests inchangés)
 - [x] Aucune régression pre-existing (4 échecs = baseline)
+
+---
+
+## WP1B.2 — DIAGNOSTIC IDEMPOTENCE WEBHOOK
+
+**Objectif :** Vérifier si un même événement Stripe peut être traité plusieurs fois.
+
+**✅ WP1B.2 TERMINÉ — 13 juillet 2026**
+
+### Trace du traitement webhook (fichiers et lignes)
+
+```
+Stripe (POST)
+ └─ POST /api/billing/webhook
+     └─ billing.py : stripe_webhook() [ligne ~235]
+         └─ payload = await request.body()
+         └─ billing_service.process_webhook_event(payload, stripe_signature)
+             └─ billing_service.py : stripe.Webhook.construct_event() [ligne 166]
+                 → vérifie la signature — rejette si invalide
+             └─ event["type"] lu [ligne 172] — event["id"] JAMAIS LU
+             └─ metadata.company_id, metadata.plan_or_addon extraits [lignes 184-185]
+             └─ retourne dict {action, company_id, ...}
+         └─ billing.py : dispatch sur action [lignes 251-284]
+             → "update_plan" : sb.from_("companies").update({plan}) [ligne 262]
+             → "add_bonus"   : usage_service.add_bonus_analyses(company_id, qty) [ligne 271]
+                 └─ usage_service.py : add_bonus_analyses() [ligne 169]
+                     └─ current_bonus = SELECT bonus_analyses  [READ]
+                     └─ UPDATE SET bonus_analyses = current_bonus + qty  [WRITE]
+```
+
+### Résultats du diagnostic
+
+| Mécanisme | Présent ? | Détail |
+|---|---|---|
+| Lecture de `event["id"]` Stripe | ❌ NON | `event["type"]` lu, `event["id"]` ignoré |
+| Table `stripe_processed_events` | ❌ NON | Aucune migration, aucune table |
+| Contrainte UNIQUE sur event_id | ❌ NON | Aucune |
+| Check `checkout.session.id` | ❌ NON | Lu uniquement pour le log |
+| Protection dans `add_bonus_analyses` | ❌ NON | READ-THEN-WRITE sans garde |
+| Upsert idempotent côté DB | ❌ NON | UPDATE simple (pas ON CONFLICT) |
+
+### Verdict par type d'événement
+
+| Événement | Doublon possible ? | Mécanisme | Risque |
+|---|---|---|---|
+| PRO activation | ✅ Idempotent | `UPDATE companies SET plan='pro'` (SET, pas INCREMENT) | Faible |
+| SCALE activation | ✅ Idempotent | `UPDATE companies SET plan='scale'` (SET, pas INCREMENT) | Faible |
+| Starter Capacity Pack | ❌ **Double crédit** | `bonus_analyses += 10` deux fois = +20 | **ÉLEVÉ** |
+| Growth Capacity Pack | ❌ **Double crédit** | `bonus_analyses += 20` deux fois = +40 | **ÉLEVÉ** |
+| Scale Capacity Pack | ❌ **Double crédit** | `bonus_analyses += 80` deux fois = +160 | **ÉLEVÉ** |
+| downgrade_free | ✅ Idempotent | `UPDATE companies SET plan='free'` (SET) | Faible |
+
+### Scénarios de double livraison Stripe
+
+Stripe **retente automatiquement** un webhook quand le serveur retourne non-2xx.
+Après WP1B.1, les erreurs d'intégrité (pack inconnu, metadata vides) retournent HTTP 400.
+Un scénario de double crédit réel peut se produire si :
+1. Le serveur traite correctement le webhook (crédite les analyses)
+2. La réponse HTTP 200 est perdue (timeout réseau, crash post-traitement)
+3. Stripe rejoue le webhook → deuxième crédit
+
+Il existe aussi un risque de livraison dupliquée côté Stripe même sans erreur (rare mais documenté).
+
+### Tests ajoutés (7 tests diagnostics — WP1B.2)
+
+| Test | Vérifie | Résultat |
+|---|---|---|
+| IDP-01 | `event["id"]` n'est jamais lu | ✅ PASS — confirme l'absence de dédup |
+| IDP-02 | PRO : même event deux fois → même dict | ✅ PASS — idempotent par accident |
+| IDP-03 | SCALE : même event deux fois → même dict | ✅ PASS — idempotent par accident |
+| IDP-04 | addon_starter : même event deux fois → add_bonus x2 | ✅ PASS — vulnérabilité confirmée |
+| IDP-05 | 3 packs : même event deux fois → add_bonus x2 | ✅ PASS — vulnérabilité confirmée |
+| IDP-06 | `add_bonus_analyses` : READ-THEN-WRITE non atomique | ✅ PASS — confirme le risque |
+| IDP-07 | Aucune table `stripe_processed_events` en migration | ✅ PASS — protection absente |
+
+**Tests totaux après WP1B.2 : 48/48 passing** (+ 95/95 WP1A — baseline inchangée)
+
+### Réponses aux questions WP1B.2
+
+1. **Les activations PRO et SCALE sont-elles idempotentes ?** ✅ OUI — par nature de l'opération SQL (SET).
+2. **Les achats d'Executive Capacity Packs sont-ils idempotents ?** ❌ NON — `bonus_analyses += qty` est un INCREMENT.
+3. **Un événement Stripe dupliqué peut-il ajouter deux fois les Analyses ?** ❌ OUI — confirmé.
+4. **Une protection existe-t-elle déjà ?** ❌ NON — aucun mécanisme à aucun niveau.
+5. **L'idempotence est-elle bloquante avant le lancement commercial ?** ❌ **OUI — BLOQUANT**.
+
+---
+
+## WP1B.3 — IDEMPOTENCE WEBHOOK (correctif) 🚫 BLOQUANT AVANT PROD
+
+**Objectif :** Garantir qu'un même événement Stripe Executive Capacity Pack
+ne crédite jamais deux fois les Analyses, quelle que soit la cause
+(retry Stripe, livraison dupliquée, crash post-traitement).
+
+**Condition :** NE PAS COMMENCER avant validation explicite de WP1B.2.
+
+**Statut :** 🔲 À démarrer — **BLOQUANT avant tout test Stripe réel et avant lancement commercial**
+
+**Contraintes :**
+- Ne pas implémenter de solution improvisée
+- Aucune migration sans validation explicite
+- Aucun push sans validation
+
+### Solution proposée : registre persistant par `event.id` Stripe
+
+**Principe** : avant tout traitement d'un webhook `checkout.session.completed`,
+vérifier si `event["id"]` a déjà été traité. Si oui → retourner HTTP 200
+immédiatement sans écriture (acquittement Stripe, pas de retry).
+
+**Migration requise (`v10_stripe_processed_events.sql`) :**
+```sql
+CREATE TABLE IF NOT EXISTS public.stripe_processed_events (
+    stripe_event_id  TEXT        NOT NULL,
+    processed_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    event_type       TEXT        NOT NULL,
+    company_id       TEXT,
+    action           TEXT,
+    PRIMARY KEY (stripe_event_id)
+);
+-- Nettoyage automatique après 90 jours (politique Stripe)
+-- (à implémenter via pg_cron ou fonction Supabase)
+COMMENT ON TABLE public.stripe_processed_events
+  IS 'Registre des événements Stripe traités — garantit l''idempotence des webhooks.';
+```
+
+**Modification `billing.py` (route handler webhook) :**
+```python
+# 1. Lire event_id AVANT tout traitement
+stripe_event_id = result.get("stripe_event_id")  # propagé par process_webhook_event
+if stripe_event_id:
+    # 2. Tenter l'insertion — UNIQUE violation = déjà traité
+    try:
+        sb.from_("stripe_processed_events").insert({
+            "stripe_event_id": stripe_event_id,
+            "event_type":      result.get("event_type", ""),
+            "company_id":      result.get("company_id", ""),
+            "action":          result.get("action", ""),
+        }).execute()
+    except Exception as e:
+        if "duplicate" in str(e).lower() or "unique" in str(e).lower():
+            logger.warning(f"[WEBHOOK IDEMPOTENCE] Événement déjà traité : {stripe_event_id}")
+            return {"received": True, "action": "duplicate_skipped"}
+        raise
+# 3. Seulement si INSERT réussi → effectuer l'écriture métier
+```
+
+**Modification `billing_service.process_webhook_event()` :**
+```python
+# Propager event["id"] dans le dict de retour
+return {
+    "action":          "add_bonus",
+    "stripe_event_id": event["id"],   # ← ajout
+    "event_type":      etype,         # ← ajout
+    ...
+}
+```
+
+**Tests à ajouter (WP1B.3) :**
+- `test_idp_pro_same_event_twice_no_double_effect` — PRO → idempotent (confirmé)
+- `test_idp_scale_same_event_twice_no_double_effect` — SCALE → idempotent (confirmé)
+- `test_idp_starter_same_event_twice_credited_once` — Starter → +10 une seule fois
+- `test_idp_growth_same_event_twice_credited_once` — Growth → +20 une seule fois
+- `test_idp_scale_pack_same_event_twice_credited_once` — Scale Capacity Pack → +80 une seule fois
+
+**Durée estimée :** 2–4h (migration + modification handler + 5 tests)
+
+**Dépendances :** WP1B.2 validé. Migration Supabase + validation explicite requises.
 
 ---
 

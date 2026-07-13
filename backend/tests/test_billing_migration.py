@@ -533,6 +533,177 @@ class TestNonRegression(unittest.TestCase):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# GROUPE 5 — Diagnostic idempotence  (WP1B.2)
+#
+# Ces tests passent en CONFIRMANT L'ABSENCE de protection d'idempotence.
+# Ils documentent l'état actuel. La correction est prévue en WP1B.3.
+#
+# ⚠️  RISQUE DOCUMENTÉ :
+#   Un même checkout.session.completed Executive Capacity Pack reçu deux fois
+#   (retry Stripe ou livraison dupliquée) créditera les Analyses DEUX FOIS.
+#   Les Plans (PRO/SCALE) sont idempotents par accident (SET, pas INCREMENT).
+#
+# Solution proposée (WP1B.3) :
+#   Table Supabase `stripe_processed_events(stripe_event_id TEXT PRIMARY KEY)`
+#   vérifiée avant toute écriture dans le handler webhook de billing.py.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestIdempotencyDiagnostic(unittest.TestCase):
+    """
+    WP1B.2 — Diagnostic d'idempotence des webhooks Stripe.
+
+    Ces tests passent en confirmant l'état actuel (vulnérabilité documentée).
+    Ils seront remplacés par des tests de comportement correct en WP1B.3.
+    """
+
+    def _process(self, plan_or_addon: str, event_id: str = "evt_test_default") -> dict:
+        """Helper : exécute process_webhook_event avec un event_id explicite."""
+        from services.billing_service import BillingService
+        svc = BillingService()
+        fake_event = {
+            "id":   event_id,          # ← Stripe event ID unique — ignoré actuellement
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_test_session_abc",
+                    "metadata": {
+                        "company_id":    "company_idp_test",
+                        "plan_or_addon": plan_or_addon,
+                    },
+                    "customer": "cus_idp_test",
+                }
+            },
+        }
+        stripe_mock = MagicMock()
+        stripe_mock.Webhook.construct_event.return_value = fake_event
+        with patch.object(svc, "_stripe", return_value=stripe_mock):
+            return svc.process_webhook_event(b"payload", "sig_test")
+
+    # IDP-01 ──────────────────────────────────────────────────────────────────
+    def test_idp_01_stripe_event_id_never_read(self):
+        """
+        Confirme que process_webhook_event() n'exploite pas event['id'] Stripe.
+        Le champ unique de l'événement n'est ni lu ni propagé dans le résultat.
+        ⚠️ Aucune barrière à la double exécution basée sur l'identifiant Stripe.
+        """
+        result = self._process("addon_starter", event_id="evt_UNIQUE_NEVER_REUSED")
+        # event["id"] n'apparaît pas dans le dict retourné
+        self.assertNotIn("stripe_event_id",   result)
+        self.assertNotIn("event_id",          result)
+        # Confirmation : seule la session Stripe est dans le résultat (comme log)
+        # mais elle n'est pas utilisée pour déduplication
+
+    # IDP-02 ──────────────────────────────────────────────────────────────────
+    def test_idp_02_plan_pro_idempotent_by_nature(self):
+        """
+        PRO : même événement traité deux fois → même action 'update_plan'.
+        Idempotent par accident : UPDATE companies SET plan='pro' est un SET,
+        pas un INCREMENT. Deux exécutions n'ont pas d'effet cumulatif.
+        ✅ Plans : pas de risque de double activation.
+        """
+        r1 = self._process("pro", "evt_pro_001")
+        r2 = self._process("pro", "evt_pro_001")   # même event_id, rejoué
+        self.assertEqual(r1["action"], "update_plan")
+        self.assertEqual(r2["action"], "update_plan")
+        self.assertEqual(r1["plan"],   r2["plan"])
+
+    # IDP-03 ──────────────────────────────────────────────────────────────────
+    def test_idp_03_plan_scale_idempotent_by_nature(self):
+        """
+        SCALE : même événement traité deux fois → même action 'update_plan'.
+        ✅ Plans : pas de risque de double activation.
+        """
+        r1 = self._process("scale", "evt_scale_001")
+        r2 = self._process("scale", "evt_scale_001")
+        self.assertEqual(r1["action"], "update_plan")
+        self.assertEqual(r1["plan"],   r2["plan"])
+
+    # IDP-04 ──────────────────────────────────────────────────────────────────
+    def test_idp_04_addon_service_layer_stateless_no_dedup(self):
+        """
+        addon_starter : même événement traité deux fois → add_bonus retourné DEUX FOIS.
+        Le service est stateless : il ne détecte pas les doublons.
+        ⚠️ VULNÉRABILITÉ CONFIRMÉE : le route handler (billing.py) appellerait
+        add_bonus_analyses(company, 10) deux fois → +20 Analyses au lieu de +10.
+        Correction prévue en WP1B.3.
+        """
+        r1 = self._process("addon_starter", "evt_starter_001")
+        r2 = self._process("addon_starter", "evt_starter_001")  # même event
+        # Les deux appels retournent add_bonus — aucune déduplication
+        self.assertEqual(r1["action"], "add_bonus")
+        self.assertEqual(r2["action"], "add_bonus")
+        self.assertEqual(r1["quantity"], 10)
+        self.assertEqual(r2["quantity"], 10)
+        # Confirmation : service stateless, dict identique les deux fois
+        self.assertEqual(r1, r2,
+                         "Service stateless vérifié : même dict retourné deux fois. "
+                         "Sans WP1B.3, le route handler créditerait +20 au lieu de +10.")
+
+    # IDP-05 ──────────────────────────────────────────────────────────────────
+    def test_idp_05_all_packs_vulnerable_to_double_credit(self):
+        """
+        Les trois packs retournent add_bonus sans déduplication.
+        ⚠️ Starter=+10, Growth=+20, Scale Capacity Pack=+80 seraient crédités
+        DEUX FOIS si Stripe rejoue le même webhook.
+        """
+        cases = [
+            ("addon_starter", 10,  "evt_starter_dbl"),
+            ("addon_growth",  20,  "evt_growth_dbl"),
+            ("addon_scale",   80,  "evt_scale_dbl"),
+        ]
+        for pack_id, expected_qty, evt_id in cases:
+            with self.subTest(pack=pack_id):
+                r1 = self._process(pack_id, evt_id)
+                r2 = self._process(pack_id, evt_id)
+                self.assertEqual(r1["quantity"], expected_qty)
+                self.assertEqual(r1, r2,
+                                 f"⚠️ {pack_id} : add_bonus retourné deux fois — "
+                                 f"double crédit de {expected_qty} Analyses possible")
+
+    # IDP-06 ──────────────────────────────────────────────────────────────────
+    def test_idp_06_add_bonus_analyses_uses_read_then_write_not_atomic(self):
+        """
+        Confirme que add_bonus_analyses() fait READ-THEN-WRITE (pas atomique).
+        La formule 'current_bonus + quantity' est un incrément non idempotent.
+        ⚠️ Pas de protection via ON CONFLICT, upsert idempotent, ou stripe_event_id.
+        """
+        import inspect
+        from services.usage_service import UsageService
+        source = inspect.getsource(UsageService.add_bonus_analyses)
+        # L'opération est un incrément, jamais un SET absolu
+        self.assertIn("current_bonus + quantity", source,
+                      "add_bonus_analyses fait un INCREMENT — pas un SET absolu idempotent")
+        # Aucune protection d'idempotence au niveau de l'opération
+        self.assertNotIn("stripe_event_id", source)
+        self.assertNotIn("ON CONFLICT",     source)
+        self.assertNotIn("stripe_session",  source)
+
+    # IDP-07 ──────────────────────────────────────────────────────────────────
+    def test_idp_07_no_processed_events_table_in_migrations(self):
+        """
+        Confirme qu'aucune migration ne crée de table stripe_processed_events.
+        ⚠️ Le registre d'événements traités est absent — protection à créer en WP1B.3.
+        """
+        migrations_dir = os.path.join(
+            os.path.dirname(__file__), "..", "migrations"
+        )
+        if not os.path.isdir(migrations_dir):
+            self.skipTest("Répertoire migrations absent — test ignoré")
+
+        for fname in os.listdir(migrations_dir):
+            if not fname.endswith(".sql"):
+                continue
+            fpath = os.path.join(migrations_dir, fname)
+            with open(fpath, "r", encoding="utf-8") as f:
+                content = f.read().lower()
+            self.assertNotIn(
+                "stripe_processed_events", content,
+                f"Table stripe_processed_events trouvée dans {fname} — "
+                f"WP1B.3 est peut-être déjà partiellement implémenté ?"
+            )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
