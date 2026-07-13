@@ -23,6 +23,7 @@
 | WP1B.1 | Webhook Hardening | ✅ Terminé | ⏳ En attente validation |
 | WP1B.2 | Diagnostic idempotence | ✅ Terminé | ⏳ En attente validation |
 | WP1B.3 | Idempotence webhook — correctif | ✅ Terminé | ⏳ En attente validation |
+| WP1B.3.1 | SQL Security Hardening | ✅ Terminé | ⏳ En attente validation |
 | WP1C | Usage Migration | 🔲 À démarrer | — |
 | WP2 | Backend Quota Fix | 🔲 À démarrer | — |
 | WP3 | Stripe Configuration | 🔲 À démarrer | — |
@@ -356,6 +357,137 @@ Le marqueur d'idempotence (`stripe_event_id`) et le traitement métier appartien
 - Première livraison Stripe d'un event_id → RPC insère + traite → HTTP 200
 - Retry Stripe (même event_id) → RPC détecte le doublon → HTTP 200, action=duplicate_skipped
 - Stripe ne retente plus (HTTP 200 reçu) → zéro double crédit possible
+
+---
+
+## WP1B.3.1 — SQL SECURITY HARDENING ✅ TERMINÉ
+
+**Objectif :** Éliminer les 3 vulnérabilités de sécurité identifiées lors de la Security Review WP1B.3 :
+- CRITICAL : `apply_stripe_webhook` (SECURITY DEFINER) callable par `anon` + `authenticated` via PostgREST → élévation de privilège
+- ELEVATED : table `stripe_webhook_events` sans protection → manipulation directe du registre d'idempotence
+- ELEVATED : aucune validation SQL des paramètres → appel direct hors Python avec valeurs arbitraires
+
+**Statut :** ✅ Implémenté — commit `fix(release-1): harden Stripe SQL security`
+
+### Protections ajoutées
+
+**1. Permissions de la fonction** (REVOKE/GRANT après CREATE OR REPLACE FUNCTION) :
+
+| Rôle | Avant WP1B.3.1 | Après WP1B.3.1 |
+|---|---|---|
+| `PUBLIC` | ✅ EXECUTE (hérité, défaut Supabase) | ❌ REVOKED |
+| `anon` | ✅ EXECUTE (hérité) | ❌ REVOKED |
+| `authenticated` | ✅ EXECUTE (hérité) | ❌ REVOKED |
+| `service_role` | ✅ EXECUTE (implicite) | ✅ GRANT explicite |
+
+```sql
+REVOKE ALL ON FUNCTION public.apply_stripe_webhook(TEXT, TEXT, TEXT, TEXT, INT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.apply_stripe_webhook(TEXT, TEXT, TEXT, TEXT, INT, TEXT, TEXT) FROM anon;
+REVOKE ALL ON FUNCTION public.apply_stripe_webhook(TEXT, TEXT, TEXT, TEXT, INT, TEXT, TEXT) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.apply_stripe_webhook(TEXT, TEXT, TEXT, TEXT, INT, TEXT, TEXT) TO service_role;
+```
+
+**2. Permissions de la table** (REVOKE après CREATE TABLE) :
+
+```sql
+REVOKE ALL ON TABLE public.stripe_webhook_events FROM PUBLIC;
+REVOKE ALL ON TABLE public.stripe_webhook_events FROM anon;
+REVOKE ALL ON TABLE public.stripe_webhook_events FROM authenticated;
+```
+
+**3. Validation SQL (defense in depth)** (RAISE EXCEPTION dans la fonction, avant INSERT) :
+
+```sql
+-- Whitelist p_action
+IF p_action NOT IN ('update_plan', 'add_bonus', 'downgrade_free', 'noop', 'unhandled') THEN
+    RAISE EXCEPTION '[apply_stripe_webhook] Action non autorisée : ''%''.', p_action;
+END IF;
+
+-- Whitelist p_new_plan (update_plan uniquement)
+IF p_action = 'update_plan' AND p_new_plan IS NOT NULL
+   AND p_new_plan NOT IN ('pro', 'scale', 'free') THEN
+    RAISE EXCEPTION '[apply_stripe_webhook] Plan non autorisé : ''%''.', p_new_plan;
+END IF;
+
+-- Whitelist p_quantity (add_bonus uniquement : 10 Starter | 20 Growth | 80 Scale Pack)
+IF p_action = 'add_bonus' AND p_quantity IS NOT NULL
+   AND p_quantity NOT IN (10, 20, 80) THEN
+    RAISE EXCEPTION '[apply_stripe_webhook] Quantité non autorisée : %.', p_quantity;
+END IF;
+```
+
+**4. Maintien des protections existantes :**
+- `SECURITY DEFINER` conservé (obligatoire pour écriture sur tables protégées)
+- `SET search_path = public` conservé (empêche l'injection via schema shadowing)
+
+### Autres fonctions SECURITY DEFINER détectées (hors scope WP1B.3.1)
+
+| Migration | Fonction | Risque |
+|---|---|---|
+| `v3_profiles_industry.sql` | `public.handle_new_user()` | ⚠️ HIGH — SECURITY DEFINER sans `SET search_path`, sans REVOKE/GRANT |
+| `v6_workspaces_entities.sql` | `public.handle_new_user()` (v2) | ⚡ MEDIUM — SECURITY DEFINER avec `SET search_path = public`, sans REVOKE/GRANT |
+
+Ces fonctions ne sont pas dans le scope WP1B.3.1 (ne concernent pas le billing).
+À corriger dans un WP dédié avant le lancement en production.
+
+### Tests ajoutés (WP1B.3.1)
+
+| Groupe | Tests ajoutés | Description |
+|---|---|---|
+| G6 — Router (suite) | G6-12 : Growth doublon → +20 une fois | Router mock, quantity=20, duplicate_skipped |
+| G6 — Router (suite) | G6-13 : Scale Pack doublon → +80 une fois | Router mock, quantity=80, duplicate_skipped |
+| G6 — Router (suite) | G6-14 : Deux event_ids distincts → deux RPC distinctes | p_stripe_event_id distinct pour chaque |
+| G6 — Router (suite) | G6-15 : Signature invalide → RPC jamais appelée | HTTPException 400 + sb.rpc.assert_not_called() |
+| G7 — SQL Hardening | SH-01 : REVOKE FROM anon (fonction) | Regex sur le fichier SQL |
+| G7 — SQL Hardening | SH-02 : REVOKE FROM authenticated (fonction) | Regex sur le fichier SQL |
+| G7 — SQL Hardening | SH-03 : GRANT TO service_role (fonction) | Regex sur le fichier SQL |
+| G7 — SQL Hardening | SH-04 : REVOKE FROM anon (table) | Regex sur le fichier SQL |
+| G7 — SQL Hardening | SH-05 : REVOKE FROM authenticated (table) | Regex sur le fichier SQL |
+| G7 — SQL Hardening | SH-06 : whitelist p_action | assertIn p_action NOT IN + RAISE EXCEPTION |
+| G7 — SQL Hardening | SH-07 : whitelist p_new_plan | assertIn p_new_plan NOT IN + pro/scale/free |
+| G7 — SQL Hardening | SH-08 : whitelist p_quantity | assertIn p_quantity NOT IN + 10/20/80 |
+| G7 — SQL Hardening | SH-09 : SECURITY DEFINER présent | assertIn SECURITY DEFINER |
+| G7 — SQL Hardening | SH-10 : SET search_path présent | assertIn SET search_path |
+| G7 — SQL Hardening | SH-11 : signature complète dans REVOKE/GRANT | assertIn signature 7 paramètres |
+| G7 — SQL Hardening | SH-12 : REVOKE FROM PUBLIC | Regex sur le fichier SQL |
+
+**Résultats des tests après WP1B.3.1 :**
+
+| Groupe | Tests | Résultat |
+|---|---|---|
+| G1 — Catalogue API | 14 | ✅ 14/14 |
+| G2 — Checkout | 10 | ✅ 10/10 |
+| G3 — Webhook Credits | 7 (+ 3 subtests) | ✅ 7/7 |
+| G4 — Non-régression | 8 | ✅ 8/8 |
+| G5 — Diagnostic idempotence (WP1B.2) | 7 (+ 6 subtests) | ✅ 7/7 |
+| G6 — Idempotence webhook (WP1B.3 + 1B.3.1) | **15** | ✅ **15/15** |
+| G7 — SQL Hardening (WP1B.3.1) | **12** | ✅ **12/12** |
+| **TOTAL test_billing_migration.py** | **75** | ✅ **75/75** |
+| test_product_catalog.py (WP1A) | 95 | ✅ 95/95 (inchangé) |
+| Baseline pre-existing failures | 4 | ✅ 4 seulement (inchangé) |
+
+### Fichiers modifiés (WP1B.3.1 uniquement)
+
+| Fichier | Modification |
+|---|---|
+| `backend/migrations/v10_stripe_webhook_events.sql` | REVOKE TABLE × 3 + RAISE EXCEPTION × 3 + REVOKE FUNCTION × 3 + GRANT FUNCTION × 1 |
+| `backend/tests/test_billing_migration.py` | +16 tests (G6-12→G6-15 + SH-01→SH-12) |
+| `RELEASE_1_CHECKLIST.md` | Section WP1B.3.1 ajoutée |
+
+### Verdict GO / NO-GO
+
+```
+╔══════════════════════════════════════════════════════════════════════╗
+║  WP1B.3.1 — VERDICT : ✅ GO PRODUCTION                              ║
+║                                                                      ║
+║  Les 3 vulnérabilités de sécurité sont corrigées.                   ║
+║  La migration est prête à être appliquée sur Supabase.              ║
+║                                                                      ║
+║  ⚠️  Après application de la migration :                            ║
+║  Vérifier en intégration que anon ne peut plus appeler              ║
+║  rpc/apply_stripe_webhook (HTTP 401 attendu).                       ║
+╚══════════════════════════════════════════════════════════════════════╝
+```
 
 ---
 

@@ -1013,6 +1013,368 @@ class TestWebhookIdempotency(unittest.TestCase):
         self.assertEqual(r2["action"], "duplicate_skipped",
                          "Deuxième livraison du même webhook → doit être ignorée sans re-crédit")
 
+    # G6-12 ───────────────────────────────────────────────────────────────────
+    def test_g6_12_addon_growth_credited_once_on_duplicate(self):
+        """
+        addon_growth livré deux fois par Stripe :
+          - 1ère livraison : RPC retourne 'processed' → action='add_bonus' (+20 analyses)
+          - 2ème livraison (même event_id) : RPC retourne 'duplicate' → ignorée
+        Les 20 analyses bonus sont créditées une seule et unique fois.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock
+        from routers.billing import stripe_webhook
+
+        service_result = {
+            "action":             "add_bonus",
+            "company_id":         "company_growth_once",
+            "quantity":           20,
+            "stripe_customer_id": "cus_test",
+            "stripe_event_id":    "evt_growth_ONCE",
+            "event_type":         "checkout.session.completed",
+        }
+        billing_mock = MagicMock()
+        billing_mock.process_webhook_event.return_value = service_result
+
+        # ── Première livraison ────────────────────────────────────────────────
+        req_1 = MagicMock()
+        req_1.body = AsyncMock(return_value=b"payload")
+        exec_1 = MagicMock()
+        exec_1.data = {"status": "processed"}
+        sb_1 = MagicMock()
+        sb_1.rpc.return_value.execute.return_value = exec_1
+
+        with patch("routers.billing._get_billing", return_value=billing_mock):
+            with patch("main.get_supabase_service", return_value=sb_1):
+                r1 = asyncio.run(stripe_webhook(req_1, "sig_test"))
+
+        self.assertEqual(r1["action"], "add_bonus")
+        _, call_params_1 = sb_1.rpc.call_args[0]
+        self.assertEqual(call_params_1["p_quantity"], 20,
+                         "Growth Pack : quantité=20 doit être transmise à la RPC")
+
+        # ── Deuxième livraison (même event_id) ───────────────────────────────
+        req_2 = MagicMock()
+        req_2.body = AsyncMock(return_value=b"payload")
+        exec_2 = MagicMock()
+        exec_2.data = {"status": "duplicate"}
+        sb_2 = MagicMock()
+        sb_2.rpc.return_value.execute.return_value = exec_2
+
+        with patch("routers.billing._get_billing", return_value=billing_mock):
+            with patch("main.get_supabase_service", return_value=sb_2):
+                r2 = asyncio.run(stripe_webhook(req_2, "sig_test"))
+
+        self.assertEqual(r2["action"], "duplicate_skipped",
+                         "Growth Pack doublon → doit être ignoré sans re-crédit de 20 analyses")
+
+    # G6-13 ───────────────────────────────────────────────────────────────────
+    def test_g6_13_addon_scale_pack_credited_once_on_duplicate(self):
+        """
+        addon_scale livré deux fois par Stripe :
+          - 1ère livraison : RPC retourne 'processed' → action='add_bonus' (+80 analyses)
+          - 2ème livraison (même event_id) : RPC retourne 'duplicate' → ignorée
+        Les 80 analyses bonus sont créditées une seule et unique fois.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock
+        from routers.billing import stripe_webhook
+
+        service_result = {
+            "action":             "add_bonus",
+            "company_id":         "company_scale_pack_once",
+            "quantity":           80,
+            "stripe_customer_id": "cus_test",
+            "stripe_event_id":    "evt_scale_pack_ONCE",
+            "event_type":         "checkout.session.completed",
+        }
+        billing_mock = MagicMock()
+        billing_mock.process_webhook_event.return_value = service_result
+
+        # ── Première livraison ────────────────────────────────────────────────
+        req_1 = MagicMock()
+        req_1.body = AsyncMock(return_value=b"payload")
+        exec_1 = MagicMock()
+        exec_1.data = {"status": "processed"}
+        sb_1 = MagicMock()
+        sb_1.rpc.return_value.execute.return_value = exec_1
+
+        with patch("routers.billing._get_billing", return_value=billing_mock):
+            with patch("main.get_supabase_service", return_value=sb_1):
+                r1 = asyncio.run(stripe_webhook(req_1, "sig_test"))
+
+        self.assertEqual(r1["action"], "add_bonus")
+        _, call_params_1 = sb_1.rpc.call_args[0]
+        self.assertEqual(call_params_1["p_quantity"], 80,
+                         "Scale Pack : quantité=80 doit être transmise à la RPC")
+
+        # ── Deuxième livraison (même event_id) ───────────────────────────────
+        req_2 = MagicMock()
+        req_2.body = AsyncMock(return_value=b"payload")
+        exec_2 = MagicMock()
+        exec_2.data = {"status": "duplicate"}
+        sb_2 = MagicMock()
+        sb_2.rpc.return_value.execute.return_value = exec_2
+
+        with patch("routers.billing._get_billing", return_value=billing_mock):
+            with patch("main.get_supabase_service", return_value=sb_2):
+                r2 = asyncio.run(stripe_webhook(req_2, "sig_test"))
+
+        self.assertEqual(r2["action"], "duplicate_skipped",
+                         "Scale Pack doublon → doit être ignoré sans re-crédit de 80 analyses")
+
+    # G6-14 ───────────────────────────────────────────────────────────────────
+    def test_g6_14_two_distinct_event_ids_trigger_two_rpc_calls(self):
+        """
+        Deux event.id Stripe distincts → deux appels RPC avec des p_stripe_event_id différents.
+        Vérifie que chaque livraison est tracée individuellement dans le registre d'idempotence
+        et que la distinction est correctement propagée jusqu'à la couche SQL.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock
+        from routers.billing import stripe_webhook
+
+        billing_mock = MagicMock()
+        exec_r = MagicMock()
+        exec_r.data = {"status": "processed"}
+
+        # ── Premier événement ─────────────────────────────────────────────────
+        billing_mock.process_webhook_event.return_value = {
+            "action":             "add_bonus",
+            "company_id":         "company_g6_14",
+            "quantity":           10,
+            "stripe_customer_id": "cus_test",
+            "stripe_event_id":    "evt_FIRST_G6_14",
+            "event_type":         "checkout.session.completed",
+        }
+        req_1 = MagicMock()
+        req_1.body = AsyncMock(return_value=b"payload")
+        sb_1 = MagicMock()
+        sb_1.rpc.return_value.execute.return_value = exec_r
+
+        with patch("routers.billing._get_billing", return_value=billing_mock):
+            with patch("main.get_supabase_service", return_value=sb_1):
+                asyncio.run(stripe_webhook(req_1, "sig_1"))
+
+        _, params_1 = sb_1.rpc.call_args[0]
+        self.assertEqual(params_1["p_stripe_event_id"], "evt_FIRST_G6_14")
+
+        # ── Deuxième événement (event_id différent) ───────────────────────────
+        billing_mock.process_webhook_event.return_value = {
+            "action":             "add_bonus",
+            "company_id":         "company_g6_14",
+            "quantity":           20,
+            "stripe_customer_id": "cus_test",
+            "stripe_event_id":    "evt_SECOND_G6_14",
+            "event_type":         "checkout.session.completed",
+        }
+        req_2 = MagicMock()
+        req_2.body = AsyncMock(return_value=b"payload")
+        sb_2 = MagicMock()
+        sb_2.rpc.return_value.execute.return_value = exec_r
+
+        with patch("routers.billing._get_billing", return_value=billing_mock):
+            with patch("main.get_supabase_service", return_value=sb_2):
+                asyncio.run(stripe_webhook(req_2, "sig_2"))
+
+        _, params_2 = sb_2.rpc.call_args[0]
+        self.assertEqual(params_2["p_stripe_event_id"], "evt_SECOND_G6_14")
+
+        # Deux event_ids distincts → deux clés distinctes dans le registre
+        self.assertNotEqual(params_1["p_stripe_event_id"], params_2["p_stripe_event_id"],
+                            "Deux livraisons distinctes doivent avoir des p_stripe_event_id distincts")
+
+    # G6-15 ───────────────────────────────────────────────────────────────────
+    def test_g6_15_invalid_stripe_signature_rpc_never_called(self):
+        """
+        Signature Stripe invalide → ValueError dans billing_service → HTTP 400.
+        La RPC apply_stripe_webhook ne doit JAMAIS être appelée.
+        Garantit qu'un faux payload ne peut pas déclencher de modification SQL.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock
+        from fastapi import HTTPException
+        from routers.billing import stripe_webhook
+
+        billing_mock = MagicMock()
+        billing_mock.process_webhook_event.side_effect = ValueError(
+            "Webhook verification failed (SignatureVerificationError): No signatures found"
+        )
+
+        sb_mock = MagicMock()
+
+        req = MagicMock()
+        req.body = AsyncMock(return_value=b"bad_payload")
+
+        with patch("routers.billing._get_billing", return_value=billing_mock):
+            with patch("main.get_supabase_service", return_value=sb_mock):
+                with self.assertRaises(HTTPException) as ctx:
+                    asyncio.run(stripe_webhook(req, "invalid_sig"))
+
+        self.assertEqual(ctx.exception.status_code, 400,
+                         "Signature invalide → HTTP 400 (pas 500)")
+        sb_mock.rpc.assert_not_called()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GROUPE 7 — SQL Hardening  (SH-01–SH-12)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestSQLHardening(unittest.TestCase):
+    """
+    WP1B.3.1 — Tests structurels de la migration SQL.
+
+    Vérifient que le fichier v10_stripe_webhook_events.sql contient
+    les protections de sécurité exigées par WP1B.3.1 avant application
+    sur Supabase.
+
+    Ces tests inspectent le code SQL source sans nécessiter de connexion Supabase.
+    Ils constituent le filet de sécurité qui empêche de déployer une migration
+    sans les garanties de permission et de validation requises.
+
+    Note : les tests de permission réelle (vérifier qu'anon ne peut effectivement
+    pas appeler la fonction sur une instance Supabase) sont des tests d'intégration
+    qui s'exécutent après application de la migration — hors scope des tests unitaires.
+    """
+
+    def _migration_content(self) -> str:
+        migration_path = os.path.join(
+            os.path.dirname(__file__), "..", "migrations", "v10_stripe_webhook_events.sql"
+        )
+        with open(migration_path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    # SH-01 ───────────────────────────────────────────────────────────────────
+    def test_sh_01_revoke_function_from_anon(self):
+        """La migration révoque tous les droits sur apply_stripe_webhook pour anon."""
+        content = self._migration_content()
+        self.assertRegex(
+            content,
+            r"REVOKE\s+ALL\s+ON\s+FUNCTION\s+.*apply_stripe_webhook.*FROM\s+anon",
+            "REVOKE ALL ON FUNCTION apply_stripe_webhook ... FROM anon doit être présent"
+        )
+
+    # SH-02 ───────────────────────────────────────────────────────────────────
+    def test_sh_02_revoke_function_from_authenticated(self):
+        """La migration révoque tous les droits sur apply_stripe_webhook pour authenticated."""
+        content = self._migration_content()
+        self.assertRegex(
+            content,
+            r"REVOKE\s+ALL\s+ON\s+FUNCTION\s+.*apply_stripe_webhook.*FROM\s+authenticated",
+            "REVOKE ALL ON FUNCTION apply_stripe_webhook ... FROM authenticated doit être présent"
+        )
+
+    # SH-03 ───────────────────────────────────────────────────────────────────
+    def test_sh_03_grant_function_to_service_role(self):
+        """La migration accorde EXECUTE sur apply_stripe_webhook à service_role uniquement."""
+        content = self._migration_content()
+        self.assertRegex(
+            content,
+            r"GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+.*apply_stripe_webhook.*TO\s+service_role",
+            "GRANT EXECUTE ON FUNCTION apply_stripe_webhook ... TO service_role doit être présent"
+        )
+
+    # SH-04 ───────────────────────────────────────────────────────────────────
+    def test_sh_04_revoke_table_from_anon(self):
+        """La migration révoque tous les droits sur la table stripe_webhook_events pour anon."""
+        content = self._migration_content()
+        self.assertRegex(
+            content,
+            r"REVOKE\s+ALL\s+ON\s+TABLE\s+.*stripe_webhook_events.*FROM\s+anon",
+            "REVOKE ALL ON TABLE stripe_webhook_events FROM anon doit être présent"
+        )
+
+    # SH-05 ───────────────────────────────────────────────────────────────────
+    def test_sh_05_revoke_table_from_authenticated(self):
+        """La migration révoque tous les droits sur la table stripe_webhook_events pour authenticated."""
+        content = self._migration_content()
+        self.assertRegex(
+            content,
+            r"REVOKE\s+ALL\s+ON\s+TABLE\s+.*stripe_webhook_events.*FROM\s+authenticated",
+            "REVOKE ALL ON TABLE stripe_webhook_events FROM authenticated doit être présent"
+        )
+
+    # SH-06 ───────────────────────────────────────────────────────────────────
+    def test_sh_06_sql_validates_action_whitelist(self):
+        """La fonction SQL valide p_action contre une whitelist via RAISE EXCEPTION."""
+        content = self._migration_content()
+        self.assertIn("p_action NOT IN", content,
+                      "La fonction doit valider p_action contre une whitelist")
+        self.assertIn("'update_plan'", content)
+        self.assertIn("'add_bonus'", content)
+        self.assertIn("'downgrade_free'", content)
+        self.assertIn("RAISE EXCEPTION", content,
+                      "Un paramètre non autorisé doit lever RAISE EXCEPTION")
+
+    # SH-07 ───────────────────────────────────────────────────────────────────
+    def test_sh_07_sql_validates_plan_whitelist(self):
+        """La fonction SQL valide p_new_plan : seuls 'pro', 'scale', 'free' sont autorisés."""
+        content = self._migration_content()
+        self.assertIn("p_new_plan NOT IN", content,
+                      "La fonction doit valider p_new_plan contre une whitelist")
+        # Les trois plans autorisés doivent figurer dans la whitelist SQL
+        self.assertIn("'pro'", content,
+                      "'pro' doit être dans la whitelist des plans autorisés")
+        self.assertIn("'scale'", content,
+                      "'scale' doit être dans la whitelist des plans autorisés")
+        self.assertIn("'free'", content,
+                      "'free' doit être dans la whitelist (utilisé par le Billing Portal)")
+
+    # SH-08 ───────────────────────────────────────────────────────────────────
+    def test_sh_08_sql_validates_quantity_whitelist(self):
+        """La fonction SQL valide p_quantity : seuls 10, 20, 80 sont autorisés."""
+        content = self._migration_content()
+        self.assertIn("p_quantity NOT IN", content,
+                      "La fonction doit valider p_quantity contre une whitelist")
+        # Les trois quantités officielles des Executive Capacity Packs
+        self.assertIn("10", content)   # Starter Pack
+        self.assertIn("20", content)   # Growth Pack
+        self.assertIn("80", content)   # Scale Capacity Pack
+
+    # SH-09 ───────────────────────────────────────────────────────────────────
+    def test_sh_09_function_has_security_definer(self):
+        """La fonction est déclarée SECURITY DEFINER (requis pour le modèle de permission)."""
+        content = self._migration_content()
+        self.assertIn("SECURITY DEFINER", content,
+                      "La fonction doit être SECURITY DEFINER")
+
+    # SH-10 ───────────────────────────────────────────────────────────────────
+    def test_sh_10_function_has_safe_search_path(self):
+        """La fonction fixe SET search_path pour prévenir l'injection via schema shadowing."""
+        content = self._migration_content()
+        self.assertIn("SET search_path", content,
+                      "La fonction SECURITY DEFINER doit fixer SET search_path")
+
+    # SH-11 ───────────────────────────────────────────────────────────────────
+    def test_sh_11_function_signature_uses_full_type_list(self):
+        """
+        La signature complète à 7 paramètres est utilisée dans les REVOKE/GRANT.
+        Sans la signature complète, PostgreSQL ne peut pas identifier la surcharge
+        exacte à protéger — les REVOKEs cibleraient une fonction inexistante.
+        """
+        content = self._migration_content()
+        self.assertIn(
+            "apply_stripe_webhook(TEXT, TEXT, TEXT, TEXT, INT, TEXT, TEXT)",
+            content,
+            "La signature complète (TEXT, TEXT, TEXT, TEXT, INT, TEXT, TEXT) "
+            "doit figurer dans les instructions REVOKE/GRANT"
+        )
+
+    # SH-12 ───────────────────────────────────────────────────────────────────
+    def test_sh_12_revoke_from_public_present(self):
+        """
+        La migration révoque EXECUTE depuis PUBLIC (groupe PostgreSQL par défaut).
+        Supabase accorde EXECUTE à PUBLIC lors du CREATE FUNCTION — ce REVOKE
+        supprime ce droit avant d'octroyer EXECUTE à service_role uniquement.
+        """
+        content = self._migration_content()
+        self.assertRegex(
+            content,
+            r"REVOKE\s+ALL\s+ON\s+FUNCTION\s+.*apply_stripe_webhook.*FROM\s+PUBLIC",
+            "REVOKE ALL ON FUNCTION ... FROM PUBLIC doit être présent "
+            "(supprime le droit EXECUTE par défaut accordé à PUBLIC)"
+        )
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 
