@@ -26,6 +26,7 @@
 | WP1B.3.1 | SQL Security Hardening | ✅ Terminé | ✅ Validé — migration appliquée |
 | WP1B.3.2 | Migration Stripe — Application & Validation | ✅ Terminé | ✅ **WP1B VALIDÉ** |
 | WP1C | Usage Migration | ✅ Terminé | ⏳ En attente validation |
+| WP1C.1 | Correction stock Capacity Packs | ✅ Terminé | ⏳ En attente validation — commit `ad437a7` |
 | WP2 | Backend Quota Fix | 🔲 À démarrer | — |
 | WP3 | Stripe Configuration | 🔲 À démarrer | — |
 | WP4 | Parcours SCALE + CreditsModal | 🔲 À démarrer | — |
