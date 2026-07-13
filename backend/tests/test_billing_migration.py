@@ -333,12 +333,98 @@ class TestWebhookCredits(unittest.TestCase):
                          "Un checkout PRO ne doit pas contenir un champ 'quantity'")
 
     # T26 ─────────────────────────────────────────────────────────────────────
-    def test_26_unknown_addon_credits_zero(self):
-        """Un pack inconnu dans les metadata Stripe crédite 0 (erreur gracieuse)."""
-        result = self._process("addon_unknown_legacy")
-        self.assertEqual(result["action"],   "add_bonus")
-        self.assertEqual(result["quantity"], 0,
-                         "Un pack inconnu doit créditer 0 analyse — jamais une quantité fantôme")
+    def test_26_unknown_addon_raises_value_error_never_credits_zero(self):
+        """
+        Un pack inconnu dans les metadata Stripe doit lever ValueError.
+        Jamais de quantité 0 silencieuse : le client a payé, il doit être crédité.
+        Le webhook HTTP retourne non-2xx → Stripe retente automatiquement.
+        """
+        with self.assertRaises(ValueError) as ctx:
+            self._process("addon_unknown_legacy")
+        msg = str(ctx.exception)
+        self.assertIn("addon_unknown_legacy", msg,
+                      "Le message d'erreur doit identifier le pack inconnu")
+
+    # T26b ────────────────────────────────────────────────────────────────────
+    def test_26b_missing_company_id_raises_value_error(self):
+        """
+        Un webhook sans company_id dans les metadata Stripe doit lever ValueError.
+        Impossible d'imputer le crédit sans connaître le client.
+        """
+        from services.billing_service import BillingService
+        svc = BillingService()
+        # Événement sans company_id dans les metadata
+        fake_event = {
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_test_no_company",
+                    "metadata": {
+                        # company_id intentionnellement absent
+                        "plan_or_addon": "addon_starter",
+                    },
+                    "customer": "cus_test",
+                }
+            },
+        }
+        stripe_mock = MagicMock()
+        stripe_mock.Webhook.construct_event.return_value = fake_event
+        with patch.object(svc, "_stripe", return_value=stripe_mock):
+            with self.assertRaises(ValueError) as ctx:
+                svc.process_webhook_event(b"payload", "sig_test")
+        self.assertIn("company_id", str(ctx.exception).lower())
+
+    # T26c ────────────────────────────────────────────────────────────────────
+    def test_26c_missing_plan_or_addon_raises_value_error(self):
+        """
+        Un webhook sans plan_or_addon dans les metadata Stripe doit lever ValueError.
+        Impossible de créditer un plan/pack sans en connaître l'identifiant.
+        """
+        from services.billing_service import BillingService
+        svc = BillingService()
+        fake_event = {
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_test_no_plan",
+                    "metadata": {
+                        "company_id": "company_xyz",
+                        # plan_or_addon intentionnellement absent
+                    },
+                    "customer": "cus_test",
+                }
+            },
+        }
+        stripe_mock = MagicMock()
+        stripe_mock.Webhook.construct_event.return_value = fake_event
+        with patch.object(svc, "_stripe", return_value=stripe_mock):
+            with self.assertRaises(ValueError) as ctx:
+                svc.process_webhook_event(b"payload", "sig_test")
+        self.assertIn("plan_or_addon", str(ctx.exception).lower())
+
+    # T26d ────────────────────────────────────────────────────────────────────
+    def test_26d_empty_metadata_raises_value_error(self):
+        """
+        Un webhook avec des metadata vides (dict vide) doit lever ValueError.
+        Protège contre les webhooks Stripe mal configurés ou frauduleux.
+        """
+        from services.billing_service import BillingService
+        svc = BillingService()
+        fake_event = {
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_test_empty_meta",
+                    "metadata": {},
+                    "customer": "cus_test",
+                }
+            },
+        }
+        stripe_mock = MagicMock()
+        stripe_mock.Webhook.construct_event.return_value = fake_event
+        with patch.object(svc, "_stripe", return_value=stripe_mock):
+            with self.assertRaises(ValueError):
+                svc.process_webhook_event(b"payload", "sig_test")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

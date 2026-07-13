@@ -173,23 +173,64 @@ class BillingService:
         logger.info(f"[WEBHOOK] Événement reçu : {etype}")
 
         if etype == "checkout.session.completed":
-            session       = event["data"]["object"]
-            metadata      = session["metadata"]
-            company_id    = metadata["company_id"] if "company_id" in metadata else ""
-            plan_or_addon = metadata["plan_or_addon"] if "plan_or_addon" in metadata else ""
-            customer_id   = session["customer"] if "customer" in session else None
+            session     = event["data"]["object"]
+            metadata    = session.get("metadata") or {}
+            customer_id = session.get("customer")
+            session_id  = session.get("id", "SESSION_ID_INCONNU")
+
+            # ── Validation d'intégrité des metadata ──────────────────────────
+            # Un champ manquant ou vide = paiement non imputable = lever
+            # immédiatement pour que Stripe retente le webhook.
+            company_id    = (metadata.get("company_id")    or "").strip()
+            plan_or_addon = (metadata.get("plan_or_addon") or "").strip()
+
+            if not company_id:
+                logger.critical(
+                    f"[WEBHOOK INTEGRITY] company_id absent ou vide dans les metadata. "
+                    f"stripe_session={session_id} — investigation manuelle requise."
+                )
+                raise ValueError(
+                    f"company_id absent ou vide dans les metadata Stripe "
+                    f"(stripe_session={session_id}). "
+                    f"Webhook non traitable — retraitement manuel requis."
+                )
+
+            if not plan_or_addon:
+                logger.critical(
+                    f"[WEBHOOK INTEGRITY] plan_or_addon absent ou vide dans les metadata. "
+                    f"stripe_session={session_id} company_id={company_id} — investigation requise."
+                )
+                raise ValueError(
+                    f"plan_or_addon absent ou vide dans les metadata Stripe "
+                    f"(stripe_session={session_id}, company_id={company_id}). "
+                    f"Webhook non traitable — retraitement manuel requis."
+                )
 
             if plan_or_addon.startswith("addon_"):
-                # Quantité lue depuis product_catalog (source unique de vérité).
-                # Ne jamais utiliser de constante locale ADDON_QUANTITIES.
+                # ── Executive Capacity Pack ───────────────────────────────────
+                # RÈGLE D'INTÉGRITÉ : un pack inconnu NE DOIT JAMAIS être
+                # transformé silencieusement en quantité 0.
+                # Le client a payé — il faut que ses crédits soient appliqués.
+                # On lève ValueError pour que le webhook retourne HTTP non-2xx
+                # et que Stripe retente automatiquement.
                 try:
-                    qty = get_executive_capacity_pack(plan_or_addon).analyses_added
+                    pack = get_executive_capacity_pack(plan_or_addon)
                 except KeyError:
-                    logger.error(
-                        f"[WEBHOOK] Executive Capacity Pack inconnu dans metadata : "
-                        f"'{plan_or_addon}'. Quantité 0 appliquée — vérifier les données Stripe."
+                    logger.critical(
+                        f"[WEBHOOK INTEGRITY] Executive Capacity Pack inconnu : "
+                        f"'{plan_or_addon}'. stripe_session={session_id} "
+                        f"company_id={company_id} customer_id={customer_id}. "
+                        f"Le client A ÉTÉ DÉBITÉ mais N'A PAS ÉTÉ CRÉDITÉ. "
+                        f"Retraitement manuel OBLIGATOIRE."
                     )
-                    qty = 0
+                    raise ValueError(
+                        f"Executive Capacity Pack inconnu dans les metadata Stripe : "
+                        f"'{plan_or_addon}' (stripe_session={session_id}, "
+                        f"company_id={company_id}). "
+                        f"Impossible de créditer — retraitement manuel requis."
+                    )
+
+                qty = pack.analyses_added   # source unique de vérité : product_catalog
                 return {
                     "action": "add_bonus",
                     "company_id": company_id,
