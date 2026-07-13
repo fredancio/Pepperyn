@@ -23,7 +23,8 @@
 | WP1B.1 | Webhook Hardening | ✅ Terminé | ⏳ En attente validation |
 | WP1B.2 | Diagnostic idempotence | ✅ Terminé | ⏳ En attente validation |
 | WP1B.3 | Idempotence webhook — correctif | ✅ Terminé | ⏳ En attente validation |
-| WP1B.3.1 | SQL Security Hardening | ✅ Terminé | ⏳ En attente validation |
+| WP1B.3.1 | SQL Security Hardening | ✅ Terminé | ✅ Validé — migration appliquée |
+| WP1B.3.2 | Migration Stripe — Application & Validation | ✅ Terminé | ✅ **WP1B VALIDÉ** |
 | WP1C | Usage Migration | 🔲 À démarrer | — |
 | WP2 | Backend Quota Fix | 🔲 À démarrer | — |
 | WP3 | Stripe Configuration | 🔲 À démarrer | — |
@@ -481,11 +482,152 @@ Ces fonctions ne sont pas dans le scope WP1B.3.1 (ne concernent pas le billing).
 ║  WP1B.3.1 — VERDICT : ✅ GO PRODUCTION                              ║
 ║                                                                      ║
 ║  Les 3 vulnérabilités de sécurité sont corrigées.                   ║
-║  La migration est prête à être appliquée sur Supabase.              ║
+║  Migration appliquée le 2026-07-13 sur ljcqbwbjeoeiugcoxfcf.       ║
+║  Permissions vérifiées réellement sur Supabase.                     ║
+╚══════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+## WP1B.3.2 — APPLICATION & VALIDATION MIGRATION STRIPE ✅ TERMINÉ
+
+**Objectif :** Appliquer `v10_stripe_webhook_events.sql` sur le Supabase réel,
+vérifier les permissions effectives, et valider l'idempotence par des tests d'intégration.
+
+**Statut :** ✅ Complété le **2026-07-13 à 16:16 UTC** — commit `docs(release-1): validate Stripe webhook migration`
+
+**Projet Supabase :** `ljcqbwbjeoeiugcoxfcf` — Pepperyn, eu-central-2, ACTIVE_HEALTHY
+
+**Migration appliquée :** `backend/migrations/v10_stripe_webhook_events.sql` (commit `5bac5b4`, MD5 `1fd4ee24c8d047c4ea9f21c95a954530`)
+
+---
+
+### Schéma réel de la table
+
+| Colonne | Type | Nullable | Défaut |
+|---|---|---|---|
+| `stripe_event_id` | TEXT | NOT NULL | — |
+| `event_type` | TEXT | NOT NULL | — |
+| `processed_at` | TIMESTAMPTZ | NOT NULL | `now()` |
+| `company_id` | TEXT | NULL | — |
+| `action` | TEXT | NULL | — |
+
+Clé primaire : `stripe_event_id` ✅  
+RLS : désactivée (table interne, protégée par REVOKE) ✅  
+Lignes initiales : 0 ✅
+
+---
+
+### Signature réelle de la fonction
+
+```
+public.apply_stripe_webhook(
+    p_stripe_event_id text,
+    p_event_type      text,
+    p_action          text,
+    p_company_id      text    DEFAULT NULL,
+    p_quantity        integer DEFAULT NULL,
+    p_new_plan        text    DEFAULT NULL,
+    p_stripe_customer text    DEFAULT NULL
+) RETURNS jsonb
+```
+
+Propriétaire : `postgres` ✅  
+Sécurité : `SECURITY DEFINER` ✅  
+search_path : `search_path=public` ✅
+
+---
+
+### Privilèges observés réellement
+
+| Rôle | EXECUTE fonction | SELECT table | INSERT table |
+|---|---|---|---|
+| `PUBLIC` | ❌ false | ❌ false | ❌ false |
+| `anon` | ❌ false | ❌ false | ❌ false |
+| `authenticated` | ❌ false | ❌ false | ❌ false |
+| `service_role` | ✅ true | ✅ true | ✅ true |
+
+Source : `has_function_privilege()` + `has_table_privilege()` exécutés sur Supabase réel.
+
+---
+
+### Résultats des tests d'intégration
+
+**Company synthétique :** `aaaaaaaa-bbbb-cccc-dddd-eeeeeeee0001` `_PEPPERYN_TEST_WP1B32_DO_NOT_USE`
+
+| Test | Appel 1 | Appel 2 (doublon) | Effet métier |
+|---|---|---|---|
+| Starter (+10) | ✅ `processed` | ✅ `duplicate` | bonus +10, jamais +20 |
+| Growth (+20) | ✅ `processed` | ✅ `duplicate` | bonus +20, jamais +40 |
+| Scale Pack (+80) | ✅ `processed` | ✅ `duplicate` | bonus +80, jamais +160 |
+| 2 events distincts A+B | ✅ `processed` | ✅ `processed` | les deux appliqués |
+| update_plan → `pro` | ✅ `processed` | ✅ `duplicate` | plan=pro, jamais rejoué |
+| update_plan → `scale` | ✅ `processed` | — | plan=scale |
+| downgrade_free | ✅ `processed` | — | plan=free |
+
+**Résultats SQL validation (RAISE EXCEPTION) :**
+
+| Paramètre invalide | Résultat |
+|---|---|
+| action `DELETE_ALL_DATA` | ✅ EXCEPTION `Action non autorisée` |
+| plan `enterprise` | ✅ EXCEPTION `Plan non autorisé` |
+| plan `power` | ✅ EXCEPTION `Plan non autorisé` |
+| quantité `999` | ✅ EXCEPTION `Quantité non autorisée` |
+| quantité `0` | ✅ EXCEPTION `Quantité non autorisée` |
+
+Marqueurs créés pour les appels invalides : **0** ✅ (rollback confirmé)
+
+---
+
+### Données de test supprimées
+
+- `stripe_webhook_events` : 8 marqueurs supprimés ✅
+- `usage_limits` : ligne test (bonus_analyses=130) supprimée ✅
+- `companies` : `_PEPPERYN_TEST_WP1B32_DO_NOT_USE` supprimée ✅
+
+---
+
+### Non-régression des données réelles
+
+| Métrique | Avant migration | Après tests + nettoyage | Résultat |
+|---|---|---|---|
+| nb_companies | 12 | 12 | ✅ identique |
+| nb_usage_limits | 8 | 8 | ✅ identique |
+| total_bonus_analyses | 0 | 0 | ✅ identique |
+| Plan free | 11 | 11 | ✅ identique |
+| Plan pro | 1 | 1 | ✅ identique |
+| stripe_webhook_events | 0 | 0 | ✅ vide et propre |
+
+---
+
+### Résultats des tests locaux après migration
+
+```
+170 passed, 3 warnings, 6 subtests passed in 2.24s
+  test_billing_migration.py  : 75/75  ✅
+  test_product_catalog.py    : 95/95  ✅
+  4 échecs PPTX préexistants : inchangés ✅
+```
+
+---
+
+### Rollback exécuté
+
+Non. ✅ Tous les critères GO sont satisfaits.
+
+---
+
+```
+╔══════════════════════════════════════════════════════════════════════╗
+║  WP1B.3.2 — VERDICT : ✅ GO — WP1B VALIDÉ                          ║
 ║                                                                      ║
-║  ⚠️  Après application de la migration :                            ║
-║  Vérifier en intégration que anon ne peut plus appeler              ║
-║  rpc/apply_stripe_webhook (HTTP 401 attendu).                       ║
+║  Migration appliquée : 2026-07-13 16:16 UTC                        ║
+║  Projet : ljcqbwbjeoeiugcoxfcf (Pepperyn)                          ║
+║  Tests d'intégration : tous réussis                                 ║
+║  Données de test : toutes supprimées                                ║
+║  Données réelles : inchangées                                       ║
+║  Tests locaux : 170/170                                             ║
+║  WP1C : non démarré ✅                                              ║
 ╚══════════════════════════════════════════════════════════════════════╝
 ```
 
