@@ -172,6 +172,19 @@ class BillingService:
         etype = event["type"]
         logger.info(f"[WEBHOOK] Événement reçu : {etype}")
 
+        # ── Validation event.id (requis pour l'idempotence WP1B.3) ──────────────
+        event_id = (event.get("id") or "").strip()
+        if not event_id:
+            logger.critical(
+                f"[WEBHOOK INTEGRITY] stripe event.id absent ou vide. "
+                f"L'idempotence ne peut pas être garantie sans identifiant d'événement. "
+                f"etype={etype}"
+            )
+            raise ValueError(
+                f"Stripe event.id absent ou vide (etype={etype}). "
+                f"L'idempotence ne peut pas être garantie — webhook non traitable."
+            )
+
         if etype == "checkout.session.completed":
             session     = event["data"]["object"]
             metadata    = session.get("metadata") or {}
@@ -232,30 +245,49 @@ class BillingService:
 
                 qty = pack.analyses_added   # source unique de vérité : product_catalog
                 return {
-                    "action": "add_bonus",
-                    "company_id": company_id,
-                    "quantity": qty,
+                    "action":             "add_bonus",
+                    "company_id":         company_id,
+                    "quantity":           qty,
                     "stripe_customer_id": customer_id,
+                    "stripe_event_id":    event_id,
+                    "event_type":         etype,
                 }
             else:
                 return {
-                    "action": "update_plan",
-                    "company_id": company_id,
-                    "plan": plan_or_addon,
+                    "action":             "update_plan",
+                    "company_id":         company_id,
+                    "plan":               plan_or_addon,
                     "stripe_customer_id": customer_id,
+                    "stripe_event_id":    event_id,
+                    "event_type":         etype,
                 }
 
         elif etype == "customer.subscription.deleted":
             obj         = event["data"]["object"]
             customer_id = obj["customer"] if "customer" in obj else ""
             company_id  = self._get_company_by_customer(customer_id)
-            return {"action": "downgrade_free", "company_id": company_id}
+            return {
+                "action":          "downgrade_free",
+                "company_id":      company_id,
+                "stripe_event_id": event_id,
+                "event_type":      etype,
+            }
 
         elif etype == "invoice.payment_failed":
             logger.warning(f"[WEBHOOK] Paiement échoué : {event['data']['object'].get('customer')}")
-            return {"action": "noop", "reason": "payment_failed — notification à implémenter"}
+            return {
+                "action":          "noop",
+                "reason":          "payment_failed — notification à implémenter",
+                "stripe_event_id": event_id,
+                "event_type":      etype,
+            }
 
-        return {"action": "unhandled", "type": etype}
+        return {
+            "action":          "unhandled",
+            "type":            etype,
+            "stripe_event_id": event_id,
+            "event_type":      etype,
+        }
 
     # ── Helpers ──────────────────────────────────────────────────────────────
 

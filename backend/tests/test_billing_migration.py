@@ -267,9 +267,14 @@ class TestCheckout(unittest.TestCase):
 # GROUPE 3 — Webhook / Crédits Executive Capacity Packs  (T21–T26)
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _make_webhook_event(plan_or_addon: str, event_type: str = "checkout.session.completed") -> dict:
-    """Construit un faux événement Stripe pour les tests webhook."""
+def _make_webhook_event(
+    plan_or_addon: str,
+    event_type: str = "checkout.session.completed",
+    event_id: str = "evt_test_group3_default",
+) -> dict:
+    """Construit un faux événement Stripe pour les tests webhook (WP1B.3 : event.id requis)."""
     return {
+        "id":   event_id,
         "type": event_type,
         "data": {
             "object": {
@@ -355,6 +360,7 @@ class TestWebhookCredits(unittest.TestCase):
         svc = BillingService()
         # Événement sans company_id dans les metadata
         fake_event = {
+            "id":   "evt_test_26b_no_company",
             "type": "checkout.session.completed",
             "data": {
                 "object": {
@@ -383,6 +389,7 @@ class TestWebhookCredits(unittest.TestCase):
         from services.billing_service import BillingService
         svc = BillingService()
         fake_event = {
+            "id":   "evt_test_26c_no_plan",
             "type": "checkout.session.completed",
             "data": {
                 "object": {
@@ -411,6 +418,7 @@ class TestWebhookCredits(unittest.TestCase):
         from services.billing_service import BillingService
         svc = BillingService()
         fake_event = {
+            "id":   "evt_test_26d_empty_meta",
             "type": "checkout.session.completed",
             "data": {
                 "object": {
@@ -582,16 +590,14 @@ class TestIdempotencyDiagnostic(unittest.TestCase):
     # IDP-01 ──────────────────────────────────────────────────────────────────
     def test_idp_01_stripe_event_id_never_read(self):
         """
-        Confirme que process_webhook_event() n'exploite pas event['id'] Stripe.
-        Le champ unique de l'événement n'est ni lu ni propagé dans le résultat.
-        ⚠️ Aucune barrière à la double exécution basée sur l'identifiant Stripe.
+        WP1B.3 — process_webhook_event() propage désormais event['id'] Stripe.
+        Le stripe_event_id est présent dans le résultat et correctement valorisé.
+        ✅ Idempotence garantie : le router peut appeler apply_stripe_webhook avec cet id.
         """
         result = self._process("addon_starter", event_id="evt_UNIQUE_NEVER_REUSED")
-        # event["id"] n'apparaît pas dans le dict retourné
-        self.assertNotIn("stripe_event_id",   result)
-        self.assertNotIn("event_id",          result)
-        # Confirmation : seule la session Stripe est dans le résultat (comme log)
-        # mais elle n'est pas utilisée pour déduplication
+        # event["id"] est désormais lu et propagé dans le dict retourné
+        self.assertIn("stripe_event_id", result)
+        self.assertEqual(result["stripe_event_id"], "evt_UNIQUE_NEVER_REUSED")
 
     # IDP-02 ──────────────────────────────────────────────────────────────────
     def test_idp_02_plan_pro_idempotent_by_nature(self):
@@ -701,6 +707,311 @@ class TestIdempotencyDiagnostic(unittest.TestCase):
                 f"Table stripe_processed_events trouvée dans {fname} — "
                 f"WP1B.3 est peut-être déjà partiellement implémenté ?"
             )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GROUPE 6 — Idempotence webhooks Stripe  (WP1B.3)
+#
+# Vérifie la chaîne complète d'idempotence :
+#   1. billing_service.py propage stripe_event_id dans tous les dicts résultats.
+#   2. Un event.id manquant ou vide lève ValueError (impossible de garantir l'idempotence).
+#   3. Le router billing.py appelle apply_stripe_webhook RPC avec les bons paramètres.
+#   4. RPC status="duplicate" → router retourne action="duplicate_skipped" (HTTP 200).
+#
+# Architecture d'idempotence :
+#   billing_service  → propage stripe_event_id (stateless)
+#   billing.py       → appelle apply_stripe_webhook via RPC
+#   apply_stripe_webhook (PG) → INSERT ON CONFLICT DO NOTHING + traitement métier atomique
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestWebhookIdempotency(unittest.TestCase):
+    """
+    WP1B.3 — Idempotence des webhooks Stripe.
+
+    Deux niveaux de tests :
+    - Service (G6-01 à G6-08) : propagation event_id, validation missing/empty id.
+    - Router  (G6-09 à G6-11) : appel RPC correct, gestion du doublon (duplicate_skipped).
+    """
+
+    def _process(self, plan_or_addon: str, event_id: str = "evt_test_idp") -> dict:
+        """Helper : process_webhook_event avec un stripe event.id explicite."""
+        from services.billing_service import BillingService
+        svc = BillingService()
+        fake_event = {
+            "id": event_id,
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_test_idp",
+                    "metadata": {
+                        "company_id":    "company_idp_test",
+                        "plan_or_addon": plan_or_addon,
+                    },
+                    "customer": "cus_idp_test",
+                }
+            },
+        }
+        stripe_mock = MagicMock()
+        stripe_mock.Webhook.construct_event.return_value = fake_event
+        with patch.object(svc, "_stripe", return_value=stripe_mock):
+            return svc.process_webhook_event(b"payload", "sig_test")
+
+    # ── Niveau Service ──────────────────────────────────────────────────────────
+
+    # G6-01 ───────────────────────────────────────────────────────────────────
+    def test_g6_01_pro_checkout_propagates_event_id(self):
+        """PRO checkout : stripe_event_id et event_type propagés dans le résultat."""
+        result = self._process("pro", "evt_pro_idp_001")
+        self.assertIn("stripe_event_id", result)
+        self.assertIn("event_type",      result)
+        self.assertEqual(result["stripe_event_id"], "evt_pro_idp_001")
+        self.assertEqual(result["event_type"],      "checkout.session.completed")
+        self.assertEqual(result["action"],          "update_plan")
+
+    # G6-02 ───────────────────────────────────────────────────────────────────
+    def test_g6_02_scale_checkout_propagates_event_id(self):
+        """SCALE checkout : stripe_event_id propagé et valorisé correctement."""
+        result = self._process("scale", "evt_scale_idp_001")
+        self.assertIn("stripe_event_id", result)
+        self.assertEqual(result["stripe_event_id"], "evt_scale_idp_001")
+        self.assertEqual(result["action"],          "update_plan")
+
+    # G6-03 ───────────────────────────────────────────────────────────────────
+    def test_g6_03_addon_starter_propagates_event_id_and_quantity(self):
+        """addon_starter : stripe_event_id propagé, quantity=10 (+10 une seule fois)."""
+        result = self._process("addon_starter", "evt_starter_idp_001")
+        self.assertIn("stripe_event_id", result)
+        self.assertEqual(result["stripe_event_id"], "evt_starter_idp_001")
+        self.assertEqual(result["action"],          "add_bonus")
+        self.assertEqual(result["quantity"],        10)
+
+    # G6-04 ───────────────────────────────────────────────────────────────────
+    def test_g6_04_addon_growth_propagates_event_id_and_quantity(self):
+        """addon_growth : stripe_event_id propagé, quantity=20 (+20 une seule fois)."""
+        result = self._process("addon_growth", "evt_growth_idp_001")
+        self.assertIn("stripe_event_id", result)
+        self.assertEqual(result["stripe_event_id"], "evt_growth_idp_001")
+        self.assertEqual(result["action"],          "add_bonus")
+        self.assertEqual(result["quantity"],        20)
+
+    # G6-05 ───────────────────────────────────────────────────────────────────
+    def test_g6_05_addon_scale_propagates_event_id_and_quantity(self):
+        """addon_scale : stripe_event_id propagé, quantity=80 (+80 une seule fois)."""
+        result = self._process("addon_scale", "evt_scale_pack_idp_001")
+        self.assertIn("stripe_event_id", result)
+        self.assertEqual(result["stripe_event_id"], "evt_scale_pack_idp_001")
+        self.assertEqual(result["action"],          "add_bonus")
+        self.assertEqual(result["quantity"],        80)
+
+    # G6-06 ───────────────────────────────────────────────────────────────────
+    def test_g6_06_two_different_events_produce_distinct_event_ids(self):
+        """Deux événements différents → deux stripe_event_id distincts dans les résultats."""
+        r1 = self._process("addon_starter", "evt_FIRST_001")
+        r2 = self._process("addon_starter", "evt_SECOND_002")
+        self.assertEqual(r1["stripe_event_id"], "evt_FIRST_001")
+        self.assertEqual(r2["stripe_event_id"], "evt_SECOND_002")
+        self.assertNotEqual(r1["stripe_event_id"], r2["stripe_event_id"],
+                            "Deux événements distincts doivent avoir des event_ids distincts")
+
+    # G6-07 ───────────────────────────────────────────────────────────────────
+    def test_g6_07_missing_event_id_raises_value_error(self):
+        """
+        Webhook sans event.id → ValueError immédiat.
+        Sans event_id, l'idempotence est impossible.
+        Stripe doit recevoir HTTP 400 et ne pas redelivrer.
+        """
+        from services.billing_service import BillingService
+        svc = BillingService()
+        fake_event = {
+            # "id" intentionnellement absent
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_test_no_event_id",
+                    "metadata": {
+                        "company_id":    "company_test",
+                        "plan_or_addon": "addon_starter",
+                    },
+                    "customer": "cus_test",
+                }
+            },
+        }
+        stripe_mock = MagicMock()
+        stripe_mock.Webhook.construct_event.return_value = fake_event
+        with patch.object(svc, "_stripe", return_value=stripe_mock):
+            with self.assertRaises(ValueError) as ctx:
+                svc.process_webhook_event(b"payload", "sig_test")
+        self.assertIn("event.id", str(ctx.exception).lower(),
+                      "Le message d'erreur doit mentionner event.id ou event_id")
+
+    # G6-08 ───────────────────────────────────────────────────────────────────
+    def test_g6_08_empty_event_id_raises_value_error(self):
+        """
+        Webhook avec event.id vide ("") → ValueError immédiat.
+        Un identifiant vide ne peut pas servir de clé d'idempotence.
+        """
+        from services.billing_service import BillingService
+        svc = BillingService()
+        fake_event = {
+            "id": "",   # vide — invalide
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_test_empty_event_id",
+                    "metadata": {
+                        "company_id":    "company_test",
+                        "plan_or_addon": "addon_starter",
+                    },
+                    "customer": "cus_test",
+                }
+            },
+        }
+        stripe_mock = MagicMock()
+        stripe_mock.Webhook.construct_event.return_value = fake_event
+        with patch.object(svc, "_stripe", return_value=stripe_mock):
+            with self.assertRaises(ValueError):
+                svc.process_webhook_event(b"payload", "sig_test")
+
+    # ── Niveau Router ───────────────────────────────────────────────────────────
+
+    # G6-09 ───────────────────────────────────────────────────────────────────
+    def test_g6_09_webhook_handler_calls_rpc_with_correct_params(self):
+        """
+        Le handler webhook appelle apply_stripe_webhook via RPC avec les bons paramètres.
+        Vérifie que stripe_event_id, action, quantity sont correctement transmis.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock
+        from routers.billing import stripe_webhook
+
+        service_result = {
+            "action":             "add_bonus",
+            "company_id":         "company_g6_test",
+            "quantity":           10,
+            "stripe_customer_id": "cus_test",
+            "stripe_event_id":    "evt_g6_rpc_test",
+            "event_type":         "checkout.session.completed",
+        }
+
+        request_mock = MagicMock()
+        request_mock.body = AsyncMock(return_value=b"payload")
+
+        billing_mock = MagicMock()
+        billing_mock.process_webhook_event.return_value = service_result
+
+        exec_result = MagicMock()
+        exec_result.data = {"status": "processed"}
+        sb_mock = MagicMock()
+        sb_mock.rpc.return_value.execute.return_value = exec_result
+
+        with patch("routers.billing._get_billing", return_value=billing_mock):
+            with patch("main.get_supabase_service", return_value=sb_mock):
+                response = asyncio.run(stripe_webhook(request_mock, "sig_test"))
+
+        # Vérifier que la RPC a été appelée avec les bons paramètres
+        sb_mock.rpc.assert_called_once()
+        call_name, call_params = sb_mock.rpc.call_args[0]
+        self.assertEqual(call_name, "apply_stripe_webhook")
+        self.assertEqual(call_params["p_stripe_event_id"], "evt_g6_rpc_test")
+        self.assertEqual(call_params["p_action"],          "add_bonus")
+        self.assertEqual(call_params["p_quantity"],        10)
+
+        self.assertEqual(response["received"], True)
+        self.assertEqual(response["action"],   "add_bonus")
+
+    # G6-10 ───────────────────────────────────────────────────────────────────
+    def test_g6_10_duplicate_event_returns_duplicate_skipped(self):
+        """
+        Quand la RPC retourne status='duplicate', le handler retourne action='duplicate_skipped'.
+        Le même stripe_event_id ne produit jamais deux effets métier.
+        Stripe reçoit HTTP 200 → ne retente pas.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock
+        from routers.billing import stripe_webhook
+
+        service_result = {
+            "action":             "add_bonus",
+            "company_id":         "company_g6_dup",
+            "quantity":           10,
+            "stripe_customer_id": "cus_test",
+            "stripe_event_id":    "evt_g6_DUPLICATE",
+            "event_type":         "checkout.session.completed",
+        }
+
+        request_mock = MagicMock()
+        request_mock.body = AsyncMock(return_value=b"payload")
+
+        billing_mock = MagicMock()
+        billing_mock.process_webhook_event.return_value = service_result
+
+        # La RPC simule un conflit sur stripe_event_id (déjà traité)
+        exec_result = MagicMock()
+        exec_result.data = {"status": "duplicate"}
+        sb_mock = MagicMock()
+        sb_mock.rpc.return_value.execute.return_value = exec_result
+
+        with patch("routers.billing._get_billing", return_value=billing_mock):
+            with patch("main.get_supabase_service", return_value=sb_mock):
+                response = asyncio.run(stripe_webhook(request_mock, "sig_test"))
+
+        self.assertEqual(response["received"], True)
+        self.assertEqual(response["action"],   "duplicate_skipped",
+                         "Un doublon Stripe doit retourner action='duplicate_skipped'")
+
+    # G6-11 ───────────────────────────────────────────────────────────────────
+    def test_g6_11_addon_starter_credited_once_on_duplicate(self):
+        """
+        addon_starter livré deux fois par Stripe :
+          - 1ère livraison : RPC retourne 'processed' → action='add_bonus' (+10)
+          - 2ème livraison (même event_id) : RPC retourne 'duplicate' → action='duplicate_skipped'
+        Les 10 Analyses bonus sont créditées une seule et unique fois.
+        """
+        import asyncio
+        from unittest.mock import AsyncMock
+        from routers.billing import stripe_webhook
+
+        service_result = {
+            "action":             "add_bonus",
+            "company_id":         "company_addon_once",
+            "quantity":           10,
+            "stripe_customer_id": "cus_test",
+            "stripe_event_id":    "evt_starter_ONCE",
+            "event_type":         "checkout.session.completed",
+        }
+
+        billing_mock = MagicMock()
+        billing_mock.process_webhook_event.return_value = service_result
+
+        # ── Première livraison : processed ────────────────────────────────────
+        request_1 = MagicMock()
+        request_1.body = AsyncMock(return_value=b"payload")
+        exec_1 = MagicMock()
+        exec_1.data = {"status": "processed"}
+        sb_1 = MagicMock()
+        sb_1.rpc.return_value.execute.return_value = exec_1
+
+        with patch("routers.billing._get_billing", return_value=billing_mock):
+            with patch("main.get_supabase_service", return_value=sb_1):
+                r1 = asyncio.run(stripe_webhook(request_1, "sig_test"))
+
+        self.assertEqual(r1["action"], "add_bonus",
+                         "Première livraison : doit créditer les analyses")
+
+        # ── Deuxième livraison (même event_id) : duplicate ────────────────────
+        request_2 = MagicMock()
+        request_2.body = AsyncMock(return_value=b"payload")
+        exec_2 = MagicMock()
+        exec_2.data = {"status": "duplicate"}
+        sb_2 = MagicMock()
+        sb_2.rpc.return_value.execute.return_value = exec_2
+
+        with patch("routers.billing._get_billing", return_value=billing_mock):
+            with patch("main.get_supabase_service", return_value=sb_2):
+                r2 = asyncio.run(stripe_webhook(request_2, "sig_test"))
+
+        self.assertEqual(r2["action"], "duplicate_skipped",
+                         "Deuxième livraison du même webhook → doit être ignorée sans re-crédit")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

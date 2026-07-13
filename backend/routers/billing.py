@@ -247,39 +247,52 @@ async def stripe_webhook(
         logger.error(f"[WEBHOOK] Erreur inattendue: {type(e).__name__}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Erreur lors du traitement du webhook.")
 
-    # Appliquer l'action résultante
-    if result.get("action") == "update_plan":
-        company_id = result.get("company_id")
-        new_plan   = result.get("plan")
-        customer_id = result.get("stripe_customer_id")
-        if company_id and new_plan:
-            try:
-                from main import get_supabase_service
-                sb = get_supabase_service()
-                update_data = {"plan": new_plan}
-                if customer_id:
-                    update_data["stripe_customer_id"] = customer_id
-                sb.from_("companies").update(update_data).eq("id", company_id).execute()
-                logger.info(f"[WEBHOOK] Plan mis à jour : {company_id} → {new_plan}")
-            except Exception as e:
-                logger.error(f"[WEBHOOK] Erreur update plan: {e}")
+    # ── Appliquer l'action via Supabase RPC (atomique + idempotent) ─────────────
+    # La fonction apply_stripe_webhook garantit que le même stripe_event_id
+    # ne produit qu'un seul effet métier, même en cas de retry Stripe.
+    # Le marqueur d'idempotence et le traitement métier sont dans la même transaction PG.
+    stripe_event_id = result.get("stripe_event_id", "")
+    event_type      = result.get("event_type", "")
+    action          = result.get("action", "noop")
+    company_id      = result.get("company_id")
+    quantity        = result.get("quantity")
+    new_plan        = result.get("plan")
+    stripe_customer = result.get("stripe_customer_id")
 
-    elif result.get("action") == "add_bonus":
-        company_id = result.get("company_id")
-        quantity = result.get("quantity", 0)
-        if company_id and quantity:
-            _get_usage().add_bonus_analyses(company_id, quantity)
-            logger.info(f"[WEBHOOK] +{quantity} analyses bonus : {company_id}")
+    try:
+        from main import get_supabase_service
+        sb = get_supabase_service()
+        rpc_resp = sb.rpc("apply_stripe_webhook", {
+            "p_stripe_event_id": stripe_event_id,
+            "p_event_type":      event_type,
+            "p_action":          action,
+            "p_company_id":      company_id,
+            "p_quantity":        quantity,
+            "p_new_plan":        new_plan,
+            "p_stripe_customer": stripe_customer,
+        }).execute()
 
-    elif result.get("action") == "downgrade_free":
-        company_id = result.get("company_id")
-        if company_id:
-            try:
-                from main import get_supabase_service
-                sb = get_supabase_service()
-                sb.from_("companies").update({"plan": "free"}).eq("id", company_id).execute()
-                logger.info(f"[WEBHOOK] Downgrade FREE : {company_id}")
-            except Exception as e:
-                logger.error(f"[WEBHOOK] Erreur downgrade: {e}")
+        rpc_data = rpc_resp.data
+        if isinstance(rpc_data, dict) and rpc_data.get("status") == "duplicate":
+            logger.warning(
+                f"[WEBHOOK IDEMPOTENCY] Doublon ignoré : "
+                f"stripe_event_id={stripe_event_id} action={action}"
+            )
+            return {"received": True, "action": "duplicate_skipped"}
 
-    return {"received": True, "action": result.get("action", "noop")}
+        logger.info(
+            f"[WEBHOOK] Traité avec succès : "
+            f"stripe_event_id={stripe_event_id} action={action}"
+        )
+
+    except Exception as e:
+        logger.error(
+            f"[WEBHOOK] Erreur RPC apply_stripe_webhook: {type(e).__name__}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur lors de l'application atomique du webhook.",
+        )
+
+    return {"received": True, "action": action}
