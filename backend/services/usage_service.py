@@ -1,28 +1,34 @@
 """
-Usage Service — Pepperyn V11.
+Usage Service — Pepperyn Release 1.0  (WP1C)
 
-Gère les limites d'usage, le reset mensuel automatique et le tracking chat.
-Toute logique de limite est ici — AUCUNE logique côté frontend.
+Moteur de quotas et de suivi d'usage.
 
-Plans V11 (source : master plan Final) :
-  FREE       → 1 analyse/mois   · 3 interactions contextuelles/analyse
-  PRO        → 15 analyses/mois · usage conversationnel étendu (soft cap Sonnet)
-  POWER      → 75 analyses/mois · usage avancé inclus
-  SCALE      → 250 analyses/mois· usage intensif inclus
-  ENTERPRISE → illimité
+Source des quotas : config/product_catalog.py (PLAN_LIMITS, get_plan).
+Aucune constante métier locale.
 
-Add-ons (crédits supplémentaires, achetables via Stripe) :
-  Starter Pack : +10 analyses  → 19€
-  Growth Pack  : +50 analyses  → 69€
-  Scale Pack   : +200 analyses → 199€
+═══════════════════════════════════════════════════════════════════════════════
+RÈGLES CONTRACTUELLES
+═══════════════════════════════════════════════════════════════════════════════
+Interactions :
+  Le quota est UNIQUEMENT mensuel (PlanLimits.chat_monthly_cap).
+  Il n'existe aucune limite d'Interactions par Analyse.
+  L'utilisateur répartit ses Interactions librement entre ses Analyses.
 
-Tables Supabase requises :
+Ordre de consommation des Analyses :
+  1. Analyses bonus (Executive Capacity Packs) — bonus_analyses en DB — EN PREMIER.
+  2. Quota mensuel du Plan — analyses_count en DB — ensuite.
+  Reset mensuel : analyses_count → 0. bonus_analyses INCHANGÉ.
+  Les Analyses bonus non consommées persistent indéfiniment.
+
+═══════════════════════════════════════════════════════════════════════════════
+TABLES SUPABASE
+═══════════════════════════════════════════════════════════════════════════════
   usage_limits :
     company_id      UUID    NOT NULL
-    year_month      TEXT    NOT NULL  -- ex: "2026-04"
+    year_month      TEXT    NOT NULL  -- ex: "2026-07"
     analyses_count  INT     DEFAULT 0
     chat_count      INT     DEFAULT 0
-    bonus_analyses  INT     DEFAULT 0  -- crédits achetés en add-on
+    bonus_analyses  INT     DEFAULT 0  -- Analyses bonus Executive Capacity Packs
     PRIMARY KEY (company_id, year_month)
 
   user_activity :
@@ -35,30 +41,7 @@ Tables Supabase requises :
 from datetime import datetime, timezone
 from typing import Optional, Tuple
 
-
-# ─── Plan limits V11 ─────────────────────────────────────────────────────────
-
-PLAN_LIMITS: dict[str, dict] = {
-    # V11 plans — chat_monthly_cap = limite messages chat/mois (Haiku, ~0.001€/msg)
-    # Avec Haiku sur tout le chat, même le cap max (2000) = ~2€ de coût LLM.
-    # Ces caps sont conservés comme garde-fou et incitation à monter de plan.
-    "free":           {"analyses": 1,    "chat_per_analysis": 3,    "chat_soft_cap": None, "chat_monthly_cap": 9},
-    "pro":            {"analyses": 15,   "chat_per_analysis": None,  "chat_soft_cap": None, "chat_monthly_cap": 300},
-    "power":          {"analyses": 75,   "chat_per_analysis": None,  "chat_soft_cap": None, "chat_monthly_cap": 1500},
-    "scale":          {"analyses": 250,  "chat_per_analysis": None,  "chat_soft_cap": None, "chat_monthly_cap": None},
-    "enterprise":     {"analyses": None, "chat_per_analysis": None,  "chat_soft_cap": None, "chat_monthly_cap": None},
-    # Legacy plan names (kept for backward compat)
-    "premium":        {"analyses": 75,   "chat_per_analysis": None,  "chat_soft_cap": None, "chat_monthly_cap": 1500},
-    "standard":       {"analyses": 15,   "chat_per_analysis": None,  "chat_soft_cap": None, "chat_monthly_cap": 300},
-    "standard_beta":  {"analyses": 15,   "chat_per_analysis": None,  "chat_soft_cap": None, "chat_monthly_cap": 300},
-}
-
-# Add-on packs (prêts à brancher sur Stripe)
-ADDON_PACKS: dict[str, dict] = {
-    "starter": {"analyses": 10,  "price_eur": 19,  "label": "Starter Pack"},
-    "growth":  {"analyses": 50,  "price_eur": 69,  "label": "Growth Pack"},
-    "scale":   {"analyses": 200, "price_eur": 199, "label": "Scale Pack"},
-}
+from config.product_catalog import PLAN_LIMITS, get_plan  # source unique des quotas
 
 
 def _current_year_month() -> str:
@@ -80,13 +63,13 @@ class UsageService:
                 pass
         return self._supabase
 
-    # ─── Usage row ───────────────────────────────────────────────────────────
+    # ─── Ligne d'usage ───────────────────────────────────────────────────────
 
     def _get_or_create_usage_row(self, company_id: str) -> dict:
-        """Get or create usage row for current month (auto-reset)."""
+        """Récupère ou crée la ligne d'usage du mois courant (reset mensuel automatique)."""
         sb = self._get_supabase()
         if not sb:
-            return {"analyses_count": 0, "chat_count": 0}
+            return {"analyses_count": 0, "chat_count": 0, "bonus_analyses": 0}
 
         year_month = _current_year_month()
         try:
@@ -100,76 +83,145 @@ class UsageService:
             if result.data:
                 return result.data[0]
 
-            # New month → insert fresh row (automatic monthly reset)
+            # Nouveau mois → insertion d'une ligne vierge (reset mensuel automatique)
             sb.from_("usage_limits").insert({
                 "company_id": company_id,
                 "year_month": year_month,
                 "analyses_count": 0,
                 "chat_count": 0,
             }).execute()
-            return {"analyses_count": 0, "chat_count": 0}
+            return {"analyses_count": 0, "chat_count": 0, "bonus_analyses": 0}
 
         except Exception:
-            return {"analyses_count": 0, "chat_count": 0}
+            return {"analyses_count": 0, "chat_count": 0, "bonus_analyses": 0}
 
-    # ─── Analysis limits ─────────────────────────────────────────────────────
+    # ─── Analyses ────────────────────────────────────────────────────────────
 
     def can_run_analysis(self, company_id: str, plan: str) -> Tuple[bool, str]:
         """
-        Check if company can run an analysis this month.
-        Returns (allowed: bool, reason: str).
-        MUST be called before every analysis — never skipped.
-        Bonus analyses (add-on packs) count toward the total available.
-        """
-        limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["free"])
-        max_analyses = limits["analyses"]
+        Vérifie si la company peut lancer une Analyse ce mois.
 
+        Ordre de consommation :
+          1. Analyses bonus (Executive Capacity Packs) — en premier.
+          2. Quota mensuel du Plan — ensuite.
+
+        Returns (allowed: bool, reason: str).
+        DOIT être appelé avant chaque Analyse — jamais contourné.
+        """
+        try:
+            limits = get_plan(plan)
+        except KeyError:
+            limits = get_plan("free")
+
+        max_analyses = limits.analyses
+
+        # Plan illimité (Enterprise)
         if max_analyses is None:
             return True, ""
 
         usage = self._get_or_create_usage_row(company_id)
-        current = usage.get("analyses_count", 0)
-        bonus = usage.get("bonus_analyses", 0)
+        analyses_used = usage.get("analyses_count", 0) or 0
+        bonus = usage.get("bonus_analyses", 0) or 0
         total_allowed = max_analyses + bonus
 
-        if current >= total_allowed:
+        if analyses_used >= total_allowed:
             if bonus > 0:
                 return False, (
-                    f"Limite de {max_analyses} analyses/mois + {bonus} crédits bonus épuisée. "
-                    "Achetez un pack de crédits supplémentaires ou passez au plan supérieur."
+                    f"Quota de {max_analyses} Analyses/mois + {bonus} Analyses bonus épuisé "
+                    f"(Plan {plan.upper()}). "
+                    "Achetez un Executive Capacity Pack ou passez au plan supérieur."
                 )
             return False, (
-                f"Limite de {max_analyses} analyse{'s' if max_analyses > 1 else ''}/mois atteinte (plan {plan.upper()}). "
-                "Achetez des crédits supplémentaires ou passez au plan supérieur."
+                f"Quota de {max_analyses} Analyse{'s' if max_analyses > 1 else ''}/mois épuisé "
+                f"(Plan {plan.upper()}). "
+                "Achetez un Executive Capacity Pack ou passez au plan supérieur."
             )
         return True, ""
 
     def get_usage_this_month(self, company_id: str, plan: str) -> dict:
         """
-        Return usage summary for the current month.
-        Used by frontend to display quota progress.
+        Résumé d'usage du mois en cours.
+
+        Calcule l'ordre de consommation (bonus en premier, mensuel ensuite)
+        et prépare les champs nécessaires à WP1D (dashboard frontend).
+
+        Retourne un dict avec :
+          - analyses : consommation mensuelle, bonus, total disponible
+          - interactions : quota mensuel global
+          - entités : limite du Plan
+          - renouvellement : date du prochain reset mensuel
         """
-        limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["free"])
-        max_analyses = limits["analyses"]
+        try:
+            limits = get_plan(plan)
+        except KeyError:
+            limits = get_plan("free")
+
+        max_analyses = limits.analyses
+        max_interactions = limits.chat_monthly_cap
+        max_entities = limits.max_entities
+
         usage = self._get_or_create_usage_row(company_id)
-        used = usage.get("analyses_count", 0)
-        bonus = usage.get("bonus_analyses", 0)
+        analyses_used = usage.get("analyses_count", 0) or 0
+        interactions_used = usage.get("chat_count", 0) or 0
+        bonus = usage.get("bonus_analyses", 0) or 0
+
+        # Ordre de consommation : bonus en premier, quota mensuel ensuite.
+        # analyses_count monte linéairement — les premières consomment le bonus,
+        # les suivantes le quota mensuel.
+        bonus_used = min(analyses_used, bonus)
+        monthly_used = max(0, analyses_used - bonus)
+        bonus_remaining = max(0, bonus - analyses_used)
+
         total_allowed = (max_analyses + bonus) if max_analyses is not None else None
+        analyses_remaining = (
+            max(0, total_allowed - analyses_used) if total_allowed is not None else None
+        )
+        monthly_remaining = max(0, max_analyses - monthly_used) if max_analyses is not None else None
+        interactions_remaining = (
+            max(0, max_interactions - interactions_used)
+            if max_interactions is not None else None
+        )
+
+        # Date du prochain renouvellement mensuel (1er du mois suivant, UTC)
+        now = datetime.now(timezone.utc)
+        if now.month == 12:
+            renewal = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            renewal = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
 
         return {
             "plan": plan,
-            "analyses_used": used,
-            "analyses_limit": max_analyses,
-            "bonus_analyses": bonus,
-            "total_allowed": total_allowed,
-            "analyses_remaining": max(0, total_allowed - used) if total_allowed is not None else None,
             "year_month": _current_year_month(),
+            # ── Analyses ──────────────────────────────────────────────────────
+            "analyses_used":              analyses_used,
+            "analyses_limit":             max_analyses,        # quota mensuel du Plan
+            "analyses_bonus":             bonus,               # total bonus disponible
+            "analyses_bonus_used":        bonus_used,          # bonus déjà consommés
+            "analyses_bonus_remaining":   bonus_remaining,     # bonus encore disponibles
+            "analyses_monthly_used":      monthly_used,        # quota mensuel consommé
+            "analyses_monthly_remaining": monthly_remaining,   # quota mensuel restant
+            "analyses_total_allowed":     total_allowed,       # quota + bonus
+            "analyses_remaining":         analyses_remaining,  # total restant
+            # ── Aliases compat legacy (billing.py GET /usage) ─────────────────
+            "bonus_analyses":             bonus,
+            "total_allowed":              total_allowed,
+            # ── Interactions ──────────────────────────────────────────────────
+            "interactions_used":          interactions_used,
+            "interactions_limit":         max_interactions,
+            "interactions_remaining":     interactions_remaining,
+            # ── Entités ───────────────────────────────────────────────────────
+            "max_entities":               max_entities,
+            # ── Renouvellement ────────────────────────────────────────────────
+            "renewal_date":               renewal.isoformat(),
         }
 
     def add_bonus_analyses(self, company_id: str, quantity: int) -> None:
         """
-        Add bonus analyses to the current month (called after Stripe payment webhook).
-        Thread-safe using Supabase atomic update.
+        Ajoute des Analyses bonus au mois courant.
+
+        Note : billing.py utilise désormais la RPC apply_stripe_webhook (WP1B.3)
+        qui est atomique. Cette méthode est conservée pour la compatibilité des
+        appels existants non encore migrés.
         """
         sb = self._get_supabase()
         if not sb:
@@ -177,9 +229,8 @@ class UsageService:
 
         year_month = _current_year_month()
         try:
-            # Ensure row exists
             usage = self._get_or_create_usage_row(company_id)
-            current_bonus = usage.get("bonus_analyses", 0)
+            current_bonus = usage.get("bonus_analyses", 0) or 0
             sb.from_("usage_limits").update({
                 "bonus_analyses": current_bonus + quantity
             }).eq("company_id", company_id).eq("year_month", year_month).execute()
@@ -188,8 +239,12 @@ class UsageService:
 
     def increment_analysis(self, company_id: str) -> None:
         """
-        Increment analysis count AFTER successful analysis.
-        Uses upsert to handle race conditions.
+        Incrémente analyses_count après une Analyse réussie.
+
+        Appelé par analyze.py après chaque Analyse complétée avec succès.
+        L'ordre de consommation (bonus en premier) est implicite : analyses_count
+        étant incrémenté linéairement, les premières analyses consomment le bonus,
+        les suivantes le quota mensuel du Plan.
         """
         sb = self._get_supabase()
         if not sb:
@@ -197,7 +252,6 @@ class UsageService:
 
         year_month = _current_year_month()
         try:
-            # Ensure row exists first
             self._get_or_create_usage_row(company_id)
 
             result = (
@@ -207,7 +261,7 @@ class UsageService:
                 .eq("year_month", year_month)
                 .execute()
             )
-            current = (result.data[0].get("analyses_count", 0) if result.data else 0)
+            current = (result.data[0].get("analyses_count", 0) if result.data else 0) or 0
 
             sb.from_("usage_limits").update({
                 "analyses_count": current + 1
@@ -216,26 +270,14 @@ class UsageService:
         except Exception:
             pass
 
-    # ─── Chat limits ─────────────────────────────────────────────────────────
-
-    def get_analysis_chat_count(self, analysis_id: str) -> int:
-        """Get chat message count for a specific analysis."""
-        sb = self._get_supabase()
-        if not sb:
-            return 0
-        try:
-            result = (
-                sb.from_("analyses")
-                .select("chat_count")
-                .eq("id", analysis_id)
-                .execute()
-            )
-            return (result.data[0] if result.data else {}).get("chat_count", 0) or 0
-        except Exception:
-            return 0
+    # ─── Interactions ─────────────────────────────────────────────────────────
+    #
+    # Une Interaction = un message chat envoyé par l'utilisateur.
+    # Le quota est mensuel et global. Aucune limite par Analyse.
+    # L'utilisateur répartit ses Interactions librement entre ses Analyses.
 
     def get_monthly_chat_count(self, company_id: str) -> int:
-        """Get total chat messages sent this month for a company."""
+        """Retourne le nombre d'Interactions envoyées ce mois pour une company."""
         sb = self._get_supabase()
         if not sb:
             return 0
@@ -259,38 +301,29 @@ class UsageService:
         plan: str,
     ) -> Tuple[bool, str, str]:
         """
-        Check if company can send a chat message.
-        Returns (allowed: bool, reason: str, model_tier: str)
+        Vérifie si la company peut envoyer une Interaction (message chat).
 
-        model_tier est toujours 'normal' — tout le chat est sur Haiku.
-        Conservé pour compatibilité avec l'appelant dans analyze.py.
+        Une Interaction est une ressource mensuelle globale.
+        Seul le quota mensuel du Plan (PlanLimits.chat_monthly_cap) s'applique.
+        Il n'existe aucune limite d'Interactions par Analyse.
 
-        Limites vérifiées (ordre de priorité) :
-          1. Per-analysis hard cap (FREE : 3 messages/analyse)
-          2. Monthly chat cap (PRO : 300/mois, POWER : 1500/mois)
+        Returns (allowed: bool, reason: str, model_tier: str).
+        model_tier est toujours 'normal' — conservé pour compatibilité avec analyze.py.
         """
-        limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["free"])
+        try:
+            limits = get_plan(plan)
+        except KeyError:
+            limits = get_plan("free")
 
-        # 1. Per-analysis hard cap (FREE plan uniquement)
-        if limits["chat_per_analysis"] is not None and analysis_id:
-            current = self.get_analysis_chat_count(analysis_id)
-            if current >= limits["chat_per_analysis"]:
-                return (
-                    False,
-                    f"Limite de {limits['chat_per_analysis']} messages par analyse atteinte (plan gratuit). "
-                    "Démarrez une nouvelle analyse ou passez au plan PRO.",
-                    "normal",
-                )
-
-        # 2. Monthly cap (PRO / POWER)
-        monthly_cap = limits.get("chat_monthly_cap")
+        monthly_cap = limits.chat_monthly_cap
         if monthly_cap is not None:
             monthly_count = self.get_monthly_chat_count(company_id)
             if monthly_count >= monthly_cap:
                 return (
                     False,
-                    f"Limite mensuelle de {monthly_cap} messages atteinte (plan {plan.upper()}). "
-                    "Passez au plan supérieur pour continuer ce mois-ci.",
+                    f"Quota mensuel de {monthly_cap} Interactions épuisé "
+                    f"(Plan {plan.upper()}). "
+                    "Passez au plan supérieur pour continuer ce mois.",
                     "normal",
                 )
 
@@ -298,32 +331,16 @@ class UsageService:
 
     def increment_chat(self, analysis_id: Optional[str], company_id: Optional[str] = None) -> None:
         """
-        Increment chat count after a message is sent.
-        Updates TWO counters :
-          - analyses.chat_count  (per-analysis, used for FREE hard cap)
-          - usage_limits.chat_count  (monthly, used for PRO/POWER monthly cap)
+        Incrémente le compteur d'Interactions après un message.
+
+        Met à jour usage_limits.chat_count (quota mensuel global).
+        Appelé par analyze.py après chaque Interaction complétée avec succès.
         """
         sb = self._get_supabase()
         if not sb:
             return
 
-        # Per-analysis counter
-        if analysis_id:
-            try:
-                result = (
-                    sb.from_("analyses")
-                    .select("chat_count")
-                    .eq("id", analysis_id)
-                    .execute()
-                )
-                current = (result.data[0] if result.data else {}).get("chat_count", 0) or 0
-                sb.from_("analyses").update({
-                    "chat_count": current + 1
-                }).eq("id", analysis_id).execute()
-            except Exception:
-                pass
-
-        # Monthly counter (for PRO/POWER caps)
+        # Compteur mensuel global (quota Interactions du Plan)
         if company_id:
             year_month = _current_year_month()
             try:
@@ -342,7 +359,7 @@ class UsageService:
             except Exception:
                 pass
 
-    # ─── Activity tracking ────────────────────────────────────────────────────
+    # ─── Tracking activité ────────────────────────────────────────────────────
 
     def track_activity(
         self,
@@ -351,9 +368,9 @@ class UsageService:
         metadata: Optional[dict] = None,
     ) -> None:
         """
-        Log a user activity event to user_activity table.
-        Events: file_uploaded | analysis_started | chat_message | export_generated
-        Non-blocking — errors silently ignored.
+        Enregistre un événement d'activité dans user_activity.
+        Événements : file_uploaded | analysis_started | chat_message | export_generated
+        Non-bloquant — erreurs ignorées silencieusement.
         """
         sb = self._get_supabase()
         if not sb:

@@ -25,7 +25,7 @@
 | WP1B.3 | Idempotence webhook — correctif | ✅ Terminé | ⏳ En attente validation |
 | WP1B.3.1 | SQL Security Hardening | ✅ Terminé | ✅ Validé — migration appliquée |
 | WP1B.3.2 | Migration Stripe — Application & Validation | ✅ Terminé | ✅ **WP1B VALIDÉ** |
-| WP1C | Usage Migration | 🔲 À démarrer | — |
+| WP1C | Usage Migration | ✅ Terminé | ⏳ En attente validation |
 | WP2 | Backend Quota Fix | 🔲 À démarrer | — |
 | WP3 | Stripe Configuration | 🔲 À démarrer | — |
 | WP4 | Parcours SCALE + CreditsModal | 🔲 À démarrer | — |
@@ -627,7 +627,138 @@ Non. ✅ Tous les critères GO sont satisfaits.
 ║  Données de test : toutes supprimées                                ║
 ║  Données réelles : inchangées                                       ║
 ║  Tests locaux : 170/170                                             ║
-║  WP1C : non démarré ✅                                              ║
+║  WP1C : démarré ✅                                                  ║
+╚══════════════════════════════════════════════════════════════════════╝
+```
+
+---
+
+## WP1C — MIGRATION DU MOTEUR D'USAGE VERS LE PRODUCT CATALOG ✅ TERMINÉ
+
+**Objectif :** Migrer `usage_service.py` exclusivement vers le Product Catalog.
+Éliminer toutes les constantes locales et le concept `chat_per_analysis`.
+
+**Commit :** `refactor(release-1): migrate usage engine to product catalog`
+
+---
+
+### Fichiers modifiés / créés
+
+| Fichier | Action | Description |
+|---|---|---|
+| `backend/services/usage_service.py` | ✅ Réécrit | Migré vers Product Catalog — suppression PLAN_LIMITS local, ADDON_PACKS, chat_per_analysis |
+| `backend/tests/test_usage_service.py` | ✅ Créé | 54 tests unitaires — FREE/PRO/SCALE/Enterprise/Packs/Interactions/Résumé |
+
+---
+
+### Constantes supprimées
+
+| Constante | Valeurs incorrectes supprimées |
+|---|---|
+| `PLAN_LIMITS` (dict local) | pro=15/300, scale=250/None, power=75/1500 — TOUS FAUX |
+| `ADDON_PACKS` (dict local) | growth=50, scale=200 — FAUX (correct : 20, 80) |
+| `chat_per_analysis` (concept) | Supprimé de tout le code, commentaires, logique |
+
+---
+
+### Nouvelle source des quotas
+
+```
+from config.product_catalog import PLAN_LIMITS, get_plan
+```
+
+Valeurs correctes désormais appliquées :
+
+| Plan | Analyses/mois | Interactions/mois | Entités |
+|---|---|---|---|
+| FREE | 1 | 3 | 1 |
+| PRO | 30 | 75 | 10 |
+| SCALE | 100 | 500 | Illimité |
+| Enterprise | Illimité | Illimité | Illimité |
+
+---
+
+### Règle Interactions — confirmée
+
+- ❌ Supprimé : vérification `chat_per_analysis` dans `can_chat()`
+- ❌ Supprimé : `get_analysis_chat_count()` (n'était utilisée que pour la limite par Analyse)
+- ❌ Supprimé : compteur par Analyse dans `increment_chat()` (mise à jour de `analyses.chat_count`)
+- ✅ Conservé : quota mensuel global `usage_limits.chat_count`
+- ✅ Aucune limite par Analyse — quota mensuel uniquement
+
+---
+
+### Ordre de consommation des Analyses — validé
+
+```
+bonus_used     = min(analyses_count, bonus_analyses)
+monthly_used   = max(0, analyses_count - bonus_analyses)
+bonus_remaining = max(0, bonus_analyses - analyses_count)
+total_allowed  = max_analyses + bonus_analyses
+```
+
+Règle : si `analyses_count < bonus_analyses` → consommation bonus. Si `analyses_count >= bonus_analyses` → consommation quota mensuel.
+
+---
+
+### Préparation WP1D — champs ajoutés dans `get_usage_this_month()`
+
+| Champ | Description |
+|---|---|
+| `analyses_bonus_used` | Analyses bonus déjà consommées |
+| `analyses_bonus_remaining` | Analyses bonus encore disponibles |
+| `analyses_monthly_used` | Analyses mensuelles consommées (hors bonus) |
+| `analyses_monthly_remaining` | Analyses mensuelles restantes |
+| `interactions_used` | Interactions envoyées ce mois |
+| `interactions_limit` | Quota mensuel d'Interactions |
+| `interactions_remaining` | Interactions restantes ce mois |
+| `max_entities` | Limite d'Entités du Plan |
+| `renewal_date` | Date ISO du prochain reset mensuel (1er du mois suivant) |
+
+---
+
+### Résultats tests WP1C
+
+```
+tests/test_usage_service.py — 54 tests — ✅ 54/54 PASSED
+tests/test_billing_migration.py — 75 tests — ✅ 75/75 PASSED (zéro régression)
+```
+
+---
+
+### Grep de régression — chat_per_analysis
+
+Résultats dans les fichiers sources (hors tests) :
+- `services/usage_service.py` → **0 occurrence** ✅
+- `config/product_catalog.py` → 1 occurrence dans un commentaire de prohibition (attendu, non fonctionnel) ✅
+- Aucune occurrence fonctionnelle dans `services/`, `routers/`, `config/`
+
+---
+
+### Signatures API préservées — compatibilité analyze.py
+
+| Méthode | Signature | Compat analyze.py |
+|---|---|---|
+| `can_run_analysis(company_id, plan)` | `→ Tuple[bool, str]` | ✅ inchangée |
+| `increment_analysis(company_id)` | `→ None` | ✅ inchangée |
+| `can_chat(company_id, analysis_id, plan)` | `→ Tuple[bool, str, str]` | ✅ inchangée |
+| `increment_chat(analysis_id, company_id)` | `→ None` | ✅ inchangée |
+
+---
+
+```
+╔══════════════════════════════════════════════════════════════════════╗
+║  WP1C — VERDICT : ✅ TERMINÉ — EN ATTENTE VALIDATION               ║
+║                                                                      ║
+║  Branche : release-1/wp1b-billing-migration                         ║
+║  Date : 2026-07-13                                                  ║
+║  usage_service.py → Product Catalog ✅                              ║
+║  PLAN_LIMITS local → supprimé ✅                                    ║
+║  ADDON_PACKS local → supprimé ✅                                    ║
+║  chat_per_analysis → supprimé ✅                                    ║
+║  54 tests WP1C → 54/54 PASSED ✅                                   ║
+║  75 tests WP1B → 75/75 PASSED (zéro régression) ✅                 ║
+║  Signatures analyze.py → préservées ✅                              ║
 ╚══════════════════════════════════════════════════════════════════════╝
 ```
 
