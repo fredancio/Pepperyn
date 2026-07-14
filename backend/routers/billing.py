@@ -276,25 +276,29 @@ async def stripe_webhook(
     # La fonction apply_stripe_webhook garantit que le même stripe_event_id
     # ne produit qu'un seul effet métier, même en cas de retry Stripe.
     # Le marqueur d'idempotence et le traitement métier sont dans la même transaction PG.
-    stripe_event_id = result.get("stripe_event_id", "")
-    event_type      = result.get("event_type", "")
-    action          = result.get("action", "noop")
-    company_id      = result.get("company_id")
-    quantity        = result.get("quantity")
-    new_plan        = result.get("plan")
-    stripe_customer = result.get("stripe_customer_id")
+    stripe_event_id     = result.get("stripe_event_id", "")
+    event_type          = result.get("event_type", "")
+    action              = result.get("action", "noop")
+    company_id          = result.get("company_id")
+    quantity            = result.get("quantity")
+    new_plan            = result.get("plan")
+    stripe_customer     = result.get("stripe_customer_id")
+    stripe_subscription = result.get("stripe_subscription_id")   # WP4B.5
+    subscription_status = result.get("subscription_status")      # WP4B.5
 
     try:
         from main import get_supabase_service
         sb = get_supabase_service()
         rpc_resp = sb.rpc("apply_stripe_webhook", {
-            "p_stripe_event_id": stripe_event_id,
-            "p_event_type":      event_type,
-            "p_action":          action,
-            "p_company_id":      company_id,
-            "p_quantity":        quantity,
-            "p_new_plan":        new_plan,
-            "p_stripe_customer": stripe_customer,
+            "p_stripe_event_id":     stripe_event_id,
+            "p_event_type":          event_type,
+            "p_action":              action,
+            "p_company_id":          company_id,
+            "p_quantity":            quantity,
+            "p_new_plan":            new_plan,
+            "p_stripe_customer":     stripe_customer,
+            "p_stripe_subscription": stripe_subscription,         # WP4B.5
+            "p_subscription_status": subscription_status,         # WP4B.5
         }).execute()
 
         rpc_data = rpc_resp.data

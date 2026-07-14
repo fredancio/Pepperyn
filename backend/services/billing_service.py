@@ -106,6 +106,7 @@ class BillingService:
                 )
 
             env_var  = _ORDERABLE_PLAN_ENV[plan_or_addon]
+
             price_id = os.environ.get(env_var)
             if not price_id:
                 raise ValueError(
@@ -121,7 +122,19 @@ class BillingService:
         _cancel = cancel_url or f"{FRONTEND_URL}/upgrade"
 
         stripe = self._stripe()
-        session = stripe.checkout.Session.create(
+
+        # subscription_data.metadata : injecte company_id et plan_or_addon directement
+        # dans l'objet Subscription Stripe (pas seulement dans la Session).
+        # Objectif : customer.subscription.created / updated / deleted peuvent résoudre
+        # la company via sub.metadata.company_id SANS dépendre de l'ordre d'arrivée
+        # des webhooks (checkout.session.completed vs customer.subscription.created).
+        _subscription_data = (
+            {"metadata": {"company_id": company_id, "plan_or_addon": plan_or_addon}}
+            if mode == "subscription"
+            else None
+        )
+
+        create_kwargs: dict = dict(
             payment_method_types=["card"],
             line_items=[{"price": price_id, "quantity": 1}],
             mode=mode,
@@ -131,6 +144,10 @@ class BillingService:
             metadata={"company_id": company_id, "plan_or_addon": plan_or_addon},
             allow_promotion_codes=True,
         )
+        if _subscription_data is not None:
+            create_kwargs["subscription_data"] = _subscription_data
+
+        session = stripe.checkout.Session.create(**create_kwargs)
         logger.info(
             f"[BILLING] Checkout créé : {session.id} "
             f"— company={company_id} — produit={plan_or_addon} — mode={mode}"
@@ -253,19 +270,123 @@ class BillingService:
                     "event_type":         etype,
                 }
             else:
+                # ── Plan payant (PRO ou SCALE) ────────────────────────────────
+                # Initialise uniquement : plan, stripe_customer_id, stripe_subscription_id.
+                # Le champ subscription_status est géré par customer.subscription.* (ci-dessous).
+                subscription_id = session.get("subscription")
                 return {
-                    "action":             "update_plan",
-                    "company_id":         company_id,
-                    "plan":               plan_or_addon,
-                    "stripe_customer_id": customer_id,
-                    "stripe_event_id":    event_id,
-                    "event_type":         etype,
+                    "action":                 "init_subscription",
+                    "company_id":             company_id,
+                    "plan":                   plan_or_addon,
+                    "stripe_customer_id":     customer_id,
+                    "stripe_subscription_id": subscription_id,
+                    "stripe_event_id":        event_id,
+                    "event_type":             etype,
                 }
 
+        elif etype in ("customer.subscription.created", "customer.subscription.updated"):
+            # ── Source de vérité du cycle de vie de l'abonnement ─────────────
+            # Ces événements gouvernent subscription_status pour toute la durée
+            # de vie de l'abonnement (renouvellements, impayés, changements de plan).
+            # customer.subscription.updated est la SEULE autorité pour subscription_status.
+            sub             = event["data"]["object"]
+            customer_id     = sub.get("customer", "")
+            subscription_id = sub.get("id", "")
+            sub_status      = sub.get("status", "")   # active | trialing | past_due | …
+            sub_metadata    = sub.get("metadata") or {}
+
+            # Résolution optionnelle du plan depuis la Price ID Stripe.
+            # Utile pour détecter un changement PRO ↔ SCALE via le Billing Portal.
+            price_id = None
+            try:
+                price_id = sub["items"]["data"][0]["price"]["id"]
+            except (KeyError, IndexError, TypeError):
+                pass
+            new_plan = self._resolve_plan_from_price_id(price_id)
+
+            # ── Résolution du company_id ──────────────────────────────────────
+            # Priorité 1 : subscription.metadata.company_id
+            #   → garanti si la session Checkout a été créée avec subscription_data.metadata.
+            #   → résistant à l'ordre d'arrivée des webhooks (aucune dépendance envers
+            #     checkout.session.completed).
+            # Priorité 2 : fallback via stripe_customer_id
+            #   → couvre les subscriptions créées avant l'ajout de subscription_data.metadata.
+            # Si aucune résolution n'aboutit : lever ValueError.
+            #   → Stripe retente le webhook (≥ 3 jours) → résolution possible lors du retry.
+            company_id = (sub_metadata.get("company_id") or "").strip()
+            if not company_id:
+                company_id = self._get_company_by_customer(customer_id)
+
+            if not company_id:
+                logger.critical(
+                    f"[WEBHOOK INTEGRITY] {etype} — company_id introuvable. "
+                    f"subscription_id={subscription_id} customer_id={customer_id} "
+                    f"sub_metadata={sub_metadata!r} stripe_event_id={event_id}. "
+                    f"Stripe va retenter l'événement."
+                )
+                raise ValueError(
+                    f"company_id introuvable pour {etype} "
+                    f"(subscription_id={subscription_id}, customer_id={customer_id}). "
+                    f"Webhook non traitable — Stripe va retenter."
+                )
+
+            return {
+                "action":                 "sync_subscription",
+                "company_id":             company_id,
+                "stripe_customer_id":     customer_id,
+                "stripe_subscription_id": subscription_id,
+                "subscription_status":    sub_status,
+                "plan":                   new_plan,    # None si prix non résolu → plan inchangé en DB
+                "stripe_event_id":        event_id,
+                "event_type":             etype,
+            }
+
+        elif etype == "invoice.paid":
+            # ── Paiement reçu — enregistrement sans mise à jour du statut ────
+            # subscription_status est géré EXCLUSIVEMENT par customer.subscription.updated.
+            # Stripe déclenche customer.subscription.updated (status→active) si le statut
+            # changeait (ex. past_due → active). S'il était déjà active, il l'est toujours.
+            # → invoice.paid est conservé dans le registre d'idempotence pour audit
+            #   et sera utilisable dans le futur (notifications, analytics, etc.).
+            invoice     = event["data"]["object"]
+            customer_id = invoice.get("customer", "")
+            logger.info(
+                f"[WEBHOOK] invoice.paid — customer={customer_id} "
+                f"stripe_event_id={event_id} — statut délégué à customer.subscription.updated."
+            )
+            return {
+                "action":          "noop",
+                "reason":          "invoice.paid — subscription_status délégué à subscription.updated",
+                "stripe_event_id": event_id,
+                "event_type":      etype,
+            }
+
         elif etype == "customer.subscription.deleted":
-            obj         = event["data"]["object"]
-            customer_id = obj["customer"] if "customer" in obj else ""
-            company_id  = self._get_company_by_customer(customer_id)
+            # ── Annulation de l'abonnement → downgrade FREE ───────────────────
+            obj          = event["data"]["object"]
+            customer_id  = obj.get("customer", "")
+            sub_metadata = obj.get("metadata") or {}
+
+            # Résolution metadata-first (même logique que subscription.created/updated).
+            # Si company introuvable : noop (pas de raise — un compte inexistant
+            # ne peut pas être downgradé, et les retries Stripe seraient infinis).
+            company_id = (sub_metadata.get("company_id") or "").strip()
+            if not company_id:
+                company_id = self._get_company_by_customer(customer_id)
+
+            if not company_id:
+                logger.critical(
+                    f"[WEBHOOK INTEGRITY] customer.subscription.deleted — company_id introuvable. "
+                    f"customer_id={customer_id} sub_metadata={sub_metadata!r} "
+                    f"stripe_event_id={event_id}. Downgrade impossible — événement archivé."
+                )
+                return {
+                    "action":          "noop",
+                    "reason":          f"company_id_not_found — customer={customer_id}",
+                    "stripe_event_id": event_id,
+                    "event_type":      etype,
+                }
+
             return {
                 "action":          "downgrade_free",
                 "company_id":      company_id,
@@ -274,10 +395,21 @@ class BillingService:
             }
 
         elif etype == "invoice.payment_failed":
-            logger.warning(f"[WEBHOOK] Paiement échoué : {event['data']['object'].get('customer')}")
+            # ── Échec de paiement — enregistrement sans mise à jour du statut ─
+            # Quand un paiement échoue, Stripe marque l'abonnement comme past_due
+            # (selon la politique de relance configurée) et déclenche
+            # customer.subscription.updated (status→past_due).
+            # subscription_status est géré EXCLUSIVEMENT par customer.subscription.updated.
+            # → invoice.payment_failed est conservé dans le registre pour audit et alertes.
+            invoice     = event["data"]["object"]
+            customer_id = invoice.get("customer", "")
+            logger.warning(
+                f"[WEBHOOK] invoice.payment_failed — customer={customer_id} "
+                f"stripe_event_id={event_id} — statut délégué à customer.subscription.updated."
+            )
             return {
                 "action":          "noop",
-                "reason":          "payment_failed — notification à implémenter",
+                "reason":          "invoice.payment_failed — subscription_status délégué à subscription.updated",
                 "stripe_event_id": event_id,
                 "event_type":      etype,
             }
@@ -290,6 +422,23 @@ class BillingService:
         }
 
     # ── Helpers ──────────────────────────────────────────────────────────────
+
+    def _resolve_plan_from_price_id(self, price_id: str) -> Optional[str]:
+        """
+        Résout un Stripe Price ID vers un identifiant de plan Pepperyn (pro | scale).
+
+        Parcourt _ORDERABLE_PLAN_ENV et compare price_id aux variables d'env actives.
+        Retourne None si le price_id ne correspond à aucun plan connu
+        (cas d'une price non Pepperyn ou d'une variable d'env absente).
+        Utilisé par customer.subscription.created/updated pour détecter les changements
+        de plan PRO ↔ SCALE opérés via le Stripe Billing Portal.
+        """
+        if not price_id:
+            return None
+        for plan_key, env_var in _ORDERABLE_PLAN_ENV.items():
+            if price_id == os.environ.get(env_var):
+                return plan_key
+        return None
 
     def _get_stripe_customer_id(self, company_id: str) -> Optional[str]:
         try:

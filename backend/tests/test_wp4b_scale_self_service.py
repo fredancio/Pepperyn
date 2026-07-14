@@ -243,10 +243,11 @@ class TestWebhookScale(unittest.TestCase):
 
     # WP4B-11 ─────────────────────────────────────────────────────────────────
     def test_wp4b_11_scale_webhook_returns_update_plan(self):
-        """Webhook SCALE → action='update_plan' (pas add_bonus)."""
+        """Webhook SCALE → action='init_subscription' (WP4B.5 — pas add_bonus, pas update_plan).
+        checkout.session.completed initialise uniquement plan + customer_id + subscription_id."""
         result = self._process("scale", "evt_wp4b_11")
-        self.assertEqual(result["action"], "update_plan",
-                         "Webhook SCALE doit retourner action='update_plan'")
+        self.assertEqual(result["action"], "init_subscription",
+                         "Webhook SCALE doit retourner action='init_subscription' (WP4B.5)")
         self.assertEqual(result["plan"], "scale",
                          "plan retourné doit être 'scale'")
         self.assertNotIn("quantity", result,
@@ -261,11 +262,12 @@ class TestWebhookScale(unittest.TestCase):
 
     # WP4B-13 ─────────────────────────────────────────────────────────────────
     def test_wp4b_13_scale_webhook_idempotent_by_nature(self):
-        """SCALE webhook rejoué deux fois → même action, pas d'effet cumulatif."""
+        """SCALE webhook rejoué deux fois → même action, pas d'effet cumulatif.
+        Python retourne toujours le même dict ; l'idempotence SQL repose sur stripe_event_id."""
         r1 = self._process("scale", "evt_wp4b_SCALE_REPLAY")
         r2 = self._process("scale", "evt_wp4b_SCALE_REPLAY")
-        self.assertEqual(r1["action"], "update_plan")
-        self.assertEqual(r2["action"], "update_plan")
+        self.assertEqual(r1["action"], "init_subscription")   # WP4B.5
+        self.assertEqual(r2["action"], "init_subscription")   # WP4B.5
         self.assertEqual(r1["plan"], r2["plan"],
                          "Deux replays → même plan retourné (idempotent)")
 
@@ -376,14 +378,15 @@ class TestNonRegressionWP4B(unittest.TestCase):
 
     # WP4B-17 ─────────────────────────────────────────────────────────────────
     def test_wp4b_17_pro_webhook_returns_update_plan_pro(self):
-        """Webhook PRO après WP4B → action='update_plan', plan='pro' (non-régression)."""
+        """Webhook PRO après WP4B.5 → action='init_subscription', plan='pro' (non-régression).
+        checkout.session.completed retourne désormais init_subscription (WP4B.5)."""
         svc = self._service()
         fake_event = _make_webhook_event("pro", event_id="evt_wp4b_pro_nr")
         stripe_mock = MagicMock()
         stripe_mock.Webhook.construct_event.return_value = fake_event
         with patch.object(svc, "_stripe", return_value=stripe_mock):
             result = svc.process_webhook_event(b"payload", "sig_test")
-        self.assertEqual(result["action"], "update_plan")
+        self.assertEqual(result["action"], "init_subscription")   # WP4B.5
         self.assertEqual(result["plan"], "pro",
                          "Webhook PRO : plan='pro' inchangé")
 

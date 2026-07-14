@@ -331,9 +331,10 @@ class TestWebhookCredits(unittest.TestCase):
 
     # T25 ─────────────────────────────────────────────────────────────────────
     def test_25_plan_checkout_does_not_add_bonus(self):
-        """Un checkout Plan (PRO) retourne 'update_plan', pas 'add_bonus'."""
+        """Un checkout Plan (PRO) retourne 'init_subscription' (WP4B.5), pas 'add_bonus'.
+        checkout.session.completed → init_subscription (plan + customer + subscription_id)."""
         result = self._process("pro")
-        self.assertEqual(result["action"], "update_plan")
+        self.assertEqual(result["action"], "init_subscription")   # WP4B.5
         self.assertNotIn("quantity", result,
                          "Un checkout PRO ne doit pas contenir un champ 'quantity'")
 
@@ -602,26 +603,27 @@ class TestIdempotencyDiagnostic(unittest.TestCase):
     # IDP-02 ──────────────────────────────────────────────────────────────────
     def test_idp_02_plan_pro_idempotent_by_nature(self):
         """
-        PRO : même événement traité deux fois → même action 'update_plan'.
-        Idempotent par accident : UPDATE companies SET plan='pro' est un SET,
+        PRO : même événement traité deux fois → même action 'init_subscription' (WP4B.5).
+        Idempotent par nature : UPDATE companies SET plan='pro' est un SET,
         pas un INCREMENT. Deux exécutions n'ont pas d'effet cumulatif.
+        L'idempotence au niveau SQL est garantie par ON CONFLICT (stripe_event_id).
         ✅ Plans : pas de risque de double activation.
         """
         r1 = self._process("pro", "evt_pro_001")
         r2 = self._process("pro", "evt_pro_001")   # même event_id, rejoué
-        self.assertEqual(r1["action"], "update_plan")
-        self.assertEqual(r2["action"], "update_plan")
+        self.assertEqual(r1["action"], "init_subscription")   # WP4B.5
+        self.assertEqual(r2["action"], "init_subscription")   # WP4B.5
         self.assertEqual(r1["plan"],   r2["plan"])
 
     # IDP-03 ──────────────────────────────────────────────────────────────────
     def test_idp_03_plan_scale_idempotent_by_nature(self):
         """
-        SCALE : même événement traité deux fois → même action 'update_plan'.
+        SCALE : même événement traité deux fois → même action 'init_subscription' (WP4B.5).
         ✅ Plans : pas de risque de double activation.
         """
         r1 = self._process("scale", "evt_scale_001")
         r2 = self._process("scale", "evt_scale_001")
-        self.assertEqual(r1["action"], "update_plan")
+        self.assertEqual(r1["action"], "init_subscription")   # WP4B.5
         self.assertEqual(r1["plan"],   r2["plan"])
 
     # IDP-04 ──────────────────────────────────────────────────────────────────
@@ -760,21 +762,23 @@ class TestWebhookIdempotency(unittest.TestCase):
 
     # G6-01 ───────────────────────────────────────────────────────────────────
     def test_g6_01_pro_checkout_propagates_event_id(self):
-        """PRO checkout : stripe_event_id et event_type propagés dans le résultat."""
+        """PRO checkout : stripe_event_id et event_type propagés dans le résultat.
+        Action = 'init_subscription' depuis WP4B.5."""
         result = self._process("pro", "evt_pro_idp_001")
         self.assertIn("stripe_event_id", result)
         self.assertIn("event_type",      result)
         self.assertEqual(result["stripe_event_id"], "evt_pro_idp_001")
         self.assertEqual(result["event_type"],      "checkout.session.completed")
-        self.assertEqual(result["action"],          "update_plan")
+        self.assertEqual(result["action"],          "init_subscription")   # WP4B.5
 
     # G6-02 ───────────────────────────────────────────────────────────────────
     def test_g6_02_scale_checkout_propagates_event_id(self):
-        """SCALE checkout : stripe_event_id propagé et valorisé correctement."""
+        """SCALE checkout : stripe_event_id propagé et valorisé correctement.
+        Action = 'init_subscription' depuis WP4B.5."""
         result = self._process("scale", "evt_scale_idp_001")
         self.assertIn("stripe_event_id", result)
         self.assertEqual(result["stripe_event_id"], "evt_scale_idp_001")
-        self.assertEqual(result["action"],          "update_plan")
+        self.assertEqual(result["action"],          "init_subscription")   # WP4B.5
 
     # G6-03 ───────────────────────────────────────────────────────────────────
     def test_g6_03_addon_starter_propagates_event_id_and_quantity(self):
