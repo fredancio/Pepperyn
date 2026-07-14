@@ -1,6 +1,12 @@
 import Link from 'next/link';
-import { EXECUTIVE_CAPACITY_PACKS } from '@/lib/plans-config';
-// WP4A — addons et valeurs commerciales alignés sur product_catalog.py via plans-config.ts.
+import { EXECUTIVE_CAPACITY_PACKS, getCommercialPlan } from '@/lib/plans-config';
+// WP4A — plans et addons chargés depuis plans-config.ts (source canonique unique).
+// Aucune constante commerciale (prix, quotas) n'est dupliquée dans ce fichier.
+
+// Données commerciales issues de la source canonique — product_catalog.py via plans-config.ts
+const FREE_CFG  = getCommercialPlan('free');
+const PRO_CFG   = getCommercialPlan('pro');
+const SCALE_CFG = getCommercialPlan('scale');
 
 type PlanPhase = {
   number: string;
@@ -22,7 +28,6 @@ type PlanExtras = {
   };
 };
 
-// WP4A — Valeurs alignées sur product_catalog.py via plans-config.ts.
 const plans: {
   name: string;
   subtitle: string;
@@ -41,17 +46,17 @@ const plans: {
   {
     name: 'FREE',
     subtitle: 'Découvrez Pepperyn',
-    price: '0€',
-    period: '',
+    price: FREE_CFG.priceLabel,
+    period: FREE_CFG.period,
     tagline: 'Idéal pour tester Pepperyn sur vos propres données.',
     highlighted: false,
     badge: null,
     color: 'green',
     features: [
-      '1 analyse / mois',
+      `${FREE_CFG.analysesPerMonth} analyse / mois`,
       'Export PDF',
       'Mémoire légère',
-      '3 échanges de suivi inclus',
+      `${FREE_CFG.interactionsPerMonth} échanges de suivi inclus`,
     ],
     extras: null,
     microcopy: 'Parfait pour tester Pepperyn sur vos propres données.',
@@ -61,15 +66,15 @@ const plans: {
   {
     name: 'PRO',
     subtitle: 'CFO, CEO, CFO de transition, dirigeants PME & startups, experts-comptables…',
-    price: '149€',
-    period: '/mois',
+    price: PRO_CFG.priceLabel,
+    period: PRO_CFG.period,
     tagline: 'Votre copilote financier complet.',
     highlighted: true,
     badge: '⭐ LE PLUS POPULAIRE',
     color: 'blue',
     features: [
-      '30 analyses / mois',
-      '75 échanges de suivi / mois',
+      `${PRO_CFG.analysesPerMonth} analyses / mois`,
+      `${PRO_CFG.interactionsPerMonth} échanges de suivi / mois`,
       'Exports Excel, PDF et PowerPoint',
       'Mémoire persistante complète',
       'Multi-entités (clients, filiales, dossiers)',
@@ -86,15 +91,15 @@ const plans: {
   {
     name: 'SCALE',
     subtitle: 'Pour les entreprises souhaitant intégrer Pepperyn directement à leur ERP, CRM et processus financiers.',
-    price: '349€',
-    period: '/mois',
+    price: SCALE_CFG.priceLabel,
+    period: SCALE_CFG.period,
     tagline: 'Votre AI Financial Operating System sur-mesure.',
     highlighted: false,
     badge: null,
     color: 'purple',
     features: [
-      '100 analyses / mois',
-      '500 échanges de suivi / mois',
+      `${SCALE_CFG.analysesPerMonth} analyses / mois`,
+      `${SCALE_CFG.interactionsPerMonth} échanges de suivi / mois`,
       '✦ Tout le plan PRO inclus',
       'Workspace multi-utilisateurs & rôles',
       'Permissions & gouvernance des analyses',

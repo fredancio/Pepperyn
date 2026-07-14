@@ -3,40 +3,78 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { normalizePlan } from '@/lib/featureGate';
-import { EXECUTIVE_CAPACITY_PACKS } from '@/lib/plans-config';
-// WP4A — addons chargés depuis plans-config.ts (source canonique unique).
+import { EXECUTIVE_CAPACITY_PACKS, getCommercialPlan } from '@/lib/plans-config';
+// WP4A — plans et addons chargés depuis plans-config.ts (source canonique unique).
+// Aucune constante commerciale (prix, quotas) n'est dupliquée dans ce fichier.
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-// WP4A — Valeurs alignées sur product_catalog.py via plans-config.ts.
+// Données commerciales issues de la source canonique — product_catalog.py via plans-config.ts
+const FREE_CFG  = getCommercialPlan('free');
+const PRO_CFG   = getCommercialPlan('pro');
+const SCALE_CFG = getCommercialPlan('scale');
+
 const PLANS_DATA = [
   {
-    id: 'free', name: 'FREE', subtitle: 'Découvrez Pepperyn', price: '0€', period: '',
+    id: 'free', name: 'FREE', subtitle: 'Découvrez Pepperyn',
+    price: FREE_CFG.priceLabel, period: FREE_CFG.period,
     tagline: 'Idéal pour tester Pepperyn sur vos propres données.',
     color: 'green', highlighted: false, badge: null,
-    features: ['1 analyse / mois', 'Export PDF', 'Mémoire légère', '3 échanges de suivi inclus'],
+    features: [
+      `${FREE_CFG.analysesPerMonth} analyse / mois`,
+      'Export PDF',
+      'Mémoire légère',
+      `${FREE_CFG.interactionsPerMonth} échanges de suivi inclus`,
+    ],
     microcopy: '"Parfait pour tester Pepperyn sur vos propres données."',
     ctaHref: null, ctaAction: null,
   },
   {
-    id: 'pro', name: 'PRO', subtitle: 'CFO, CEO, CFO de transition, dirigeants PME & startups, experts-comptables…', price: '149€', period: '/mois',
+    id: 'pro', name: 'PRO',
+    subtitle: 'CFO, CEO, CFO de transition, dirigeants PME & startups, experts-comptables…',
+    price: PRO_CFG.priceLabel, period: PRO_CFG.period,
     tagline: 'Votre copilote financier complet.',
     color: 'blue', highlighted: true, badge: '⭐ LE PLUS POPULAIRE',
-    features: ['30 analyses / mois', '75 échanges de suivi / mois', 'Exports Excel, PDF et PowerPoint', 'Mémoire persistante complète', 'Multi-entités (clients, filiales, dossiers)', 'Simulateur de décisions financières', 'Analyse multi-périodes & comparaisons', 'Projections financières', 'Executive Capacity Packs disponibles à la demande'],
+    features: [
+      `${PRO_CFG.analysesPerMonth} analyses / mois`,
+      `${PRO_CFG.interactionsPerMonth} échanges de suivi / mois`,
+      'Exports Excel, PDF et PowerPoint',
+      'Mémoire persistante complète',
+      'Multi-entités (clients, filiales, dossiers)',
+      'Simulateur de décisions financières',
+      'Analyse multi-périodes & comparaisons',
+      'Projections financières',
+      'Executive Capacity Packs disponibles à la demande',
+    ],
     microcopy: '"Gérez plusieurs clients ou entités depuis un seul outil."',
     ctaHref: null, ctaAction: 'stripe',
   },
   {
-    id: 'scale', name: 'SCALE', subtitle: 'Pour départements financiers, cabinets & groupes multi-entités', price: '349€', period: '/mois',
+    id: 'scale', name: 'SCALE',
+    subtitle: 'Pour départements financiers, cabinets & groupes multi-entités',
+    price: SCALE_CFG.priceLabel, period: SCALE_CFG.period,
     tagline: 'Votre AI Financial Operating System sur-mesure.',
     color: 'purple', highlighted: false, badge: null,
-    features: ['100 analyses / mois', '500 échanges de suivi / mois', '✦ Tout le plan PRO inclus', 'Workspace multi-utilisateurs & rôles', 'Permissions & gouvernance des analyses', 'Architecture multi-filiales & consolidation', 'Intégrations ERP, CRM & logiciels comptables', 'Workflows financiers personnalisés', 'Reporting automatisé & tableaux de bord', 'Hébergement dédié / déploiement on-premise', 'LLM privé / open-source en option', 'Onboarding dédié & SLA support prioritaire'],
+    features: [
+      `${SCALE_CFG.analysesPerMonth} analyses / mois`,
+      `${SCALE_CFG.interactionsPerMonth} échanges de suivi / mois`,
+      '✦ Tout le plan PRO inclus',
+      'Workspace multi-utilisateurs & rôles',
+      'Permissions & gouvernance des analyses',
+      'Architecture multi-filiales & consolidation',
+      'Intégrations ERP, CRM & logiciels comptables',
+      'Workflows financiers personnalisés',
+      'Reporting automatisé & tableaux de bord',
+      'Hébergement dédié / déploiement on-premise',
+      'LLM privé / open-source en option',
+      'Onboarding dédié & SLA support prioritaire',
+    ],
     microcopy: '"Industrialisez votre pilotage financier à l\'échelle de votre organisation."',
     ctaHref: '/contact', ctaAction: null,
   },
 ];
 
-// WP4A — Packs chargés depuis plans-config.ts (source canonique unique).
+// Packs chargés depuis plans-config.ts (source canonique unique).
 const addons = EXECUTIVE_CAPACITY_PACKS.map(pack => ({
   id:   pack.id,
   name: pack.name,

@@ -176,7 +176,7 @@ export function CreditsModal({
                   <button
                     onClick={() => {
                       // TODO WP4 : POST /api/billing/checkout { plan_or_addon: addon.id }
-                      window.location.href = 'mailto:contact@pepperyn.com?subject=Achat%20Executive%20Capacity%20Pepperyn&body=Je%20souhaite%20acheter%20le%20' + addon.name;
+                      window.location.href = 'mailto:info@finflate.com?subject=Achat%20Executive%20Capacity%20Pepperyn&body=Je%20souhaite%20acheter%20le%20' + addon.name;
                     }}
                     className="px-3 py-1.5 bg-[#1B73E8] text-white text-xs font-bold rounded-lg hover:bg-[#0D47A1] transition-colors whitespace-nowrap"
                   >
@@ -192,8 +192,8 @@ export function CreditsModal({
             <p className="text-xs text-amber-700 font-medium">
               ⚡ Paiement en ligne disponible très prochainement.
               En attendant, envoyez un email à{' '}
-              <a href="mailto:contact@pepperyn.com" className="underline font-bold">
-                contact@pepperyn.com
+              <a href="mailto:info@finflate.com" className="underline font-bold">
+                info@finflate.com
               </a>{' '}
               pour activer votre Executive Capacity Pack immédiatement.
             </p>
