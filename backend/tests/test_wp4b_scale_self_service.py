@@ -203,11 +203,17 @@ class TestCheckoutScaleRouter(unittest.TestCase):
         self.assertTrue(result.get("success"), "FREE → SCALE doit retourner success=True")
 
     # WP4B-09 ─────────────────────────────────────────────────────────────────
-    def test_wp4b_09_pro_company_can_upgrade_to_scale(self):
-        """PRO → SCALE : upgrade autorisé (plans différents)."""
-        result = self._checkout("scale", "pro")
-        self.assertIn("data", result)
-        self.assertTrue(result.get("success"), "PRO → SCALE doit retourner success=True")
+    def test_wp4b_09_pro_company_blocked_from_scale_checkout(self):
+        """PRO → SCALE : bloqué → HTTP 400 (WP4B.1 — risque double-abonnement Stripe).
+        Une company PRO doit utiliser le Billing Portal pour passer à SCALE.
+        """
+        exc = self._checkout_raises("scale", "pro")
+        self.assertEqual(exc.status_code, 400,
+                         "PRO → SCALE doit retourner HTTP 400")
+        self.assertIn("PRO", exc.detail,
+                      "Message doit mentionner le plan courant PRO")
+        self.assertIn("Billing Portal", exc.detail,
+                      "Message doit suggérer le Billing Portal")
 
     # WP4B-10 ─────────────────────────────────────────────────────────────────
     def test_wp4b_10_scale_company_can_buy_addon(self):
