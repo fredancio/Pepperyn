@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { EXECUTIVE_CAPACITY_PACKS } from '@/lib/plans-config';
+// WP4A — addons et valeurs commerciales alignés sur product_catalog.py via plans-config.ts.
 
 type PlanPhase = {
   number: string;
@@ -20,6 +22,7 @@ type PlanExtras = {
   };
 };
 
+// WP4A — Valeurs alignées sur product_catalog.py via plans-config.ts.
 const plans: {
   name: string;
   subtitle: string;
@@ -48,7 +51,7 @@ const plans: {
       '1 analyse / mois',
       'Export PDF',
       'Mémoire légère',
-      '3 interactions contextuelles incluses',
+      '3 échanges de suivi inclus',
     ],
     extras: null,
     microcopy: 'Parfait pour tester Pepperyn sur vos propres données.',
@@ -65,15 +68,15 @@ const plans: {
     badge: '⭐ LE PLUS POPULAIRE',
     color: 'blue',
     features: [
-      '15 analyses / mois',
-      '75 interactions contextuelles / mois',
+      '30 analyses / mois',
+      '75 échanges de suivi / mois',
       'Exports Excel, PDF et PowerPoint',
       'Mémoire persistante complète',
       'Multi-entités (clients, filiales, dossiers)',
       'Simulateur de décisions financières',
       'Analyse multi-périodes & comparaisons',
       'Projections financières',
-      'Crédits supplémentaires disponibles à la demande',
+      'Executive Capacity Packs disponibles à la demande',
     ],
     extras: null,
     microcopy: 'Gérez plusieurs clients ou entités depuis un seul outil.',
@@ -90,8 +93,8 @@ const plans: {
     badge: null,
     color: 'purple',
     features: [
-      '250 analyses / mois',
-      '500 interactions contextuelles / mois',
+      '100 analyses / mois',
+      '500 échanges de suivi / mois',
       '✦ Tout le plan PRO inclus',
       'Workspace multi-utilisateurs & rôles',
       'Permissions & gouvernance des analyses',
@@ -160,11 +163,12 @@ const plans: {
   },
 ];
 
-const addons = [
-  { name: 'Starter Pack', desc: '+10 analyses', price: '19€' },
-  { name: 'Growth Pack', desc: '+50 analyses', price: '69€' },
-  { name: 'Scale Pack', desc: '+200 analyses', price: '199€' },
-];
+// WP4A — Packs chargés depuis plans-config.ts (source canonique unique).
+const addons = EXECUTIVE_CAPACITY_PACKS.map(pack => ({
+  name: pack.name,
+  desc: `+${pack.analysesAdded} analyses`,
+  price: pack.priceLabel,
+}));
 
 const colorMap: Record<string, { ring: string; badge: string; bg: string; text: string; cta: string; ctaText: string }> = {
   green:  { ring: 'border-green-200',  badge: 'bg-green-100 text-green-700',   bg: 'bg-white',     text: 'text-[#1A1A2E]', cta: 'bg-green-600 text-white hover:bg-green-700',  ctaText: 'text-white' },

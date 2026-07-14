@@ -1,12 +1,13 @@
 'use client';
 import { useEffect } from 'react';
 import Link from 'next/link';
+import { EXECUTIVE_CAPACITY_PACKS } from '@/lib/plans-config';
 
 // WP1D — Option B
 // Section usage entièrement réécrite : quota mensuel d'abord, Executive Capacity Pack ensuite.
 // Vocabulaire officiel : "Executive Capacity Pack" (jamais "bonus" ni "Crédits d'analyses").
 // Toutes les valeurs viennent directement du backend (zéro recalcul côté frontend).
-// La section packs (ADDONS) reste inchangée — périmètre WP4.
+// WP4A — La section packs utilise désormais plans-config.ts (source canonique unique).
 
 interface CreditsModalProps {
   plan: string;
@@ -19,12 +20,15 @@ interface CreditsModalProps {
   onClose: () => void;
 }
 
-// Packs inchangés — valeurs et prix seront chargés depuis GET /api/billing/plans en WP4.
-const ADDONS = [
-  { id: 'addon_starter', name: 'Starter Pack', analyses: 10,  price: '19€', popular: false },
-  { id: 'addon_growth',  name: 'Growth Pack',  analyses: 50,  price: '69€', popular: true  },
-  { id: 'addon_scale',   name: 'Scale Pack',   analyses: 200, price: '199€', popular: false },
-];
+// WP4A — Packs chargés depuis plans-config.ts (source canonique unique).
+// Aucune constante commerciale n'est dupliquée ici.
+const ADDONS = EXECUTIVE_CAPACITY_PACKS.map((pack, i) => ({
+  id:      pack.id,
+  name:    pack.name,
+  analyses: pack.analysesAdded,
+  price:   pack.priceLabel,
+  popular: i === 1, // Growth Capacity Pack = le plus populaire
+}));
 
 export function CreditsModal({
   plan,

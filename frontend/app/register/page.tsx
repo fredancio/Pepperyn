@@ -195,7 +195,7 @@ function RegisterForm() {
           <span className="text-2xl">⭐</span>
           <div>
             <p className="text-white font-bold text-sm">Vous activez le plan PRO</p>
-            <p className="text-slate-300 text-xs mt-0.5">15 analyses / mois · Exports Excel, PDF & PowerPoint · Mémoire persistante complète</p>
+            <p className="text-slate-300 text-xs mt-0.5">30 analyses / mois · Exports Excel, PDF & PowerPoint · Mémoire persistante complète</p>
           </div>
         </div>
       )}

@@ -2,13 +2,16 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { packLabel } from '@/lib/plans-config';
 
+// WP4A — PLAN_LABELS utilise packLabel() depuis plans-config.ts pour les packs.
+// Aucune quantité ni nom de pack n'est dupliqué ici.
 const PLAN_LABELS: Record<string, string> = {
-  pro:   'PRO',
-  scale: 'SCALE',
-  addon_starter: 'Starter Pack (+10 analyses)',
-  addon_growth:  'Growth Pack (+50 analyses)',
-  addon_scale:   'Scale Pack (+200 analyses)',
+  pro:           'PRO',
+  scale:         'SCALE',
+  addon_starter: packLabel('addon_starter'),  // 'Starter Capacity Pack (+10 analyses)'
+  addon_growth:  packLabel('addon_growth'),   // 'Growth Capacity Pack (+20 analyses)'
+  addon_scale:   packLabel('addon_scale'),    // 'Scale Capacity Pack (+80 analyses)'
 };
 
 export default function BillingSuccessPage() {
@@ -40,7 +43,7 @@ export default function BillingSuccessPage() {
         </div>
 
         <h1 className="text-2xl font-extrabold text-[#1A1A2E] mb-2">
-          {isAddon ? 'Crédits ajoutés !' : 'Bienvenue sur le plan ' + (PLAN_LABELS[plan] || plan) + ' !'}
+          {isAddon ? 'Analyses ajoutées !' : 'Bienvenue sur le plan ' + (PLAN_LABELS[plan] || plan) + ' !'}
         </h1>
 
         <p className="text-[#5F6368] mb-6">

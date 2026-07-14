@@ -98,7 +98,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     requiredPlan: 'PRO',
     requiredPlanPrice: '149€/mois',
     benefits: [
-      '15 analyses / mois',
+      '30 analyses / mois',
       'Exports Excel, PDF et PowerPoint',
       'Mémoire persistante complète',
       'Suivi des tendances financières',
@@ -112,7 +112,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     requiredPlan: 'PRO',
     requiredPlanPrice: '149€/mois',
     benefits: [
-      '15 analyses / mois',
+      '30 analyses / mois',
       'Exports Excel, PDF et PowerPoint',
       'Mémoire persistante complète',
       'Suivi des tendances financières',
@@ -127,7 +127,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     requiredPlanPrice: '149€/mois',
     benefits: [
       'Usage conversationnel inclus (illimité)',
-      '15 analyses / mois',
+      '30 analyses / mois',
       'Mémoire persistante complète',
       'Priorisation intelligente',
     ],
@@ -142,7 +142,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
       'Mémoire persistante complète',
       'Suivi des tendances financières',
       'Alertes et dérives détectées automatiquement',
-      '15 analyses / mois',
+      '30 analyses / mois',
     ],
     emoji: '🧠',
   },
@@ -155,7 +155,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
       'Analyse multi-périodes',
       'Comparaison de périodes',
       'Suivi des tendances financières',
-      '15 analyses / mois',
+      '30 analyses / mois',
     ],
     emoji: '📅',
   },
@@ -167,7 +167,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     benefits: [
       'Projections simples',
       'Priorisation intelligente',
-      '15 analyses / mois',
+      '30 analyses / mois',
       'Mémoire persistante complète',
     ],
     emoji: '🔮',
@@ -180,7 +180,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     requiredPlan: 'PRO',
     requiredPlanPrice: '149€/mois',
     benefits: [
-      '15 analyses / mois',
+      '30 analyses / mois',
       'Multi-entités avec mémoire persistante par entité',
       'Simulateur de décisions',
       'Projections avancées',
@@ -196,7 +196,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     requiredPlanPrice: '149€/mois',
     benefits: [
       'Simulateur de décisions',
-      '15 analyses / mois',
+      '30 analyses / mois',
       'Multi-entités',
       'Projections avancées',
       'Exports Excel, PDF et PowerPoint',
@@ -211,7 +211,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     requiredPlan: 'SCALE',
     requiredPlanPrice: '349€/mois',
     benefits: [
-      '250 analyses / mois',
+      '100 analyses / mois',
       'Multi-users avec permissions utilisateurs',
       'Workspace collaboratif',
       'Gouvernance des analyses',
@@ -227,7 +227,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     benefits: [
       'Support prioritaire',
       'Workspace collaboratif',
-      '250 analyses / mois',
+      '100 analyses / mois',
       'Connexion ERP/CRM sur devis',
     ],
     emoji: '🎯',
@@ -241,7 +241,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
       'Connexion ERP, CRM, comptabilité sur devis',
       'Onboarding et implémentation inclus dans le devis',
       'Workflows personnalisés selon vos processus',
-      '250 analyses / mois',
+      '100 analyses / mois',
       'Support prioritaire dédié',
     ],
     emoji: '🔗',

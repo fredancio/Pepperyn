@@ -12,12 +12,12 @@ const firstAnswer = (
 
     <div>
       <p className="font-semibold text-[#1A1A2E] mb-1">Plan PRO — 149€/mois :</p>
-      <p>15 analyses par mois, exports Excel/PDF/PowerPoint, mémoire persistante complète, multi-entités, simulateur de décisions financières, analyse multi-périodes et projections.</p>
+      <p>30 analyses par mois, exports Excel/PDF/PowerPoint, mémoire persistante complète, multi-entités, simulateur de décisions financières, analyse multi-périodes et projections.</p>
     </div>
 
     <div>
       <p className="font-semibold text-[#1A1A2E] mb-1">Plan SCALE — 349€/mois :</p>
-      <p>250 analyses par mois, chat illimité, workspace multi-utilisateurs, permissions et gouvernance des analyses, support prioritaire dédié, et connexion ERP/CRM/systèmes comptables sur devis avec onboarding dédié.</p>
+      <p>100 analyses par mois, 500 échanges de suivi / mois, workspace multi-utilisateurs, permissions et gouvernance des analyses, support prioritaire dédié, et connexion ERP/CRM/systèmes comptables sur devis avec onboarding dédié.</p>
     </div>
 
     <p><span className="font-semibold text-[#1A1A2E]">En résumé :</span> une infrastructure IA entièrement dédiée à votre entreprise.</p>
