@@ -199,18 +199,22 @@ async def create_checkout_session(
     #   - même plan (ex. SCALE → SCALE) : double-souscription identique
     #   - plan différent (ex. PRO → SCALE) : risque de créer un second abonnement
     #     Stripe, car create_checkout_session ne passe pas customer=existing_id.
-    # Solution : utiliser le Billing Portal pour tout changement de plan.
+    #
+    # WP4B.2 — Le Billing Portal Stripe existe côté backend mais n'est pas encore
+    # accessible depuis l'interface frontend (aucune route UI), et le webhook
+    # customer.subscription.updated n'est pas géré. L'upgrade automatisé PRO → SCALE
+    # reste à construire. En attendant, les changements de plan passent par email.
     if body.plan_or_addon in ('pro', 'scale') and plan in ('pro', 'scale'):
         if plan == body.plan_or_addon:
             detail = (
                 f"Votre entreprise bénéficie déjà du plan {body.plan_or_addon.upper()}. "
-                f"Pour modifier votre abonnement, utilisez le Billing Portal."
+                f"Pour modifier votre abonnement, contactez info@finflate.com."
             )
         else:
             detail = (
                 f"Votre entreprise est actuellement sur le plan {plan.upper()}. "
-                f"Pour changer de plan ({plan.upper()} → {body.plan_or_addon.upper()}), "
-                f"utilisez le Billing Portal afin d'éviter une double facturation."
+                f"Pour passer de {plan.upper()} à {body.plan_or_addon.upper()}, "
+                f"contactez info@finflate.com."
             )
         raise HTTPException(status_code=400, detail=detail)
 

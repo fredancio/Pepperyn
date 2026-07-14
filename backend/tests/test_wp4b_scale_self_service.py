@@ -205,15 +205,16 @@ class TestCheckoutScaleRouter(unittest.TestCase):
     # WP4B-09 ─────────────────────────────────────────────────────────────────
     def test_wp4b_09_pro_company_blocked_from_scale_checkout(self):
         """PRO → SCALE : bloqué → HTTP 400 (WP4B.1 — risque double-abonnement Stripe).
-        Une company PRO doit utiliser le Billing Portal pour passer à SCALE.
+        WP4B.2 : le Billing Portal n'étant pas accessible depuis l'UI,
+        le message renvoie vers info@finflate.com.
         """
         exc = self._checkout_raises("scale", "pro")
         self.assertEqual(exc.status_code, 400,
                          "PRO → SCALE doit retourner HTTP 400")
         self.assertIn("PRO", exc.detail,
                       "Message doit mentionner le plan courant PRO")
-        self.assertIn("Billing Portal", exc.detail,
-                      "Message doit suggérer le Billing Portal")
+        self.assertIn("info@finflate.com", exc.detail,
+                      "Message doit renvoyer vers info@finflate.com (WP4B.2)")
 
     # WP4B-10 ─────────────────────────────────────────────────────────────────
     def test_wp4b_10_scale_company_can_buy_addon(self):

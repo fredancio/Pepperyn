@@ -102,11 +102,15 @@ class TestCrossPlanSubscriptionBlock(unittest.TestCase):
                       "Message doit mentionner le plan actuel PRO")
 
     # WP4B1-04 ────────────────────────────────────────────────────────────────
-    def test_wp4b1_04_cross_plan_error_mentions_billing_portal(self):
-        """PRO → SCALE : message d'erreur suggère le Billing Portal."""
+    def test_wp4b1_04_cross_plan_error_mentions_contact_email(self):
+        """PRO → SCALE : message d'erreur renvoie vers info@finflate.com.
+        WP4B.2 : le Billing Portal n'est pas accessible depuis l'UI frontend
+        et le webhook subscription.updated n'est pas géré.
+        L'upgrade PRO→SCALE passe provisoirement par email.
+        """
         exc = self._checkout_raises("scale", "pro")
-        self.assertIn("Billing Portal", exc.detail,
-                      "Message doit suggérer le Billing Portal")
+        self.assertIn("info@finflate.com", exc.detail,
+                      "Message doit renvoyer vers info@finflate.com")
 
     # WP4B1-05 ────────────────────────────────────────────────────────────────
     def test_wp4b1_05_free_to_pro_still_allowed(self):
