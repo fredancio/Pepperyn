@@ -623,7 +623,7 @@ export function ChatContainer() {
               <div>
                 <div className="flex items-center justify-between px-2 mb-1.5">
                   <p className="text-xs font-semibold text-[#5F6368] uppercase tracking-wide">
-                    Entités
+                    Clients ou entreprises
                   </p>
                   {!canAccess(plan, 'entities') && (
                     <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-semibold">
@@ -637,7 +637,7 @@ export function ChatContainer() {
                   <div className="flex flex-col gap-1">
                     {(entities.length > 0
                       ? entities
-                      : [{ id: 'placeholder', name: adminName || 'Entité principale', is_primary: true }] as Entity[]
+                      : [{ id: 'placeholder', name: adminName || 'Entreprise principale', is_primary: true }] as Entity[]
                     ).map(entity => (
                       <div
                         key={entity.id}
@@ -672,11 +672,11 @@ export function ChatContainer() {
                           value={newEntityName}
                           onChange={e => setNewEntityName(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Escape') setShowAddEntity(false); }}
-                          placeholder="Nom de l'entité..."
+                          placeholder="Nom du client ou de l'entreprise..."
                           className="w-full px-2.5 py-1.5 text-xs border border-[#1B73E8]/40 rounded-lg focus:outline-none focus:border-[#1B73E8]"
                         />
                         <p className="text-[11px] text-[#5F6368] px-0.5">
-                          Cette entité est-elle une filiale de votre groupe, ou un client que vous accompagnez ?
+                          S&apos;agit-il d&apos;une entreprise de votre groupe ou d&apos;un client que vous accompagnez ?
                         </p>
                         <div className="flex gap-1.5">
                           <button
@@ -726,7 +726,7 @@ export function ChatContainer() {
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
-                        Ajouter une entité
+                        Ajouter un client ou une entreprise
                       </button>
                     )}
                   </div>
@@ -739,7 +739,7 @@ export function ChatContainer() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-base">🏢</span>
                       <span className="text-xs font-semibold text-[#1A1A2E] group-hover:text-amber-700">
-                        Multi-entités
+                        Clients ou entreprises
                       </span>
                       <svg className="w-3.5 h-3.5 text-[#5F6368] ml-auto flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -798,7 +798,7 @@ export function ChatContainer() {
                     ) : (
                       <div className="bg-red-50 border border-red-100 rounded-xl p-3">
                         <p className="text-xs text-red-700 font-medium mb-2">
-                          Êtes-vous sûr de vouloir supprimer l&apos;historique d&apos;analyse pour cette entité ?
+                          Êtes-vous sûr de vouloir supprimer l&apos;historique d&apos;analyse pour ce client ou cette entreprise ?
                         </p>
                         <div className="flex gap-2">
                           <button

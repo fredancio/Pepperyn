@@ -224,7 +224,7 @@ export async function createEntity(name: string, relationType?: EntityRelationTy
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Erreur création entité');
+    throw new Error(err.detail || 'Erreur création client ou entreprise');
   }
   return res.json();
 }

@@ -146,7 +146,7 @@ export default function DonneesSécuriséesPage() {
 
             <div className="border-t border-gray-100 pt-5">
               <h3 className="text-base font-bold text-[#1A1A2E] mb-2">Isolation des entreprises, filiales et clients</h3>
-              <p className="text-[#5F6368] leading-relaxed mb-2">Pepperyn fonctionne avec un système d&apos;entités cloisonnées.</p>
+              <p className="text-[#5F6368] leading-relaxed mb-2">Pepperyn fonctionne avec un système de clients ou entreprises cloisonnés.</p>
               <p className="text-[#5F6368] leading-relaxed mb-2">
                 Chaque entreprise, client, filiale ou organisation dispose de son propre espace logique comprenant :
               </p>

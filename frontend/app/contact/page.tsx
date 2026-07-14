@@ -7,7 +7,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 const DEFIS = [
   'Analyse financière manuelle & chronophage',
-  'Reporting multi-entités ou multi-périodes',
+  'Reporting multi-clients ou multi-périodes',
   'Suivi de trésorerie & cash flow',
   'Consolidation de données ERP / CRM',
   'Pilotage de marges et rentabilité',

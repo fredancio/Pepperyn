@@ -12,7 +12,7 @@ const firstAnswer = (
 
     <div>
       <p className="font-semibold text-[#1A1A2E] mb-1">Plan PRO — 149€/mois :</p>
-      <p>30 analyses par mois, exports Excel/PDF/PowerPoint, mémoire persistante complète, multi-entités, simulateur de décisions financières, analyse multi-périodes et projections.</p>
+      <p>30 analyses par mois, exports Excel/PDF/PowerPoint, mémoire persistante complète, clients ou entreprises multiples, simulateur de décisions financières, analyse multi-périodes et projections.</p>
     </div>
 
     <div>

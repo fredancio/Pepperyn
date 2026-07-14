@@ -175,13 +175,13 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
 
   // ── PRO (absorbé depuis POWER) ───────────────────────────────────────────────
   entities: {
-    label: 'Multi-entités',
-    description: 'Gérez plusieurs sociétés, filiales ou portefeuilles clients avec une mémoire et un historique distincts par entité.',
+    label: 'Clients ou entreprises multiples',
+    description: 'Gérez plusieurs sociétés, filiales ou portefeuilles clients avec une mémoire et un historique distincts par client ou entreprise.',
     requiredPlan: 'PRO',
     requiredPlanPrice: '149€/mois',
     benefits: [
       '30 analyses / mois',
-      'Multi-entités avec mémoire persistante par entité',
+      'Clients ou entreprises multiples avec mémoire persistante',
       'Simulateur de décisions',
       'Projections avancées',
       'Comparaison de périodes',
@@ -197,7 +197,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     benefits: [
       'Simulateur de décisions',
       '30 analyses / mois',
-      'Multi-entités',
+      'Clients ou entreprises multiples',
       'Projections avancées',
       'Exports Excel, PDF et PowerPoint',
     ],
