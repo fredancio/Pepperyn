@@ -193,6 +193,16 @@ async def create_checkout_session(
     """
     company_id, plan = await _resolve_auth(authorization)
 
+    # WP4B — Anti double-souscription : empêcher l'achat d'un plan déjà actif.
+    # Le portail Stripe reste disponible via /api/billing/portal pour gérer
+    # ou annuler un abonnement existant.
+    if body.plan_or_addon in ('pro', 'scale') and plan == body.plan_or_addon:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Votre entreprise bénéficie déjà du plan {body.plan_or_addon.upper()}. "
+                   f"Pour modifier votre abonnement, utilisez le Billing Portal."
+        )
+
     try:
         result = _get_billing().create_checkout_session(
             plan_or_addon=body.plan_or_addon,

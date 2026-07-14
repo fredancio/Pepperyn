@@ -163,8 +163,10 @@ const plans: {
       },
     },
     microcopy: 'Industrialisez votre pilotage financier à l\'échelle de votre organisation.',
-    cta: 'Nous contacter',
-    ctaHref: '/contact',
+    // WP4B — SCALE self-service : CTA pointe vers le parcours d'inscription SCALE,
+    // et non plus vers /contact (réservé à Pepperyn Connected / Enterprise).
+    cta: 'Choisir SCALE',
+    ctaHref: '/register?plan=scale',
   },
 ];
 

@@ -33,7 +33,8 @@ const USAGE_TYPES = [
 function RegisterForm() {
   const searchParams = useSearchParams();
   const planParam = searchParams.get('plan') ?? 'free';
-  const isPro = planParam === 'pro';
+  const isPro   = planParam === 'pro';
+  const isScale = planParam === 'scale';
 
   const [step, setStep] = useState<Step>('form');
   const [prenom, setPrenom] = useState('');
@@ -78,7 +79,9 @@ function RegisterForm() {
     setLoading(true);
     setError('');
     try {
-      const emailRedirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(isPro ? '/checkout/pro' : '/app/chat')}`;
+      const emailRedirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(
+        isPro ? '/checkout/pro' : isScale ? '/checkout/scale' : '/app/chat'
+      )}`;
       await signUpAdmin(email, password, prenom, industry, businessModel, {
         nom,
         organisation,
@@ -143,6 +146,45 @@ function RegisterForm() {
                 Le bouton ci-dessus fonctionne dès que votre email est confirmé.
               </p>
             </>
+          ) : isScale ? (
+            <>
+              <h2 className="text-2xl font-bold text-[#1A1A2E] mb-2">
+                🏆 Votre espace SCALE est créé !
+              </h2>
+              <p className="text-[#5F6368] mb-4">
+                Bienvenue, <strong>{prenom} {nom}</strong>. Plus qu'une étape pour activer le plan SCALE.
+              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 text-left">
+                <div className="flex items-start gap-2">
+                  <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">Vérifiez votre email</p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      Un lien de confirmation a été envoyé à <strong>{email}</strong>. Cliquez dessus pour activer votre compte — vous serez redirigé(e) automatiquement vers le paiement SCALE.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-6 text-left">
+                <p className="text-xs font-semibold text-purple-700 mb-2 uppercase tracking-wide">Étapes suivantes</p>
+                <ol className="flex flex-col gap-1.5">
+                  {['Confirmez votre email (lien envoyé)', 'Complétez le paiement SCALE via Stripe'].map((s, i) => (
+                    <li key={i} className="flex items-center gap-2 text-xs text-[#5F6368]">
+                      <span className="w-5 h-5 bg-purple-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0">{i + 1}</span>
+                      {s}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              <Button size="lg" className="w-full" onClick={() => window.location.href = '/checkout/scale'}>
+                Accéder au paiement SCALE →
+              </Button>
+              <p className="text-center text-xs text-[#5F6368] mt-3 italic">
+                Le bouton ci-dessus fonctionne dès que votre email est confirmé.
+              </p>
+            </>
           ) : (
             <>
               <h2 className="text-2xl font-bold text-[#1A1A2E] mb-2">
@@ -183,6 +225,8 @@ function RegisterForm() {
           <h1 className="text-2xl font-bold text-[#1A1A2E]">Créer votre espace entreprise</h1>
           {isPro ? (
             <p className="text-sm text-[#1B73E8] font-medium">Plan PRO — 149€/mois · Sans engagement</p>
+          ) : isScale ? (
+            <p className="text-sm text-purple-600 font-medium">Plan SCALE — 349€/mois · Sans engagement</p>
           ) : (
             <p className="text-sm text-[#5F6368]">Commencez gratuitement — sans carte bancaire</p>
           )}
@@ -196,6 +240,17 @@ function RegisterForm() {
           <div>
             <p className="text-white font-bold text-sm">Vous activez le plan PRO</p>
             <p className="text-slate-300 text-xs mt-0.5">30 analyses / mois · Exports Excel, PDF & PowerPoint · Mémoire persistante complète</p>
+          </div>
+        </div>
+      )}
+
+      {/* SCALE intent banner */}
+      {isScale && (
+        <div className="w-full max-w-md mb-4 bg-[#4C1D95] rounded-2xl px-5 py-4 flex items-center gap-3">
+          <span className="text-2xl">🏆</span>
+          <div>
+            <p className="text-white font-bold text-sm">Vous activez le plan SCALE</p>
+            <p className="text-purple-200 text-xs mt-0.5">100 analyses / mois · 500 échanges de suivi · Clients ou entreprises illimités</p>
           </div>
         </div>
       )}
@@ -408,6 +463,14 @@ function RegisterForm() {
               </div>
               <p className="text-xs text-slate-300">Paiement sécurisé via Stripe après la création de votre espace</p>
             </div>
+          ) : isScale ? (
+            <div className="bg-[#4C1D95] rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 bg-purple-300 text-purple-900 text-xs font-bold rounded-full">SCALE</span>
+                <span className="text-sm font-medium text-white">349€/mois — sans engagement</span>
+              </div>
+              <p className="text-xs text-purple-300">Paiement sécurisé via Stripe après la création de votre espace</p>
+            </div>
           ) : (
             <div className="bg-[#EFF6FF] border border-blue-100 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-1">
@@ -425,6 +488,8 @@ function RegisterForm() {
               ? 'Création de votre espace...'
               : isPro
               ? 'Créer mon espace et passer à PRO →'
+              : isScale
+              ? 'Créer mon espace et passer à SCALE →'
               : 'Créer mon espace →'}
           </Button>
 

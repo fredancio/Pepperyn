@@ -70,7 +70,8 @@ const PLANS_DATA = [
       'Onboarding dédié & SLA support prioritaire',
     ],
     microcopy: '"Industrialisez votre pilotage financier à l\'échelle de votre organisation."',
-    ctaHref: '/contact', ctaAction: null,
+    // WP4B — SCALE self-service via Stripe Checkout (identique au parcours PRO).
+    ctaHref: null, ctaAction: 'stripe',
   },
 ];
 
@@ -190,7 +191,7 @@ export default function UpgradePage() {
             const c = colorMap[plan.color];
             const isHighlighted = plan.highlighted;
             const isCurrent = !loadingPlan && currentPlan === plan.id;
-            const isUpgrade = !loadingPlan && plan.id !== 'free' && currentPlan !== plan.id && plan.id !== 'scale';
+            const isUpgrade = !loadingPlan && plan.id !== 'free' && currentPlan !== plan.id;
 
             return (
               <div
@@ -258,7 +259,11 @@ export default function UpgradePage() {
                     disabled={loading === plan.id}
                     className={`w-full py-2.5 rounded-xl font-bold text-sm text-center transition-all block disabled:opacity-70 ${c.ctaUpgrade}`}
                   >
-                    {loading === plan.id ? 'Redirection…' : 'Passer à PRO'}
+                    {loading === plan.id
+                      ? 'Redirection…'
+                      : plan.id === 'scale'
+                      ? 'Choisir SCALE →'
+                      : 'Passer à PRO →'}
                   </button>
                 ) : null}
               </div>
