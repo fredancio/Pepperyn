@@ -17,3 +17,25 @@ Thumbs.db
 RAPPORT_SECURITE.md
 CHECKLIST_DEPLOIEMENT_SECURITE.md
 GUIDE_PAS_A_PAS_DEPLOIEMENT.md
+
+# Environnements
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# TypeScript
+*.tsbuildinfo
+
+# Fichiers temporaires LibreOffice
+lu*.tmp
+.~lock.*#
+
+# Windows / macOS
+Thumbs.db
+Desktop.ini
