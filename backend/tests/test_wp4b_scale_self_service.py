@@ -276,14 +276,16 @@ class TestWebhookScale(unittest.TestCase):
         """
         Webhook SCALE rejoué → RPC retourne 'duplicate' → action='duplicate_skipped'.
         Le plan n'est activé qu'une seule fois.
+        Mock aligné WP4B.5 : action='init_subscription' + stripe_subscription_id.
         """
         from routers.billing import stripe_webhook
 
         service_result = {
-            "action": "update_plan",
+            "action": "init_subscription",          # WP4B.5 — checkout.session.completed
             "plan": "scale",
             "company_id": "company_wp4b_14",
             "stripe_customer_id": "cus_test",
+            "stripe_subscription_id": "sub_test_dup",  # WP4B.5 — présent dans le résultat réel
             "stripe_event_id": "evt_wp4b_SCALE_DUP",
             "event_type": "checkout.session.completed",
         }
@@ -311,16 +313,20 @@ class TestWebhookScale(unittest.TestCase):
         """
         Webhook SCALE livraison initiale → RPC appelée avec p_new_plan='scale'.
         Vérifie la chaîne complète jusqu'à l'application SQL.
+        WP4B.5 : p_action='init_subscription', p_stripe_subscription transmis,
+        p_subscription_status=None (délégué à customer.subscription.created).
         """
         from routers.billing import stripe_webhook
 
         service_result = {
-            "action": "update_plan",
+            "action": "init_subscription",              # WP4B.5 — checkout.session.completed
             "plan": "scale",
             "company_id": "company_wp4b_15",
             "stripe_customer_id": "cus_test",
+            "stripe_subscription_id": "sub_test_wp4b_15",  # WP4B.5 — fourni par le service
             "stripe_event_id": "evt_wp4b_15_scale_rpc",
             "event_type": "checkout.session.completed",
+            # subscription_status absent : checkout ne touche pas au statut (WP4B.5)
         }
 
         billing_mock = MagicMock()
@@ -340,11 +346,18 @@ class TestWebhookScale(unittest.TestCase):
         sb_ok.rpc.assert_called_once()
         call_name, call_params = sb_ok.rpc.call_args[0]
         self.assertEqual(call_name, "apply_stripe_webhook")
-        self.assertEqual(call_params["p_action"], "update_plan",
-                         "p_action doit être 'update_plan' pour SCALE")
+        # WP4B.5 — checkout.session.completed → init_subscription (plus update_plan)
+        self.assertEqual(call_params["p_action"], "init_subscription",
+                         "p_action doit être 'init_subscription' pour checkout.session.completed (WP4B.5)")
         self.assertEqual(call_params["p_new_plan"], "scale",
                          "p_new_plan doit être 'scale'")
         self.assertEqual(call_params["p_stripe_event_id"], "evt_wp4b_15_scale_rpc")
+        # WP4B.5 — le router transmet stripe_subscription_id au RPC
+        self.assertEqual(call_params["p_stripe_subscription"], "sub_test_wp4b_15",
+                         "p_stripe_subscription doit être transmis par le router (WP4B.5)")
+        # WP4B.5 — subscription_status absent du résultat checkout → None transmis au RPC
+        self.assertIsNone(call_params["p_subscription_status"],
+                          "p_subscription_status doit être None pour init_subscription (WP4B.5)")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
