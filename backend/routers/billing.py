@@ -189,7 +189,6 @@ async def create_checkout_session(
 ):
     """
     Crée une session Stripe Checkout pour un plan ou un add-on.
-    ⚠️  Retourne un placeholder jusqu'à la configuration de Stripe.
     """
     company_id, plan = await _resolve_auth(authorization)
 
@@ -200,10 +199,12 @@ async def create_checkout_session(
     #   - plan différent (ex. PRO → SCALE) : risque de créer un second abonnement
     #     Stripe, car create_checkout_session ne passe pas customer=existing_id.
     #
-    # WP4B.2 — Le Billing Portal Stripe existe côté backend mais n'est pas encore
-    # accessible depuis l'interface frontend (aucune route UI), et le webhook
-    # customer.subscription.updated n'est pas géré. L'upgrade automatisé PRO → SCALE
-    # reste à construire. En attendant, les changements de plan passent par email.
+    # WP4B.2 / WP4B.5 — Le Billing Portal Stripe est opérationnel côté backend.
+    # Le cycle de vie complet est désormais géré : customer.subscription.created,
+    # customer.subscription.updated et customer.subscription.deleted sont traités
+    # par billing_service.process_webhook_event() et appliqués atomiquement via
+    # apply_stripe_webhook(). Les évolutions futures concernent les fonctionnalités
+    # métier supplémentaires (UI Portal, notifications), pas le cycle de vie.
     if body.plan_or_addon in ('pro', 'scale') and plan in ('pro', 'scale'):
         if plan == body.plan_or_addon:
             detail = (
@@ -240,7 +241,6 @@ async def create_portal_session(
 ):
     """
     Ouvre le Billing Portal Stripe pour gérer l'abonnement.
-    ⚠️  Retourne un placeholder jusqu'à la configuration de Stripe.
     """
     company_id, plan = await _resolve_auth(authorization)
     result = _get_billing().create_portal_session(company_id=company_id)
