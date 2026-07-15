@@ -254,11 +254,41 @@ async def stripe_webhook(
 ):
     """
     Webhook Stripe (POST depuis Stripe Dashboard).
-    À enregistrer dans Stripe : https://your-railway-url/api/billing/webhook
-    Événements à activer :
+    À enregistrer dans Stripe : https://<railway-url>/api/billing/webhook
+
+    Événements obligatoires à activer dans le Dashboard Stripe :
+
       - checkout.session.completed
+          → action : init_subscription (plan payant) ou add_bonus (Executive Capacity Pack).
+            Initialise plan, stripe_customer_id et stripe_subscription_id.
+            Ne touche pas à subscription_status (délégué à subscription.updated).
+
+      - customer.subscription.created
+          → action : sync_subscription.
+            Synchronise l'abonnement dès sa création (résolution via metadata-first
+            ou fallback stripe_customer_id). Utile quand cet événement arrive AVANT
+            checkout.session.completed (ordre non garanti par Stripe).
+
+      - customer.subscription.updated
+          → action : sync_subscription.
+            SEULE AUTORITÉ pour subscription_status et les changements de plan
+            (renouvellements, past_due, reprise active, upgrade/downgrade via Portal).
+
       - customer.subscription.deleted
+          → action : downgrade_free.
+            Passe le compte en plan FREE, annule stripe_subscription_id.
+            Si la company est introuvable : noop (pas de retry infini).
+
       - invoice.payment_failed
+          → action : noop (audit uniquement).
+            Le statut past_due est positionné par customer.subscription.updated.
+            Conservé dans le registre d'idempotence pour audit et alertes futures.
+
+    Événements optionnels (noop, pour audit uniquement) :
+
+      - invoice.paid
+          → action : noop. Le statut active est géré par customer.subscription.updated.
+            Conservé dans le registre pour traçabilité et analytics futurs.
     """
     payload = await request.body()
     logger.info(f"[WEBHOOK] Reçu — sig présente: {bool(stripe_signature)}, payload: {len(payload)} bytes")
