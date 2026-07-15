@@ -1,4 +1,12 @@
 import Link from 'next/link';
+import { EXECUTIVE_CAPACITY_PACKS, getCommercialPlan } from '@/lib/plans-config';
+// WP4A — plans et addons chargés depuis plans-config.ts (source canonique unique).
+// Aucune constante commerciale (prix, quotas) n'est dupliquée dans ce fichier.
+
+// Données commerciales issues de la source canonique — product_catalog.py via plans-config.ts
+const FREE_CFG  = getCommercialPlan('free');
+const PRO_CFG   = getCommercialPlan('pro');
+const SCALE_CFG = getCommercialPlan('scale');
 
 type PlanPhase = {
   number: string;
@@ -38,17 +46,17 @@ const plans: {
   {
     name: 'FREE',
     subtitle: 'Découvrez Pepperyn',
-    price: '0€',
-    period: '',
+    price: FREE_CFG.priceLabel,
+    period: FREE_CFG.period,
     tagline: 'Idéal pour tester Pepperyn sur vos propres données.',
     highlighted: false,
     badge: null,
     color: 'green',
     features: [
-      '1 analyse / mois',
+      `${FREE_CFG.analysesPerMonth} analyse / mois`,
       'Export PDF',
       'Mémoire légère',
-      '3 interactions contextuelles incluses',
+      `${FREE_CFG.interactionsPerMonth} échanges de suivi inclus`,
     ],
     extras: null,
     microcopy: 'Parfait pour tester Pepperyn sur vos propres données.',
@@ -58,40 +66,40 @@ const plans: {
   {
     name: 'PRO',
     subtitle: 'CFO, CEO, CFO de transition, dirigeants PME & startups, experts-comptables…',
-    price: '149€',
-    period: '/mois',
+    price: PRO_CFG.priceLabel,
+    period: PRO_CFG.period,
     tagline: 'Votre copilote financier complet.',
     highlighted: true,
     badge: '⭐ LE PLUS POPULAIRE',
     color: 'blue',
     features: [
-      '15 analyses / mois',
-      '75 interactions contextuelles / mois',
+      `${PRO_CFG.analysesPerMonth} analyses / mois`,
+      `${PRO_CFG.interactionsPerMonth} échanges de suivi / mois`,
       'Exports Excel, PDF et PowerPoint',
       'Mémoire persistante complète',
-      'Multi-entités (clients, filiales, dossiers)',
+      'Clients ou entreprises multiples (filiales, dossiers)',
       'Simulateur de décisions financières',
       'Analyse multi-périodes & comparaisons',
       'Projections financières',
-      'Crédits supplémentaires disponibles à la demande',
+      'Executive Capacity Packs disponibles à la demande',
     ],
     extras: null,
-    microcopy: 'Gérez plusieurs clients ou entités depuis un seul outil.',
+    microcopy: 'Gérez plusieurs clients ou entreprises depuis un seul outil.',
     cta: 'Passer à PRO',
     ctaHref: '/register?plan=pro',
   },
   {
     name: 'SCALE',
     subtitle: 'Pour les entreprises souhaitant intégrer Pepperyn directement à leur ERP, CRM et processus financiers.',
-    price: '349€',
-    period: '/mois',
+    price: SCALE_CFG.priceLabel,
+    period: SCALE_CFG.period,
     tagline: 'Votre AI Financial Operating System sur-mesure.',
     highlighted: false,
     badge: null,
     color: 'purple',
     features: [
-      '250 analyses / mois',
-      '500 interactions contextuelles / mois',
+      `${SCALE_CFG.analysesPerMonth} analyses / mois`,
+      `${SCALE_CFG.interactionsPerMonth} échanges de suivi / mois`,
       '✦ Tout le plan PRO inclus',
       'Workspace multi-utilisateurs & rôles',
       'Permissions & gouvernance des analyses',
@@ -155,16 +163,19 @@ const plans: {
       },
     },
     microcopy: 'Industrialisez votre pilotage financier à l\'échelle de votre organisation.',
-    cta: 'Nous contacter',
-    ctaHref: '/contact',
+    // WP4B — SCALE self-service : CTA pointe vers le parcours d'inscription SCALE,
+    // et non plus vers /contact (réservé à Pepperyn Connected / Enterprise).
+    cta: 'Choisir SCALE',
+    ctaHref: '/register?plan=scale',
   },
 ];
 
-const addons = [
-  { name: 'Starter Pack', desc: '+10 analyses', price: '19€' },
-  { name: 'Growth Pack', desc: '+50 analyses', price: '69€' },
-  { name: 'Scale Pack', desc: '+200 analyses', price: '199€' },
-];
+// WP4A — Packs chargés depuis plans-config.ts (source canonique unique).
+const addons = EXECUTIVE_CAPACITY_PACKS.map(pack => ({
+  name: pack.name,
+  desc: `+${pack.analysesAdded} analyses`,
+  price: pack.priceLabel,
+}));
 
 const colorMap: Record<string, { ring: string; badge: string; bg: string; text: string; cta: string; ctaText: string }> = {
   green:  { ring: 'border-green-200',  badge: 'bg-green-100 text-green-700',   bg: 'bg-white',     text: 'text-[#1A1A2E]', cta: 'bg-green-600 text-white hover:bg-green-700',  ctaText: 'text-white' },

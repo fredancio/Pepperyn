@@ -98,7 +98,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     requiredPlan: 'PRO',
     requiredPlanPrice: '149€/mois',
     benefits: [
-      '15 analyses / mois',
+      '30 analyses / mois',
       'Exports Excel, PDF et PowerPoint',
       'Mémoire persistante complète',
       'Suivi des tendances financières',
@@ -112,7 +112,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     requiredPlan: 'PRO',
     requiredPlanPrice: '149€/mois',
     benefits: [
-      '15 analyses / mois',
+      '30 analyses / mois',
       'Exports Excel, PDF et PowerPoint',
       'Mémoire persistante complète',
       'Suivi des tendances financières',
@@ -127,7 +127,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     requiredPlanPrice: '149€/mois',
     benefits: [
       'Usage conversationnel inclus (illimité)',
-      '15 analyses / mois',
+      '30 analyses / mois',
       'Mémoire persistante complète',
       'Priorisation intelligente',
     ],
@@ -142,7 +142,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
       'Mémoire persistante complète',
       'Suivi des tendances financières',
       'Alertes et dérives détectées automatiquement',
-      '15 analyses / mois',
+      '30 analyses / mois',
     ],
     emoji: '🧠',
   },
@@ -155,7 +155,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
       'Analyse multi-périodes',
       'Comparaison de périodes',
       'Suivi des tendances financières',
-      '15 analyses / mois',
+      '30 analyses / mois',
     ],
     emoji: '📅',
   },
@@ -167,7 +167,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     benefits: [
       'Projections simples',
       'Priorisation intelligente',
-      '15 analyses / mois',
+      '30 analyses / mois',
       'Mémoire persistante complète',
     ],
     emoji: '🔮',
@@ -175,13 +175,13 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
 
   // ── PRO (absorbé depuis POWER) ───────────────────────────────────────────────
   entities: {
-    label: 'Multi-entités',
-    description: 'Gérez plusieurs sociétés, filiales ou portefeuilles clients avec une mémoire et un historique distincts par entité.',
+    label: 'Clients ou entreprises multiples',
+    description: 'Gérez plusieurs sociétés, filiales ou portefeuilles clients avec une mémoire et un historique distincts par client ou entreprise.',
     requiredPlan: 'PRO',
     requiredPlanPrice: '149€/mois',
     benefits: [
-      '15 analyses / mois',
-      'Multi-entités avec mémoire persistante par entité',
+      '30 analyses / mois',
+      'Clients ou entreprises multiples avec mémoire persistante',
       'Simulateur de décisions',
       'Projections avancées',
       'Comparaison de périodes',
@@ -196,8 +196,8 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     requiredPlanPrice: '149€/mois',
     benefits: [
       'Simulateur de décisions',
-      '15 analyses / mois',
-      'Multi-entités',
+      '30 analyses / mois',
+      'Clients ou entreprises multiples',
       'Projections avancées',
       'Exports Excel, PDF et PowerPoint',
     ],
@@ -211,7 +211,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     requiredPlan: 'SCALE',
     requiredPlanPrice: '349€/mois',
     benefits: [
-      '250 analyses / mois',
+      '100 analyses / mois',
       'Multi-users avec permissions utilisateurs',
       'Workspace collaboratif',
       'Gouvernance des analyses',
@@ -227,7 +227,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
     benefits: [
       'Support prioritaire',
       'Workspace collaboratif',
-      '250 analyses / mois',
+      '100 analyses / mois',
       'Connexion ERP/CRM sur devis',
     ],
     emoji: '🎯',
@@ -241,7 +241,7 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
       'Connexion ERP, CRM, comptabilité sur devis',
       'Onboarding et implémentation inclus dans le devis',
       'Workflows personnalisés selon vos processus',
-      '250 analyses / mois',
+      '100 analyses / mois',
       'Support prioritaire dédié',
     ],
     emoji: '🔗',
@@ -249,16 +249,19 @@ export const FEATURE_META: Record<Feature, FeatureMeta | null> = {
 };
 
 // ── Quota analyses par plan ──────────────────────────────────────────────────
+// Valeurs alignées sur config/product_catalog.py (WP1A).
+// Utilisées UNIQUEMENT comme fallback si l'API /billing/usage est indisponible.
+// La source de vérité reste toujours le backend (BillingUsage.analyses_limit).
 export const PLAN_QUOTA: Record<string, number> = {
   free:          1,
-  pro:           15,
-  power:         75,
-  scale:         250,
+  pro:           30,
+  power:         100,   // alias SCALE — plan supprimé du catalogue public
+  scale:         100,
   enterprise:    9999,
-  // Legacy
-  standard_beta: 15,
-  standard:      15,
-  premium:       75,
+  // Legacy aliases
+  standard_beta: 30,
+  standard:      30,
+  premium:       100,   // alias POWER → SCALE
 };
 
 export function getQuota(plan: string): number {

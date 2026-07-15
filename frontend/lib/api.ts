@@ -224,7 +224,7 @@ export async function createEntity(name: string, relationType?: EntityRelationTy
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || 'Erreur création entité');
+    throw new Error(err.detail || 'Erreur création client ou entreprise');
   }
   return res.json();
 }
@@ -242,12 +242,33 @@ export async function fetchEntities(): Promise<Entity[]> {
 }
 
 export interface BillingUsage {
-  analyses_used: number;
-  analyses_limit: number;
-  bonus_analyses: number;
-  total_allowed: number;
-  analyses_remaining: number;
+  plan: string;
   year_month: string;
+
+  // ── Quota mensuel ────────────────────────────────────────────────────────
+  analyses_used: number;               // analyses consommées ce mois
+  analyses_limit: number;              // quota mensuel du plan
+  analyses_monthly_used: number;       // = analyses_used en Option B
+  analyses_monthly_remaining: number | null;  // calculé par le backend
+
+  // ── Executive Capacity Pack (Option B — companies.bonus_analyses_remaining)
+  analyses_bonus_remaining: number;    // stock permanent — jamais remis à zéro
+  analyses_bonus_suspended: boolean;   // true si plan FREE avec stock > 0
+  analyses_total_allowed: number | null;
+  analyses_remaining: number | null;   // total immédiatement utilisable
+
+  // ── Interactions ─────────────────────────────────────────────────────────
+  interactions_used: number;
+  interactions_limit: number | null;
+  interactions_remaining: number | null;
+
+  // ── Entités & Renouvellement ─────────────────────────────────────────────
+  max_entities: number | null;
+  renewal_date: string;                // ISO8601 — 1er du mois suivant UTC
+
+  // ── Aliases compat — à supprimer en WP5 ─────────────────────────────────
+  bonus_analyses?: number;
+  total_allowed?: number | null;
 }
 
 export async function fetchBillingUsage(): Promise<BillingUsage | null> {

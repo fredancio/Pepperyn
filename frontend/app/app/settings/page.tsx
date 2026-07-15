@@ -287,23 +287,83 @@ export default function SettingsPage() {
               )}
             </div>
 
-            {/* Usage stats — données réelles depuis /api/billing/usage */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-[#EFF6FF] rounded-xl p-4 text-center">
-                <p className="text-2xl font-extrabold text-[#1B73E8]">
-                  {billingUsage ? billingUsage.analyses_remaining : (company?.analyses_restantes ?? '—')}
-                </p>
-                <p className="text-xs text-[#5F6368] mt-0.5">Analyses restantes</p>
+            {/* WP1D — Option B : valeurs directement depuis BillingUsage, zéro recalcul.
+                Fallback '—' si l'API est indisponible (plus de colonnes DB périmées). */}
+            <div className="flex flex-col gap-4">
+
+              {/* Quota mensuel */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-sm font-semibold text-[#1A1A2E]">Quota mensuel</span>
+                  <span className="text-sm font-bold text-[#1B73E8]">
+                    {billingUsage
+                      ? `${billingUsage.analyses_monthly_used ?? billingUsage.analyses_used} / ${billingUsage.analyses_limit}`
+                      : '—'}
+                  </span>
+                </div>
+                {billingUsage && (
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-[#1B73E8] rounded-full transition-all duration-500"
+                      style={{
+                        width: `${billingUsage.analyses_limit > 0
+                          ? Math.min(100, ((billingUsage.analyses_monthly_used ?? billingUsage.analyses_used) / billingUsage.analyses_limit) * 100)
+                          : 0}%`
+                      }}
+                    />
+                  </div>
+                )}
+                {billingUsage?.renewal_date && (
+                  <p className="text-xs text-[#5F6368] mt-1">
+                    Renouvellement le {new Date(billingUsage.renewal_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
+                  </p>
+                )}
               </div>
-              <div className="bg-[#EFF6FF] rounded-xl p-4 text-center">
-                <p className="text-2xl font-extrabold text-[#1B73E8]">
-                  {billingUsage ? billingUsage.analyses_used : (company?.analyses_totales_effectuees ?? '—')}
-                </p>
-                <p className="text-xs text-[#5F6368] mt-0.5">
-                  Analyses réalisées
-                  {billingUsage?.analyses_limit ? <span className="text-[#1B73E8]/60"> / {billingUsage.total_allowed}</span> : null}
-                </p>
-              </div>
+
+              {/* Executive Capacity Pack */}
+              {billingUsage && billingUsage.analyses_bonus_remaining > 0 && (
+                <div className={`rounded-xl px-4 py-3 ${
+                  billingUsage.analyses_bonus_suspended
+                    ? 'bg-amber-50 border border-amber-100'
+                    : 'bg-green-50 border border-green-100'
+                }`}>
+                  {billingUsage.analyses_bonus_suspended ? (
+                    <>
+                      <p className="text-xs font-semibold text-amber-800 mb-0.5">⏸ Executive Capacity Pack</p>
+                      <p className="text-sm font-bold text-amber-700">{billingUsage.analyses_bonus_remaining} analyses disponibles</p>
+                      <p className="text-xs text-amber-600 mt-0.5">Conservées tant qu&apos;elles ne sont pas utilisées.</p>
+                      <p className="text-xs text-amber-600">Suspendues sur plan FREE. Aucune analyse ne sera perdue.</p>
+                      <p className="text-xs text-amber-600">Réactivées automatiquement dès le passage à PRO ou SCALE.</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs font-semibold text-green-800 mb-0.5">♾️ Executive Capacity Pack</p>
+                      <p className="text-sm font-bold text-green-700">{billingUsage.analyses_bonus_remaining} analyses disponibles</p>
+                      <p className="text-xs text-green-600 mt-0.5">Conservées tant qu&apos;elles ne sont pas utilisées.</p>
+                      <p className="text-xs text-green-600">Consommées en priorité avant le quota mensuel.</p>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Interactions */}
+              {billingUsage?.interactions_limit && billingUsage.interactions_limit > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-semibold text-[#1A1A2E]">Échanges de suivi ce mois</span>
+                    <span className="text-sm font-bold text-[#1B73E8]">
+                      {billingUsage.interactions_used} / {billingUsage.interactions_limit}
+                    </span>
+                  </div>
+                  {billingUsage.interactions_remaining !== null && (
+                    <p className="text-xs text-[#5F6368]">
+                      {billingUsage.interactions_remaining} échange{billingUsage.interactions_remaining > 1 ? 's' : ''} restant{billingUsage.interactions_remaining > 1 ? 's' : ''}
+                      {' '}— budget mensuel partagé entre toutes vos analyses
+                    </p>
+                  )}
+                </div>
+              )}
+
             </div>
           </div>
         </section>
@@ -459,41 +519,96 @@ export default function SettingsPage() {
               Utilisation &amp; Analytics
             </h2>
           </div>
+          {/* WP1D — Option B : grille enrichie, valeurs directement depuis BillingUsage. */}
           <div className="p-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {[
-                { label: 'Total analyses', value: billingUsage?.analyses_used ?? '—', icon: '📊' },
-                { label: 'Analyses restantes', value: billingUsage?.analyses_remaining ?? '—', icon: '🔢' },
-                { label: 'Plan actuel', value: planLabels[company?.plan || 'free'] || company?.plan || '—', icon: '⭐', isText: true },
-                { label: 'Statut', value: company?.plan && company.plan !== 'free' ? 'Actif' : 'Gratuit', icon: '✅', isText: true },
-              ].map((stat, i) => (
-                <div key={i} className="bg-[#EFF6FF] rounded-xl p-4">
-                  <p className="text-xl mb-1">{stat.icon}</p>
-                  <p className={`font-extrabold text-[#1B73E8] ${stat.isText ? 'text-base' : 'text-2xl'}`}>
-                    {stat.value}
-                  </p>
-                  <p className="text-xs text-[#5F6368] mt-0.5">{stat.label}</p>
-                </div>
-              ))}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div className="bg-[#EFF6FF] rounded-xl p-4">
+                <p className="text-xl mb-1">📊</p>
+                <p className="font-extrabold text-[#1B73E8] text-2xl">
+                  {billingUsage?.analyses_monthly_used ?? billingUsage?.analyses_used ?? '—'}
+                </p>
+                <p className="text-xs text-[#5F6368] mt-0.5">Analyses ce mois</p>
+              </div>
+              <div className="bg-[#EFF6FF] rounded-xl p-4">
+                <p className="text-xl mb-1">🔢</p>
+                <p className="font-extrabold text-[#1B73E8] text-2xl">
+                  {billingUsage?.analyses_monthly_remaining ?? billingUsage?.analyses_remaining ?? '—'}
+                </p>
+                <p className="text-xs text-[#5F6368] mt-0.5">Restantes ce mois</p>
+              </div>
+              <div className="bg-[#EFF6FF] rounded-xl p-4">
+                <p className="text-xl mb-1">♾️</p>
+                {billingUsage?.analyses_bonus_remaining != null && billingUsage.analyses_bonus_remaining > 0 ? (
+                  <>
+                    <p className={`font-extrabold text-2xl ${billingUsage.analyses_bonus_suspended ? 'text-amber-500' : 'text-green-600'}`}>
+                      {billingUsage.analyses_bonus_remaining}
+                    </p>
+                    <p className="text-xs text-[#5F6368] mt-0.5">
+                      Executive Capacity Pack
+                      {billingUsage.analyses_bonus_suspended && ' ⏸'}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-extrabold text-[#1B73E8] text-2xl">—</p>
+                    <p className="text-xs text-[#5F6368] mt-0.5">Executive Capacity Pack</p>
+                  </>
+                )}
+              </div>
+              <div className="bg-[#EFF6FF] rounded-xl p-4">
+                <p className="text-xl mb-1">💬</p>
+                <p className="font-extrabold text-[#1B73E8] text-2xl">
+                  {billingUsage?.interactions_remaining ?? '—'}
+                </p>
+                <p className="text-xs text-[#5F6368] mt-0.5">Échanges restants ce mois</p>
+              </div>
+              <div className="bg-[#EFF6FF] rounded-xl p-4">
+                <p className="text-xl mb-1">⭐</p>
+                <p className="font-extrabold text-[#1B73E8] text-base">
+                  {planLabels[company?.plan || 'free'] || company?.plan || '—'}
+                </p>
+                <p className="text-xs text-[#5F6368] mt-0.5">Plan actuel</p>
+              </div>
+              <div className="bg-[#EFF6FF] rounded-xl p-4">
+                <p className="text-xl mb-1">📅</p>
+                <p className="font-extrabold text-[#1B73E8] text-base">
+                  {billingUsage?.renewal_date
+                    ? new Date(billingUsage.renewal_date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })
+                    : '—'}
+                </p>
+                <p className="text-xs text-[#5F6368] mt-0.5">Prochain renouvellement</p>
+              </div>
             </div>
 
-            {/* Barre de progression — données réelles */}
+            {/* Barre de progression — quota mensuel uniquement (WP1D) */}
             {billingUsage && (
               <div className="mt-5">
                 <div className="flex justify-between text-xs text-[#5F6368] mb-1.5">
-                  <span>Analyses utilisées ce mois</span>
-                  <span>{billingUsage.analyses_used} / {billingUsage.total_allowed}</span>
+                  <span>Quota mensuel utilisé</span>
+                  <span>
+                    {billingUsage.analyses_monthly_used ?? billingUsage.analyses_used} / {billingUsage.analyses_limit}
+                  </span>
                 </div>
                 <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                   <div
                     className="h-full bg-[#1B73E8] rounded-full transition-all duration-500"
                     style={{
-                      width: `${Math.min(100, billingUsage.total_allowed > 0
-                        ? (billingUsage.analyses_used / billingUsage.total_allowed) * 100
-                        : 0)}%`
+                      width: `${billingUsage.analyses_limit > 0
+                        ? Math.min(100, ((billingUsage.analyses_monthly_used ?? billingUsage.analyses_used) / billingUsage.analyses_limit) * 100)
+                        : 0}%`
                     }}
                   />
                 </div>
+                {billingUsage.analyses_bonus_remaining > 0 && !billingUsage.analyses_bonus_suspended && (
+                  <p className="text-xs text-green-600 mt-1.5 font-medium">
+                    + {billingUsage.analyses_bonus_remaining} analyses Executive Capacity Pack ♾️
+                  </p>
+                )}
+                {billingUsage.analyses_bonus_remaining > 0 && billingUsage.analyses_bonus_suspended && (
+                  <p className="text-xs text-amber-600 mt-1.5">
+                    ⏸ {billingUsage.analyses_bonus_remaining} analyses Executive Capacity Pack suspendues — réactivées à partir de PRO
+                  </p>
+                )}
               </div>
             )}
           </div>

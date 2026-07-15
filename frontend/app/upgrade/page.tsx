@@ -3,41 +3,85 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { normalizePlan } from '@/lib/featureGate';
+import { EXECUTIVE_CAPACITY_PACKS, getCommercialPlan } from '@/lib/plans-config';
+// WP4A — plans et addons chargés depuis plans-config.ts (source canonique unique).
+// Aucune constante commerciale (prix, quotas) n'est dupliquée dans ce fichier.
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+// Données commerciales issues de la source canonique — product_catalog.py via plans-config.ts
+const FREE_CFG  = getCommercialPlan('free');
+const PRO_CFG   = getCommercialPlan('pro');
+const SCALE_CFG = getCommercialPlan('scale');
+
 const PLANS_DATA = [
   {
-    id: 'free', name: 'FREE', subtitle: 'Découvrez Pepperyn', price: '0€', period: '',
+    id: 'free', name: 'FREE', subtitle: 'Découvrez Pepperyn',
+    price: FREE_CFG.priceLabel, period: FREE_CFG.period,
     tagline: 'Idéal pour tester Pepperyn sur vos propres données.',
     color: 'green', highlighted: false, badge: null,
-    features: ['1 analyse / mois', 'Export PDF', 'Mémoire légère', '3 interactions contextuelles incluses'],
+    features: [
+      `${FREE_CFG.analysesPerMonth} analyse / mois`,
+      'Export PDF',
+      'Mémoire légère',
+      `${FREE_CFG.interactionsPerMonth} échanges de suivi inclus`,
+    ],
     microcopy: '"Parfait pour tester Pepperyn sur vos propres données."',
     ctaHref: null, ctaAction: null,
   },
   {
-    id: 'pro', name: 'PRO', subtitle: 'CFO, CEO, CFO de transition, dirigeants PME & startups, experts-comptables…', price: '149€', period: '/mois',
+    id: 'pro', name: 'PRO',
+    subtitle: 'CFO, CEO, CFO de transition, dirigeants PME & startups, experts-comptables…',
+    price: PRO_CFG.priceLabel, period: PRO_CFG.period,
     tagline: 'Votre copilote financier complet.',
     color: 'blue', highlighted: true, badge: '⭐ LE PLUS POPULAIRE',
-    features: ['15 analyses / mois', '75 interactions contextuelles / mois', 'Exports Excel, PDF et PowerPoint', 'Mémoire persistante complète', 'Multi-entités (clients, filiales, dossiers)', 'Simulateur de décisions financières', 'Analyse multi-périodes & comparaisons', 'Projections financières', 'Crédits supplémentaires disponibles à la demande'],
-    microcopy: '"Gérez plusieurs clients ou entités depuis un seul outil."',
+    features: [
+      `${PRO_CFG.analysesPerMonth} analyses / mois`,
+      `${PRO_CFG.interactionsPerMonth} échanges de suivi / mois`,
+      'Exports Excel, PDF et PowerPoint',
+      'Mémoire persistante complète',
+      'Clients ou entreprises multiples (filiales, dossiers)',
+      'Simulateur de décisions financières',
+      'Analyse multi-périodes & comparaisons',
+      'Projections financières',
+      'Executive Capacity Packs disponibles à la demande',
+    ],
+    microcopy: '"Gérez plusieurs clients ou entreprises depuis un seul outil."',
     ctaHref: null, ctaAction: 'stripe',
   },
   {
-    id: 'scale', name: 'SCALE', subtitle: 'Pour départements financiers, cabinets & groupes multi-entités', price: '349€', period: '/mois',
+    id: 'scale', name: 'SCALE',
+    subtitle: 'Pour départements financiers, cabinets & groupes multi-sociétés',
+    price: SCALE_CFG.priceLabel, period: SCALE_CFG.period,
     tagline: 'Votre AI Financial Operating System sur-mesure.',
     color: 'purple', highlighted: false, badge: null,
-    features: ['250 analyses / mois', '500 interactions contextuelles / mois', '✦ Tout le plan PRO inclus', 'Workspace multi-utilisateurs & rôles', 'Permissions & gouvernance des analyses', 'Architecture multi-filiales & consolidation', 'Intégrations ERP, CRM & logiciels comptables', 'Workflows financiers personnalisés', 'Reporting automatisé & tableaux de bord', 'Hébergement dédié / déploiement on-premise', 'LLM privé / open-source en option', 'Onboarding dédié & SLA support prioritaire'],
+    features: [
+      `${SCALE_CFG.analysesPerMonth} analyses / mois`,
+      `${SCALE_CFG.interactionsPerMonth} échanges de suivi / mois`,
+      '✦ Tout le plan PRO inclus',
+      'Workspace multi-utilisateurs & rôles',
+      'Permissions & gouvernance des analyses',
+      'Architecture multi-filiales & consolidation',
+      'Intégrations ERP, CRM & logiciels comptables',
+      'Workflows financiers personnalisés',
+      'Reporting automatisé & tableaux de bord',
+      'Hébergement dédié / déploiement on-premise',
+      'LLM privé / open-source en option',
+      'Onboarding dédié & SLA support prioritaire',
+    ],
     microcopy: '"Industrialisez votre pilotage financier à l\'échelle de votre organisation."',
-    ctaHref: '/contact', ctaAction: null,
+    // WP4B — SCALE self-service via Stripe Checkout (identique au parcours PRO).
+    ctaHref: null, ctaAction: 'stripe',
   },
 ];
 
-const addons = [
-  { id: 'addon_starter', name: 'Starter Pack', desc: '+10 analyses', price: '19€' },
-  { id: 'addon_growth',  name: 'Growth Pack',  desc: '+50 analyses', price: '69€' },
-  { id: 'addon_scale',   name: 'Scale Pack',   desc: '+200 analyses', price: '199€' },
-];
+// Packs chargés depuis plans-config.ts (source canonique unique).
+const addons = EXECUTIVE_CAPACITY_PACKS.map(pack => ({
+  id:   pack.id,
+  name: pack.name,
+  desc: `+${pack.analysesAdded} analyses`,
+  price: pack.priceLabel,
+}));
 
 const colorMap: Record<string, { ring: string; bg: string; ctaUpgrade: string; ctaCurrent: string }> = {
   green:  { ring: 'border-green-200',  bg: 'bg-white',     ctaUpgrade: 'bg-green-600 text-white hover:bg-green-700', ctaCurrent: 'bg-gray-100 text-gray-400 cursor-default' },
@@ -147,7 +191,7 @@ export default function UpgradePage() {
             const c = colorMap[plan.color];
             const isHighlighted = plan.highlighted;
             const isCurrent = !loadingPlan && currentPlan === plan.id;
-            const isUpgrade = !loadingPlan && plan.id !== 'free' && currentPlan !== plan.id && plan.id !== 'scale';
+            const isUpgrade = !loadingPlan && plan.id !== 'free' && currentPlan !== plan.id;
 
             return (
               <div
@@ -215,7 +259,11 @@ export default function UpgradePage() {
                     disabled={loading === plan.id}
                     className={`w-full py-2.5 rounded-xl font-bold text-sm text-center transition-all block disabled:opacity-70 ${c.ctaUpgrade}`}
                   >
-                    {loading === plan.id ? 'Redirection…' : 'Passer à PRO'}
+                    {loading === plan.id
+                      ? 'Redirection…'
+                      : plan.id === 'scale'
+                      ? 'Choisir SCALE →'
+                      : 'Passer à PRO →'}
                   </button>
                 ) : null}
               </div>
