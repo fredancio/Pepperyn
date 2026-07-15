@@ -186,6 +186,17 @@ class BillingService:
         except Exception as e:
             raise ValueError(f"Webhook verification failed ({type(e).__name__}): {e}")
 
+        # ── Normalisation StripeObject → dict natif ──────────────────────────
+        # stripe >= 5.x : construct_event() retourne un StripeObject typé,
+        # pas un dict Python. StripeObject ne supporte ni .get() ni .items()
+        # ni les autres opérations dict standard — d'où le AttributeError: get
+        # observé en production.
+        # to_dict() convertit récursivement l'événement et TOUS les objets
+        # imbriqués (data.object, metadata, items.data, price, etc.) en dicts
+        # Python natifs. Après cette ligne, event est un dict ordinaire.
+        if hasattr(event, "to_dict"):
+            event = event.to_dict()
+
         etype = event["type"]
         logger.info(f"[WEBHOOK] Événement reçu : {etype}")
 
