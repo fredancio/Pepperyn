@@ -1525,6 +1525,239 @@ class TestV11bRPCOptionB(unittest.TestCase):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# GROUPE 9 — RLS stripe_webhook_events  (v13 — WP4B.5 sécurité)
+#
+# Vérifie la migration v13_rls_stripe_webhook_events.sql.
+# Garantit que la migration est :
+#   - idempotente (DROP POLICY IF EXISTS avant CREATE POLICY)
+#   - complète  (ENABLE RLS, FOR ALL, USING, WITH CHECK)
+#   - correcte  (REVOKE anon, REVOKE authenticated, absence de FORCE RLS)
+#
+# Ces tests sont structurels (lecture du fichier SQL source).
+# Aucune connexion Supabase requise.
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestV13RLSStripeWebhookEvents(unittest.TestCase):
+    """
+    WP4B.5 — Tests structurels de la migration v13_rls_stripe_webhook_events.sql.
+
+    Valident que :
+      1.  Fichier v13 présent dans migrations/.
+      2.  ENABLE ROW LEVEL SECURITY présent.
+      3.  DROP POLICY IF EXISTS présent AVANT CREATE POLICY (idempotence).
+      4.  Policy nommée 'service_role_only'.
+      5.  FOR ALL explicitement déclaré.
+      6.  Clause USING présente (protection lecture/source).
+      7.  Clause WITH CHECK présente et explicite (protection écriture).
+      8.  USING et WITH CHECK ciblent auth.role() = 'service_role'.
+      9.  REVOKE ALL FROM anon présent.
+      10. REVOKE ALL FROM authenticated présent.
+      11. FORCE ROW LEVEL SECURITY absent (ne doit pas bloquer SECURITY DEFINER).
+      12. v10 ne contient pas déjà ENABLE RLS (pas de doublon).
+      13. Instructions de rollback présentes.
+    """
+
+    def _v13_content(self) -> str:
+        migration_path = os.path.join(
+            os.path.dirname(__file__), "..", "migrations",
+            "v13_rls_stripe_webhook_events.sql"
+        )
+        with open(migration_path, "r", encoding="utf-8") as f:
+            return f.read()
+
+    # V13-01 ──────────────────────────────────────────────────────────────────
+    def test_v13_01_fichier_existe(self):
+        """La migration v13 existe dans le répertoire migrations/."""
+        migrations_dir = os.path.join(os.path.dirname(__file__), "..", "migrations")
+        self.assertIn(
+            "v13_rls_stripe_webhook_events.sql",
+            os.listdir(migrations_dir),
+            "v13_rls_stripe_webhook_events.sql absent du répertoire migrations/"
+        )
+
+    # V13-02 ──────────────────────────────────────────────────────────────────
+    def test_v13_02_rls_enable(self):
+        """ALTER TABLE stripe_webhook_events ENABLE ROW LEVEL SECURITY est présent."""
+        content = self._v13_content()
+        self.assertIn(
+            "ENABLE ROW LEVEL SECURITY",
+            content,
+            "v13 doit activer RLS sur stripe_webhook_events"
+        )
+        self.assertIn(
+            "stripe_webhook_events",
+            content,
+            "v13 doit cibler la table stripe_webhook_events"
+        )
+
+    # V13-03 ──────────────────────────────────────────────────────────────────
+    def test_v13_03_drop_policy_before_create_policy(self):
+        """DROP POLICY IF EXISTS apparaît AVANT CREATE POLICY (migration idempotente).
+
+        Sans cette précaution, réexécuter la migration lève 'policy already exists'.
+        L'ordre DROP → CREATE garantit que la migration peut être appliquée plusieurs
+        fois sans erreur (redéploiement, réapplication manuelle, staging).
+        """
+        content = self._v13_content()
+        drop_pos   = content.find('DROP POLICY IF EXISTS "service_role_only"')
+        create_pos = content.find('CREATE POLICY "service_role_only"')
+        self.assertGreater(drop_pos, 0,
+            "DROP POLICY IF EXISTS 'service_role_only' introuvable dans v13")
+        self.assertGreater(create_pos, 0,
+            "CREATE POLICY 'service_role_only' introuvable dans v13")
+        self.assertLess(drop_pos, create_pos,
+            "DROP POLICY IF EXISTS doit apparaître AVANT CREATE POLICY (idempotence)")
+
+    # V13-04 ──────────────────────────────────────────────────────────────────
+    def test_v13_04_policy_name_service_role_only(self):
+        """La policy s'appelle 'service_role_only'."""
+        content = self._v13_content()
+        self.assertIn(
+            '"service_role_only"',
+            content,
+            "La policy doit s'appeler 'service_role_only'"
+        )
+
+    # V13-05 ──────────────────────────────────────────────────────────────────
+    def test_v13_05_policy_for_all(self):
+        """La policy est déclarée FOR ALL (couverture de toutes les opérations).
+
+        SELECT, INSERT, UPDATE et DELETE sont couverts explicitement.
+        Un audit de sécurité ne doit pas avoir à inférer la portée depuis la
+        valeur par défaut de PostgreSQL.
+        """
+        content = self._v13_content()
+        self.assertIn(
+            "FOR ALL",
+            content,
+            "v13 doit déclarer FOR ALL explicitement"
+        )
+
+    # V13-06 ──────────────────────────────────────────────────────────────────
+    def test_v13_06_policy_has_using_clause(self):
+        """La clause USING est présente (protection lecture et source d'UPDATE/DELETE)."""
+        content = self._v13_content()
+        self.assertIn(
+            "USING",
+            content,
+            "v13 doit déclarer USING pour protéger la lecture "
+            "et le ciblage source des UPDATE/DELETE"
+        )
+
+    # V13-07 ──────────────────────────────────────────────────────────────────
+    def test_v13_07_policy_has_with_check_clause(self):
+        """La clause WITH CHECK est présente et explicite (protection écriture).
+
+        WITH CHECK est déclaré explicitement pour que la protection des INSERTs
+        et des UPDATE soit immédiatement visible à l'audit — intention explicite,
+        auditabilité, et défense en profondeur — et non inférée depuis USING.
+        """
+        content = self._v13_content()
+        self.assertIn(
+            "WITH CHECK",
+            content,
+            "v13 doit déclarer WITH CHECK explicitement "
+            "(protection écriture visible à l'audit)"
+        )
+
+    # V13-08 ──────────────────────────────────────────────────────────────────
+    def test_v13_08_using_and_with_check_both_target_service_role(self):
+        """USING et WITH CHECK ciblent tous les deux auth.role() = 'service_role'.
+
+        Les deux expressions doivent être identiques : cohérence entre protection
+        lecture et protection écriture. Une divergence serait un bug de sécurité.
+        Vérification : au moins 2 occurrences de la condition dans le fichier.
+        """
+        content = self._v13_content()
+        occurrences = content.count("auth.role() = 'service_role'")
+        self.assertGreaterEqual(
+            occurrences, 2,
+            "auth.role() = 'service_role' doit apparaître au moins deux fois "
+            "(une dans USING, une dans WITH CHECK)"
+        )
+
+    # V13-09 ──────────────────────────────────────────────────────────────────
+    def test_v13_09_revoke_anon(self):
+        """REVOKE ALL ON TABLE stripe_webhook_events FROM anon est présent.
+
+        Ces REVOKE sont déjà dans v10. v13 les réaffirme explicitement pour garantir
+        que la protection par privilège est effective indépendamment de l'ordre
+        d'exécution des migrations.
+        """
+        content = self._v13_content()
+        self.assertRegex(
+            content,
+            r"REVOKE\s+ALL\s+ON\s+TABLE\s+public\.stripe_webhook_events\s+FROM\s+anon",
+            "v13 doit REVOKE ALL ON TABLE stripe_webhook_events FROM anon"
+        )
+
+    # V13-10 ──────────────────────────────────────────────────────────────────
+    def test_v13_10_revoke_authenticated(self):
+        """REVOKE ALL ON TABLE stripe_webhook_events FROM authenticated est présent."""
+        content = self._v13_content()
+        self.assertRegex(
+            content,
+            r"REVOKE\s+ALL\s+ON\s+TABLE\s+public\.stripe_webhook_events\s+FROM\s+authenticated",
+            "v13 doit REVOKE ALL ON TABLE stripe_webhook_events FROM authenticated"
+        )
+
+    # V13-11 ──────────────────────────────────────────────────────────────────
+    def test_v13_11_no_force_row_level_security(self):
+        """FORCE ROW LEVEL SECURITY est absent du SQL actif (hors commentaires).
+
+        FORCE RLS forcerait la RLS sur le propriétaire de la table (postgres).
+        Cela bloquerait apply_stripe_webhook() qui s'exécute en SECURITY DEFINER
+        avec les privilèges de postgres — ce qui casserait les webhooks Stripe.
+        Le but est de bloquer anon et authenticated, pas le propriétaire de la fonction.
+
+        Note : le fichier peut mentionner FORCE ROW LEVEL SECURITY dans les commentaires
+        pour documenter ce qui N'est PAS fait. Seules les lignes SQL actives sont vérifiées.
+        """
+        content = self._v13_content()
+        # Filtrer les lignes SQL actives : exclure les lignes vides et les lignes
+        # dont le premier token non-espace est "--" (commentaire SQL de ligne).
+        active_lines = [
+            line for line in content.splitlines()
+            if line.strip() and not line.strip().startswith("--")
+        ]
+        active_sql = "\n".join(active_lines)
+        self.assertNotIn(
+            "FORCE ROW LEVEL SECURITY",
+            active_sql,
+            "FORCE ROW LEVEL SECURITY ne doit pas apparaître dans le SQL actif de v13 — "
+            "cela bloquerait apply_stripe_webhook() (SECURITY DEFINER s'exécutant comme postgres)"
+        )
+
+    # V13-12 ──────────────────────────────────────────────────────────────────
+    def test_v13_12_no_rls_in_v10(self):
+        """v10 ne doit pas activer RLS (la protection v10 est par REVOKE, pas RLS).
+
+        Vérifie que v10 et v13 ne se contredisent pas : v10 protège via REVOKE,
+        v13 ajoute RLS comme couche indépendante. Les deux coexistent.
+        """
+        v10_path = os.path.join(
+            os.path.dirname(__file__), "..", "migrations", "v10_stripe_webhook_events.sql"
+        )
+        with open(v10_path, "r", encoding="utf-8") as f:
+            v10_content = f.read()
+        self.assertNotIn(
+            "ENABLE ROW LEVEL SECURITY",
+            v10_content,
+            "v10 ne doit pas activer RLS — c'est le rôle exclusif de v13"
+        )
+
+    # V13-13 ──────────────────────────────────────────────────────────────────
+    def test_v13_13_rollback_instructions_present(self):
+        """Les instructions de rollback sont présentes (DROP POLICY + DISABLE RLS)."""
+        content = self._v13_content()
+        self.assertIn(
+            "DISABLE ROW LEVEL SECURITY",
+            content,
+            "v13 doit documenter le DISABLE ROW LEVEL SECURITY de rollback"
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
