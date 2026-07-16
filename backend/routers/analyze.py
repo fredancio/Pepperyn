@@ -4,6 +4,7 @@ POST /api/analyze      — Analyze an uploaded financial file
 POST /api/analyze/text — Text question (no file)
 """
 import asyncio
+import hashlib
 import logging
 import os
 import time
@@ -20,6 +21,7 @@ from models.schemas import AnalyzeResponse, TextQueryRequest, TextQueryResponse,
 from connectors import FileConnector
 from services.llm_service import run_full_pipeline, get_anthropic_client, call_chat_intelligent
 from services.excel_export import generate_excel_report
+from services.decision_fingerprint import compute_decision_fingerprint, FINGERPRINT_VERSION
 from services.usage_service import UsageService
 from services.data_quality_gate import validate_excel_before_analysis
 from services.anonymization_service import (
@@ -674,6 +676,10 @@ async def _run_analysis_pipeline(
     # il n'est jamais écrit sur disque. Il sera libéré par le GC Python
     # à la fin de cette requête. Conforme au master plan "auto-delete source file".
     file_size_bytes = len(file_bytes)  # stocker avant suppression
+    # FIN-001 — SHA-256 du fichier brut (identité source, octet pour octet).
+    # Calculé ici, avant del file_bytes, et transmis à _save_to_db().
+    # Distinct du decision_fingerprint (données sources ≠ conclusions décisionnelles).
+    source_data_hash = hashlib.sha256(file_bytes).hexdigest()
     del file_bytes  # libération explicite immédiate
     logger.info(f"[SECURITY] Fichier source supprimé de la mémoire après analyse — {analyse_id}")
 
@@ -728,6 +734,7 @@ async def _run_analysis_pipeline(
         cost=cost,
         duration_ms=duration_ms,
         plan=plan,
+        source_data_hash=source_data_hash,
     )
 
     # Save memory APRÈS _save_to_db (FK: financial_metrics.analyse_id → analyses.id)
@@ -764,6 +771,7 @@ def _save_to_db(
     duration_ms: int,
     plan: str,
     entity_id: Optional[str] = None,
+    source_data_hash: Optional[str] = None,
 ):
     """Save analysis record to Supabase. Errors are logged but non-blocking."""
     try:
@@ -793,6 +801,19 @@ def _save_to_db(
             insert_payload["fichier_taille_bytes"] = file_size
         if entity_id is not None:
             insert_payload["entity_id"] = entity_id
+
+        # FIN-001 — Decision Fingerprint (WP5A)
+        # compute_decision_fingerprint() est le seul point de calcul autorisé.
+        # Ne jamais recalculer ce fingerprint dans un export, une route de lecture,
+        # ou un autre service.
+        _fp = compute_decision_fingerprint(analysis_result)
+        if _fp is not None:
+            insert_payload["decision_fingerprint"] = _fp
+            insert_payload["decision_fingerprint_version"] = FINGERPRINT_VERSION
+        # source_data_hash : SHA-256(file_bytes bruts), calculé avant del file_bytes.
+        # Identité du fichier source — distinct et indépendant du fingerprint décisionnel.
+        if source_data_hash is not None:
+            insert_payload["source_data_hash"] = source_data_hash
 
         logger.debug("[DB] Insert analyse %s", analyse_id)
         result = supabase.from_("analyses").insert(insert_payload).execute()
