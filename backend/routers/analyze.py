@@ -22,6 +22,7 @@ from connectors import FileConnector
 from services.llm_service import run_full_pipeline, get_anthropic_client, call_chat_intelligent
 from services.excel_export import generate_excel_report
 from services.decision_fingerprint import compute_decision_fingerprint, FINGERPRINT_VERSION
+from services.decision_kernel_extractor import extract_decision_kernel  # WP5C
 from services.usage_service import UsageService
 from services.data_quality_gate import validate_excel_before_analysis
 from services.anonymization_service import (
@@ -683,6 +684,19 @@ async def _run_analysis_pipeline(
     del file_bytes  # libération explicite immédiate
     logger.info(f"[SECURITY] Fichier source supprimé de la mémoire après analyse — {analyse_id}")
 
+    # ── WP5C — Decision Kernel extraction (additive, non-bloquant) ───────────
+    # Appelé après l'overwrite EDM (plan_action_haute final, L586-601) et après
+    # l'attachement de data_quality (L603-621). Ne lit que analysis_result —
+    # jamais modifié, jamais persisté via ce pointeur. Retourne None si CA-2
+    # échoue (toutes les Decisions insufficient_data) ou sur toute erreur interne.
+    # Non-bloquant par conception : un Kernel None ne compromet pas la persistance
+    # de l'analyse ni aucun export existant.
+    _decision_kernel = extract_decision_kernel(
+        analysis_result=analysis_result,
+        analyse_id=analyse_id,
+        source_data_hash=source_data_hash,
+    )
+
     # Increment analysis usage counter (server-side, after success)
     _usage_service.increment_analysis(company_id)
 
@@ -735,6 +749,7 @@ async def _run_analysis_pipeline(
         duration_ms=duration_ms,
         plan=plan,
         source_data_hash=source_data_hash,
+        decision_kernel=_decision_kernel,  # WP5C — None si extraction échouée/CA-2
     )
 
     # Save memory APRÈS _save_to_db (FK: financial_metrics.analyse_id → analyses.id)
@@ -772,6 +787,7 @@ def _save_to_db(
     plan: str,
     entity_id: Optional[str] = None,
     source_data_hash: Optional[str] = None,
+    decision_kernel=None,  # Optional[DecisionKernel] — WP5C
 ):
     """Save analysis record to Supabase. Errors are logged but non-blocking."""
     try:
@@ -814,6 +830,14 @@ def _save_to_db(
         # Identité du fichier source — distinct et indépendant du fingerprint décisionnel.
         if source_data_hash is not None:
             insert_payload["source_data_hash"] = source_data_hash
+
+        # WP5C — Decision Kernel (Commit 5)
+        # Persistance additive : aucun flux existant ne dépend de ces deux colonnes.
+        # decision_kernel_version est lu depuis l'objet Kernel (jamais hardcodé 'dk-1').
+        # Si decision_kernel est None (CA-2 ou erreur interne), les colonnes restent NULL.
+        if decision_kernel is not None:
+            insert_payload["decision_kernel"] = decision_kernel.model_dump(mode="json")
+            insert_payload["decision_kernel_version"] = decision_kernel.kernel_version
 
         logger.debug("[DB] Insert analyse %s", analyse_id)
         result = supabase.from_("analyses").insert(insert_payload).execute()
