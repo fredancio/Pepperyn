@@ -25,7 +25,7 @@ Pipeline interne (12 phases)
     Phase 6  — Déduplication global_recommendations
     Phase 7  — Dérivation score_global + niveau_urgence (decision_rules)
     Phase 8  — Calcul AttributionMetrics
-    [Phase 9  — Fingerprint — SKIPPED — Commit 6, KERNEL-INV-013]
+    Phase 9  — Decision Fingerprint (après Phase 10, KERNEL-INV-013)
     Phase 10 — Canonicalisation (ordre stable, JSONB déterministe)
     Phase 11 — Scellement (kernel_produced_at)
     Phase 12 — Validation CA-1 → CA-11
@@ -72,6 +72,7 @@ from services.decision_kernel import (
     Recommendation,
     SourceRef,
 )
+from services.decision_fingerprint import compute_decision_fingerprint_from_kernel  # WP5C Phase 9
 from services.decision_rules import (
     derive_niveau_urgence,
     derive_polarity,
@@ -731,8 +732,8 @@ def _run_extraction_pipeline(
         kernel_id=analyse_id,
         kernel_version=KERNEL_VERSION,
         kernel_produced_at=produced_at or datetime.now(timezone.utc),
-        decision_fingerprint=None,              # Phase 9 — Commit 6 (KERNEL-INV-013)
-        decision_fingerprint_version=None,      # Phase 9 — Commit 6
+        decision_fingerprint=None,              # Phase 9 : posé après Phase 10 (KERNEL-INV-013)
+        decision_fingerprint_version=None,      # Phase 9 : posé après Phase 10
         source_data_hash=source_data_hash,
         # Bloc B — Contexte (secteur/modele_economique absents de AnalysisResult dk-1)
         type_document=ar.type_document or "AUTRE",
@@ -755,9 +756,16 @@ def _run_extraction_pipeline(
     # ── Phase 10 — Canonicalisation ───────────────────────────────────────────
     _canonicalize(kernel)
 
-    # [Phase 9 — Decision Fingerprint — SKIPPED — Commit 6]
-    # compute_decision_fingerprint() sera réconcilié pour prendre un DecisionKernel
-    # en entrée (KERNEL-INV-013). Phase insérée ici entre Phase 10 et Phase 12.
+    # ── Phase 9 — Decision Fingerprint (KERNEL-INV-013) ──────────────────────
+    # Calculé APRÈS Phase 10 : global_recommendations et global_findings sont
+    # dans un ordre stable et déterministe avant d'entrer dans le hash SHA-256.
+    # compute_decision_fingerprint_from_kernel() délègue à l'algorithme WP5A
+    # inchangé — seule la source des données est le Kernel (KERNEL-INV-013).
+    # Retourne (None, None) si le Kernel n'a pas de champ décisionnel significatif
+    # (cas théorique dans ce branch, CA-2 étant intercepté avant cette étape).
+    _fp, _fp_version = compute_decision_fingerprint_from_kernel(kernel)
+    kernel.decision_fingerprint = _fp
+    kernel.decision_fingerprint_version = _fp_version
 
     # ── Phase 12 — Validation CA-1 → CA-11 ───────────────────────────────────
     _validate_kernel(kernel)

@@ -21,7 +21,9 @@ from models.schemas import AnalyzeResponse, TextQueryRequest, TextQueryResponse,
 from connectors import FileConnector
 from services.llm_service import run_full_pipeline, get_anthropic_client, call_chat_intelligent
 from services.excel_export import generate_excel_report
-from services.decision_fingerprint import compute_decision_fingerprint, FINGERPRINT_VERSION
+# WP5C Commit 6 — compute_decision_fingerprint / FINGERPRINT_VERSION retirés de analyze.py.
+# Le fingerprint est désormais calculé dans l'extracteur (Phase 9, KERNEL-INV-013)
+# et lu depuis decision_kernel.decision_fingerprint. Aucun calcul dans ce fichier.
 from services.decision_kernel_extractor import extract_decision_kernel  # WP5C
 from services.usage_service import UsageService
 from services.data_quality_gate import validate_excel_before_analysis
@@ -818,26 +820,26 @@ def _save_to_db(
         if entity_id is not None:
             insert_payload["entity_id"] = entity_id
 
-        # FIN-001 — Decision Fingerprint (WP5A)
-        # compute_decision_fingerprint() est le seul point de calcul autorisé.
-        # Ne jamais recalculer ce fingerprint dans un export, une route de lecture,
-        # ou un autre service.
-        _fp = compute_decision_fingerprint(analysis_result)
-        if _fp is not None:
-            insert_payload["decision_fingerprint"] = _fp
-            insert_payload["decision_fingerprint_version"] = FINGERPRINT_VERSION
         # source_data_hash : SHA-256(file_bytes bruts), calculé avant del file_bytes.
         # Identité du fichier source — distinct et indépendant du fingerprint décisionnel.
         if source_data_hash is not None:
             insert_payload["source_data_hash"] = source_data_hash
 
-        # WP5C — Decision Kernel (Commit 5)
-        # Persistance additive : aucun flux existant ne dépend de ces deux colonnes.
+        # WP5C — Decision Kernel + Decision Fingerprint (Commit 5 & 6)
+        # Persistance additive : aucun flux existant ne dépend de ces colonnes.
         # decision_kernel_version est lu depuis l'objet Kernel (jamais hardcodé 'dk-1').
         # Si decision_kernel est None (CA-2 ou erreur interne), les colonnes restent NULL.
+        # WP5C Commit 6 (KERNEL-INV-013) : le fingerprint est embarqué dans le Kernel
+        # (Phase 9 de l'extracteur). Il n'est jamais recalculé ici depuis AnalysisResult.
         if decision_kernel is not None:
             insert_payload["decision_kernel"] = decision_kernel.model_dump(mode="json")
             insert_payload["decision_kernel_version"] = decision_kernel.kernel_version
+            # Fingerprint : lu depuis le Kernel (posé en Phase 9, après canonicalisation).
+            # None possible si le proxy ne contient pas de champ décisionnel significatif
+            # (cas théorique pour un Kernel non-CA-2 — normalement toujours set).
+            if decision_kernel.decision_fingerprint is not None:
+                insert_payload["decision_fingerprint"] = decision_kernel.decision_fingerprint
+                insert_payload["decision_fingerprint_version"] = decision_kernel.decision_fingerprint_version
 
         logger.debug("[DB] Insert analyse %s", analyse_id)
         result = supabase.from_("analyses").insert(insert_payload).execute()

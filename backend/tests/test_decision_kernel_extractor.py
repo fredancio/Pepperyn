@@ -892,12 +892,12 @@ class TestExtractDecisionKernel:
         # Comparer les JSONs (excluent kernel_produced_at qui est forcé identique ici)
         assert r1.model_dump() == r2.model_dump()
 
-    def test_decision_fingerprint_is_none(self):
-        """decision_fingerprint=None — Phase 9 réservée au Commit 6 (KERNEL-INV-013)."""
+    def test_decision_fingerprint_set_after_extraction(self):
+        """decision_fingerprint et decision_fingerprint_version sont posés par Phase 9."""
         result = extract_decision_kernel(_ar(), _ANALYSE_ID, _produced_at=_TEST_NOW)
         assert result is not None
-        assert result.decision_fingerprint is None
-        assert result.decision_fingerprint_version is None
+        assert result.decision_fingerprint is not None
+        assert result.decision_fingerprint_version is not None
 
     def test_source_data_hash_propagated(self):
         """source_data_hash fourni → propagé dans le Kernel."""
@@ -977,3 +977,104 @@ class TestRunExtractionPipelineRaisesOnValidationError:
             _run_extraction_pipeline(ar, _ANALYSE_ID, "sha256-abc", _TEST_NOW)
         assert exc.value.criteria == "CA-2"
         assert exc.value.kernel_id == _ANALYSE_ID
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# TestPhase9Fingerprint — WP5C Commit 6 (KERNEL-INV-013)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestPhase9Fingerprint:
+    """Vérifie la Phase 9 — Decision Fingerprint intégré dans le pipeline extracteur.
+
+    KERNEL-INV-013 : compute_decision_fingerprint_from_kernel() est appelée
+    APRÈS Phase 10 (canonicalisation), AVANT Phase 12 (validation).
+    Le fingerprint est posé sur kernel.decision_fingerprint et
+    kernel.decision_fingerprint_version.
+
+    Tests d'intégration via extract_decision_kernel() (pipeline complet).
+    """
+
+    def test_fingerprint_present_apres_extraction(self):
+        """Pipeline complet → decision_fingerprint est non-None dans le Kernel."""
+        result = extract_decision_kernel(
+            _ar(score_rentabilite=5, score_risque=7, score_structure=6, score_liquidite=4),
+            _ANALYSE_ID,
+            source_data_hash="sha256-xyz",
+            _produced_at=_TEST_NOW,
+        )
+        assert result is not None
+        assert result.decision_fingerprint is not None
+
+    def test_fingerprint_version_est_v1(self):
+        """decision_fingerprint_version == "v1" (FINGERPRINT_VERSION)."""
+        result = extract_decision_kernel(
+            _ar(), _ANALYSE_ID, _produced_at=_TEST_NOW
+        )
+        assert result is not None
+        assert result.decision_fingerprint_version == "v1"
+
+    def test_fingerprint_est_32_hex_chars(self):
+        """Format : chaîne de 32 caractères hexadécimaux."""
+        result = extract_decision_kernel(
+            _ar(), _ANALYSE_ID, _produced_at=_TEST_NOW
+        )
+        assert result is not None
+        fp = result.decision_fingerprint
+        assert fp is not None
+        assert len(fp) == 32
+        assert all(c in "0123456789abcdef" for c in fp)
+
+    def test_fingerprint_deterministe(self):
+        """Même AnalysisResult → même fingerprint sur deux invocations."""
+        ar = _ar(
+            score_rentabilite=3,
+            score_risque=8,
+            alertes=["Marge critique"],
+            plan_action_haute=["Réduire les coûts fixes"],
+        )
+        r1 = extract_decision_kernel(ar, _ANALYSE_ID, _produced_at=_TEST_NOW)
+        r2 = extract_decision_kernel(ar, _ANALYSE_ID, _produced_at=_TEST_NOW)
+        assert r1 is not None and r2 is not None
+        assert r1.decision_fingerprint == r2.decision_fingerprint
+
+    def test_fingerprint_nul_si_ca2(self):
+        """CA-2 : extract_decision_kernel() retourne None → pas de Kernel, pas de fingerprint."""
+        ar_ca2 = _ar(
+            score_rentabilite=None,
+            score_risque=None,
+            score_structure=None,
+            score_liquidite=None,
+        )
+        result = extract_decision_kernel(ar_ca2, _ANALYSE_ID, _produced_at=_TEST_NOW)
+        assert result is None   # pas de Kernel, donc pas de fingerprint
+
+    def test_fingerprint_differe_selon_scores(self):
+        """Scores différents → fingerprints différents (quand la tranche change)."""
+        ar_faible = _ar(score_rentabilite=2)   # FAIBLE
+        ar_eleve  = _ar(score_rentabilite=8)   # ÉLEVÉ
+        r1 = extract_decision_kernel(ar_faible, _ANALYSE_ID, _produced_at=_TEST_NOW)
+        r2 = extract_decision_kernel(ar_eleve,  _ANALYSE_ID, _produced_at=_TEST_NOW)
+        assert r1 is not None and r2 is not None
+        assert r1.decision_fingerprint != r2.decision_fingerprint
+
+    def test_fingerprint_ca4_pair_set_together(self):
+        """CA-4 : fingerprint et fingerprint_version sont posés ensemble."""
+        result = extract_decision_kernel(
+            _ar(), _ANALYSE_ID, _produced_at=_TEST_NOW
+        )
+        assert result is not None
+        has_fp = result.decision_fingerprint is not None
+        has_version = result.decision_fingerprint_version is not None
+        assert has_fp == has_version, "CA-4 : fingerprint et version doivent être liés"
+
+    def test_fingerprint_inclus_dans_kernel_jsonb(self):
+        """model_dump() inclut decision_fingerprint — sérialisable dans JSONB."""
+        result = extract_decision_kernel(
+            _ar(), _ANALYSE_ID, _produced_at=_TEST_NOW
+        )
+        assert result is not None
+        dumped = result.model_dump(mode="json")
+        assert "decision_fingerprint" in dumped
+        assert dumped["decision_fingerprint"] is not None
+        assert "decision_fingerprint_version" in dumped
+        assert dumped["decision_fingerprint_version"] == "v1"
