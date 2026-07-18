@@ -761,6 +761,25 @@ async def _run_analysis_pipeline(
         except Exception as e:
             logger.error(f"[MEMORY] save_analysis_memory failed: {e}")
 
+    # ── Arc Décisionnel MVP v16 — détection de conséquences candidates ────────
+    # Appelé après _save_to_db (analyses.id doit exister avant arc_analysis_links).
+    # Non-bloquant : une erreur ici ne doit jamais bloquer la réponse principale.
+    # Résultat inclus dans AnalyzeResponse pour injection dans ChatContainer.
+    arc_consequence_candidates: list = []
+    try:
+        from services.arc_service import arc_service as _arc_service
+        arc_consequence_candidates = _arc_service.detect_consequence_candidates(
+            company_id=company_id,
+            new_analysis_id=analyse_id,
+            analyse_json=analysis_result.model_dump(),
+        )
+    except Exception as e:
+        logger.error(
+            "[ARC] detect_consequence_candidates failed — analyse_id=%s : %s",
+            analyse_id, e,
+            exc_info=True,
+        )
+
     return AnalyzeResponse(
         success=True,
         message=f"Analyse complète — {duration_ms}ms",
@@ -770,6 +789,7 @@ async def _run_analysis_pipeline(
         cout_estime=cost,
         memory_insight=memory_insight,
         recommendations_tracking=recommendations_tracking,
+        arc_consequence_candidates=arc_consequence_candidates or None,
     )
 
 

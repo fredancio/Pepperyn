@@ -249,6 +249,9 @@ class AnalyzeResponse(BaseModel):
     cout_estime: float = 0.0
     memory_insight: Optional[str] = None
     recommendations_tracking: Optional[List[dict]] = None
+    # Arc Décisionnel MVP v16 — candidats conséquences détectés post-analyse
+    # Chaque item : {arc_id, recommendation_text, hypothesis, analysis_id, ...}
+    arc_consequence_candidates: Optional[List[dict]] = None
 
 
 class TextQueryRequest(BaseModel):
