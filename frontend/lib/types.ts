@@ -44,7 +44,7 @@ export interface Message {
   company_id: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  content_type: 'text' | 'analysis' | 'file' | 'error' | 'feedback_request' | 'recommendation_checkin';
+  content_type: 'text' | 'analysis' | 'file' | 'error' | 'feedback_request' | 'recommendation_checkin' | 'arc_consequence_prompt';
   metadata?: Record<string, unknown>;
   created_at: string;
 }

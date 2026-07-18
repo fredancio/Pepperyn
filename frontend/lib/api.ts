@@ -1,6 +1,6 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-async function getAuthHeaders(): Promise<Record<string, string>> {
+export async function getAuthHeaders(): Promise<Record<string, string>> {
   if (typeof window === 'undefined') return {};
 
   // Try guest token first
@@ -336,7 +336,13 @@ export async function submitDecisionFeedback(params: {
   recommendation_source?: string;
   status: DecisionFeedbackStatus;
   comment?: string;
-}): Promise<{ success: boolean }> {
+}): Promise<{
+  success: boolean;
+  // Arc Décisionnel MVP v16 — présent si status='planned' et arc créé côté backend
+  arc_created?: boolean;
+  arc_id?: string | null;
+  arc_status?: string | null;
+}> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/api/decision-feedback`, {
     method: 'POST',
