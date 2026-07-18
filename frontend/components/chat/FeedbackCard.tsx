@@ -13,7 +13,7 @@ type IntentionChoice = 'planned' | 'rejected' | 'unsure' | 'no_longer_relevant';
 const INTENTION_OPTIONS: { choice: IntentionChoice; label: string; status: DecisionFeedbackStatus }[] = [
   { choice: 'planned', label: 'Je vais appliquer', status: 'planned' },
   { choice: 'rejected', label: 'Je ne vais pas appliquer', status: 'rejected' },
-  { choice: 'unsure', label: 'Je ne sais pas encore', status: 'planned' },
+  { choice: 'unsure', label: 'Je ne sais pas encore', status: 'unsure' },
   { choice: 'no_longer_relevant', label: "Ce n'est pas pertinent", status: 'no_longer_relevant' },
 ];
 

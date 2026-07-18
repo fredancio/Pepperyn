@@ -25,7 +25,13 @@ router = APIRouter(prefix="/api", tags=["decision-memory"])
 _decision_memory_service = DecisionMemoryService()
 
 VALID_STATUSES = {
-    "planned", "done", "partially_done", "not_done", "rejected", "no_longer_relevant",
+    "planned",           # Intention ferme : "Je vais appliquer"     → Arc créé
+    "unsure",            # Indécision      : "Je ne sais pas encore" → pas d'Arc
+    "done",
+    "partially_done",
+    "not_done",
+    "rejected",
+    "no_longer_relevant",
 }
 
 

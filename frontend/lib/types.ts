@@ -53,7 +53,8 @@ export interface Message {
 
 /** Statuts possibles pour le feedback sur une recommandation. */
 export type DecisionFeedbackStatus =
-  | 'planned'
+  | 'planned'     // Intention ferme → Arc créé
+  | 'unsure'      // Indécision      → pas d'Arc
   | 'done'
   | 'partially_done'
   | 'not_done'
