@@ -301,6 +301,15 @@ export function ChatContainer() {
           setMessages(prev => [...prev, feedbackMsg]);
         }
 
+        // Arc Décisionnel MVP v16 — candidats conséquence détectés par arc_service
+        // Injecté non-bloquant : seulement si le backend a retourné des candidats.
+        if (analyseId && result.arc_consequence_candidates?.length > 0) {
+          const arcMsg = makeLocalMessage('assistant', '', 'arc_consequence_prompt', {
+            candidates: result.arc_consequence_candidates,
+          });
+          setMessages(prev => [...prev, arcMsg]);
+        }
+
         // ── V2 Conversation Engine : message d'accueil ──────────────────────
         // Appel silencieux à /api/conversation-context/{analyseId}.
         // Anti-doublon : injecté une seule fois par analyse_id.
@@ -855,7 +864,7 @@ export function ChatContainer() {
               {adminEmail.toLowerCase() === 'fredanciaux16@gmail.com' && (
                 <Link href="/admin" className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-[#1B73E8] hover:bg-blue-50 transition-colors">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                  CRM Admin
+                  Pepperyn Control Center
                 </Link>
               )}
               <Link

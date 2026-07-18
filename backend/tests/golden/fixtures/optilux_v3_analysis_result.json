@@ -1,0 +1,93 @@
+{
+  "_comment": "Golden fixture WP5C — Optilux v3 — représentatif d'une PME en situation critique.",
+  "_version": "dk-1",
+  "_produced_at_test": "2026-07-17T12:00:00+00:00",
+  "_analyse_id_test": "optilux-golden-v3-001",
+  "_source_data_hash_test": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+
+  "type_document": "P&L",
+  "score_confiance": 72,
+
+  "data_quality": {
+    "score_data": 78,
+    "score_completude": 65,
+    "score_confiance_conclusions": 71,
+    "status": "ok",
+    "document_format": "xlsx",
+    "mapping_summary": ["CA trouvé", "Charges trouvées", "EBE estimé"],
+    "anomalies": [],
+    "assumptions": ["EBE estimé depuis P&L simplifié"],
+    "sheets_detected": ["P&L", "Bilan synthétique"]
+  },
+
+  "score_rentabilite": 3,
+  "score_risque": 7,
+  "score_structure": 4,
+  "score_liquidite": 3,
+
+  "niveau_urgence": "critique",
+  "score_global": 2,
+
+  "score_interpretations": {
+    "rentabilite": "La marge nette est profondément négative sur les 12 derniers mois.",
+    "risque": "L'endettement représente 78% des capitaux propres — seuil critique dépassé.",
+    "structure": "Le bilan présente un déséquilibre actif court terme / passif long terme.",
+    "liquidite": "La trésorerie nette est négative depuis le T2 2025."
+  },
+
+  "problemes_critiques": [
+    "Marge nette négative sur 3 exercices consécutifs",
+    "Trésorerie nette négative depuis le T2 2025",
+    "Endettement court terme supérieur aux actifs liquides"
+  ],
+
+  "alertes": [
+    "Marge nette négative sur 3 exercices consécutifs.",
+    "Dégradation du ratio de liquidité immédiate"
+  ],
+
+  "impact_financier": [
+    "Risque de rupture de trésorerie à 60 jours estimé à 45 000 €"
+  ],
+
+  "ce_qui_detruit": [
+    "Structure de coûts fixes incompressibles représentant 82 % du CA"
+  ],
+
+  "plan_action_haute": [
+    "Renégocier immédiatement les lignes de crédit court terme",
+    "Réduire les charges fixes de 15 % d'ici 30 jours"
+  ],
+
+  "plan_action_secondaire": [
+    "Mettre en place un suivi hebdomadaire de la trésorerie",
+    "Identifier et recouvrer les créances clients au-delà de 60 jours"
+  ],
+
+  "leviers_croissance": [
+    "Optimiser le mix produit vers les références à marge supérieure à 40 %"
+  ],
+
+  "plan_action_30_60_90": [
+    {
+      "action": "Renégocier immédiatement les lignes de crédit court terme",
+      "horizon": "30"
+    },
+    {
+      "action": "Réduire les charges fixes de 15 % d'ici 30 jours",
+      "horizon": "30"
+    },
+    {
+      "action": "Mettre en place un suivi hebdomadaire de la trésorerie",
+      "horizon": "60"
+    },
+    {
+      "action": "Identifier et recouvrer les créances clients au-delà de 60 jours",
+      "horizon": "60"
+    },
+    {
+      "action": "Optimiser le mix produit vers les références à marge supérieure à 40 %",
+      "horizon": "90"
+    }
+  ]
+}

@@ -13,7 +13,7 @@ type IntentionChoice = 'planned' | 'rejected' | 'unsure' | 'no_longer_relevant';
 const INTENTION_OPTIONS: { choice: IntentionChoice; label: string; status: DecisionFeedbackStatus }[] = [
   { choice: 'planned', label: 'Je vais appliquer', status: 'planned' },
   { choice: 'rejected', label: 'Je ne vais pas appliquer', status: 'rejected' },
-  { choice: 'unsure', label: 'Je ne sais pas encore', status: 'planned' },
+  { choice: 'unsure', label: 'Je ne sais pas encore', status: 'unsure' },
   { choice: 'no_longer_relevant', label: "Ce n'est pas pertinent", status: 'no_longer_relevant' },
 ];
 
@@ -36,6 +36,8 @@ export function FeedbackCard({ reportId, recommendations }: FeedbackCardProps) {
   const [comments, setComments] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
+  // Arc Décisionnel MVP v16 — trace si un arc a été créé pour cette recommandation
+  const [arcTracked, setArcTracked] = useState<Record<string, boolean>>({});
 
   if (items.length === 0) return null;
 
@@ -52,7 +54,7 @@ export function FeedbackCard({ reportId, recommendations }: FeedbackCardProps) {
     if (!option) return;
     setSaving(prev => ({ ...prev, [rec.id]: true }));
     try {
-      await submitDecisionFeedback({
+      const response = await submitDecisionFeedback({
         report_id: reportId,
         recommendation_id: rec.id,
         recommendation_text: rec.text,
@@ -61,6 +63,10 @@ export function FeedbackCard({ reportId, recommendations }: FeedbackCardProps) {
         comment: comment || undefined,
       });
       setSaved(prev => ({ ...prev, [rec.id]: true }));
+      // Arc Décisionnel MVP v16 : si le backend a créé un arc, afficher "Décision tracée ✓"
+      if (response.arc_created) {
+        setArcTracked(prev => ({ ...prev, [rec.id]: true }));
+      }
     } catch {
       // silencieux — pas bloquant pour l'utilisateur
     } finally {
@@ -133,11 +139,20 @@ export function FeedbackCard({ reportId, recommendations }: FeedbackCardProps) {
               )}
 
               {isSaved && (
-                <div className="flex items-center gap-1.5 text-xs text-green-700 font-medium">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Merci, c&apos;est noté.
+                <div className="flex items-center gap-3 text-xs flex-wrap">
+                  <div className="flex items-center gap-1.5 text-green-700 font-medium">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Merci, c&apos;est noté.
+                  </div>
+                  {/* Arc Décisionnel MVP v16 : confirmation non-intrusive de la traçabilité */}
+                  {arcTracked[rec.id] && (
+                    <div className="flex items-center gap-1 text-amber-700 font-medium">
+                      <span>🔗</span>
+                      <span>Décision tracée</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

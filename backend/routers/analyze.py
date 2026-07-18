@@ -4,6 +4,7 @@ POST /api/analyze      — Analyze an uploaded financial file
 POST /api/analyze/text — Text question (no file)
 """
 import asyncio
+import hashlib
 import logging
 import os
 import time
@@ -20,6 +21,10 @@ from models.schemas import AnalyzeResponse, TextQueryRequest, TextQueryResponse,
 from connectors import FileConnector
 from services.llm_service import run_full_pipeline, get_anthropic_client, call_chat_intelligent
 from services.excel_export import generate_excel_report
+# WP5C Commit 6 — compute_decision_fingerprint / FINGERPRINT_VERSION retirés de analyze.py.
+# Le fingerprint est désormais calculé dans l'extracteur (Phase 9, KERNEL-INV-013)
+# et lu depuis decision_kernel.decision_fingerprint. Aucun calcul dans ce fichier.
+from services.decision_kernel_extractor import extract_decision_kernel  # WP5C
 from services.usage_service import UsageService
 from services.data_quality_gate import validate_excel_before_analysis
 from services.anonymization_service import (
@@ -674,8 +679,25 @@ async def _run_analysis_pipeline(
     # il n'est jamais écrit sur disque. Il sera libéré par le GC Python
     # à la fin de cette requête. Conforme au master plan "auto-delete source file".
     file_size_bytes = len(file_bytes)  # stocker avant suppression
+    # FIN-001 — SHA-256 du fichier brut (identité source, octet pour octet).
+    # Calculé ici, avant del file_bytes, et transmis à _save_to_db().
+    # Distinct du decision_fingerprint (données sources ≠ conclusions décisionnelles).
+    source_data_hash = hashlib.sha256(file_bytes).hexdigest()
     del file_bytes  # libération explicite immédiate
     logger.info(f"[SECURITY] Fichier source supprimé de la mémoire après analyse — {analyse_id}")
+
+    # ── WP5C — Decision Kernel extraction (additive, non-bloquant) ───────────
+    # Appelé après l'overwrite EDM (plan_action_haute final, L586-601) et après
+    # l'attachement de data_quality (L603-621). Ne lit que analysis_result —
+    # jamais modifié, jamais persisté via ce pointeur. Retourne None si CA-2
+    # échoue (toutes les Decisions insufficient_data) ou sur toute erreur interne.
+    # Non-bloquant par conception : un Kernel None ne compromet pas la persistance
+    # de l'analyse ni aucun export existant.
+    _decision_kernel = extract_decision_kernel(
+        analysis_result=analysis_result,
+        analyse_id=analyse_id,
+        source_data_hash=source_data_hash,
+    )
 
     # Increment analysis usage counter (server-side, after success)
     _usage_service.increment_analysis(company_id)
@@ -728,6 +750,8 @@ async def _run_analysis_pipeline(
         cost=cost,
         duration_ms=duration_ms,
         plan=plan,
+        source_data_hash=source_data_hash,
+        decision_kernel=_decision_kernel,  # WP5C — None si extraction échouée/CA-2
     )
 
     # Save memory APRÈS _save_to_db (FK: financial_metrics.analyse_id → analyses.id)
@@ -736,6 +760,25 @@ async def _run_analysis_pipeline(
             _memory_service.save_analysis_memory(company_id, analyse_id, analysis_result.model_dump())
         except Exception as e:
             logger.error(f"[MEMORY] save_analysis_memory failed: {e}")
+
+    # ── Arc Décisionnel MVP v16 — détection de conséquences candidates ────────
+    # Appelé après _save_to_db (analyses.id doit exister avant arc_analysis_links).
+    # Non-bloquant : une erreur ici ne doit jamais bloquer la réponse principale.
+    # Résultat inclus dans AnalyzeResponse pour injection dans ChatContainer.
+    arc_consequence_candidates: list = []
+    try:
+        from services.arc_service import arc_service as _arc_service
+        arc_consequence_candidates = _arc_service.detect_consequence_candidates(
+            company_id=company_id,
+            new_analysis_id=analyse_id,
+            analyse_json=analysis_result.model_dump(),
+        )
+    except Exception as e:
+        logger.error(
+            "[ARC] detect_consequence_candidates failed — analyse_id=%s : %s",
+            analyse_id, e,
+            exc_info=True,
+        )
 
     return AnalyzeResponse(
         success=True,
@@ -746,6 +789,7 @@ async def _run_analysis_pipeline(
         cout_estime=cost,
         memory_insight=memory_insight,
         recommendations_tracking=recommendations_tracking,
+        arc_consequence_candidates=arc_consequence_candidates or None,
     )
 
 
@@ -764,6 +808,8 @@ def _save_to_db(
     duration_ms: int,
     plan: str,
     entity_id: Optional[str] = None,
+    source_data_hash: Optional[str] = None,
+    decision_kernel=None,  # Optional[DecisionKernel] — WP5C
 ):
     """Save analysis record to Supabase. Errors are logged but non-blocking."""
     try:
@@ -793,6 +839,27 @@ def _save_to_db(
             insert_payload["fichier_taille_bytes"] = file_size
         if entity_id is not None:
             insert_payload["entity_id"] = entity_id
+
+        # source_data_hash : SHA-256(file_bytes bruts), calculé avant del file_bytes.
+        # Identité du fichier source — distinct et indépendant du fingerprint décisionnel.
+        if source_data_hash is not None:
+            insert_payload["source_data_hash"] = source_data_hash
+
+        # WP5C — Decision Kernel + Decision Fingerprint (Commit 5 & 6)
+        # Persistance additive : aucun flux existant ne dépend de ces colonnes.
+        # decision_kernel_version est lu depuis l'objet Kernel (jamais hardcodé 'dk-1').
+        # Si decision_kernel est None (CA-2 ou erreur interne), les colonnes restent NULL.
+        # WP5C Commit 6 (KERNEL-INV-013) : le fingerprint est embarqué dans le Kernel
+        # (Phase 9 de l'extracteur). Il n'est jamais recalculé ici depuis AnalysisResult.
+        if decision_kernel is not None:
+            insert_payload["decision_kernel"] = decision_kernel.model_dump(mode="json")
+            insert_payload["decision_kernel_version"] = decision_kernel.kernel_version
+            # Fingerprint : lu depuis le Kernel (posé en Phase 9, après canonicalisation).
+            # None possible si le proxy ne contient pas de champ décisionnel significatif
+            # (cas théorique pour un Kernel non-CA-2 — normalement toujours set).
+            if decision_kernel.decision_fingerprint is not None:
+                insert_payload["decision_fingerprint"] = decision_kernel.decision_fingerprint
+                insert_payload["decision_fingerprint_version"] = decision_kernel.decision_fingerprint_version
 
         logger.debug("[DB] Insert analyse %s", analyse_id)
         result = supabase.from_("analyses").insert(insert_payload).execute()

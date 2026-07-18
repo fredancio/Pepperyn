@@ -1,0 +1,202 @@
+{
+  "kernel_id": "optilux-golden-v3-001",
+  "kernel_version": "dk-1",
+  "kernel_produced_at": "2026-07-17T12:00:00Z",
+  "decision_fingerprint": "8780ad72a7b868118c0c64c606a2756f",
+  "decision_fingerprint_version": "v1",
+  "source_data_hash": "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2",
+  "type_document": "P&L",
+  "secteur": null,
+  "modele_economique": null,
+  "decisions": [
+    {
+      "local_id": "d-01",
+      "scope": "RENTABILITÉ",
+      "status": "available",
+      "score": 3,
+      "polarity": "CRITIQUE",
+      "interpretation_text": "La marge nette est profondément négative sur les 12 derniers mois.",
+      "findings": [],
+      "recommendations": []
+    },
+    {
+      "local_id": "d-02",
+      "scope": "RISQUE",
+      "status": "available",
+      "score": 7,
+      "polarity": "CRITIQUE",
+      "interpretation_text": "L'endettement représente 78% des capitaux propres — seuil critique dépassé.",
+      "findings": [],
+      "recommendations": []
+    },
+    {
+      "local_id": "d-03",
+      "scope": "STRUCTURE",
+      "status": "available",
+      "score": 4,
+      "polarity": "ÉLEVÉ",
+      "interpretation_text": "Le bilan présente un déséquilibre actif court terme / passif long terme.",
+      "findings": [],
+      "recommendations": []
+    },
+    {
+      "local_id": "d-04",
+      "scope": "LIQUIDITÉ",
+      "status": "available",
+      "score": 3,
+      "polarity": "CRITIQUE",
+      "interpretation_text": "La trésorerie nette est négative depuis le T2 2025.",
+      "findings": [],
+      "recommendations": []
+    }
+  ],
+  "score_global": 3,
+  "niveau_urgence": "Critique",
+  "global_findings": [
+    {
+      "local_id": "f-01",
+      "statement": "Marge nette négative sur 3 exercices consécutifs",
+      "source_field": "problemes_critiques",
+      "source_index": 0,
+      "source_section": null,
+      "severity": "CRITIQUE",
+      "scope_status": "global",
+      "evidence_refs": [],
+      "source_refs": [
+        {
+          "source_field": "alertes",
+          "source_index": 0,
+          "source_section": null
+        }
+      ]
+    },
+    {
+      "local_id": "f-02",
+      "statement": "Trésorerie nette négative depuis le T2 2025",
+      "source_field": "problemes_critiques",
+      "source_index": 1,
+      "source_section": null,
+      "severity": "CRITIQUE",
+      "scope_status": "global",
+      "evidence_refs": [],
+      "source_refs": []
+    },
+    {
+      "local_id": "f-03",
+      "statement": "Endettement court terme supérieur aux actifs liquides",
+      "source_field": "problemes_critiques",
+      "source_index": 2,
+      "source_section": null,
+      "severity": "CRITIQUE",
+      "scope_status": "global",
+      "evidence_refs": [],
+      "source_refs": []
+    },
+    {
+      "local_id": "f-04",
+      "statement": "Dégradation du ratio de liquidité immédiate",
+      "source_field": "alertes",
+      "source_index": 1,
+      "source_section": null,
+      "severity": "ÉLEVÉ",
+      "scope_status": "global",
+      "evidence_refs": [],
+      "source_refs": []
+    },
+    {
+      "local_id": "f-05",
+      "statement": "Risque de rupture de trésorerie à 60 jours estimé à 45 000 €",
+      "source_field": "impact_financier",
+      "source_index": 0,
+      "source_section": null,
+      "severity": null,
+      "scope_status": "global",
+      "evidence_refs": [],
+      "source_refs": []
+    },
+    {
+      "local_id": "f-06",
+      "statement": "Structure de coûts fixes incompressibles représentant 82 % du CA",
+      "source_field": "ce_qui_detruit",
+      "source_index": 0,
+      "source_section": null,
+      "severity": null,
+      "scope_status": "global",
+      "evidence_refs": [],
+      "source_refs": []
+    }
+  ],
+  "global_recommendations": [
+    {
+      "local_id": "r-01",
+      "directive": "Renégocier immédiatement les lignes de crédit court terme",
+      "source_field": "plan_action_haute",
+      "source_index": 0,
+      "priority": "HAUTE",
+      "horizon": "IMMÉDIAT",
+      "intent_text": null,
+      "expected_outcome": null,
+      "scope_status": "global",
+      "source_refs": []
+    },
+    {
+      "local_id": "r-02",
+      "directive": "Réduire les charges fixes de 15 % d'ici 30 jours",
+      "source_field": "plan_action_haute",
+      "source_index": 1,
+      "priority": "HAUTE",
+      "horizon": "IMMÉDIAT",
+      "intent_text": null,
+      "expected_outcome": null,
+      "scope_status": "global",
+      "source_refs": []
+    },
+    {
+      "local_id": "r-03",
+      "directive": "Mettre en place un suivi hebdomadaire de la trésorerie",
+      "source_field": "plan_action_secondaire",
+      "source_index": 0,
+      "priority": "SECONDAIRE",
+      "horizon": "COURT_TERME",
+      "intent_text": null,
+      "expected_outcome": null,
+      "scope_status": "global",
+      "source_refs": []
+    },
+    {
+      "local_id": "r-04",
+      "directive": "Identifier et recouvrer les créances clients au-delà de 60 jours",
+      "source_field": "plan_action_secondaire",
+      "source_index": 1,
+      "priority": "SECONDAIRE",
+      "horizon": "COURT_TERME",
+      "intent_text": null,
+      "expected_outcome": null,
+      "scope_status": "global",
+      "source_refs": []
+    },
+    {
+      "local_id": "r-05",
+      "directive": "Optimiser le mix produit vers les références à marge supérieure à 40 %",
+      "source_field": "leviers_croissance",
+      "source_index": 0,
+      "priority": "SECONDAIRE",
+      "horizon": "MOYEN_TERME",
+      "intent_text": null,
+      "expected_outcome": null,
+      "scope_status": "global",
+      "source_refs": []
+    }
+  ],
+  "score_confiance": 72,
+  "data_quality_score": 78,
+  "data_quality_blocking": false,
+  "attribution": {
+    "mode": "conservative_v1",
+    "dimension_decisions_available": 4,
+    "findings_total": 6,
+    "findings_scoped": 0,
+    "recommendations_total": 5,
+    "recommendations_scoped": 0
+  }
+}

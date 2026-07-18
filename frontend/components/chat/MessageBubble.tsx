@@ -3,6 +3,7 @@ import { AnalysisResult } from './AnalysisResult';
 import { CoachingMessage } from './CoachingMessage';
 import { FeedbackCard } from './FeedbackCard';
 import { RecommendationCheckIn } from './RecommendationCheckIn';
+import { ArcConsequencePrompt } from './ArcConsequencePrompt';
 
 // ─── Renderer Markdown léger ────────────────────────────────────────────────
 // Interprète ##, **bold**, - list items, ✓ checkmarks
@@ -123,6 +124,38 @@ export function MessageBubble({ message, questionsRestantes, plan = 'free', onCh
         </div>
         <div className="flex-1">
           <FeedbackCard reportId={meta.report_id} recommendations={meta.recommendations} />
+          <p className="text-xs text-[#5F6368] mt-1 ml-1">{formatTime(message.created_at)}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Arc Décisionnel MVP v16 — candidat conséquence détecté après analyse
+  if (message.content_type === 'arc_consequence_prompt' && message.metadata) {
+    const meta = message.metadata as {
+      candidates: Array<{
+        arc_id: string;
+        analysis_id: string;
+        hypothesis: string;
+        recommendation_text: string;
+        decision_text?: string | null;
+      }>;
+    };
+    const c = meta.candidates?.[0];
+    if (!c) return null;
+    return (
+      <div className="flex items-start gap-3 max-w-[92%] animate-slide-up">
+        <div className="w-8 h-8 bg-amber-500 rounded-full flex-shrink-0 flex items-center justify-center mt-1 shadow-sm">
+          <span className="text-white text-xs font-bold">🔗</span>
+        </div>
+        <div className="flex-1">
+          <ArcConsequencePrompt
+            arcId={c.arc_id}
+            analysisId={c.analysis_id}
+            hypothesis={c.hypothesis}
+            recommendationText={c.recommendation_text}
+            decisionText={c.decision_text}
+          />
           <p className="text-xs text-[#5F6368] mt-1 ml-1">{formatTime(message.created_at)}</p>
         </div>
       </div>

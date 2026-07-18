@@ -400,12 +400,13 @@ class DecisionMemoryService:
                     "rapport précédent :"
                 )
                 status_fr = {
-                    "planned": "prévu mais pas encore fait",
-                    "done": "FAIT",
-                    "partially_done": "partiellement fait",
-                    "not_done": "PAS FAIT",
-                    "rejected": "REJETÉ par l'utilisateur",
-                    "no_longer_relevant": "n'est plus pertinent",
+                    "planned":             "prévu mais pas encore fait",
+                    "unsure":              "indécis — l'utilisateur ne sait pas encore",
+                    "done":                "FAIT",
+                    "partially_done":      "partiellement fait",
+                    "not_done":            "PAS FAIT",
+                    "rejected":            "REJETÉ par l'utilisateur",
+                    "no_longer_relevant":  "n'est plus pertinent",
                 }
                 for r in with_feedback:
                     status_label = status_fr.get(r["status"], r["status"])

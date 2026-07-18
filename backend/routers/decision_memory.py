@@ -25,7 +25,13 @@ router = APIRouter(prefix="/api", tags=["decision-memory"])
 _decision_memory_service = DecisionMemoryService()
 
 VALID_STATUSES = {
-    "planned", "done", "partially_done", "not_done", "rejected", "no_longer_relevant",
+    "planned",           # Intention ferme : "Je vais appliquer"     → Arc créé
+    "unsure",            # Indécision      : "Je ne sais pas encore" → pas d'Arc
+    "done",
+    "partially_done",
+    "not_done",
+    "rejected",
+    "no_longer_relevant",
 }
 
 
@@ -97,4 +103,46 @@ async def submit_decision_feedback(
     except Exception as e:
         logger.warning(f"[DECISION MEMORY] compute_user_patterns failed: {e}")
 
-    return {"success": True}
+    # ── Arc Décisionnel MVP v16 — création d'arc si intention déclarée ────────
+    # Source de vérité unique : le backend crée l'arc. Le frontend lit le résultat.
+    # Non-bloquant : un échec ici ne doit jamais empêcher le retour du feedback.
+    # Reconstruction possible via POST /api/admin/arcs/backfill (idempotent).
+    arc_created = False
+    arc_id = None
+    arc_status = None
+
+    if request.status == "planned":
+        try:
+            from services.arc_service import arc_service
+            arc_result = arc_service.create_arc_from_feedback(
+                company_id=company_id,
+                origin_analysis_id=request.report_id,
+                recommendation_id=request.recommendation_id,
+                decision_source=request.recommendation_source or "plan_action",
+                recommendation_text=request.recommendation_text,
+            )
+            arc_created = arc_result.get("created", False)
+            arc_id = arc_result.get("arc_id")
+            arc_status = arc_result.get("arc_status")
+        except ValueError as e:
+            # Guard DCT : analyse sans DecisionKernel valide — log et continue
+            logger.warning(
+                "[ARC] Arc non créé (guard DCT) — company=%s report=%s : %s",
+                company_id, request.report_id, e,
+            )
+        except Exception as e:
+            # Erreur inattendue — log structuré + continue (feedback déjà sauvé)
+            logger.error(
+                "[ARC] Échec création arc — company=%s report=%s recommendation=%s : %s",
+                company_id, request.report_id, request.recommendation_id, e,
+                exc_info=True,
+            )
+            # L'arc peut être reconstruit via : POST /api/admin/arcs/backfill?company_id=...
+            # Reconstruction sûre car UNIQUE(origin_analysis_id, recommendation_id).
+
+    return {
+        "success": True,
+        "arc_created": arc_created,
+        "arc_id": arc_id,
+        "arc_status": arc_status,
+    }
