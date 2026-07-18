@@ -301,6 +301,15 @@ export function ChatContainer() {
           setMessages(prev => [...prev, feedbackMsg]);
         }
 
+        // Arc Décisionnel MVP v16 — candidats conséquence détectés par arc_service
+        // Injecté non-bloquant : seulement si le backend a retourné des candidats.
+        if (analyseId && result.arc_consequence_candidates?.length > 0) {
+          const arcMsg = makeLocalMessage('assistant', '', 'arc_consequence_prompt', {
+            candidates: result.arc_consequence_candidates,
+          });
+          setMessages(prev => [...prev, arcMsg]);
+        }
+
         // ── V2 Conversation Engine : message d'accueil ──────────────────────
         // Appel silencieux à /api/conversation-context/{analyseId}.
         // Anti-doublon : injecté une seule fois par analyse_id.
