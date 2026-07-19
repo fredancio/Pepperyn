@@ -34,7 +34,15 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
+from models.financial_truth import QuantifiedImpact
 from models.schemas import DataQualityInfo, ScenarioCase
+
+# ── Phase 4B : Financial Truth Layer ─────────────────────────────────────────
+# QuantifiedImpact est importé directement depuis models.financial_truth.
+# financial_truth.py n'importe que la stdlib → aucun cycle d'import.
+# Pydantic v2 gère les Python dataclasses nativement (pas d'arbitrary_types_allowed).
+# Les renderers ignorent quantified_impact en Phase 4B (ils lisent annual_impact).
+# En Phase 4C, les renderers liront quantified_impact en priorité.
 
 __all__ = [
     "CostOfInaction",
@@ -65,6 +73,10 @@ class ValueDestroyer(BaseModel):
     pct_revenue: Optional[float] = None         # 🐍 dérivé (si CA total connu — Étape B+)
     trend: Optional[str] = None                  # "up" | "down" | "stable" | None
     comment: Optional[str] = None                # texte libre (LLM) — jamais un calcul
+    # ── Phase 4B : Financial Truth Layer ────────────────────────────────────
+    # Coexiste avec annual_impact. Ignoré par les renderers en Phase 4B.
+    # Pydantic v2 valide le type : seul QuantifiedImpact ou None est accepté.
+    quantified_impact: Optional[QuantifiedImpact] = None
 
 
 class ExecutiveDecision(BaseModel):
@@ -78,6 +90,10 @@ class ExecutiveDecision(BaseModel):
     priority: str = "Not evaluated"              # 🐍 dérivé des seuils d'impact
     roi_score: float = 0.0                         # 🐍 dérivé (impact x difficulté)
     status: str = "To launch"                       # 🐍 valeur par défaut
+    # ── Phase 4B : Financial Truth Layer ────────────────────────────────────
+    # Coexiste avec annual_impact. Ignoré par les renderers en Phase 4B.
+    # Pydantic v2 valide le type : seul QuantifiedImpact ou None est accepté.
+    quantified_impact: Optional[QuantifiedImpact] = None
 
 
 class ExecutionItem(BaseModel):
