@@ -20,6 +20,8 @@ from typing import Any
 import pandas as pd
 import openpyxl
 
+from .temporal_normalizer import build_temporal_context
+
 logger = logging.getLogger(__name__)
 
 MAX_ROWS = 10_000
@@ -236,6 +238,30 @@ def _extract_bilan_summary(sheets_data: list[dict[str, Any]]) -> dict[str, Any]:
     return found
 
 
+def _extract_temporal_headers(sheets_data: list[dict[str, Any]]) -> list[str]:
+    """
+    Return the column header list from the best candidate sheet for temporal
+    classification.  Priority:
+      1. First P&L-format sheet (format_hint == "pl_mensuel")
+      2. First sheet with ≥ 3 columns
+    Skips sheets with fewer than 3 columns — not enough temporal context.
+    """
+    pl_sheet: dict[str, Any] | None = None
+    first_wide: dict[str, Any] | None = None
+
+    for sheet in sheets_data:
+        cols = sheet.get("columns", [])
+        if len(cols) < 3:
+            continue
+        if sheet.get("format_hint") == "pl_mensuel" and pl_sheet is None:
+            pl_sheet = sheet
+        if first_wide is None:
+            first_wide = sheet
+
+    chosen = pl_sheet or first_wide
+    return list(chosen["columns"]) if chosen else []
+
+
 def _build_excel_result(
     filename: str, sheet_names: list[str], sheets_data: list[dict[str, Any]]
 ) -> dict[str, Any]:
@@ -256,6 +282,18 @@ def _build_excel_result(
     bilan_summary = _extract_bilan_summary(sheets_data)
     if bilan_summary:
         result["bilan_summary"] = bilan_summary
+
+    # ── Temporal context: dynamic column classification ───────────────────────
+    # Determine which columns are current vs historical vs budget WITHOUT
+    # hardcoding specific years. Uses hierarchical signal hierarchy so that
+    # "12 months N-1 + 6 months YTD N" correctly identifies N as current year
+    # (not N-1, even though N-1 appears more frequently).
+    temporal_headers = _extract_temporal_headers(sheets_data)
+    if temporal_headers:
+        try:
+            result["temporal_context"] = build_temporal_context(temporal_headers)
+        except Exception as e:  # pragma: no cover — defensive
+            logger.warning(f"[parser] temporal_normalizer failed: {e}")
 
     # ── RÈGLE ABSOLUE N°10 : manifeste complet de toutes les feuilles ────────
     # Injecté dans le contexte LLM AVANT les données.

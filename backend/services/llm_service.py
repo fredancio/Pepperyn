@@ -346,9 +346,12 @@ Chaque affirmation appartient à UNE seule catégorie — elles sont exclusives.
       Jamais : "Les factures n'ont pas été émises."
       Toujours conditionnel : "pourrait", "semble", "peut indiquer".
 
-[REC] Recommandation — Action proposée. TOUJOURS conditionnelle.
-      Exemple : "Si des prestations ont été réalisées sans être facturées : émettre les factures."
-      JAMAIS basée sur une hypothèse unique. Plusieurs causes doivent être envisagées.
+[REC] Recommandation — Action proposée. TOUJOURS conditionnelle à une [HYP] explicite.
+      Format OBLIGATOIRE : "Si [hypothèse] → [action recommandée]"
+      Exemple ✓ : "Si des prestations ont été réalisées en septembre sans être facturées → émettre les factures."
+      Exemple ✗ : "Émettre les factures de septembre." (certitude non démontrée — INTERDIT)
+      RÈGLE : plusieurs causes possibles doivent être envisagées avant toute [REC] unique.
+      Une [REC] sans [HYP] explicite préalable est une erreur de catégorisation.
 
 [SIM] Simulation — Projection. TOUJOURS annoncée comme simulation.
       Jamais présentée comme une prévision certaine.
@@ -1040,9 +1043,12 @@ Raisons fiabilité : [si score < 70% : bilan absent / partiel / non réconcilié
 
 # QUICK WINS
 (3 opportunités immédiates chiffrées max — actions à fort impact et faible effort)
-→ [Description de l'action] | ROI : [estimation€ ou % ou "Non chiffrable"] | Délai : [ex : "2 semaines"] | Difficulté : [faible / moyenne / élevée]
-→ [Description de l'action] | ROI : [...] | Délai : [...] | Difficulté : [...]
-→ [Description de l'action] | ROI : [...] | Délai : [...] | Difficulté : [...]
+RÈGLE ABSOLUE : chaque quick win doit être conditionnel à une hypothèse explicite.
+Format OBLIGATOIRE : "Si [hypothèse vérifiable] → [action concrète]"
+INTERDIT : "Émettre les factures X" sans condition. OBLIGATOIRE : "Si des factures X n'ont pas été émises → les émettre."
+→ Si [hypothèse] → [action] | ROI : [estimation€ ou % ou "Non chiffrable"] | Délai : [ex : "2 semaines"] | Difficulté : [faible / moyenne / élevée]
+→ Si [hypothèse] → [action] | ROI : [...] | Délai : [...] | Difficulté : [...]
+→ Si [hypothèse] → [action] | ROI : [...] | Délai : [...] | Difficulté : [...]
 
 # DÉCISION
 (quelques phrases claires — orientées action immédiate)
