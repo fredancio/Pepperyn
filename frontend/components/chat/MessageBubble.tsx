@@ -59,6 +59,18 @@ function MarkdownContent({ text }: { text: string }) {
       continue;
     }
 
+    // H3 : ### Titre
+    if (/^###\s+/.test(line)) {
+      flushList();
+      const title = line.replace(/^#+\s+/, '');
+      nodes.push(
+        <p key={idx++} className="text-xs font-semibold text-[#1A1A2E] mt-2 mb-0.5">
+          {renderInline(title)}
+        </p>
+      );
+      continue;
+    }
+
     // H2 : ## Titre
     if (/^##\s+/.test(line)) {
       flushList();

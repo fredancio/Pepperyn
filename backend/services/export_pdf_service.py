@@ -2331,9 +2331,14 @@ def _build_page_transparence(result: dict, edm, styles: dict) -> list:
     ))
     s.append(_sp(7))
 
-    score_data  = result.get("score_confiance") or result.get("confidence_score") or 0
-    health      = result.get("score_global") or 0
     dq          = result.get("data_quality") or {}
+    # score_data = technical file quality (0-100), from data_quality gate.
+    # Fallback to score_confiance (reasoning confidence) only if not present.
+    _dq_score   = (dq.get("score_data") if isinstance(dq, dict) else None)
+    score_data  = _dq_score if _dq_score is not None else (
+        result.get("score_confiance") or result.get("confidence_score") or 0
+    )
+    health      = result.get("score_global") or 0
     anomalies   = dq.get("anomalies") or [] if isinstance(dq, dict) else []
     assumptions = dq.get("assumptions") or [] if isinstance(dq, dict) else []
     limits      = dq.get("limits") or [] if isinstance(dq, dict) else []
@@ -2367,7 +2372,7 @@ def _build_page_transparence(result: dict, edm, styles: dict) -> list:
 
     scores_data = [
         [
-            Paragraph("FIABILITÉ DES DONNÉES SOURCE", row_lbl_ps),
+            Paragraph("QUALITÉ TECHNIQUE DU FICHIER", row_lbl_ps),
             Paragraph("CONFIANCE DU RAISONNEMENT STRATÉGIQUE", row_lbl_ps),
         ],
         [

@@ -135,17 +135,19 @@ HYPO_R_MARGE_N = 22
 
 # ─── Utilitaires de formatage ────────────────────────────────────────────────
 
-def _parse_eur(s: Optional[str]) -> float:
-    """Parses a monetary string to float.
+def _parse_eur(s: Optional[str]) -> Optional[float]:
+    """Parses a monetary string to float, or None if not parsable.
 
     Handles:
       '1 800 000 €'                        → 1_800_000.0
       '1.2M €'                             → 1_200_000.0
       '**-240 000 €** (marge : -2,9 %)'   → -240_000.0  (markdown + parenthetical)
       '2 242 000 € — 18,2%'               → 2_242_000.0  (em-dash annotation)
+      'Données insuffisantes'              → None  (not parsable — not 0)
+      None / ''                            → None
     """
     if not s:
-        return 0.0
+        return None
     s = str(s)
     # Strip markdown bold/italic markers (** or *)
     s = re.sub(r"\*+", "", s)
@@ -161,7 +163,7 @@ def _parse_eur(s: Optional[str]) -> float:
             return float(c[:-1]) * 1_000
         return float(c)
     except (ValueError, TypeError):
-        return 0.0
+        return None
 
 
 def _strip_md(text: Optional[str]) -> str:
@@ -338,15 +340,18 @@ def _build_edm(wb: Workbook, edm, raw: dict) -> None:
     # case_to_edm() ne les propage pas (champs absents du modèle EDM legacy).
     # RULE 004 — le renderer AFFICHE. Il lit depuis la source : raw.ceo_dashboard.
     # RULE 001 — aucune valeur ne peut rester à 0 si la donnée est disponible.
-    _ebitda_val = 0.0
-    _cash_val   = 0.0
+    # INVARIANT — ABSENCE DE DONNÉE ≠ ZÉRO FINANCIER :
+    # Si la valeur est "Données insuffisantes" ou non parsable, la cellule EDM
+    # doit être VIDE (None) — jamais 0. Un 0 financier visible serait mensonger.
+    _ebitda_val: float | None = None
+    _cash_val:   float | None = None
     for _card in ((raw or {}).get("ceo_dashboard") or []):
         _lbl = (_card.get("label", "") if isinstance(_card, dict) else "").lower()
         _val = (_card.get("value", "") if isinstance(_card, dict) else "")
         if "ebitda" in _lbl:
-            _ebitda_val = _parse_eur(_val)
+            _ebitda_val = _parse_eur(_val)   # None si "Données insuffisantes" → cellule vide
         elif any(k in _lbl for k in ("trésor", "tresor", "cash", "liquid")):
-            _cash_val = _parse_eur(_val)
+            _cash_val = _parse_eur(_val)     # None si "Données insuffisantes" → cellule vide
 
     global_rows = [
         (EDM_R_HEALTH,    "Score Santé",                edm.health_score or 0),
@@ -729,16 +734,20 @@ def _build_hypotheses(wb: Workbook, edm, raw: dict = None) -> None:
     ws.row_dimensions[HYPO_R_COI + 1].height = 8
 
     # Section B — Hypothèses de revenus
-    ebitda_num = _parse_eur(edm.ebitda)
-    # mn2 fix: récupérer le CA réel depuis le dashboard LLM si disponible
-    ca_initial = 0.0
+    # INVARIANT — ABSENCE DE DONNÉE ≠ ZÉRO FINANCIER :
+    # ebitda_num sert uniquement de fallback pour estimer le CA initial.
+    # Si EBITDA inconnu (None), on ne peut pas en déduire un CA = 0.
+    # Si CA inconnu, la cellule reste vide (None) — l'utilisateur la remplira.
+    ebitda_num: float | None = _parse_eur(edm.ebitda)   # Optional — jamais de fallback 0
+    ca_initial: float | None = None
     if raw:
         for _card in (raw.get("ceo_dashboard") or []):
             _lbl = (_card.get("label", "") if isinstance(_card, dict) else "").lower()
             if any(k in _lbl for k in ("ca total", "chiffre d'affaires", "revenu", "revenue")):
-                ca_initial = _parse_eur(_card.get("value", "0"))
+                ca_initial = _parse_eur(_card.get("value"))  # None si absent ou non parsable
                 break
-    if not ca_initial:
+    # Fallback EBITDA → CA estimé uniquement si CA inconnu ET EBITDA connu
+    if ca_initial is None and ebitda_num is not None:
         ca_initial = max(ebitda_num * 2.5, 0)
     _section_bar(ws, HYPO_R_CA - 1,
                  "B — HYPOTHÈSES DE REVENUS  ↓ cellules bleues modifiables",
