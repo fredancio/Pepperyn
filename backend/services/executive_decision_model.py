@@ -28,6 +28,7 @@ IMPORTANT (Étape A/B) :
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 from datetime import date, timedelta
@@ -45,6 +46,51 @@ from models.executive_decision_model import (
 from models.schemas import DataQualityInfo, ScenarioCase
 
 logger = logging.getLogger(__name__)
+
+# ── E2E Campaign logging — TEMPORAIRE (supprimer après Gate Review Phase 4C) ──
+_e2e_log = logging.getLogger("pepperyn.e2e")
+
+
+def _log_qi_e2e(item_type: str, idx: int, qi) -> None:
+    """
+    Log structuré pour la Campagne E2E Phase 4B → 4C.
+    Permet de mesurer L3 (précision LLM) sur metric_type / period_basis / nature /
+    current_vs_historical / annualization_quality / provenance.
+
+    TEMPORAIRE — ne pas laisser en production après la Gate Review.
+    Tag de version figée : e2e-campaign-1-start
+    """
+    try:
+        if qi is not None:
+            ann_q = qi.annualization_quality()
+            _e2e_log.info(
+                "[E2E] %s[%d] %s",
+                item_type,
+                idx,
+                json.dumps(
+                    {
+                        "metric_type": qi.metric_type.value,
+                        "period_basis": qi.period_basis.value,
+                        "nature": qi.nature.value,
+                        "confidence": qi.confidence,
+                        "is_current_period": qi.is_current_period,
+                        "is_unresolved": qi.is_unresolved(),
+                        "ann_quality": ann_q.value if ann_q else None,
+                        "provenance": [
+                            r.source_type.value if r.source_type else None
+                            for r in qi.source_references
+                        ],
+                        "amount": qi.amount,
+                    },
+                    ensure_ascii=False,
+                ),
+            )
+        else:
+            _e2e_log.info("[E2E] %s[%d] qi=None", item_type, idx)
+    except Exception as _e2e_err:
+        # Le logging E2E ne doit jamais faire planter le pipeline
+        logger.debug("[E2E] logging error for %s[%d]: %s", item_type, idx, _e2e_err)
+# ── Fin logging E2E ───────────────────────────────────────────────────────────
 
 
 def _try_deserialize_qi(qi_dict: Any, amount: Optional[float] = None):
@@ -237,7 +283,7 @@ def _find_dashboard_value(raw_cards: list, *keywords: str) -> Optional[str]:
 
 def _build_executive_decisions(raw_quick_wins: list) -> list[ExecutiveDecision]:
     decisions: list[ExecutiveDecision] = []
-    for w in raw_quick_wins or []:
+    for _qw_idx, w in enumerate(raw_quick_wins or []):
         if not isinstance(w, dict):
             continue
         description = w.get("description") or ""
@@ -245,6 +291,7 @@ def _build_executive_decisions(raw_quick_wins: list) -> list[ExecutiveDecision]:
         impact = parse_amount_eur(w.get("roi_estime"))
         # ── Phase 4B : quantified_impact parallèle (legacy inchangé) ────────
         qi = _try_deserialize_qi(w.get("quantified_impact"), amount=impact)
+        _log_qi_e2e("quick_win", _qw_idx, qi)
         decisions.append(
             ExecutiveDecision(
                 decision=description,
@@ -291,7 +338,7 @@ def _build_value_destroyers(
     destroyers: list[ValueDestroyer] = []
 
     if raw_structured:
-        for item in raw_structured:
+        for _vd_idx, item in enumerate(raw_structured):
             if not isinstance(item, dict):
                 continue
             name = (item.get("name") or "").strip()
@@ -301,6 +348,7 @@ def _build_value_destroyers(
             trend = _TREND_MAP.get((item.get("tendance") or "").strip().lower())
             # ── Phase 4B : quantified_impact parallèle (legacy inchangé) ────
             qi = _try_deserialize_qi(item.get("quantified_impact"), amount=impact)
+            _log_qi_e2e("destroyer", _vd_idx, qi)
             destroyers.append(
                 ValueDestroyer(
                     name=name,
