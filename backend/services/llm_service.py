@@ -1050,6 +1050,43 @@ INTERDIT : "Émettre les factures X" sans condition. OBLIGATOIRE : "Si des factu
 → Si [hypothèse] → [action] | ROI : [...] | Délai : [...] | Difficulté : [...]
 → Si [hypothèse] → [action] | ROI : [...] | Délai : [...] | Difficulté : [...]
 
+# IMPACTS FINANCIERS STRUCTURÉS
+(Phase 4B — Financial Truth Layer — JSON strict, aucun texte libre en dehors du bloc)
+Pour chaque ligne de "CE QUI DETRUIT" et chaque ligne de "QUICK WINS" (dans le même ordre, ref_index 0-based) :
+```json
+[
+  {{
+    "ref_type": "destroyer",
+    "ref_index": 0,
+    "metric_type": "EBITDA",
+    "period_basis": "ANNUAL",
+    "nature": "RECURRING",
+    "confidence": 0.85,
+    "source_period": "FY 2019",
+    "is_current_period": true,
+    "gross_margin_rate": null,
+    "gross_margin_source": null,
+    "ytd_periods_elapsed": null
+  }}
+]
+```
+Valeurs autorisées metric_type : REVENUE | GROSS_MARGIN | EBITDA | NET_PROFIT | CASH | COST | COST_SAVING | WORKING_CAPITAL | EXPOSURE | UNKNOWN
+Valeurs autorisées period_basis : ANNUAL | MONTHLY | QUARTERLY | YTD | ANNUALIZED | POINT_IN_TIME | UNKNOWN
+Valeurs autorisées nature : ONE_TIME | RECURRING | STRUCTURAL | UNKNOWN
+Règles :
+- metric_type EBITDA si l'impact touche directement la marge opérationnelle
+- metric_type COST si c'est une charge directe (masse salariale, sous-traitance)
+- metric_type REVENUE si c'est un manque à gagner sur le CA
+- nature ONE_TIME si ponctuel (ex : retard facturation d'un mois précis)
+- nature RECURRING si ça se reproduit chaque mois/trimestre/an
+- period_basis POINT_IN_TIME pour les ONE_TIME ponctuels
+- is_current_period false si l'impact date d'un exercice historique (avant l'année courante identifiée)
+- gross_margin_rate : taux de marge brute si connu explicitement (0.0-1.0), sinon null
+- gross_margin_source : "EXPLICIT_FILE" si fourni dans le document, "LLM_EXTRACTED" si estimé, null si inconnu
+- ytd_periods_elapsed : si period_basis=YTD, nombre de mois calendaires écoulés (ex : Jan-Sep = 9), sinon null
+- ref_type "quick_win" pour les QUICK WINS
+- Si incertitude totale sur un champ → UNKNOWN (jamais d'invention)
+
 # DÉCISION
 (quelques phrases claires — orientées action immédiate)
 
@@ -1172,6 +1209,129 @@ def _clean_verified_text(text: str) -> str:
         if line.strip():
             lines.append(line)
     return "\n".join(lines)
+
+
+def _parse_structured_impacts_section(
+    section_text: str,
+) -> dict[tuple[str, int], dict]:
+    """
+    Parse le bloc JSON de la section # IMPACTS FINANCIERS STRUCTURÉS.
+
+    Contrat :
+      - Jamais d'exception propagée — retourne {} en cas d'erreur.
+      - Règle duplicate : first valid wins. Si deux items partagent le même
+        (ref_type, ref_index), le premier dans le tableau JSON est retenu.
+        Les doublons ultérieurs sont ignorés silencieusement.
+      - amount est toujours None dans le dict retourné ; il sera injecté par
+        _try_deserialize_qi() depuis le parseur legacy (Phase 4B).
+      - Les enums inconnus (metric_type, period_basis, nature) sont conservés
+        tels quels dans le dict ; _safe_enum() les convertit en UNKNOWN lors
+        de QuantifiedImpact.from_dict().
+
+    Args:
+        section_text: Contenu brut de la section IMPACTS FINANCIERS STRUCTURÉS
+                      (texte entre le marqueur et la section suivante).
+
+    Returns:
+        dict keyed by (ref_type: str, ref_index: int) → QI dict.
+        Vide si section_text est vide, si le JSON est absent/invalide,
+        ou si aucun item n'est parseable.
+    """
+    if not section_text:
+        return {}
+
+    import json as _json
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+    result: dict[tuple[str, int], dict] = {}
+
+    try:
+        # Chercher le bloc JSON avec ou sans délimiteurs backtick
+        _json_match = re.search(r"```(?:json)?\s*(\[.*?\])\s*```",
+                                section_text, re.DOTALL)
+        if not _json_match:
+            _json_match = re.search(r"(\[.*\])", section_text, re.DOTALL)
+        if not _json_match:
+            return {}
+
+        _parsed_list = _json.loads(_json_match.group(1))
+        if not isinstance(_parsed_list, list):
+            return {}
+
+        for _item in _parsed_list:
+            if not isinstance(_item, dict):
+                continue
+
+            # Extraire et valider ref_type / ref_index
+            _rtype = str(_item.get("ref_type", "")).strip()
+            _ridx_raw = _item.get("ref_index")
+            if not _rtype or _ridx_raw is None:
+                continue
+            try:
+                _ridx = int(_ridx_raw)
+            except (TypeError, ValueError):
+                continue
+
+            key = (_rtype, _ridx)
+            # Règle duplicate : first valid wins
+            if key in result:
+                _log.debug(
+                    f"[llm] duplicate (ref_type={_rtype!r}, ref_index={_ridx}) "
+                    f"ignoré (first valid wins)"
+                )
+                continue
+
+            # Annualization depuis ytd_periods_elapsed
+            _ann = None
+            _ytd_n = _item.get("ytd_periods_elapsed")
+            if _ytd_n is not None and _item.get("period_basis") in ("YTD", "ANNUALIZED"):
+                try:
+                    _n = int(_ytd_n)
+                    _q = "CERTIFIED" if _n >= 6 else "RUN_RATE"
+                    _ann = {
+                        "periods_elapsed": _n,
+                        "periods_per_year": 12,
+                        "quality": _q,
+                        "annualization_method": f"amount / {_n} * 12",
+                        "seasonality_flag": False,
+                    }
+                except (TypeError, ValueError):
+                    pass
+
+            # GrossMargin depuis gross_margin_rate / gross_margin_source
+            _gm = None
+            _gmr = _item.get("gross_margin_rate")
+            _gms = _item.get("gross_margin_source")
+            if _gmr is not None or _gms:
+                _gm = {
+                    "rate": _gmr,
+                    "source": _gms or "LLM_EXTRACTED",
+                }
+
+            # Confidence : float robuste (None ou invalide → 0.5)
+            _conf_raw = _item.get("confidence")
+            try:
+                _conf = float(_conf_raw) if _conf_raw is not None else 0.5
+            except (TypeError, ValueError):
+                _conf = 0.5
+
+            result[key] = {
+                "metric_type": _item.get("metric_type", "UNKNOWN"),
+                "period_basis": _item.get("period_basis", "UNKNOWN"),
+                "nature": _item.get("nature", "UNKNOWN"),
+                "confidence": _conf,
+                "source_period": _item.get("source_period"),
+                "is_current_period": bool(_item.get("is_current_period", True)),
+                "gross_margin": _gm,
+                "annualization": _ann,
+                "amount": None,  # Injecté par _try_deserialize_qi() depuis legacy
+            }
+
+    except Exception as _e:
+        _log.debug(f"[llm] _parse_structured_impacts_section failed: {_e}")
+        return {}
+
+    return result
 
 
 def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, Any]:
@@ -1625,6 +1785,24 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
         return wins
 
     quick_wins = _parse_quick_wins(quick_wins_raw)
+
+    # ── Parse Phase 4B — IMPACTS FINANCIERS STRUCTURÉS ──────────────────────
+    # Délégué à _parse_structured_impacts_section() (fonction module-level testable).
+    # Si absent ou malformé → dict vide → aucun effet sur legacy.
+    # Règle duplicate : first valid wins (documentée dans la fonction).
+    impacts_structures_raw = extract_section("IMPACTS FINANCIERS STRUCTURÉS")
+    _qi_by_ref = _parse_structured_impacts_section(impacts_structures_raw)
+
+    # Injection de quantified_impact dans value_destroyers et quick_wins
+    for _i, _d in enumerate(value_destroyers):
+        _qi_dict = _qi_by_ref.get(("destroyer", _i))
+        if _qi_dict:
+            _d["quantified_impact"] = dict(_qi_dict)   # copie defensive
+
+    for _i, _w in enumerate(quick_wins):
+        _qi_dict = _qi_by_ref.get(("quick_win", _i))
+        if _qi_dict:
+            _w["quantified_impact"] = dict(_qi_dict)   # copie defensive
 
     # ── Parse V11 — Plan 30/60/90 ────────────────────────────────────────────
     def _parse_plan_30_60_90(raw: str) -> list[dict]:

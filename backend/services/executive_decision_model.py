@@ -28,6 +28,7 @@ IMPORTANT (Étape A/B) :
 """
 from __future__ import annotations
 
+import logging
 import re
 from datetime import date, timedelta
 from typing import Any, Optional
@@ -42,6 +43,51 @@ from models.executive_decision_model import (
     ValueDestroyer,
 )
 from models.schemas import DataQualityInfo, ScenarioCase
+
+logger = logging.getLogger(__name__)
+
+
+def _try_deserialize_qi(qi_dict: Any, amount: Optional[float] = None):
+    """
+    Désérialise un QuantifiedImpact depuis un dict LLM V3.
+
+    Args:
+        qi_dict: Dict brut LLM avec metric_type, period_basis, nature, etc.
+                 N'inclut PAS amount (le LLM JSON V3 ne fournit pas le montant).
+        amount:  Montant parsé depuis la chaîne legacy (parse_amount_eur).
+                 Si fourni et que qi_dict.amount est None, amount est injecté
+                 avec source_type=LEGACY_PARSE pour traçabilité explicite.
+                 Un fallback legacy ne doit JAMAIS être confondu avec une
+                 extraction V3 certifiée.
+
+    Retourne None si absent, None, ou invalide.
+    Jamais d'exception levée — retour None si quoi que ce soit échoue.
+    """
+    if not isinstance(qi_dict, dict):
+        return None
+    try:
+        from models.financial_truth import QuantifiedImpact, SourceType
+        effective_dict = dict(qi_dict)
+
+        if effective_dict.get("amount") is None and amount is not None:
+            # Injection depuis le parseur legacy — marquer explicitement la provenance
+            effective_dict["amount"] = amount
+            legacy_ref = {
+                "fact_id": None,
+                "source_type": SourceType.LEGACY_PARSE.value,
+                "source_quote": (
+                    "amount injected from parse_amount_eur legacy fallback (Phase 4B) — "
+                    "not a certified V3 extraction"
+                ),
+            }
+            refs = list(effective_dict.get("source_references") or [])
+            refs.insert(0, legacy_ref)
+            effective_dict["source_references"] = refs
+
+        return QuantifiedImpact.from_dict(effective_dict)
+    except Exception as e:
+        logger.debug(f"[edm] quantified_impact deserialization failed: {e}")
+        return None
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Constantes de calcul (seuils et mappings — ajustables sans toucher au reste)
@@ -197,6 +243,8 @@ def _build_executive_decisions(raw_quick_wins: list) -> list[ExecutiveDecision]:
         description = w.get("description") or ""
         difficulty = w.get("difficulte")
         impact = parse_amount_eur(w.get("roi_estime"))
+        # ── Phase 4B : quantified_impact parallèle (legacy inchangé) ────────
+        qi = _try_deserialize_qi(w.get("quantified_impact"), amount=impact)
         decisions.append(
             ExecutiveDecision(
                 decision=description,
@@ -208,6 +256,7 @@ def _build_executive_decisions(raw_quick_wins: list) -> list[ExecutiveDecision]:
                 priority=compute_priority(impact),
                 roi_score=compute_roi_score(impact, difficulty),
                 status=STATUS_DEFAULT,
+                quantified_impact=qi,
             )
         )
     # Tri par impact décroissant — None traité comme le plus bas
@@ -250,6 +299,8 @@ def _build_value_destroyers(
                 continue
             impact = parse_amount_eur(item.get("impact_annuel"))
             trend = _TREND_MAP.get((item.get("tendance") or "").strip().lower())
+            # ── Phase 4B : quantified_impact parallèle (legacy inchangé) ────
+            qi = _try_deserialize_qi(item.get("quantified_impact"), amount=impact)
             destroyers.append(
                 ValueDestroyer(
                     name=name,
@@ -258,6 +309,7 @@ def _build_value_destroyers(
                     pct_revenue=compute_pct_revenue(impact, total_revenue),
                     trend=trend,
                     comment=_clean_optional_text(item.get("commentaire")),
+                    quantified_impact=qi,
                 )
             )
     else:
@@ -274,6 +326,7 @@ def _build_value_destroyers(
                     pct_revenue=compute_pct_revenue(impact, total_revenue),
                     trend=None,
                     comment=None,
+                    quantified_impact=None,  # format bullet legacy — pas de QI extractable
                 )
             )
 
