@@ -1,4 +1,23 @@
+import { isDemoModeEnabled } from '@/lib/demo-mode';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+/**
+ * Contenu texte simulé pour les téléchargements en mode démo (External User
+ * Testing Prototype, 2026-08-05) — jamais de contenu réel, jamais d'appel
+ * réseau. Le format réel (xlsx/pdf/pptx) n'est volontairement pas reproduit :
+ * seul le geste de téléchargement est démontré, avec un contenu qui
+ * s'annonce lui-même comme un exemple.
+ */
+function demoDownloadBlob(label: string): Blob {
+  const text =
+    `APERÇU DE DÉMONSTRATION — Prototype Pepperyn\n\n` +
+    `${label}\n\n` +
+    `Ce fichier illustre l'emplacement d'un livrable réel. Aucune analyse ` +
+    `n'a été exécutée : ce prototype utilise exclusivement des données ` +
+    `fictives et ne se connecte à aucun service réel.\n`;
+  return new Blob([text], { type: 'text/plain;charset=utf-8' });
+}
 
 export async function getAuthHeaders(): Promise<Record<string, string>> {
   if (typeof window === 'undefined') return {};
@@ -138,6 +157,9 @@ export async function updatePin(newPin: string) {
 }
 
 export async function downloadExcel(analyseId: string): Promise<Blob> {
+  if (isDemoModeEnabled()) {
+    return demoDownloadBlob('Exemple de modèle financier (Executive Financial Model).');
+  }
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/api/export/${analyseId}`, { headers });
   if (!res.ok) {
@@ -148,6 +170,9 @@ export async function downloadExcel(analyseId: string): Promise<Blob> {
 }
 
 export async function downloadPdf(analyseId: string): Promise<Blob> {
+  if (isDemoModeEnabled()) {
+    return demoDownloadBlob('Exemple de rapport (Executive Report).');
+  }
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/api/export-pdf/${analyseId}`, { headers });
   if (!res.ok) {
@@ -158,6 +183,9 @@ export async function downloadPdf(analyseId: string): Promise<Blob> {
 }
 
 export async function downloadPptx(analyseId: string): Promise<Blob> {
+  if (isDemoModeEnabled()) {
+    return demoDownloadBlob('Aperçu de démonstration (Executive Board Deck).');
+  }
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/api/export-pptx/${analyseId}`, { headers });
   if (!res.ok) {

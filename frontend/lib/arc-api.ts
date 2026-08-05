@@ -14,6 +14,8 @@
 
 import { getAuthHeaders } from '@/lib/api';
 import type { BriefingItem, PortfolioCard } from '@/lib/types';
+import { isDemoModeEnabled } from '@/lib/demo-mode';
+import { getDemoPortfolio, getDemoReviewBriefing } from '@/lib/demo-data';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -118,6 +120,14 @@ export async function fetchReviewBriefing(
   entityId?: string,
   limit = 5,
 ): Promise<BriefingItem[]> {
+  // Mode démo (External User Testing Prototype, 2026-08-05) : court-circuit
+  // total avant toute construction de fetch() — jamais d'appel réseau,
+  // jamais de Supabase, données 100% locales et fictives (lib/demo-data.ts).
+  if (isDemoModeEnabled()) {
+    const items = getDemoReviewBriefing(entityId);
+    return limit ? items.slice(0, limit) : items;
+  }
+
   const headers = await getAuthHeaders();
   const params = new URLSearchParams();
   if (entityId) params.set('entity_id', entityId);
@@ -140,6 +150,12 @@ export async function fetchReviewBriefing(
  * de revue. Regroupement pur côté backend, aucune nouvelle donnée.
  */
 export async function fetchPortfolio(): Promise<PortfolioCard[]> {
+  // Mode démo : jamais d'appel réseau — cartes gelées de lib/demo-data.ts,
+  // elles-mêmes générées via la vraie fonction ArcService.build_portfolio_briefing().
+  if (isDemoModeEnabled()) {
+    return getDemoPortfolio();
+  }
+
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/api/portfolio`, { headers });
   if (!res.ok) {
@@ -161,6 +177,12 @@ export async function abandonArc(
   arcId: string,
   reason?: string,
 ): Promise<{ abandoned: boolean; arc_id: string; already_abandoned?: boolean }> {
+  // Mode démo : jamais d'écriture, réelle ou simulée côté serveur — réponse
+  // simulée en mémoire uniquement, aucun fetch, aucune persistance.
+  if (isDemoModeEnabled()) {
+    return { abandoned: true, arc_id: arcId };
+  }
+
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/api/arcs/${arcId}/abandon`, {
     method: 'POST',
