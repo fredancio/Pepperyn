@@ -12,7 +12,7 @@
 |---|---|
 | **Nom** | Portfolio Intelligence |
 | **Objectif métier** | Faire qu'un professionnel sache, en ouvrant Pepperyn, quel client préparer en premier et pourquoi — à l'échelle du portefeuille, pas client par client. |
-| **État** | **Incréments 1 et 2 livrés et fusionnés sur `main`** (Release Gate 2026-08-05, merges `ae79a9e` puis `771e7ae` ; rapport `docs/Architecture/blueprint/PORTFOLIO_INCREMENT_1_2_RELEASE_GATE.md`). Incrément 3 (état vide honnête) proposé, **pas encore ouvert**. |
+| **État** | **Incréments 1 et 2 livrés et fusionnés sur `main`** (Release Gate 2026-08-05, merges `ae79a9e` puis `771e7ae` ; rapport `docs/Architecture/blueprint/PORTFOLIO_INCREMENT_1_2_RELEASE_GATE.md`). **Correction "Closed-Only Clients" livrée et fusionnée** (merge `bc98187`, rapport `docs/Architecture/blueprint/PORTFOLIO_CLOSED_ONLY_FIX_PR_REVIEW.md`). **Portfolio Home Product Validation : PASSED WITH MINOR RESERVATIONS** (`docs/Product/PORTFOLIO_HOME_FINAL_VALIDATION.md`). Incrément 3 (état vide honnête) proposé, **pas encore ouvert**. |
 
 ---
 
@@ -41,19 +41,17 @@
 
 ---
 
-## 5. Prochaine étape réelle : Portfolio Home Product Validation
+## 5. Prochaine étape réelle : External User Testing
 
-Avant tout enrichissement supplémentaire de la carte Portfolio (Incrément 3 ou au-delà), la prochaine étape est une validation produit, pas un nouvel incrément de code :
+**Portfolio Home Product Validation : DONE — PASSED WITH MINOR RESERVATIONS.** Un défaut réel a été trouvé (client "closed-only" affichant une action active sans sujet à préparer), corrigé, testé, et revalidé sur le même jeu de données fictives ; les deux réserves UX restantes (section 6) ont été jugées non bloquantes.
 
-**Objectif :** observer le rendu réel et tester si un utilisateur comprend, en quelques secondes, quel client ouvrir, pourquoi, et quelle action effectuer.
-
-Cette validation doit précéder tout nouvel enrichissement de carte.
+**Prochaine étape :** exposer Portfolio Home à de vrais professionnels (External User Testing) — pas un nouvel incrément de code, pas de nouvel enrichissement de carte avant retour d'usage réel.
 
 ---
 
 ## 6. Réserves UX ouvertes (Release Gate, Mission 6 — à observer, pas à corriger)
 
-Classées **OBSERVE IN USER TESTING** — n'entrent pas automatiquement dans l'Incrément 3, aucune modification d'interface tant qu'elles n'ont pas été confirmées par un usage réel :
+Classées **OBSERVE IN USER TESTING** — n'entrent pas automatiquement dans l'Incrément 3, aucune modification d'interface tant qu'elles n'ont pas été confirmées par un usage réel. Reconfirmées inchangées après la correction "Closed-Only Clients" (aucun fichier frontend touché par ce correctif) :
 
 1. Sur les cartes portant plusieurs informations secondaires (contexte temporel, `why_it_matters`, compteur), la densité peut devenir élevée dans une longue liste de clients.
 2. `why_it_matters_display` utilise actuellement la même couleur de texte que le nom du client, ce qui peut concurrencer visuellement l'attention portée au nom du client plutôt que de rester une information secondaire.
@@ -66,10 +64,13 @@ Classées **OBSERVE IN USER TESTING** — n'entrent pas automatiquement dans l'I
 |---|---|
 | Capability actuelle | Portfolio Intelligence |
 | Dernier incrément livré | Incréments 1 et 2, fusionnés sur `main` (2026-08-05, merges `ae79a9e`, `771e7ae`) |
-| Incrément en cours | Aucun |
-| Dernière Release Gate | Portfolio Intelligence, Incréments 1+2 (2026-08-05) — **PASSED WITH MINOR RESERVATIONS** |
-| État des tests (sur `main`, post Release Gate) | Backend : 943 passés, 8 échecs préexistants non liés (inchangés), 1 skip. Frontend : 30/30 tests Jest verts. Build production Next.js réussi. |
-| Nombre d'échecs connus | 8 — préexistants, non liés à Portfolio Intelligence, identiques avant et après les deux fusions |
+| Dernière correction | Closed-Only Clients (2026-08-05, merge `bc98187`) — **DONE** |
+| Incrément en cours | Aucun — Incrément 3 **NOT OPENED** |
+| Portfolio Home Product Validation | **PASSED WITH MINOR RESERVATIONS** (2026-08-05) |
+| Prochaine étape | **External User Testing** |
+| Dernière Release Gate | Portfolio Closed-Only Fix (2026-08-05) — voir `PORTFOLIO_HOME_FINAL_VALIDATION.md` |
+| État des tests (sur `main`, post correction) | Backend : 952 passés, 8 échecs préexistants non liés (inchangés), 1 skip. Frontend : 30/30 tests Jest verts. Build production Next.js réussi. |
+| Nombre d'échecs connus | 8 — préexistants, non liés à Portfolio Intelligence, identiques depuis les fusions des Incréments 1+2 et de la correction Closed-Only |
 
 ---
 
