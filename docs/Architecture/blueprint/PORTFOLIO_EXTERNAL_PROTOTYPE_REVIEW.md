@@ -16,6 +16,8 @@ Le garde-fou central, `frontend/lib/demo-mode.ts::isDemoModeEnabled()`, exige **
 
 Ce double contrôle garantit que le mode démo ne peut **jamais** s'activer sur le domaine de production, même si le drapeau `NEXT_PUBLIC_DEMO_MODE` était positionné par erreur dans les réglages Production de Vercel — vérifié par 8 tests dédiés (`lib/__tests__/demo-mode.test.ts`), dont le cas critique flag=true + environnement=production → désactivé.
 
+**Garantie de compilation (ajoutée suite à la revue de Fred)** : au-delà du garde-fou d'exécution ci-dessus, `next.config.js` écrase `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY` par une valeur factice **au moment du build** quand `NEXT_PUBLIC_DEMO_MODE=true` — avant que Next.js ne construise le `DefinePlugin` qui inline les variables `NEXT_PUBLIC_*` dans le bundle. Conséquence : aucune vraie valeur Supabase n'est physiquement présente dans les fichiers statiques générés, quelle que soit la configuration des variables d'environnement Vercel (Preview héritant ou non des mêmes valeurs que Production). Preuve : build réel avec de fausses valeurs Supabase réalistes + `NEXT_PUBLIC_DEMO_MODE=true`, puis recherche exhaustive de ces valeurs dans `.next/static` et `.next/server` — aucune occurrence ; le même build sans le drapeau démo les inline normalement (non-régression pour l'application réelle). Test automatisé de non-régression : `frontend/__tests__/next.config.test.js` (3 cas).
+
 Toute fonction de `lib/arc-api.ts` et `lib/api.ts` qui doit rester strictement isolée consulte `isDemoModeEnabled()` **avant** toute construction de `fetch()` :
 - `fetchPortfolio()`, `fetchReviewBriefing()` → lisent `lib/demo-data.ts` (aucun réseau).
 - `abandonArc()` → réponse simulée en mémoire (aucune écriture, réelle ou distante).
@@ -31,12 +33,12 @@ Les routes `/demo/portfolio` et `/demo/chat` vivent hors de `app/app/*` (donc ho
 |---|---|
 | `frontend/lib/demo-mode.ts` | Nouveau — garde-fou central. |
 | `frontend/lib/demo-data.ts` | Nouveau — jeu de données fictif gelé (12 clients). |
-| `frontend/next.config.js` | Modifié — ajout du seul bloc `env` exposant `NEXT_PUBLIC_VERCEL_ENV` ; `headers()` existant intact. |
+| `frontend/next.config.js` | Modifié — bloc `env` exposant `NEXT_PUBLIC_VERCEL_ENV` ; écrasement de `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` par une valeur factice quand `NEXT_PUBLIC_DEMO_MODE=true` (garantie de compilation, section 1) ; `headers()` existant intact. |
 | `frontend/lib/arc-api.ts`, `frontend/lib/api.ts` | Modifiés — court-circuit démo ajouté en tête de chaque fonction concernée, logique réelle inchangée en aval. |
 | `frontend/app/demo/layout.tsx`, `frontend/app/demo/portfolio/page.tsx`, `frontend/app/demo/chat/page.tsx` | Nouveaux — pages de démonstration. |
 | `frontend/components/demo/DemoBanner.tsx` | Nouveau — bandeau d'identification + lien de feedback. |
 | `frontend/components/chat/PortfolioHome.tsx` | **Seul composant réutilisé modifié** — une ligne de wiring (voir ci-dessous), rien d'autre. |
-| 6 fichiers `__tests__/*.test.ts(x)` | Nouveaux — 27 tests couvrant les 15 cas obligatoires de la Mission 9. |
+| 7 fichiers `__tests__/*.test.[tj]s(x)` | Nouveaux — 30 tests couvrant les 15 cas obligatoires de la Mission 9 + la garantie de compilation Supabase. |
 
 **Détail de la modification à `PortfolioHome.tsx`** : `handlePrepareReview` naviguait en dur vers `/app/chat?entity=<id>` (route authentifiée). En mode démo, cette route redirigerait immédiatement vers `/login`, rendant le parcours testable impossible. La cible devient conditionnelle : `isDemoModeEnabled() ? '/demo/chat' : '/app/chat'`. Hiérarchie de carte, tri, densité, `why_it_matters` : strictement inchangés. Le test préexistant (`PortfolioHome.test.tsx`) reste vert sans modification ; un test dédié (`PortfolioHome.demo.test.tsx`) couvre la nouvelle branche.
 
@@ -90,9 +92,9 @@ Aucune visite guidée ajoutée. Le seul texte d'orientation est celui déjà val
 | 14 — Absence de téléchargement réel | `api.demo.test.ts` | ✅ |
 | 15 — Build de prévisualisation valide | `next build` (avec et sans `NEXT_PUBLIC_DEMO_MODE=true`) | ✅ |
 
-**Suite complète frontend :** 65/65 tests verts (38 préexistants + 27 nouveaux), 10 suites.
+**Suite complète frontend :** 68/68 tests verts (38 préexistants + 30 nouveaux), 11 suites.
 **Tests ciblés Portfolio + Review Briefing (backend) :** 57/57 verts (backend non modifié).
-**Build production Next.js :** réussi deux fois — configuration par défaut, et avec `NEXT_PUBLIC_DEMO_MODE=true` / `VERCEL_ENV=preview` (routes `/demo/chat`, `/demo/portfolio` générées).
+**Build production Next.js :** réussi trois fois — configuration par défaut, avec `NEXT_PUBLIC_DEMO_MODE=true` / `VERCEL_ENV=preview`, et avec `NEXT_PUBLIC_DEMO_MODE=true` + de fausses valeurs Supabase réalistes injectées (pour prouver leur absence du bundle, section 7).
 
 ---
 
@@ -102,20 +104,22 @@ Aucune visite guidée ajoutée. Le seul texte d'orientation est celui déjà val
 |---|---|
 | Aucun secret dans le bundle client (clé service Supabase, clé secrète Stripe, clé API Anthropic) | ✅ PASS — recherche exhaustive sur `.next/static` et `.next/server/app/demo`, aucune correspondance |
 | Aucune URL de production non voulue | ✅ PASS avec observation — la chaîne `localhost:8000` (valeur de repli par défaut de `lib/api.ts`, préexistante, non spécifique à ce prototype) apparaît dans un chunk partagé ; inerte car jamais atteinte en mode démo |
-| Aucun identifiant Supabase réel | ⚠️ **CONDITIONNEL — action requise avant déploiement** (détail ci-dessous) |
+| Aucun identifiant Supabase réel | ✅ PASS — garantie de compilation, voir détail ci-dessous |
 | Aucun fichier utilisateur | ✅ PASS — `public/` ne contient que des assets de marque |
 | Aucun vrai prospect | ✅ PASS — dataset 100% fictif, noms inventés |
 | Aucune donnée démo issue des anciens dossiers Optilux/Démo sans validation explicite | ✅ PASS — dataset généré depuis zéro via le vrai `ArcService`, aucune référence aux anciens dossiers |
 | Aucune fonction d'écriture atteignable | ✅ PASS — prouvé par test : `fetch()` jamais appelé par `abandonArc`, `downloadExcel/Pdf/Pptx` en mode démo |
 | Aucune dépendance à un backend local | ✅ PASS — même preuve : zéro appel réseau en mode démo |
 
-### Détail de l'item conditionnel — identifiants Supabase
+### Détail — identifiants Supabase (résolu)
 
-Le dossier `frontend/` contient un `.env.local` local (non suivi par Git, correctement ignoré) portant les vraies valeurs `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY` du projet. Next.js inline **toute** variable `NEXT_PUBLIC_*` présente dans l'environnement de build au moment du `next build` — indépendamment du mode démo, qui est un garde-fou d'exécution, pas de compilation. Un build de test réalisé avec ce `.env.local` a confirmé que l'URL Supabase réelle apparaît dans un chunk JavaScript statique.
+Constat initial : `frontend/.env.local` local (non suivi par Git, correctement ignoré) porte les vraies valeurs `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY`. Next.js inline par défaut **toute** variable `NEXT_PUBLIC_*` présente dans l'environnement de build — indépendamment du mode démo, qui n'était jusque-là qu'un garde-fou d'exécution, pas de compilation. Un premier build de test avait confirmé que l'URL réelle apparaissait dans un chunk JavaScript statique.
 
-Cette clé est une clé anonyme publique par conception Supabase (protégée par Row Level Security, jamais un secret au sens strict), mais le mandat demande explicitement qu'aucun identifiant Supabase réel n'apparaisse dans ce prototype. Aucun code du prototype n'importe ni n'utilise cette valeur (`isDemoModeEnabled()` court-circuite avant tout accès), mais elle resterait techniquement présente et publiquement récupérable dans les fichiers statiques déployés si la Vercel Preview Deployment hérite des mêmes variables d'environnement `NEXT_PUBLIC_SUPABASE_*` que la production.
+**Corrigé** (suite à la demande explicite de Fred) : `next.config.js` écrase désormais `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` par une valeur factice syntaxiquement valide (`https://demo-mode-disabled.invalid` / `demo-mode-disabled`) dès que `NEXT_PUBLIC_DEMO_MODE=true`, avant la construction du `DefinePlugin` de Next.js — donc avant que la vraie valeur ne puisse être inlinée où que ce soit dans le build (client ou serveur, sur n'importe quelle route de l'application, pas seulement `/demo/*`).
 
-**Action requise avant toute mise en ligne (Mission 11) :** dans les réglages Vercel du projet, vérifier la portée (scope) de `NEXT_PUBLIC_SUPABASE_URL` et `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Si elles sont configurées pour tous les environnements (Production + Preview + Development), soit les redéfinir avec des valeurs vides/factices spécifiquement pour l'environnement Preview de cette branche, soit confirmer explicitement que l'exposition de la clé anonyme est acceptée (elle est conçue pour être publique). Cette décision revient à Fred — non prise unilatéralement ici.
+Une suppression pure (`delete`) a été essayée en premier et rejetée : `frontend/lib/supabase.ts` appelle `createClient(url, key)` de façon inconditionnelle au chargement du module, et ce module est importé statiquement par les pages authentifiées (`/app/*`, `/login`, etc.) qui font partie du **même** `next build` que `/demo/*`. Supprimer purement la variable faisait échouer `createClient(undefined, undefined)` pendant la génération statique de ces pages et cassait tout le build. La valeur factice évite ce problème (URL syntaxiquement valide, jamais utilisée pour un vrai appel réseau côté `/demo/*` puisque `lib/supabase.ts` n'y est jamais chargé — `isDemoModeEnabled()` court-circuite avant tout `import()` dynamique de ce module).
+
+**Preuve directe :** build réel avec `NEXT_PUBLIC_DEMO_MODE=true` et de fausses valeurs Supabase réalistes injectées (`https://ljcqbwbjeoeiugcoxfcf.supabase.co` + un faux JWT) → recherche exhaustive de ces deux chaînes dans l'intégralité de `.next/` (client et serveur) → **aucune occurrence**. Le même build sans le drapeau démo les inline normalement, confirmant l'absence de régression pour l'application réelle. Test automatisé de non-régression : `frontend/__tests__/next.config.test.js` (3 cas — écrasement en mode démo, préservation quand le drapeau est absent, préservation quand il vaut `"false"`).
 
 ---
 
@@ -127,18 +131,18 @@ Cette clé est une clé anonyme publique par conception Supabase (protégée par
 
 1. Depuis un poste avec accès `git push` : `git push origin prototype/portfolio-external-user-testing-2026-08-05` (uniquement cette branche — jamais `main`).
 2. Sur le projet Vercel existant : la Preview Deployment se crée automatiquement au push si le projet est déjà connecté au dépôt GitHub (comportement standard Vercel pour toute branche non-`main`). Sinon, ouvrir l'onglet **Deployments** → **Create Deployment** → sélectionner la branche.
-3. Avant ou juste après la création, définir la variable d'environnement `NEXT_PUBLIC_DEMO_MODE=true`, scope **Preview uniquement** (jamais Production) — sans elle, le garde-fou de `app/demo/layout.tsx` affichera le message neutre au lieu du prototype.
-4. Traiter l'item conditionnel de la section 7 (`NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY`) avant de partager l'URL à des testeurs externes.
-5. Ne jamais promouvoir cette Preview Deployment en Production ; ne jamais modifier le domaine principal.
-6. Une fois l'URL de prévisualisation connue, la reporter dans `EXTERNAL_TESTING_README.md` (section « URL du prototype »).
+3. Avant ou juste après la création, définir la variable d'environnement `NEXT_PUBLIC_DEMO_MODE=true`, scope **Preview uniquement** (jamais Production) — sans elle, le garde-fou de `app/demo/layout.tsx` affichera le message neutre au lieu du prototype. Aucune autre action de configuration n'est requise : `next.config.js` neutralise automatiquement `NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY` dès que ce drapeau est actif, quelles que soient les autres variables héritées par l'environnement Preview (section 7).
+4. Ne jamais promouvoir cette Preview Deployment en Production ; ne jamais modifier le domaine principal.
+5. Une fois l'URL de prévisualisation connue, la reporter dans `EXTERNAL_TESTING_README.md` (section « URL du prototype »).
 
 ---
 
 ## 9. Risques restants
 
-- Item conditionnel de sécurité (section 7) — nécessite une action de configuration Vercel avant tout partage externe.
-- Réserves UX déjà connues et volontairement non corrigées (densité de carte, couleur de `why_it_matters_display`) — inchangées, hors périmètre de cette mission (« Aucune correction des deux réserves UX »).
-- Le déploiement effectif (push + Preview Deployment) n'a pas pu être exécuté dans cet environnement — reste à la charge de Fred selon les étapes ci-dessus.
+- Réserves UX déjà connues et volontairement non corrigées (densité de carte, couleur de `why_it_matters_display`) — héritées de la Portfolio Home Product Validation, inchangées, hors périmètre de cette mission (« Aucune correction des deux réserves UX »). N'affectent ni la sécurité ni l'isolation du prototype.
+- Le déploiement effectif (push + Preview Deployment) n'a pas pu être exécuté dans cet environnement, faute d'accès `git push`/Vercel — reste à la charge de Fred selon les étapes exactes de la section 8. Aucune action de configuration supplémentaire n'est requise de sa part au-delà de la variable `NEXT_PUBLIC_DEMO_MODE`.
+
+L'item de sécurité conditionnel initialement identifié (section 7) a été corrigé au niveau du code, avec preuve directe par build, et n'est plus un risque restant.
 
 ---
 
@@ -146,4 +150,4 @@ Cette clé est une clé anonyme publique par conception Supabase (protégée par
 
 **PORTFOLIO EXTERNAL TESTING PROTOTYPE COMPLETED.**
 **FINAL VERDICT:**
-**PROTOTYPE READY WITH MINOR RESERVATIONS**
+**PROTOTYPE READY FOR EXTERNAL TESTING**
