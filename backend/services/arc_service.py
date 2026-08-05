@@ -629,6 +629,10 @@ class ArcService:
         base = {
             "arc_id": arc.get("id"),
             "source_type": "decision_arc",
+            # Nécessaire pour le regroupement par client dans
+            # build_portfolio_briefing() — additif, ne change rien pour les
+            # consommateurs existants du Briefing de revue.
+            "entity_id": arc.get("entity_id"),
             "title": title,
             "learning_text": None,
         }
@@ -755,6 +759,73 @@ class ArcService:
         items = [self._arc_to_briefing_item(arc) for arc in arcs]
         items.sort(key=lambda item: BRIEFING_PRIORITY_ORDER.get(item["priority"], 99))
         return items[: max(limit, 0)] if limit else items[:5]
+
+    # ── Portfolio Intelligence — synthèse multi-clients (Incrément 1) ─────────
+
+    def build_portfolio_briefing(self, company_id: str) -> list[dict]:
+        """
+        Construit le Portfolio : une carte par client, portant uniquement
+        son point le plus prioritaire parmi ses BriefingItem actifs.
+
+        Pur regroupement du Briefing de revue existant par entity_id — aucun
+        nouveau calcul, aucune nouvelle source de donnée, aucune nouvelle
+        classification. Lecture seule.
+
+        NOTE : appelle build_review_briefing() avec un limit explicite élevé
+        plutôt que limit=0. limit=0 est falsy en Python et retomberait sur
+        la branche `else` (items[:5]) à l'intérieur de build_review_briefing,
+        ce qui tronquerait silencieusement le portefeuille entier à 5 items
+        au lieu de retenir le point prioritaire de chaque client.
+
+        Un arc sans entity_id (jamais rattaché à un client) est exclu — il
+        n'y a pas de carte client à laquelle le rattacher (voir
+        PORTFOLIO_INTELLIGENCE_MVP.md : la carte est structurée par client).
+        """
+        items = self.build_review_briefing(company_id=company_id, entity_id=None, limit=1000)
+        if not items:
+            return []
+
+        # items est déjà trié par priorité (urgent → to_check → done → closed) ;
+        # le premier item rencontré pour un entity_id est donc son plus prioritaire.
+        by_entity: dict[str, dict] = {}
+        for item in items:
+            eid = item.get("entity_id")
+            if not eid:
+                continue
+            if eid not in by_entity:
+                by_entity[eid] = item
+
+        if not by_entity:
+            return []
+
+        entity_ids = list(by_entity.keys())
+        entity_names: dict[str, str] = {}
+        supabase = self._get_supabase()
+        if supabase:
+            try:
+                result = (
+                    supabase.from_("entities")
+                    .select("id, name")
+                    .in_("id", entity_ids)
+                    .execute()
+                )
+                for row in result.data or []:
+                    entity_names[row["id"]] = row["name"]
+            except Exception as e:
+                logger.warning(
+                    "[ARC] build_portfolio_briefing — lecture des noms clients échouée: %s", e
+                )
+
+        cards = [
+            {
+                "entity_id": eid,
+                "entity_name": entity_names.get(eid, "Client"),
+                "top_item": item,
+            }
+            for eid, item in by_entity.items()
+        ]
+        cards.sort(key=lambda c: BRIEFING_PRIORITY_ORDER.get(c["top_item"]["priority"], 99))
+        return cards
 
     # ── "Ne plus suivre" — transition ABANDONED ───────────────────────────────
 

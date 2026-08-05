@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { Message, Session } from '@/lib/types';
 import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, fetchPreviousRecommendations, fetchConversationContext, type BillingUsage, type Entity, type EntityRelationType } from '@/lib/api';
@@ -54,6 +54,7 @@ Ou démarrez une nouvelle analyse avec un nouveau fichier.`;
 
 export function ChatContainer() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [isTyping, setIsTyping] = useState(false);
   const [sessionId, setSessionId] = useState<string | undefined>();
@@ -87,6 +88,16 @@ export function ChatContainer() {
   const handlePrepareQuestion = useCallback((question: string) => {
     prefillCounterRef.current += 1;
     setPrefillToken({ id: prefillCounterRef.current, text: question });
+  }, []);
+
+  // Portfolio Intelligence (Incrément 1) — "Préparer cette revue" navigue
+  // vers /app/chat?entity=<id> pour pré-sélectionner le client concerné.
+  // Lu une seule fois au montage : selectedEntityId reste ensuite la seule
+  // source de vérité (même convention que le sélecteur de client manuel).
+  useEffect(() => {
+    const entityParam = searchParams.get('entity');
+    if (entityParam) setSelectedEntityId(entityParam);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const questionsRestantes = analysisReceived && plan === 'free'

@@ -152,6 +152,8 @@ export type BriefingPriority = 'urgent' | 'to_check' | 'done' | 'closed';
 export interface BriefingItem {
   arc_id: string;
   source_type: 'decision_arc';
+  /** Client propriétaire de l'arc — utilisé pour le regroupement Portfolio. */
+  entity_id?: string | null;
   priority: BriefingPriority;
   title: string;
   temporal_context: string;
@@ -159,4 +161,19 @@ export interface BriefingItem {
   questions_to_ask: string[];
   /** Présent uniquement pour priority='closed'. */
   learning_text?: string | null;
+}
+
+/**
+ * Une carte de Portfolio Intelligence (Incrément 1) — un client, son point
+ * le plus prioritaire. Regroupement du Briefing de revue par entity_id,
+ * voir ArcService.build_portfolio_briefing() côté backend.
+ *
+ * Périmètre Incrément 1 : seuls entity_name et top_item.title sont affichés
+ * dans PortfolioHome — why_it_matters/temporal_context/compteur arrivent
+ * en Incrément 2 (card completeness).
+ */
+export interface PortfolioCard {
+  entity_id: string;
+  entity_name: string;
+  top_item: BriefingItem;
 }

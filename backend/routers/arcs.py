@@ -7,6 +7,7 @@ POST /api/arcs/{arc_id}/learning    — valider le learning et fermer l'arc
 POST /api/arcs/{arc_id}/abandon     — "Ne plus suivre" (Review Briefing)
 
 GET  /api/review-briefing         — Briefing de revue (Capability 3)
+GET  /api/portfolio                — Portfolio Intelligence, Incrément 1 (Capability 7)
 GET  /api/admin/arcs/integrity    — compter les feedbacks sans arc (monitoring)
 POST /api/admin/arcs/backfill     — créer les arcs manquants (reconstruction idempotente)
 """
@@ -49,6 +50,30 @@ async def get_review_briefing(
         limit=min(limit, 5) if limit else 5,
     )
     return {"items": items}
+
+
+@router.get("/portfolio")
+async def get_portfolio(
+    authorization: Optional[str] = Header(default=None),
+    x_auth_type: Optional[str] = Header(default=None),
+):
+    """
+    Portfolio Intelligence (Incrément 1, Capability 7) — une carte par
+    client, triée par priorité, portant son point le plus prioritaire du
+    Briefing de revue.
+
+    Regroupement pur du Briefing de revue existant — aucune nouvelle donnée,
+    aucun nouveau calcul.
+
+    Périmètre Incrément 1 (voir PORTFOLIO_HOME_IMPLEMENTATION_PLAN.md) :
+    nom du client + titre du point prioritaire + action "Préparer cette
+    revue" seulement. why_it_matters / temporal_context / compteur sont
+    prévus pour l'Incrément 2 — déjà présents sur chaque carte (via
+    top_item) mais volontairement non affichés côté frontend avant.
+    """
+    company_id, _plan, _auth_type = await _resolve_auth(authorization, x_auth_type)
+    cards = arc_service.build_portfolio_briefing(company_id=company_id)
+    return {"cards": cards}
 
 
 @router.post("/arcs/{arc_id}/abandon")

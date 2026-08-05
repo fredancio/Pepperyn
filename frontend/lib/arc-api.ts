@@ -13,7 +13,7 @@
  */
 
 import { getAuthHeaders } from '@/lib/api';
-import type { BriefingItem } from '@/lib/types';
+import type { BriefingItem, PortfolioCard } from '@/lib/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -132,6 +132,22 @@ export async function fetchReviewBriefing(
   }
   const data = await res.json();
   return data.items as BriefingItem[];
+}
+
+/**
+ * Lit le Portfolio Intelligence (Incrément 1) — une carte par client,
+ * triée par priorité, portant son point le plus prioritaire du Briefing
+ * de revue. Regroupement pur côté backend, aucune nouvelle donnée.
+ */
+export async function fetchPortfolio(): Promise<PortfolioCard[]> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/portfolio`, { headers });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || 'Erreur lecture du portefeuille');
+  }
+  const data = await res.json();
+  return data.cards as PortfolioCard[];
 }
 
 /**
