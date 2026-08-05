@@ -218,3 +218,14 @@ describe('PortfolioHome — "Préparer cette revue"', () => {
     expect(mockPush).toHaveBeenCalledWith('/app/chat?entity=entity-42');
   });
 });
+
+describe('PortfolioHome — Organisation Sharing Demo absente hors mode démo', () => {
+  test('le point d\'entrée "Partager l\'organisation" n\'apparaît pas dans le vrai portefeuille authentifié', async () => {
+    mockedFetchPortfolio.mockResolvedValue([makeCard()]);
+    render(<PortfolioHome />);
+    await screen.findByText('Client A');
+
+    expect(screen.queryByText("Partager l'organisation")).not.toBeInTheDocument();
+    expect(screen.queryByTestId('share-organization-overlay')).not.toBeInTheDocument();
+  });
+});

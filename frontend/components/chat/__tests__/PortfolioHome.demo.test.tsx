@@ -69,3 +69,25 @@ describe('PortfolioHome — navigation en mode démo (cas 9)', () => {
     expect(mockPush).toHaveBeenCalledWith('/demo/chat?entity=e1');
   });
 });
+
+describe('PortfolioHome — point d\'entrée Organisation Sharing Demo (mode démo)', () => {
+  test('"Partager l\'organisation" est visible sur la carte sans remplacer "Préparer cette revue"', async () => {
+    mockedFetchPortfolio.mockResolvedValue([makeCard()]);
+    render(<PortfolioHome />);
+    await screen.findByText('Cabinet Lefèvre & Associés');
+
+    expect(screen.getByTestId('portfolio-share-e1')).toHaveTextContent("Partager l'organisation");
+    expect(screen.getByText('Préparer cette revue')).toBeInTheDocument();
+  });
+
+  test('cliquer sur "Partager l\'organisation" ouvre le panneau de partage', async () => {
+    mockedFetchPortfolio.mockResolvedValue([makeCard()]);
+    render(<PortfolioHome />);
+    await screen.findByText('Cabinet Lefèvre & Associés');
+
+    fireEvent.click(screen.getByTestId('portfolio-share-e1'));
+
+    expect(screen.getByTestId('share-organization-overlay')).toBeInTheDocument();
+    expect(screen.getByText('Partager cette organisation')).toBeInTheDocument();
+  });
+});

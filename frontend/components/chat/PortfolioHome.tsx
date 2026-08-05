@@ -37,12 +37,22 @@
  *     confirmées distinct du nombre de sujets actifs : pas de champ
  *     backend correspondant aujourd'hui — volontairement non affiché
  *     plutôt qu'approximé (voir rapport de validation associé).
+ *
+ * Organisation Sharing Demo (2026-08-05) : point d'entrée "Partager
+ * l'organisation" ajouté sur chaque carte, strictement gardé par
+ * isDemoModeEnabled() — ce composant est partagé avec /app/portfolio (vrai
+ * portefeuille authentifié) et la simulation de partage n'a aucun sens ni
+ * autorisation d'apparaître hors du prototype de démonstration. Action
+ * volontairement secondaire (lien texte discret, pas un bouton plein) pour
+ * ne jamais concurrencer "Préparer cette revue" comme second CTA principal.
+ * Aucune autre modification de la carte, du tri ou des données.
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchPortfolio } from '@/lib/arc-api';
 import { isDemoModeEnabled } from '@/lib/demo-mode';
+import { ShareOrganizationPanel } from '@/components/sharing/ShareOrganizationPanel';
 import type { PortfolioCard, BriefingPriority } from '@/lib/types';
 
 const PRIORITY_META: Record<BriefingPriority, { icon: string; label: string }> = {
@@ -58,6 +68,8 @@ export function PortfolioHome() {
   const router = useRouter();
   const [cards, setCards] = useState<PortfolioCard[]>([]);
   const [state, setState] = useState<LoadState>('loading');
+  const [shareTarget, setShareTarget] = useState<{ id: string; name: string } | null>(null);
+  const demoMode = isDemoModeEnabled();
 
   const load = useCallback(async () => {
     setState('loading');
@@ -194,18 +206,38 @@ export function PortfolioHome() {
                       )}
                     </div>
                   </div>
-                  {/* 7. Action unique */}
-                  <button
-                    type="button"
-                    onClick={() => handlePrepareReview(card.entity_id)}
-                    className="shrink-0 text-xs font-semibold text-white bg-[#1B73E8] hover:bg-[#0D47A1] rounded-lg px-3 py-2 transition-colors"
-                  >
-                    Préparer cette revue
-                  </button>
+                  {/* 7. Action principale + (démo uniquement) action secondaire de partage */}
+                  <div className="shrink-0 flex flex-col items-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => handlePrepareReview(card.entity_id)}
+                      className="text-xs font-semibold text-white bg-[#1B73E8] hover:bg-[#0D47A1] rounded-lg px-3 py-2 transition-colors"
+                    >
+                      Préparer cette revue
+                    </button>
+                    {demoMode && (
+                      <button
+                        type="button"
+                        onClick={() => setShareTarget({ id: card.entity_id, name: card.entity_name })}
+                        className="text-[11px] font-medium text-[#5F6368] hover:text-[#1B73E8] underline-offset-2 hover:underline"
+                        data-testid={`portfolio-share-${card.entity_id}`}
+                      >
+                        Partager l&apos;organisation
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
           </div>
+        )}
+
+        {demoMode && shareTarget && (
+          <ShareOrganizationPanel
+            entityId={shareTarget.id}
+            entityName={shareTarget.name}
+            onClose={() => setShareTarget(null)}
+          />
         )}
       </div>
     </div>
