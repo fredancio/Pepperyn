@@ -1,9 +1,11 @@
 /**
- * Arc Décisionnel API — MVP v16.
+ * Arc Décisionnel API — MVP v16 + Review Briefing (Capability 3).
  *
- * Deux endpoints publics uniquement :
+ * Endpoints publics :
  *   - confirmConsequenceLink : confirmer/rejeter un lien conséquence candidate
  *   - validateLearning       : valider le learning et fermer l'arc
+ *   - fetchReviewBriefing    : lire le briefing de revue actif
+ *   - abandonArc             : "Ne plus suivre" — retire un arc du briefing actif
  *
  * NOTE : la création d'arc n'est PAS exposée ici.
  * Le backend est la source de vérité unique — l'arc est créé dans decision_memory.py
@@ -11,8 +13,20 @@
  */
 
 import { getAuthHeaders } from '@/lib/api';
+import type { BriefingItem } from '@/lib/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '';
+
+/**
+ * Motifs proposés pour "Ne plus suivre" — mêmes clés que
+ * ABANDON_REASON_CHOICES côté backend (models/decision_arc.py).
+ */
+export const ABANDON_REASON_CHOICES: Record<string, string> = {
+  handled_elsewhere: 'Traité en dehors de Pepperyn',
+  no_longer_relevant: 'Devenu non pertinent',
+  decision_abandoned: 'Décision abandonnée',
+  other: 'Autre',
+};
 
 export interface ArcConsequenceResult {
   confirmed: boolean;
@@ -85,6 +99,61 @@ export async function validateLearning(
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error((err as { detail?: string }).detail || 'Erreur validation learning');
+  }
+  return res.json();
+}
+
+/**
+ * Lit le Review Briefing actif — synthèse opérationnelle des décisions
+ * suivies avec un client, priorisées, avec questions prêtes à poser.
+ *
+ * entityId optionnel : scope sur le client actuellement sélectionné
+ * (même convention que fetchAnalysesHistory). Sans lui, renvoie les arcs
+ * actifs de toute la company.
+ *
+ * Périmètre : uniquement les décisions/recommandations DecisionArc —
+ * jamais d'échéances comptables, fiscales ou administratives.
+ */
+export async function fetchReviewBriefing(
+  entityId?: string,
+  limit = 5,
+): Promise<BriefingItem[]> {
+  const headers = await getAuthHeaders();
+  const params = new URLSearchParams();
+  if (entityId) params.set('entity_id', entityId);
+  if (limit) params.set('limit', String(limit));
+  const qs = params.toString();
+  const res = await fetch(`${API_URL}/api/review-briefing${qs ? `?${qs}` : ''}`, {
+    headers,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || 'Erreur lecture du briefing de revue');
+  }
+  const data = await res.json();
+  return data.items as BriefingItem[];
+}
+
+/**
+ * "Ne plus suivre" — retire un arc du Review Briefing actif.
+ *
+ * RÈGLE SÉMANTIQUE : ne signifie jamais que le sujet est réglé, résolu ou
+ * exécuté — uniquement que le suivi s'arrête. L'arc n'est jamais supprimé ;
+ * historique et liens restent intacts (transition vers status='abandoned').
+ */
+export async function abandonArc(
+  arcId: string,
+  reason?: string,
+): Promise<{ abandoned: boolean; arc_id: string; already_abandoned?: boolean }> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/arcs/${arcId}/abandon`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason: reason ?? null }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || 'Erreur lors du retrait du briefing actif');
   }
   return res.json();
 }

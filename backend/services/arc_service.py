@@ -25,6 +25,19 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# ── Review Briefing — classification et gabarits (Capability 3) ──────────────
+#
+# Toute cette section est déterministe et testable sans base de données :
+# entrée = liste d'arcs + date du jour, sortie = liste de BriefingItem.
+# Aucun appel LLM — voir REVIEW_BRIEFING_IMPLEMENTATION_PLAN.md section 6.
+
+BRIEFING_PRIORITY_ORDER = {"urgent": 0, "to_check": 1, "done": 2, "closed": 3}
+
+# Seuil de bascule vers "urgent" pour une recommandation non décidée.
+# Hypothèse de départ, non calibrée sur un usage réel — voir plan section 5,
+# explicitement modifiable sans autre impact.
+URGENT_INTENTION_THRESHOLD_DAYS = 21
+
 
 class ArcService:
 
@@ -564,6 +577,257 @@ class ArcService:
                 arc.get("decision_confirmation_source"),
             ),
         }
+
+    # ── Review Briefing — synthèse opérationnelle ─────────────────────────────
+
+    @staticmethod
+    def _days_since(iso_timestamp: Optional[str]) -> int:
+        """Nombre de jours entiers écoulés depuis un timestamp ISO. 0 si absent/invalide."""
+        if not iso_timestamp:
+            return 0
+        try:
+            ts = iso_timestamp.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(ts)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            delta = datetime.now(timezone.utc) - dt
+            return max(delta.days, 0)
+        except (ValueError, TypeError):
+            return 0
+
+    @staticmethod
+    def _format_date_fr(iso_timestamp: Optional[str]) -> str:
+        """Formate un timestamp ISO en date française courte. Chaîne vide si absent/invalide."""
+        if not iso_timestamp:
+            return ""
+        try:
+            ts = iso_timestamp.replace("Z", "+00:00")
+            dt = datetime.fromisoformat(ts)
+            mois = [
+                "janvier", "février", "mars", "avril", "mai", "juin",
+                "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+            ]
+            return f"{dt.day} {mois[dt.month - 1]} {dt.year}"
+        except (ValueError, TypeError, IndexError):
+            return ""
+
+    def _arc_to_briefing_item(self, arc: dict) -> dict:
+        """
+        Traduit un DecisionArc en BriefingItem — classification par priorité
+        et génération templatée de why_it_matters / questions_to_ask.
+
+        RÈGLE : jamais de causalité inventée, jamais un libellé qui affirme
+        qu'un sujet est "réglé"/"résolu"/"exécuté" au-delà de ce que
+        execution_status garantit réellement.
+        """
+        status = arc.get("status")
+        execution_status = arc.get("execution_status", "not_started")
+        recommendation_text = arc.get("recommendation_text", "") or ""
+        decision_text = arc.get("decision_text")
+        title = decision_text or recommendation_text
+
+        base = {
+            "arc_id": arc.get("id"),
+            "source_type": "decision_arc",
+            "title": title,
+            "learning_text": None,
+        }
+
+        if status == "intention":
+            days = self._days_since(arc.get("created_at"))
+            if days > URGENT_INTENTION_THRESHOLD_DAYS:
+                return {
+                    **base,
+                    "priority": "urgent",
+                    "temporal_context": f"Recommandé il y a {days} jours",
+                    "why_it_matters": "Toujours sans décision confirmée après au moins une revue.",
+                    "questions_to_ask": [
+                        "Où en êtes-vous sur cette recommandation ?",
+                        "Souhaitez-vous l'appliquer, ou faut-il la reconsidérer ?",
+                    ],
+                }
+            return {
+                **base,
+                "priority": "to_check",
+                "temporal_context": f"Recommandé il y a {days} jours",
+                "why_it_matters": "Décision encore en attente.",
+                "questions_to_ask": ["Qu'avez-vous décidé pour cette recommandation ?"],
+            }
+
+        if status == "execution":
+            if execution_status == "complete":
+                days = self._days_since(
+                    arc.get("execution_updated_at") or arc.get("decision_confirmed_at")
+                )
+                return {
+                    **base,
+                    "priority": "to_check",
+                    "temporal_context": f"Exécuté il y a {days} jours",
+                    "why_it_matters": "Effet pas encore confirmé dans une analyse.",
+                    "questions_to_ask": ["Quel effet avez-vous observé depuis ?"],
+                }
+            days = self._days_since(arc.get("decision_confirmed_at") or arc.get("updated_at"))
+            return {
+                **base,
+                "priority": "to_check",
+                "temporal_context": f"Décidé il y a {days} jours",
+                "why_it_matters": "Exécution en cours.",
+                "questions_to_ask": ["Où en est l'exécution depuis notre dernier échange ?"],
+            }
+
+        if status in ("consequences_linked", "learning_proposed"):
+            days = self._days_since(arc.get("updated_at"))
+            return {
+                **base,
+                "priority": "done",
+                "temporal_context": f"Effet confirmé il y a {days} jours",
+                "why_it_matters": "Apprentissage en attente.",
+                "questions_to_ask": ["Cet effet s'est-il maintenu depuis ?"],
+            }
+
+        if status == "closed":
+            date_str = self._format_date_fr(arc.get("closed_at"))
+            return {
+                **base,
+                "priority": "closed",
+                "temporal_context": f"Clôturé le {date_str}" if date_str else "Clôturé",
+                "why_it_matters": None,
+                # Jamais de question sur une carte close — rien d'ouvert à discuter
+                # (voir REVIEW_BRIEFING_IMPLEMENTATION_PLAN.md section 1B).
+                "questions_to_ask": [],
+                "learning_text": arc.get("learning_text"),
+            }
+
+        # status == "decision" (réservé, non atteignable en MVP) ou valeur
+        # inattendue — traité comme "à vérifier" sans sur-affirmer un état.
+        days = self._days_since(arc.get("updated_at"))
+        return {
+            **base,
+            "priority": "to_check",
+            "temporal_context": f"Mis à jour il y a {days} jours",
+            "why_it_matters": "Statut en cours de traitement.",
+            "questions_to_ask": [],
+        }
+
+    def build_review_briefing(
+        self,
+        company_id: str,
+        entity_id: Optional[str] = None,
+        limit: int = 5,
+    ) -> list[dict]:
+        """
+        Construit le Briefing de revue : arcs actifs (jamais 'abandoned'),
+        classés par priorité, avec questions prêtes à poser. Lecture seule.
+
+        entity_id : filtre optionnel sur le client actuellement sélectionné
+        (frontend/components/chat/ChatContainer.tsx::selectedEntityId) — sans
+        ce filtre, un cabinet avec plusieurs clients verrait un mélange
+        d'arcs de clients différents, ce qui contredit l'objectif même du
+        composant ("quand le cabinet ouvre un client"). Rétrocompatible :
+        entity_id=None renvoie tous les arcs actifs de la company.
+        """
+        supabase = self._get_supabase()
+        if not supabase:
+            return []
+
+        query = (
+            supabase.from_("decision_arcs")
+            .select(
+                "id, status, execution_status, recommendation_text, decision_text, "
+                "execution_notes, learning_text, created_at, updated_at, "
+                "decision_confirmed_at, execution_updated_at, closed_at, entity_id"
+            )
+            .eq("company_id", company_id)
+            .neq("status", "abandoned")
+        )
+        if entity_id:
+            query = query.eq("entity_id", entity_id)
+
+        try:
+            result = query.order("updated_at", desc=True).execute()
+        except Exception as e:
+            logger.error("[ARC] build_review_briefing — fetch failed: %s", e)
+            return []
+
+        # Filtre défensif redondant avec le .neq() de la requête ci-dessus —
+        # garantit l'exclusion même si la couche de mock/DB ne l'applique pas.
+        arcs = [a for a in (result.data or []) if a.get("status") != "abandoned"]
+        items = [self._arc_to_briefing_item(arc) for arc in arcs]
+        items.sort(key=lambda item: BRIEFING_PRIORITY_ORDER.get(item["priority"], 99))
+        return items[: max(limit, 0)] if limit else items[:5]
+
+    # ── "Ne plus suivre" — transition ABANDONED ───────────────────────────────
+
+    def abandon_arc(
+        self,
+        arc_id: str,
+        company_id: str,
+        reason: Optional[str] = None,
+    ) -> dict:
+        """
+        "Ne plus suivre" côté UI — Review Briefing.
+
+        RÈGLE SÉMANTIQUE (correction 2026-08-05) : abandoned signifie
+        uniquement "ce point ne doit plus apparaître dans le briefing actif".
+        Ne signifie JAMAIS réglé/résolu/exécuté — cette méthode ne déduit
+        aucun résultat métier, elle enregistre un arrêt de suivi.
+
+        Ne supprime rien : la ligne, l'historique et arc_analysis_links
+        restent intacts. Idempotent si l'arc est déjà abandoned.
+
+        Lève ValueError si l'arc est introuvable (ou n'appartient pas à
+        company_id) ou si l'arc est déjà CLOSED (le trigger d'immutabilité
+        le refuserait de toute façon — vérifié ici en amont pour renvoyer
+        une erreur explicite plutôt qu'une exception de trigger SQL).
+        """
+        supabase = self._get_supabase()
+        if not supabase:
+            return {"abandoned": False, "arc_id": arc_id}
+
+        try:
+            arc_result = (
+                supabase.from_("decision_arcs")
+                .select("id, status")
+                .eq("id", arc_id)
+                .eq("company_id", company_id)
+                .single()
+                .execute()
+            )
+        except Exception as e:
+            raise ValueError(f"[ARC] Arc {arc_id} introuvable — {e}")
+
+        arc = arc_result.data
+        if not arc:
+            raise ValueError(f"[ARC] Arc {arc_id} introuvable.")
+
+        current_status = arc.get("status")
+        if current_status == "closed":
+            raise ValueError(
+                f"[ARC] Arc {arc_id} est CLOSED et immuable — impossible de le "
+                f"retirer du briefing via 'Ne plus suivre'."
+            )
+        if current_status == "abandoned":
+            # Idempotent : déjà retiré du briefing actif, pas une erreur.
+            return {"abandoned": True, "arc_id": arc_id, "already_abandoned": True}
+
+        now = self._now()
+        update = {
+            "status": "abandoned",
+            "abandoned_at": now,
+            "abandoned_reason": reason,
+        }
+
+        try:
+            supabase.from_("decision_arcs").update(update).eq("id", arc_id).execute()
+        except Exception as e:
+            logger.error("[ARC] abandon_arc — update failed pour arc %s: %s", arc_id, e)
+            raise
+
+        logger.info(
+            "[ARC] Arc retiré du briefing actif ('Ne plus suivre') — arc_id=%s reason=%s",
+            arc_id, reason or "(non précisé)",
+        )
+        return {"abandoned": True, "arc_id": arc_id, "abandoned_at": now}
 
     # ── Backfill ──────────────────────────────────────────────────────────────
 

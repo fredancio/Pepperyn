@@ -126,3 +126,49 @@ class ArcLearningRequest(BaseModel):
     learning_text: Optional[str] = None
     # Requis si arc.decision_text IS NULL — confirmation rétrospective
     decision_text: Optional[str] = None
+
+
+class ArcAbandonRequest(BaseModel):
+    """
+    POST /api/arcs/{id}/abandon — "Ne plus suivre" côté UI (Review Briefing).
+
+    RÈGLE SÉMANTIQUE (correction 2026-08-05) : cette transition signifie
+    uniquement "ce point ne doit plus apparaître dans le briefing actif".
+    Elle n'affirme jamais que le sujet a été réglé, résolu ou exécuté —
+    `abandoned` == suivi arrêté, pas résultat constaté.
+    """
+    reason: Optional[str] = None
+
+
+# ── Review Briefing (Capability 3 — Monthly Review Engine) ───────────────────
+
+BriefingPriority = Literal["urgent", "to_check", "done", "closed"]
+
+# Motifs proposés à l'utilisateur pour abandoned_reason — vocabulaire interne
+# reste "abandoned" dans tous les cas, ce sont des libellés de contexte humain,
+# jamais un nouveau statut métier affiché comme un résultat constaté par Pepperyn.
+ABANDON_REASON_CHOICES: dict[str, str] = {
+    "handled_elsewhere": "Traité en dehors de Pepperyn",
+    "no_longer_relevant": "Devenu non pertinent",
+    "decision_abandoned": "Décision abandonnée",
+    "other": "Autre",
+}
+
+
+class BriefingItem(BaseModel):
+    """
+    Un élément du Review Briefing — synthèse opérationnelle, pas un fait brut.
+    Généré par ArcService.build_review_briefing() à partir d'un DecisionArc.
+    why_it_matters et questions_to_ask sont toujours templatés (jamais un
+    appel LLM) — voir REVIEW_BRIEFING_IMPLEMENTATION_PLAN.md section 6.
+    """
+    arc_id: str
+    source_type: Literal["decision_arc"] = "decision_arc"
+    priority: BriefingPriority
+    title: str
+    temporal_context: str
+    why_it_matters: Optional[str] = None
+    questions_to_ask: list[str] = []
+    # Affiché uniquement pour priority="closed" — jamais de question sur une
+    # carte close (rien d'ouvert à discuter, voir section 1B du plan).
+    learning_text: Optional[str] = None

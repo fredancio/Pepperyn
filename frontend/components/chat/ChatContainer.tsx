@@ -7,7 +7,8 @@ import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetc
 import { getCurrentAuthMode, signOutAdmin, clearGuestAuth, getGuestPlan } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { MessageBubble, TypingIndicator } from './MessageBubble';
-import { InputBar } from './InputBar';
+import { InputBar, type PrefillToken } from './InputBar';
+import { ReviewBriefing } from './ReviewBriefing';
 import { PwaInstallButton } from '@/components/ui/PwaInstallButton';
 import { Spinner } from '@/components/ui/Spinner';
 import { UpgradeModal } from '@/components/ui/UpgradeModal';
@@ -79,6 +80,14 @@ export function ChatContainer() {
   const [deletingHistory, setDeletingHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasMessages = messages.length > 1;
+  // Review Briefing — "Préparer cette question" (jamais d'envoi automatique).
+  const [prefillToken, setPrefillToken] = useState<PrefillToken | null>(null);
+  const prefillCounterRef = useRef(0);
+
+  const handlePrepareQuestion = useCallback((question: string) => {
+    prefillCounterRef.current += 1;
+    setPrefillToken({ id: prefillCounterRef.current, text: question });
+  }, []);
 
   const questionsRestantes = analysisReceived && plan === 'free'
     ? Math.max(0, MAX_CHAT_QUESTIONS_FREE - questionsPostAnalysis)
@@ -1004,6 +1013,10 @@ export function ChatContainer() {
           ) : (
             /* Conversation messages */
             <div className="flex flex-col gap-4 p-4 md:p-6 max-w-4xl mx-auto w-full">
+              <ReviewBriefing
+                entityId={selectedEntityId || undefined}
+                onPrepareQuestion={handlePrepareQuestion}
+              />
               {messages.map(msg => (
                 <MessageBubble
                   key={msg.id}
@@ -1052,6 +1065,7 @@ export function ChatContainer() {
                   ? 'Limite de questions atteinte — démarrez une nouvelle analyse'
                   : 'Posez une question de suivi...'
               }
+              prefillToken={prefillToken}
             />
             {!canAccess(plan, 'conversational') && (
               <p className="text-center text-xs text-[#5F6368]/50 pb-2 italic">

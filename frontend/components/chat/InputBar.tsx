@@ -1,7 +1,19 @@
 'use client';
-import { useState, useRef, KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, KeyboardEvent } from 'react';
 import { FileUploadZone } from './FileUploadZone';
 import { GuidedOnboarding } from './GuidedOnboarding';
+
+/**
+ * Jeton de préremplissage — "Préparer cette question" (Review Briefing).
+ *
+ * `id` doit changer UNIQUEMENT sur un clic explicite de l'utilisateur.
+ * L'effet de préremplissage est déclenché par `id`, jamais par `text` seul —
+ * ceci garantit qu'aucun re-render ordinaire ne redéclenche le préremplissage.
+ */
+export interface PrefillToken {
+  id: number;
+  text: string;
+}
 
 interface InputBarProps {
   onSendMessage: (text: string) => void;
@@ -11,6 +23,8 @@ interface InputBarProps {
   uploadOnly?: boolean;
   onFileChange?: (file: File | null) => void;
   plan?: string;
+  /** Préremplit le champ texte sans jamais l'envoyer ni écraser un brouillon existant. */
+  prefillToken?: PrefillToken | null;
 }
 
 type TargetPreset = 'end_year' | 'plus_6m' | 'plus_12m' | 'custom';
@@ -35,7 +49,7 @@ function computeTargetDate(preset: TargetPreset, customDate: string): string {
   return '';
 }
 
-export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, uploadOnly, onFileChange, plan = 'free' }: InputBarProps) {
+export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, uploadOnly, onFileChange, plan = 'free', prefillToken }: InputBarProps) {
   const [text, setText] = useState('');
   const [showFileZone, setShowFileZone] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -98,6 +112,29 @@ export function InputBar({ onSendMessage, onSendFile, disabled, placeholder, upl
     setSelectedFile(null);
     onFileChange?.(null);
   };
+
+  // ── Préremplissage "Préparer cette question" (Review Briefing) ───────────
+  // Déclenché UNIQUEMENT par un changement de prefillToken.id (clic explicite
+  // côté ChatContainer) — jamais par un re-render ordinaire. Ne déclenche
+  // jamais d'envoi. Un brouillon existant n'est jamais écrasé : la question
+  // est ajoutée à la suite du texte déjà présent.
+  useEffect(() => {
+    if (!prefillToken) return;
+    setText((prev) => {
+      if (!prev.trim()) return prefillToken.text;
+      const separator = prev.endsWith('\n') ? '' : '\n';
+      return `${prev}${separator}${prefillToken.text}`;
+    });
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current;
+      if (ta) {
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 160) + 'px';
+        ta.focus();
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillToken?.id]);
 
   // Mode uploadOnly — zone de dépôt + "Lancer l'analyse" toujours visible
   if (uploadOnly) {
