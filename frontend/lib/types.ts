@@ -138,3 +138,25 @@ export interface BetaTestimonial {
   is_published: boolean;
   created_at: string;
 }
+
+// ─── Review Briefing (Capability 3 — Monthly Review Engine) ──────────────
+
+/** Priorité opérationnelle d'un élément du briefing. */
+export type BriefingPriority = 'urgent' | 'to_check' | 'done' | 'closed';
+
+/**
+ * Un élément du Review Briefing — synthèse opérationnelle d'un DecisionArc.
+ * why_it_matters et questions_to_ask sont toujours templatés côté backend
+ * (jamais générés par un LLM).
+ */
+export interface BriefingItem {
+  arc_id: string;
+  source_type: 'decision_arc';
+  priority: BriefingPriority;
+  title: string;
+  temporal_context: string;
+  why_it_matters?: string | null;
+  questions_to_ask: string[];
+  /** Présent uniquement pour priority='closed'. */
+  learning_text?: string | null;
+}
