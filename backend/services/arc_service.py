@@ -833,27 +833,44 @@ class ArcService:
         Un arc sans entity_id (jamais rattaché à un client) est exclu — il
         n'y a pas de carte client à laquelle le rattacher (voir
         PORTFOLIO_INTELLIGENCE_MVP.md : la carte est structurée par client).
+
+        RÈGLE MÉTIER (Portfolio Home Product Validation, 2026-08-05 —
+        correctif "Closed-Only Clients") : un point "closed" ne constitue
+        jamais une raison active de préparer un client. Il est exclu ici de
+        l'agrégation active — jamais choisi comme point principal, jamais
+        compté, et un client dont TOUS les points sont "closed" (ou
+        "abandoned", déjà exclu par build_review_briefing) ne produit
+        aucune carte. Périmètre volontairement limité au Portfolio : le
+        Review Briefing (build_review_briefing) continue d'afficher les
+        points "closed" sans filtre, car un client déjà ouvert dans le chat
+        doit pouvoir consulter son historique clos — seul le Portfolio, qui
+        répond à "quel client dois-je préparer maintenant", exclut le clos.
         """
         items = self.build_review_briefing(company_id=company_id, entity_id=None, limit=None)
         if not items:
             return []
 
         # items est déjà trié par priorité (urgent → to_check → done → closed) ;
-        # le premier item rencontré pour un entity_id est donc son plus prioritaire.
-        # active_counts compte, par client, les points non "closed" — un point
-        # clos ne demande plus de préparation, il ne doit pas gonfler le
-        # compteur "+N autres points à suivre" (Mission 2).
+        # active_items retire les points "closed" avant tout regroupement —
+        # un point clos ne peut donc plus jamais devenir top_item, ni gonfler
+        # le compteur "+N autres points à suivre". Le premier item rencontré
+        # pour un entity_id, dans active_items, est son point actif le plus
+        # prioritaire.
+        active_items = [item for item in items if item.get("priority") != "closed"]
+
         by_entity: dict[str, dict] = {}
         active_counts: dict[str, int] = {}
-        for item in items:
+        for item in active_items:
             eid = item.get("entity_id")
             if not eid:
                 continue
-            if item.get("priority") != "closed":
-                active_counts[eid] = active_counts.get(eid, 0) + 1
+            active_counts[eid] = active_counts.get(eid, 0) + 1
             if eid not in by_entity:
                 by_entity[eid] = item
 
+        # Un client dont tous les points sont "closed" (ou "abandoned") n'a
+        # aucune entrée dans active_items — aucune carte n'est créée pour
+        # lui, conformément à la règle métier ci-dessus.
         if not by_entity:
             return []
 
@@ -879,11 +896,10 @@ class ArcService:
         for eid, item in by_entity.items():
             entity_name = entity_names.get(eid, "Client")
             total_active = active_counts.get(eid, 0)
-            # Le point affiché (top_item) est déjà l'un des `total_active`
-            # s'il n'est pas lui-même "closed" — on ne le recompte pas comme
-            # "autre point".
-            top_is_active = item.get("priority") != "closed"
-            other_active_count = max(total_active - (1 if top_is_active else 0), 0)
+            # top_item est désormais toujours actif par construction (jamais
+            # "closed", voir active_items ci-dessus) — il fait donc toujours
+            # partie de total_active ; on ne le recompte pas comme "autre point".
+            other_active_count = max(total_active - 1, 0)
             why_it_matters = item.get("why_it_matters")
             why_it_matters_display = (
                 why_it_matters if self._is_why_it_matters_distinct(why_it_matters) else None
