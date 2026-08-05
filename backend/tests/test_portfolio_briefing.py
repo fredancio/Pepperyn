@@ -251,9 +251,16 @@ class TestPortfolioCounter:
         assert cards[0]["other_active_count"] == 0
 
     def test_top_item_itself_never_double_counted(self):
-        """Si le point affiché est lui-même 'closed' (cas limite), il n'est pas recompté."""
+        """Cas mis à jour par le correctif "Closed-Only Clients" (2026-08-05) :
+        un client dont le seul arc est 'closed' ne produit plus de carte du
+        tout (voir TestPortfolioClosedOnlyExclusion) — ce test couvrait
+        auparavant le cas limite "top_item lui-même 'closed', non recompté",
+        devenu impossible par construction puisque top_item ne peut plus
+        jamais être 'closed'. Remplacé ici par le cas voisin toujours
+        pertinent : un client avec un seul arc actif (non clos) a bien
+        other_active_count == 0."""
         sb = make_supabase_with_tables([
-            make_arc(id="arc-closed", entity_id="entity-A", status="closed", closed_at=days_ago(5)),
+            make_arc(id="arc-open", entity_id="entity-A", status="intention", created_at=days_ago(5)),
         ], entities_data=[{"id": "entity-A", "name": "Client A"}])
         svc = make_arc_service_with_mock(sb)
 
@@ -373,3 +380,143 @@ class TestPortfolioTieBreak:
         cards = svc.build_portfolio_briefing(company_id="company-1")
 
         assert [c["entity_name"] for c in cards] == ["Alpha Corp", "Zebra Corp"]
+
+
+# ── Tests : correctif "Closed-Only Clients" (Portfolio Home Product ──────────
+# Validation, 2026-08-05) — un point "closed" ne constitue jamais une raison
+# active de préparer un client. Voir PORTFOLIO_CLOSED_ONLY_FIX_PR_REVIEW.md.
+
+class TestPortfolioClosedOnlyExclusion:
+
+    def test_client_with_only_closed_arc_produces_no_card(self):
+        """Cas 1 — client avec uniquement un arc 'closed' : aucune carte Portfolio."""
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-closed", entity_id="entity-A", status="closed", closed_at=days_ago(20)),
+        ], entities_data=[{"id": "entity-A", "name": "Client A"}])
+        svc = make_arc_service_with_mock(sb)
+
+        cards = svc.build_portfolio_briefing(company_id="company-1")
+
+        assert cards == []
+
+    def test_client_with_only_abandoned_arc_produces_no_card(self):
+        """Cas 2 — client avec uniquement un arc 'abandoned' : aucune carte Portfolio
+        (déjà exclu par build_review_briefing, reconfirmé ici au niveau Portfolio)."""
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-abandoned", entity_id="entity-A", status="abandoned"),
+        ], entities_data=[{"id": "entity-A", "name": "Client A"}])
+        svc = make_arc_service_with_mock(sb)
+
+        cards = svc.build_portfolio_briefing(company_id="company-1")
+
+        assert cards == []
+
+    def test_client_with_open_and_closed_arc_card_based_on_open_only(self):
+        """Cas 3 — client avec un arc ouvert et un arc 'closed' : une carte fondée
+        uniquement sur l'arc ouvert."""
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-closed", entity_id="entity-A", status="closed", closed_at=days_ago(20)),
+            make_arc(id="arc-open", entity_id="entity-A", status="execution", execution_status="in_progress",
+                      decision_confirmed_at=days_ago(10)),
+        ], entities_data=[{"id": "entity-A", "name": "Client A"}])
+        svc = make_arc_service_with_mock(sb)
+
+        cards = svc.build_portfolio_briefing(company_id="company-1")
+
+        assert len(cards) == 1
+        assert cards[0]["top_item"]["arc_id"] == "arc-open"
+        assert cards[0]["top_item"]["priority"] != "closed"
+
+    def test_counter_ignores_closed_arcs(self):
+        """Cas 4 — le compteur ignore les arcs 'closed' (comportement déjà correct,
+        reconfirmé après le correctif)."""
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-open", entity_id="entity-A", status="intention", created_at=days_ago(30)),
+            make_arc(id="arc-closed-1", entity_id="entity-A", status="closed", closed_at=days_ago(5)),
+            make_arc(id="arc-closed-2", entity_id="entity-A", status="closed", closed_at=days_ago(10)),
+        ], entities_data=[{"id": "entity-A", "name": "Client A"}])
+        svc = make_arc_service_with_mock(sb)
+
+        cards = svc.build_portfolio_briefing(company_id="company-1")
+
+        assert cards[0]["other_active_count"] == 0
+
+    def test_top_item_can_never_be_closed_even_with_many_closed_arcs(self):
+        """Cas 5 — le point principal ne peut jamais être un arc 'closed', même
+        lorsque plusieurs arcs clos existent aux côtés d'un seul arc ouvert récent."""
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-closed-1", entity_id="entity-A", status="closed", closed_at=days_ago(2)),
+            make_arc(id="arc-closed-2", entity_id="entity-A", status="closed", closed_at=days_ago(4)),
+            make_arc(id="arc-closed-3", entity_id="entity-A", status="closed", closed_at=days_ago(6)),
+            make_arc(id="arc-open", entity_id="entity-A", status="intention", created_at=days_ago(1)),
+        ], entities_data=[{"id": "entity-A", "name": "Client A"}])
+        svc = make_arc_service_with_mock(sb)
+
+        cards = svc.build_portfolio_briefing(company_id="company-1")
+
+        assert len(cards) == 1
+        assert cards[0]["top_item"]["priority"] != "closed"
+        assert cards[0]["top_item"]["arc_id"] == "arc-open"
+
+    def test_card_priority_never_derived_from_closed_arc(self):
+        """Cas 6 — la priorité de la carte ne dépend jamais d'un arc 'closed' :
+        un client avec un arc 'closed' récent et un arc 'to_check' plus ancien
+        doit porter la priorité 'to_check', jamais 'closed'."""
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-closed", entity_id="entity-A", status="closed", closed_at=days_ago(1)),
+            make_arc(id="arc-to-check", entity_id="entity-A", status="execution", execution_status="in_progress",
+                      decision_confirmed_at=days_ago(15)),
+        ], entities_data=[{"id": "entity-A", "name": "Client A"}])
+        svc = make_arc_service_with_mock(sb)
+
+        cards = svc.build_portfolio_briefing(company_id="company-1")
+
+        assert cards[0]["top_item"]["priority"] == "to_check"
+
+    def test_client_with_multiple_open_arcs_unchanged_behavior(self):
+        """Cas 7 — un client avec plusieurs arcs ouverts (aucun 'closed') conserve
+        le comportement actuel : top_item = le plus prioritaire, compteur exact."""
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-urgent", entity_id="entity-A", status="intention", created_at=days_ago(30)),
+            make_arc(id="arc-to-check-1", entity_id="entity-A", status="execution", execution_status="in_progress"),
+            make_arc(id="arc-to-check-2", entity_id="entity-A", status="execution", execution_status="complete"),
+        ], entities_data=[{"id": "entity-A", "name": "Client A"}])
+        svc = make_arc_service_with_mock(sb)
+
+        cards = svc.build_portfolio_briefing(company_id="company-1")
+
+        assert cards[0]["top_item"]["arc_id"] == "arc-urgent"
+        assert cards[0]["other_active_count"] == 2
+
+    def test_closed_arc_data_and_history_remain_intact_in_review_briefing(self):
+        """Cas 8 — l'historique et les données des arcs 'closed' restent intacts :
+        le Review Briefing (non filtré par ce correctif) continue de les exposer
+        avec tous leurs champs, notamment learning_text."""
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-closed", entity_id="entity-A", status="closed", closed_at=days_ago(20),
+                      learning_text="Le changement de fournisseur a réduit les délais de 30%."),
+        ], entities_data=[{"id": "entity-A", "name": "Client A"}])
+        svc = make_arc_service_with_mock(sb)
+
+        items = svc.build_review_briefing(company_id="company-1")
+
+        assert len(items) == 1
+        assert items[0]["priority"] == "closed"
+        assert items[0]["learning_text"] == "Le changement de fournisseur a réduit les délais de 30%."
+
+    def test_review_briefing_unaffected_by_portfolio_closed_filter(self):
+        """Cas 9 — le Review Briefing ne change pas involontairement : un client
+        avec uniquement un arc 'closed' n'apparaît plus dans le Portfolio, mais
+        apparaît toujours dans le Review Briefing (périmètres volontairement
+        distincts)."""
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-closed", entity_id="entity-A", status="closed", closed_at=days_ago(20)),
+        ], entities_data=[{"id": "entity-A", "name": "Client A"}])
+        svc = make_arc_service_with_mock(sb)
+
+        portfolio_cards = svc.build_portfolio_briefing(company_id="company-1")
+        briefing_items = svc.build_review_briefing(company_id="company-1")
+
+        assert portfolio_cards == []
+        assert len(briefing_items) == 1
+        assert briefing_items[0]["priority"] == "closed"
