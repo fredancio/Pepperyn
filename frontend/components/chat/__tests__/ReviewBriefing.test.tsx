@@ -57,7 +57,7 @@ describe('ReviewBriefing — rendu', () => {
 
     expect(await screen.findByText('Briefing de revue')).toBeInTheDocument();
     expect(
-      screen.getByText('Points issus des recommandations et décisions suivies avec ce client.')
+      screen.getByText('Points issus des recommandations et décisions actives.')
     ).toBeInTheDocument();
     expect(screen.getByText('Point A')).toBeInTheDocument();
     expect(screen.getByText('Point B')).toBeInTheDocument();

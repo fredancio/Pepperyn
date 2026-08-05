@@ -78,7 +78,7 @@ export function PortfolioHome() {
       <div className="max-w-2xl mx-auto">
         <h1 className="text-xl font-extrabold text-[#1A1A2E] mb-1">Portefeuille</h1>
         <p className="text-sm text-[#5F6368] mb-6">
-          Vos clients avec un point à traiter, triés par priorité.
+          Vos organisations avec un point à traiter, triées par priorité.
         </p>
 
         {state === 'loading' && (

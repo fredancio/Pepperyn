@@ -93,7 +93,7 @@ function DemoChatPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const entityId = searchParams.get('entity') || undefined;
-  const clientName = (entityId && getDemoEntityName(entityId)) || 'ce client';
+  const clientName = (entityId && getDemoEntityName(entityId)) || 'cette organisation';
 
   const [messages, setMessages] = useState<Message[]>(() => [
     makeMessage({

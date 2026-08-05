@@ -112,7 +112,7 @@ export function ReviewBriefing({ entityId, onPrepareQuestion }: ReviewBriefingPr
       <div className="px-5 py-3.5 bg-indigo-100 border-b border-indigo-200">
         <p className="font-bold text-sm text-[#1A1A2E]">Briefing de revue</p>
         <p className="text-xs mt-0.5 text-[#5F6368]">
-          Points issus des recommandations et décisions suivies avec ce client.
+          Points issus des recommandations et décisions actives.
         </p>
       </div>
 
