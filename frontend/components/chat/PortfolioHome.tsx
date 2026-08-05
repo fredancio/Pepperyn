@@ -29,6 +29,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchPortfolio } from '@/lib/arc-api';
+import { isDemoModeEnabled } from '@/lib/demo-mode';
 import type { PortfolioCard, BriefingPriority } from '@/lib/types';
 
 const PRIORITY_META: Record<BriefingPriority, { icon: string; label: string }> = {
@@ -64,7 +65,12 @@ export function PortfolioHome() {
   }, [load]);
 
   const handlePrepareReview = (entityId: string) => {
-    router.push(`/app/chat?entity=${entityId}`);
+    // External User Testing Prototype (2026-08-05) : en mode démo, navigue
+    // vers la route de démonstration (aucune authentification, aucun accès
+    // réel) plutôt que /app/chat. Seul point de wiring modifié dans ce
+    // composant — hiérarchie, tri et rendu des cartes restent inchangés.
+    const base = isDemoModeEnabled() ? '/demo/chat' : '/app/chat';
+    router.push(`${base}?entity=${entityId}`);
   };
 
   return (
