@@ -1,5 +1,5 @@
 """
-Tests unitaires — Portfolio Intelligence, Incrément 1 (Capability 7).
+Tests unitaires — Portfolio Intelligence, Incréments 1 + 2 (Capability 7).
 
 Couvre :
   - regroupement des BriefingItem par entity_id (une carte par client)
@@ -8,8 +8,11 @@ Couvre :
   - exclusion des arcs sans entity_id (pas de carte client possible)
   - résolution des noms de clients via la table entities
   - liste vide si aucun arc actif / pas de Supabase
-  - absence de troncature à 5 clients (bug limit=0 de build_review_briefing
-    évité explicitement — voir arc_service.build_portfolio_briefing)
+  - absence de troncature (limit=None demandé explicitement, voir
+    arc_service.build_portfolio_briefing)
+  - Incrément 2 : compteur d'autres points actifs (Mission 2), affichage
+    filtré de why_it_matters (Mission 3), tie-break de tri par ancienneté
+    puis nom de client (Mission 4)
 
 build_portfolio_briefing() est un pur regroupement de build_review_briefing()
 déjà testé dans test_review_briefing.py — ces tests ne re-testent donc pas
@@ -20,7 +23,13 @@ test_review_briefing.py.
 """
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
+
+
+def days_ago(n: int) -> str:
+    """ISO timestamp à n jours dans le passé — pour contrôler age_days dans les tests."""
+    return (datetime.now(timezone.utc) - timedelta(days=n)).isoformat()
 
 
 def make_arc_service_with_mock(supabase_mock):
@@ -196,5 +205,171 @@ class TestPortfolioGrouping:
 
         top_item = cards[0]["top_item"]
         for field in ("arc_id", "priority", "title", "temporal_context",
-                      "why_it_matters", "questions_to_ask", "entity_id"):
+                      "why_it_matters", "questions_to_ask", "entity_id", "age_days"):
             assert field in top_item
+
+
+# ── Tests : compteur d'autres points actifs (Incrément 2, Mission 2) ─────────
+
+class TestPortfolioCounter:
+
+    def test_zero_when_only_one_active_point(self):
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-1", entity_id="entity-A", status="execution", execution_status="in_progress"),
+        ], entities_data=[{"id": "entity-A", "name": "Client A"}])
+        svc = make_arc_service_with_mock(sb)
+
+        cards = svc.build_portfolio_briefing(company_id="company-1")
+
+        assert cards[0]["other_active_count"] == 0
+
+    def test_counts_other_active_points_excluding_the_one_shown(self):
+        """3 points actifs pour le même client → top_item + 2 autres."""
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-urgent", entity_id="entity-A", status="intention", created_at=days_ago(30)),
+            make_arc(id="arc-to-check-1", entity_id="entity-A", status="execution", execution_status="in_progress"),
+            make_arc(id="arc-to-check-2", entity_id="entity-A", status="execution", execution_status="complete"),
+        ], entities_data=[{"id": "entity-A", "name": "Client A"}])
+        svc = make_arc_service_with_mock(sb)
+
+        cards = svc.build_portfolio_briefing(company_id="company-1")
+
+        assert cards[0]["top_item"]["arc_id"] == "arc-urgent"
+        assert cards[0]["other_active_count"] == 2
+
+    def test_closed_points_never_counted(self):
+        """Un point 'closed' ne demande plus de préparation — jamais compté."""
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-urgent", entity_id="entity-A", status="intention", created_at=days_ago(30)),
+            make_arc(id="arc-closed-1", entity_id="entity-A", status="closed", closed_at=days_ago(5)),
+            make_arc(id="arc-closed-2", entity_id="entity-A", status="closed", closed_at=days_ago(10)),
+        ], entities_data=[{"id": "entity-A", "name": "Client A"}])
+        svc = make_arc_service_with_mock(sb)
+
+        cards = svc.build_portfolio_briefing(company_id="company-1")
+
+        assert cards[0]["other_active_count"] == 0
+
+    def test_top_item_itself_never_double_counted(self):
+        """Si le point affiché est lui-même 'closed' (cas limite), il n'est pas recompté."""
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-closed", entity_id="entity-A", status="closed", closed_at=days_ago(5)),
+        ], entities_data=[{"id": "entity-A", "name": "Client A"}])
+        svc = make_arc_service_with_mock(sb)
+
+        cards = svc.build_portfolio_briefing(company_id="company-1")
+
+        assert cards[0]["other_active_count"] == 0
+
+
+# ── Tests : affichage filtré de why_it_matters (Incrément 2, Mission 3) ──────
+
+class TestWhyItMattersDistinctFunction:
+    """Teste directement la fonction pure — aucun mock Supabase nécessaire."""
+
+    def test_none_text_is_not_distinct(self):
+        from services.arc_service import ArcService
+        assert ArcService._is_why_it_matters_distinct(None) is False
+
+    def test_known_redundant_texts_are_not_distinct(self):
+        from services.arc_service import ArcService
+        redundant_texts = [
+            "Toujours sans décision confirmée après au moins une revue.",
+            "Décision encore en attente.",
+            "Exécution en cours.",
+            "Statut en cours de traitement.",
+        ]
+        for text in redundant_texts:
+            assert ArcService._is_why_it_matters_distinct(text) is False, text
+
+    def test_known_distinct_texts_are_distinct(self):
+        from services.arc_service import ArcService
+        distinct_texts = [
+            "Effet pas encore confirmé dans une analyse.",
+            "Apprentissage en attente.",
+        ]
+        for text in distinct_texts:
+            assert ArcService._is_why_it_matters_distinct(text) is True, text
+
+    def test_unknown_text_defaults_to_distinct(self):
+        """Un texte hors de l'ensemble fermé connu n'est pas présumé redondant."""
+        from services.arc_service import ArcService
+        assert ArcService._is_why_it_matters_distinct("Un texte jamais vu.") is True
+
+
+class TestPortfolioWhyItMattersDisplay:
+
+    def test_hidden_when_redundant(self):
+        """intention/to_check → 'Décision encore en attente.' — masqué sur la carte."""
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-1", entity_id="entity-A", status="intention", created_at=days_ago(3)),
+        ], entities_data=[{"id": "entity-A", "name": "Client A"}])
+        svc = make_arc_service_with_mock(sb)
+
+        cards = svc.build_portfolio_briefing(company_id="company-1")
+
+        assert cards[0]["top_item"]["why_it_matters"] == "Décision encore en attente."
+        assert cards[0]["why_it_matters_display"] is None
+
+    def test_shown_when_distinct(self):
+        """execution/complete → 'Effet pas encore confirmé dans une analyse.' — affiché."""
+        sb = make_supabase_with_tables([
+            make_arc(
+                id="arc-1", entity_id="entity-A", status="execution",
+                execution_status="complete", execution_updated_at=days_ago(12),
+            ),
+        ], entities_data=[{"id": "entity-A", "name": "Client A"}])
+        svc = make_arc_service_with_mock(sb)
+
+        cards = svc.build_portfolio_briefing(company_id="company-1")
+
+        assert cards[0]["why_it_matters_display"] == "Effet pas encore confirmé dans une analyse."
+
+    def test_review_briefing_item_unaffected_by_portfolio_filter(self):
+        """top_item.why_it_matters reste intact — seul why_it_matters_display est filtré."""
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-1", entity_id="entity-A", status="intention", created_at=days_ago(3)),
+        ], entities_data=[{"id": "entity-A", "name": "Client A"}])
+        svc = make_arc_service_with_mock(sb)
+
+        cards = svc.build_portfolio_briefing(company_id="company-1")
+
+        # Le champ brut, destiné au Review Briefing, n'est jamais supprimé.
+        assert cards[0]["top_item"]["why_it_matters"] == "Décision encore en attente."
+
+
+# ── Tests : tri — tie-break par ancienneté puis nom (Incrément 2, Mission 4) ─
+
+class TestPortfolioTieBreak:
+
+    def test_older_point_ranks_first_within_same_priority(self):
+        older = days_ago(40)
+        newer = days_ago(25)
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-newer", entity_id="entity-B", status="intention", created_at=newer),
+            make_arc(id="arc-older", entity_id="entity-A", status="intention", created_at=older),
+        ], entities_data=[
+            {"id": "entity-A", "name": "Client A"},
+            {"id": "entity-B", "name": "Client B"},
+        ])
+        svc = make_arc_service_with_mock(sb)
+
+        cards = svc.build_portfolio_briefing(company_id="company-1")
+
+        # Les deux sont "urgent" (>21 jours) — le plus ancien (A, 40 jours) passe en premier.
+        assert [c["entity_id"] for c in cards] == ["entity-A", "entity-B"]
+
+    def test_final_tie_break_by_entity_name_when_priority_and_age_equal(self):
+        same_age = days_ago(30)
+        sb = make_supabase_with_tables([
+            make_arc(id="arc-zebra", entity_id="entity-zebra", status="intention", created_at=same_age),
+            make_arc(id="arc-alpha", entity_id="entity-alpha", status="intention", created_at=same_age),
+        ], entities_data=[
+            {"id": "entity-zebra", "name": "Zebra Corp"},
+            {"id": "entity-alpha", "name": "Alpha Corp"},
+        ])
+        svc = make_arc_service_with_mock(sb)
+
+        cards = svc.build_portfolio_briefing(company_id="company-1")
+
+        assert [c["entity_name"] for c in cards] == ["Alpha Corp", "Zebra Corp"]

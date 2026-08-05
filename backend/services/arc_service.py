@@ -649,6 +649,7 @@ class ArcService:
                         "Où en êtes-vous sur cette recommandation ?",
                         "Souhaitez-vous l'appliquer, ou faut-il la reconsidérer ?",
                     ],
+                    "age_days": days,
                 }
             return {
                 **base,
@@ -656,6 +657,7 @@ class ArcService:
                 "temporal_context": f"Recommandé il y a {days} jours",
                 "why_it_matters": "Décision encore en attente.",
                 "questions_to_ask": ["Qu'avez-vous décidé pour cette recommandation ?"],
+                "age_days": days,
             }
 
         if status == "execution":
@@ -669,6 +671,7 @@ class ArcService:
                     "temporal_context": f"Exécuté il y a {days} jours",
                     "why_it_matters": "Effet pas encore confirmé dans une analyse.",
                     "questions_to_ask": ["Quel effet avez-vous observé depuis ?"],
+                    "age_days": days,
                 }
             days = self._days_since(arc.get("decision_confirmed_at") or arc.get("updated_at"))
             return {
@@ -677,6 +680,7 @@ class ArcService:
                 "temporal_context": f"Décidé il y a {days} jours",
                 "why_it_matters": "Exécution en cours.",
                 "questions_to_ask": ["Où en est l'exécution depuis notre dernier échange ?"],
+                "age_days": days,
             }
 
         if status in ("consequences_linked", "learning_proposed"):
@@ -687,9 +691,11 @@ class ArcService:
                 "temporal_context": f"Effet confirmé il y a {days} jours",
                 "why_it_matters": "Apprentissage en attente.",
                 "questions_to_ask": ["Cet effet s'est-il maintenu depuis ?"],
+                "age_days": days,
             }
 
         if status == "closed":
+            days = self._days_since(arc.get("closed_at"))
             date_str = self._format_date_fr(arc.get("closed_at"))
             return {
                 **base,
@@ -700,6 +706,7 @@ class ArcService:
                 # (voir REVIEW_BRIEFING_IMPLEMENTATION_PLAN.md section 1B).
                 "questions_to_ask": [],
                 "learning_text": arc.get("learning_text"),
+                "age_days": days,
             }
 
         # status == "decision" (réservé, non atteignable en MVP) ou valeur
@@ -711,13 +718,14 @@ class ArcService:
             "temporal_context": f"Mis à jour il y a {days} jours",
             "why_it_matters": "Statut en cours de traitement.",
             "questions_to_ask": [],
+            "age_days": days,
         }
 
     def build_review_briefing(
         self,
         company_id: str,
         entity_id: Optional[str] = None,
-        limit: int = 5,
+        limit: Optional[int] = 5,
     ) -> list[dict]:
         """
         Construit le Briefing de revue : arcs actifs (jamais 'abandoned'),
@@ -729,7 +737,21 @@ class ArcService:
         d'arcs de clients différents, ce qui contredit l'objectif même du
         composant ("quand le cabinet ouvre un client"). Rétrocompatible :
         entity_id=None renvoie tous les arcs actifs de la company.
+
+        Sémantique de `limit` (Incrément 2, Mission 5 — corrige l'ancienne
+        convention où `limit=0` retombait silencieusement sur `items[:5]`,
+        0 étant falsy en Python) :
+          - limit=None → aucune limite, tous les items actifs retournés.
+          - limit=0    → zéro résultat, littéral, jamais réinterprété.
+          - limit > 0  → au plus `limit` items.
+          - limit < 0  → ValueError explicite (valeur interdite, pas de
+            convention implicite silencieuse).
         """
+        if limit is not None and limit < 0:
+            raise ValueError(
+                f"[ARC] build_review_briefing — limit doit être >= 0 ou None (reçu {limit})."
+            )
+
         supabase = self._get_supabase()
         if not supabase:
             return []
@@ -758,40 +780,77 @@ class ArcService:
         arcs = [a for a in (result.data or []) if a.get("status") != "abandoned"]
         items = [self._arc_to_briefing_item(arc) for arc in arcs]
         items.sort(key=lambda item: BRIEFING_PRIORITY_ORDER.get(item["priority"], 99))
-        return items[: max(limit, 0)] if limit else items[:5]
+        if limit is None:
+            return items
+        return items[:limit]
 
-    # ── Portfolio Intelligence — synthèse multi-clients (Incrément 1) ─────────
+    # ── Portfolio Intelligence — synthèse multi-clients (Incrément 1 + 2) ─────
+
+    # Textes why_it_matters jugés redondants avec l'icône de priorité, le
+    # statut et le contexte temporel — voir
+    # docs/Product/portfolio-card-review/PORTFOLIO_INFORMATION_HIERARCHY.md
+    # section 3.2. Ensemble fermé et documenté, pas une heuristique sur le
+    # texte : ces chaînes viennent d'un nombre fini et connu de gabarits
+    # dans _arc_to_briefing_item, jamais d'un texte libre ou généré par LLM.
+    _WHY_IT_MATTERS_REDUNDANT_TEXTS = frozenset({
+        "Toujours sans décision confirmée après au moins une revue.",
+        "Décision encore en attente.",
+        "Exécution en cours.",
+        "Statut en cours de traitement.",
+    })
+
+    @staticmethod
+    def _is_why_it_matters_distinct(why_it_matters: Optional[str]) -> bool:
+        """
+        Fonction pure et déterministe (Mission 3, Incrément 2) : décide si
+        why_it_matters apporte, sur la carte Portfolio, une information
+        distincte de l'icône de priorité, du statut, du contexte temporel
+        et du titre — seul cas où il doit être rendu.
+
+        Ne s'applique qu'à PortfolioCard.why_it_matters_display — le Review
+        Briefing par client continue d'afficher BriefingItem.why_it_matters
+        sans filtre, inchangé (le texte y est lu une fois, pas scanné sur
+        80 cartes).
+        """
+        if not why_it_matters:
+            return False
+        return why_it_matters not in ArcService._WHY_IT_MATTERS_REDUNDANT_TEXTS
 
     def build_portfolio_briefing(self, company_id: str) -> list[dict]:
         """
-        Construit le Portfolio : une carte par client, portant uniquement
-        son point le plus prioritaire parmi ses BriefingItem actifs.
+        Construit le Portfolio : une carte par client, portant son point le
+        plus prioritaire parmi ses BriefingItem actifs, complétée par un
+        compteur d'autres points actifs et un why_it_matters filtré.
 
         Pur regroupement du Briefing de revue existant par entity_id — aucun
-        nouveau calcul, aucune nouvelle source de donnée, aucune nouvelle
-        classification. Lecture seule.
+        nouveau calcul de domaine, aucune nouvelle source de donnée, aucune
+        nouvelle classification. Lecture seule.
 
-        NOTE : appelle build_review_briefing() avec un limit explicite élevé
-        plutôt que limit=0. limit=0 est falsy en Python et retomberait sur
-        la branche `else` (items[:5]) à l'intérieur de build_review_briefing,
-        ce qui tronquerait silencieusement le portefeuille entier à 5 items
-        au lieu de retenir le point prioritaire de chaque client.
+        Appelle build_review_briefing(limit=None) — demande explicitement
+        l'absence de limite (Incrément 2, Mission 5), plutôt que l'ancienne
+        valeur arbitraire limit=1000.
 
         Un arc sans entity_id (jamais rattaché à un client) est exclu — il
         n'y a pas de carte client à laquelle le rattacher (voir
         PORTFOLIO_INTELLIGENCE_MVP.md : la carte est structurée par client).
         """
-        items = self.build_review_briefing(company_id=company_id, entity_id=None, limit=1000)
+        items = self.build_review_briefing(company_id=company_id, entity_id=None, limit=None)
         if not items:
             return []
 
         # items est déjà trié par priorité (urgent → to_check → done → closed) ;
         # le premier item rencontré pour un entity_id est donc son plus prioritaire.
+        # active_counts compte, par client, les points non "closed" — un point
+        # clos ne demande plus de préparation, il ne doit pas gonfler le
+        # compteur "+N autres points à suivre" (Mission 2).
         by_entity: dict[str, dict] = {}
+        active_counts: dict[str, int] = {}
         for item in items:
             eid = item.get("entity_id")
             if not eid:
                 continue
+            if item.get("priority") != "closed":
+                active_counts[eid] = active_counts.get(eid, 0) + 1
             if eid not in by_entity:
                 by_entity[eid] = item
 
@@ -816,15 +875,39 @@ class ArcService:
                     "[ARC] build_portfolio_briefing — lecture des noms clients échouée: %s", e
                 )
 
-        cards = [
-            {
+        cards = []
+        for eid, item in by_entity.items():
+            entity_name = entity_names.get(eid, "Client")
+            total_active = active_counts.get(eid, 0)
+            # Le point affiché (top_item) est déjà l'un des `total_active`
+            # s'il n'est pas lui-même "closed" — on ne le recompte pas comme
+            # "autre point".
+            top_is_active = item.get("priority") != "closed"
+            other_active_count = max(total_active - (1 if top_is_active else 0), 0)
+            why_it_matters = item.get("why_it_matters")
+            why_it_matters_display = (
+                why_it_matters if self._is_why_it_matters_distinct(why_it_matters) else None
+            )
+            cards.append({
                 "entity_id": eid,
-                "entity_name": entity_names.get(eid, "Client"),
+                "entity_name": entity_name,
                 "top_item": item,
-            }
-            for eid, item in by_entity.items()
-        ]
-        cards.sort(key=lambda c: BRIEFING_PRIORITY_ORDER.get(c["top_item"]["priority"], 99))
+                "other_active_count": other_active_count,
+                "why_it_matters_display": why_it_matters_display,
+            })
+
+        # Tri (Mission 4) : priorité du point le plus prioritaire, puis, à
+        # égalité, ancienneté décroissante de ce même point (le plus ancien
+        # en premier — age_days vient de _arc_to_briefing_item, calculé
+        # depuis created_at/decision_confirmed_at/execution_updated_at/
+        # updated_at/closed_at selon le statut, voir cette méthode), puis,
+        # à double égalité, nom du client par ordre alphabétique (tie-break
+        # final stable, sans signification métier au-delà du déterminisme).
+        cards.sort(key=lambda c: (
+            BRIEFING_PRIORITY_ORDER.get(c["top_item"]["priority"], 99),
+            -c["top_item"].get("age_days", 0),
+            (c["entity_name"] or "").lower(),
+        ))
         return cards
 
     # ── "Ne plus suivre" — transition ABANDONED ───────────────────────────────

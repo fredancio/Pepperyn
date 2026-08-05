@@ -37,6 +37,7 @@ function makeItem(overrides: Partial<BriefingItem> = {}): BriefingItem {
     temporal_context: 'il y a 45 jours',
     why_it_matters: 'Cette décision est en attente depuis plus de 3 semaines.',
     questions_to_ask: ['Avez-vous pris une décision sur ce point ?'],
+    age_days: 45,
     ...overrides,
   };
 }

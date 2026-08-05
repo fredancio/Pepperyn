@@ -123,6 +123,61 @@ class TestBuildReviewBriefingRead:
         assert ("entity_id", "entity-42") in eq_calls
 
 
+# ── Tests : sémantique de `limit` (Incrément 2, Mission 5) ────────────────────
+#
+# Corrige l'ancienne convention implicite (limit=0 falsy → retombait sur 5).
+# Nouvelle sémantique : None = illimité, 0 = zéro résultat littéral,
+# négatif = ValueError explicite.
+
+class TestLimitSemantics:
+
+    def test_limit_none_returns_all_items(self):
+        """limit=None ne tronque rien, même au-delà de l'ancien défaut de 5."""
+        sb = make_supabase_mock()
+        svc = make_arc_service_with_mock(sb)
+        sb.execute.return_value = MagicMock(
+            data=[make_arc(id=f"arc-{i}", status="intention", created_at="2026-01-01T00:00:00Z")
+                  for i in range(8)]
+        )
+
+        items = svc.build_review_briefing(company_id="company-1", limit=None)
+
+        assert len(items) == 8
+
+    def test_limit_zero_returns_empty_list_literally(self):
+        """limit=0 signifie zéro résultat — jamais réinterprété comme "non fourni"."""
+        sb = make_supabase_mock()
+        svc = make_arc_service_with_mock(sb)
+        sb.execute.return_value = MagicMock(
+            data=[make_arc(id="arc-1", status="intention", created_at="2026-01-01T00:00:00Z")]
+        )
+
+        items = svc.build_review_briefing(company_id="company-1", limit=0)
+
+        assert items == []
+
+    def test_negative_limit_raises_value_error(self):
+        """Une valeur négative est un usage interdit, rejeté explicitement."""
+        sb = make_supabase_mock()
+        svc = make_arc_service_with_mock(sb)
+
+        with pytest.raises(ValueError, match="limit"):
+            svc.build_review_briefing(company_id="company-1", limit=-1)
+
+    def test_default_limit_unchanged_at_five(self):
+        """Le comportement par défaut (aucun limit fourni) reste inchangé : 5."""
+        sb = make_supabase_mock()
+        svc = make_arc_service_with_mock(sb)
+        sb.execute.return_value = MagicMock(
+            data=[make_arc(id=f"arc-{i}", status="intention", created_at="2026-01-01T00:00:00Z")
+                  for i in range(8)]
+        )
+
+        items = svc.build_review_briefing(company_id="company-1")
+
+        assert len(items) == 5
+
+
 # ── Tests : structure et ordre de priorité ────────────────────────────────────
 
 class TestBriefingItemStructureAndOrder:
