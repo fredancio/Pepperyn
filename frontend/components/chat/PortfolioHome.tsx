@@ -1,18 +1,27 @@
 'use client';
 
 /**
- * PortfolioHome — Portfolio Intelligence, Incréments 1 + 2 (Capability 7).
+ * PortfolioHome — Portfolio Intelligence, Incréments 1 + 2 (Capability 7),
+ * évolution "écran d'accueil quotidien" (2026-08-05).
  *
- * Écran unique : ligne d'orientation + liste de cartes triées par priorité,
+ * Écran unique : résumé de situation + liste de cartes triées par priorité,
  * une carte par client, portant son point le plus prioritaire du Briefing
  * de revue. "Préparer cette revue" ouvre /app/chat avec ce client
  * pré-sélectionné (voir ChatContainer.tsx::searchParams).
  *
- * Hiérarchie de la carte (Incrément 2, Mission 6 — voir
- * docs/Product/portfolio-card-review/) : priorité → nom du client → titre
- * du point → contexte temporel → why_it_matters (si distinct) → compteur
- * (si > 1) → action. Une seule action, jamais de menu, filtre, score,
- * widget, donnée financière, bouton d'abandon ni aperçu du briefing.
+ * RÈGLE DE CETTE ÉVOLUTION : uniquement de la présentation. Aucun nouveau
+ * calcul, aucun nouvel appel réseau, aucune donnée inventée — le résumé de
+ * situation et l'enrichissement des cartes ne font que réorganiser/agréger
+ * ce que `cards` (PortfolioCard[], déjà reçu de fetchPortfolio()) contient
+ * déjà. L'ordre des cartes, les priorités et tri restent entièrement
+ * décidés par build_portfolio_briefing() côté backend — inchangé.
+ *
+ * Hiérarchie de la carte (Incrément 2 + évolution accueil quotidien) :
+ * organisation + priorité (même ligne, priorité au nom de l'organisation) →
+ * titre du point → contexte (ancienneté, why_it_matters si distinct,
+ * nombre de sujets actifs) → action. Une seule action, jamais de menu,
+ * filtre, score, widget, donnée financière, bouton d'abandon ni aperçu du
+ * briefing.
  *
  * Contexte temporel toujours factuel (déjà garanti côté backend par
  * _arc_to_briefing_item — jamais d'injonction du type "à traiter
@@ -24,6 +33,10 @@
  *     état vide honnête plus détaillé reste Incrément 3.
  *   - écran par défaut à l'ouverture de l'app : Incrément 4 — pour cet
  *     incrément, accessible uniquement par lien direct (/app/portfolio).
+ *   - date de dernière revue / dernière analyse, nombre de décisions
+ *     confirmées distinct du nombre de sujets actifs : pas de champ
+ *     backend correspondant aujourd'hui — volontairement non affiché
+ *     plutôt qu'approximé (voir rapport de validation associé).
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -73,13 +86,37 @@ export function PortfolioHome() {
     router.push(`${base}?entity=${entityId}`);
   };
 
+  // Résumé de situation — pure agrégation côté client de `cards`, déjà reçu
+  // de fetchPortfolio(). Aucun nouveau calcul métier : les 3 catégories
+  // reprennent exactement les priorités déjà décidées par le backend
+  // (BRIEFING_PRIORITY_ORDER / _arc_to_briefing_item) ; "closed" n'apparaît
+  // jamais ici car build_portfolio_briefing() ne produit jamais de carte
+  // dont le point principal est clos.
+  const urgentCount = cards.filter((c) => c.top_item.priority === 'urgent').length;
+  const toCheckCount = cards.filter((c) => c.top_item.priority === 'to_check').length;
+  const doneCount = cards.filter((c) => c.top_item.priority === 'done').length;
+  const summaryParts = [
+    urgentCount > 0 ? `${urgentCount} urgente${urgentCount > 1 ? 's' : ''}` : null,
+    toCheckCount > 0 ? `${toCheckCount} à vérifier` : null,
+    doneCount > 0 ? `${doneCount} confirmée${doneCount > 1 ? 's' : ''} récemment` : null,
+  ].filter((p): p is string => p !== null);
+
   return (
     <div className="min-h-screen bg-[#EFF6FF] px-4 py-8">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-xl font-extrabold text-[#1A1A2E] mb-1">Portefeuille</h1>
-        <p className="text-sm text-[#5F6368] mb-6">
-          Vos organisations avec un point à traiter, triées par priorité.
-        </p>
+
+        {state === 'loaded' && cards.length > 0 && (
+          <div className="mb-6" data-testid="portfolio-summary">
+            <p className="text-sm text-[#1A1A2E]">
+              <span className="font-semibold">{cards.length}</span> organisation
+              {cards.length > 1 ? 's' : ''} demande{cards.length > 1 ? 'nt' : ''} votre attention.
+            </p>
+            {summaryParts.length > 0 && (
+              <p className="text-xs text-[#5F6368] mt-1">{summaryParts.join(' · ')}</p>
+            )}
+          </div>
+        )}
 
         {state === 'loading' && (
           <p className="text-sm text-[#5F6368]" data-testid="portfolio-loading">
@@ -115,40 +152,47 @@ export function PortfolioHome() {
                   data-testid={`portfolio-card-${card.entity_id}`}
                 >
                   <div className="min-w-0">
-                    {/* 1. Priorité */}
-                    <p className="text-xs font-semibold text-[#5F6368] flex items-center gap-1">
-                      <span aria-hidden="true">{meta.icon}</span> {meta.label}
-                    </p>
-                    {/* 2. Nom du client */}
-                    <p className="text-sm font-bold text-[#1A1A2E] mt-0.5">{card.entity_name}</p>
+                    {/* 1 + 2. Organisation d'abord (regard), priorité juste à côté */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-bold text-[#1A1A2E] truncate">{card.entity_name}</p>
+                      <span className="shrink-0 inline-flex items-center gap-1 text-xs font-semibold text-[#5F6368]">
+                        <span aria-hidden="true">{meta.icon}</span> {meta.label}
+                      </span>
+                    </div>
                     {/* 3. Titre du point principal */}
-                    <p className="text-sm text-[#5F6368] mt-0.5 truncate">{card.top_item.title}</p>
-                    {/* 4. Contexte temporel — texte factuel déjà généré côté backend */}
-                    <p
-                      className="text-xs text-[#5F6368] mt-1"
-                      data-testid={`portfolio-temporal-${card.entity_id}`}
-                    >
-                      {card.top_item.temporal_context}
-                    </p>
-                    {/* 5. why_it_matters — uniquement quand distinct (décidé côté backend) */}
-                    {card.why_it_matters_display && (
+                    <p className="text-sm text-[#5F6368] mt-1 truncate">{card.top_item.title}</p>
+                    {/* 4. Contexte — regroupé : ancienneté, why_it_matters, sujets actifs */}
+                    <div className="mt-1.5 space-y-1">
                       <p
-                        className="text-xs text-[#1A1A2E] mt-1.5"
-                        data-testid={`portfolio-why-${card.entity_id}`}
+                        className="text-xs text-[#5F6368]"
+                        data-testid={`portfolio-temporal-${card.entity_id}`}
                       >
-                        {card.why_it_matters_display}
+                        {card.top_item.temporal_context}
                       </p>
-                    )}
-                    {/* 6. Compteur — uniquement si d'autres points actifs existent */}
-                    {card.other_active_count > 0 && (
-                      <p
-                        className="text-xs text-[#5F6368] mt-1.5"
-                        data-testid={`portfolio-counter-${card.entity_id}`}
-                      >
-                        +{card.other_active_count} autre{card.other_active_count > 1 ? 's' : ''} point
-                        {card.other_active_count > 1 ? 's' : ''} à suivre
-                      </p>
-                    )}
+                      {/* why_it_matters — uniquement quand distinct (décidé côté backend) */}
+                      {card.why_it_matters_display && (
+                        <p
+                          className="text-xs text-[#1A1A2E]"
+                          data-testid={`portfolio-why-${card.entity_id}`}
+                        >
+                          {card.why_it_matters_display}
+                        </p>
+                      )}
+                      {/* Sujets actifs — uniquement si d'autres points actifs existent :
+                          un seul sujet actif n'ajoute aucune information au-delà du
+                          titre déjà affiché ci-dessus. */}
+                      {card.other_active_count > 0 && (
+                        <p
+                          className="text-xs text-[#5F6368]"
+                          data-testid={`portfolio-counter-${card.entity_id}`}
+                        >
+                          <span className="inline-block px-1.5 py-0.5 rounded-full bg-gray-50 border border-gray-200">
+                            +{card.other_active_count} autre{card.other_active_count > 1 ? 's' : ''} point
+                            {card.other_active_count > 1 ? 's' : ''} à suivre
+                          </span>
+                        </p>
+                      )}
+                    </div>
                   </div>
                   {/* 7. Action unique */}
                   <button
