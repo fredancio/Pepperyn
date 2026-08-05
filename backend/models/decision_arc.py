@@ -164,6 +164,11 @@ class BriefingItem(BaseModel):
     """
     arc_id: str
     source_type: Literal["decision_arc"] = "decision_arc"
+    # Client propriétaire de l'arc — nécessaire pour regrouper par client
+    # dans Portfolio Intelligence (build_portfolio_briefing). Absent pour un
+    # arc sans client rattaché ; ce champ ne change rien pour les usages
+    # existants du Briefing de revue (déjà scopé par entity_id en amont).
+    entity_id: Optional[str] = None
     priority: BriefingPriority
     title: str
     temporal_context: str
@@ -172,3 +177,23 @@ class BriefingItem(BaseModel):
     # Affiché uniquement pour priority="closed" — jamais de question sur une
     # carte close (rien d'ouvert à discuter, voir section 1B du plan).
     learning_text: Optional[str] = None
+
+
+# ── Portfolio Intelligence (Incrément 1) ──────────────────────────────────────
+
+class PortfolioCard(BaseModel):
+    """
+    Une carte de Portfolio Intelligence — un client, son point le plus
+    prioritaire parmi ses BriefingItem actifs. Généré par
+    ArcService.build_portfolio_briefing() : pur regroupement du Briefing de
+    revue existant par entity_id, aucun nouveau calcul, aucune nouvelle
+    source de donnée.
+
+    Périmètre Incrément 1 (voir PORTFOLIO_HOME_IMPLEMENTATION_PLAN.md) :
+    entity_name + top_item.title + action seulement. why_it_matters /
+    temporal_context / compteur multi-points sont déjà présents sur top_item
+    mais volontairement non affichés avant l'Incrément 2.
+    """
+    entity_id: str
+    entity_name: str
+    top_item: BriefingItem
