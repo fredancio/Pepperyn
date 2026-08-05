@@ -177,9 +177,15 @@ class BriefingItem(BaseModel):
     # Affiché uniquement pour priority="closed" — jamais de question sur une
     # carte close (rien d'ouvert à discuter, voir section 1B du plan).
     learning_text: Optional[str] = None
+    # Ancienneté brute en jours, utilisée pour le tie-break de tri du
+    # Portfolio (Incrément 2, Mission 4) — voir _arc_to_briefing_item()
+    # pour la date exacte utilisée selon le statut. Additif : ne change
+    # rien pour les consommateurs existants du Briefing de revue, qui
+    # continuent d'utiliser temporal_context (texte formaté), pas ce champ.
+    age_days: int = 0
 
 
-# ── Portfolio Intelligence (Incrément 1) ──────────────────────────────────────
+# ── Portfolio Intelligence (Incrément 1 + 2) ──────────────────────────────────
 
 class PortfolioCard(BaseModel):
     """
@@ -189,11 +195,24 @@ class PortfolioCard(BaseModel):
     revue existant par entity_id, aucun nouveau calcul, aucune nouvelle
     source de donnée.
 
-    Périmètre Incrément 1 (voir PORTFOLIO_HOME_IMPLEMENTATION_PLAN.md) :
-    entity_name + top_item.title + action seulement. why_it_matters /
-    temporal_context / compteur multi-points sont déjà présents sur top_item
-    mais volontairement non affichés avant l'Incrément 2.
+    Incrément 1 : entity_name + top_item.title + action.
+    Incrément 2 (voir docs/Product/portfolio-card-review/) : ajoute
+    other_active_count et why_it_matters_display. temporal_context reste
+    lu directement depuis top_item — déjà présent, jamais dupliqué ici.
     """
     entity_id: str
     entity_name: str
     top_item: BriefingItem
+    # Nombre d'autres points actifs (priority != "closed") du même client,
+    # en plus de top_item — 0 si aucun. "Actif" exclut délibérément
+    # "closed" : un point clos ne demande plus de préparation, le compter
+    # gonflerait la charge perçue sans raison (voir Mission 2, Incrément 2).
+    other_active_count: int = 0
+    # Sous-ensemble de top_item.why_it_matters : présent uniquement quand
+    # le texte apporte une information distincte de l'icône de priorité,
+    # du statut, du contexte temporel et du titre — voir
+    # ArcService._is_why_it_matters_distinct() (Mission 3, Incrément 2).
+    # None ne signifie jamais "aucune raison" : uniquement "déjà dite
+    # ailleurs sur la carte". Le Review Briefing par client continue
+    # d'afficher top_item.why_it_matters sans filtre, inchangé.
+    why_it_matters_display: Optional[str] = None

@@ -161,19 +161,31 @@ export interface BriefingItem {
   questions_to_ask: string[];
   /** Présent uniquement pour priority='closed'. */
   learning_text?: string | null;
+  /** Ancienneté brute en jours — utilisée pour le tie-break de tri du Portfolio (Incrément 2). */
+  age_days: number;
 }
 
 /**
- * Une carte de Portfolio Intelligence (Incrément 1) — un client, son point
- * le plus prioritaire. Regroupement du Briefing de revue par entity_id,
- * voir ArcService.build_portfolio_briefing() côté backend.
+ * Une carte de Portfolio Intelligence — un client, son point le plus
+ * prioritaire. Regroupement du Briefing de revue par entity_id, voir
+ * ArcService.build_portfolio_briefing() côté backend.
  *
- * Périmètre Incrément 1 : seuls entity_name et top_item.title sont affichés
- * dans PortfolioHome — why_it_matters/temporal_context/compteur arrivent
- * en Incrément 2 (card completeness).
+ * Incrément 1 : entity_name + top_item.title + action.
+ * Incrément 2 : other_active_count (compteur, Mission 2) et
+ * why_it_matters_display (affichage filtré, Mission 3) — temporal_context
+ * reste lu directement depuis top_item, jamais dupliqué ici.
  */
 export interface PortfolioCard {
   entity_id: string;
   entity_name: string;
   top_item: BriefingItem;
+  /** Nombre d'autres points actifs (hors "closed") du même client, en plus de top_item. */
+  other_active_count: number;
+  /**
+   * Sous-ensemble de top_item.why_it_matters : présent uniquement quand le
+   * texte apporte une information distincte de l'icône de priorité, du
+   * statut, du contexte temporel et du titre. null ne signifie jamais
+   * "aucune raison" — uniquement "déjà dite ailleurs sur la carte".
+   */
+  why_it_matters_display?: string | null;
 }

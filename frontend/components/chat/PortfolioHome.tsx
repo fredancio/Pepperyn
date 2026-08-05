@@ -1,17 +1,27 @@
 'use client';
 
 /**
- * PortfolioHome — Portfolio Intelligence, Incrément 1 (Capability 7).
+ * PortfolioHome — Portfolio Intelligence, Incréments 1 + 2 (Capability 7).
  *
  * Écran unique : ligne d'orientation + liste de cartes triées par priorité,
  * une carte par client, portant son point le plus prioritaire du Briefing
  * de revue. "Préparer cette revue" ouvre /app/chat avec ce client
  * pré-sélectionné (voir ChatContainer.tsx::searchParams).
  *
- * PÉRIMÈTRE INCRÉMENT 1 (voir PORTFOLIO_HOME_IMPLEMENTATION_PLAN.md) :
- *   - nom du client + titre du point prioritaire + action seulement.
- *   - why_it_matters, temporal_context, compteur multi-points : Incrément 2.
- *   - tri fin par ancienneté, état vide détaillé : Incrément 3.
+ * Hiérarchie de la carte (Incrément 2, Mission 6 — voir
+ * docs/Product/portfolio-card-review/) : priorité → nom du client → titre
+ * du point → contexte temporel → why_it_matters (si distinct) → compteur
+ * (si > 1) → action. Une seule action, jamais de menu, filtre, score,
+ * widget, donnée financière, bouton d'abandon ni aperçu du briefing.
+ *
+ * Contexte temporel toujours factuel (déjà garanti côté backend par
+ * _arc_to_briefing_item — jamais d'injonction du type "à traiter
+ * aujourd'hui"). Ce composant ne fait qu'afficher les champs déjà
+ * calculés, aucune génération de texte ici.
+ *
+ * PÉRIMÈTRE RESTANT HORS DE CET INCRÉMENT :
+ *   - tri fin par ancienneté déjà appliqué côté backend (Mission 4) ;
+ *     état vide honnête plus détaillé reste Incrément 3.
  *   - écran par défaut à l'ouverture de l'app : Incrément 4 — pour cet
  *     incrément, accessible uniquement par lien direct (/app/portfolio).
  */
@@ -99,12 +109,42 @@ export function PortfolioHome() {
                   data-testid={`portfolio-card-${card.entity_id}`}
                 >
                   <div className="min-w-0">
+                    {/* 1. Priorité */}
                     <p className="text-xs font-semibold text-[#5F6368] flex items-center gap-1">
                       <span aria-hidden="true">{meta.icon}</span> {meta.label}
                     </p>
+                    {/* 2. Nom du client */}
                     <p className="text-sm font-bold text-[#1A1A2E] mt-0.5">{card.entity_name}</p>
+                    {/* 3. Titre du point principal */}
                     <p className="text-sm text-[#5F6368] mt-0.5 truncate">{card.top_item.title}</p>
+                    {/* 4. Contexte temporel — texte factuel déjà généré côté backend */}
+                    <p
+                      className="text-xs text-[#5F6368] mt-1"
+                      data-testid={`portfolio-temporal-${card.entity_id}`}
+                    >
+                      {card.top_item.temporal_context}
+                    </p>
+                    {/* 5. why_it_matters — uniquement quand distinct (décidé côté backend) */}
+                    {card.why_it_matters_display && (
+                      <p
+                        className="text-xs text-[#1A1A2E] mt-1.5"
+                        data-testid={`portfolio-why-${card.entity_id}`}
+                      >
+                        {card.why_it_matters_display}
+                      </p>
+                    )}
+                    {/* 6. Compteur — uniquement si d'autres points actifs existent */}
+                    {card.other_active_count > 0 && (
+                      <p
+                        className="text-xs text-[#5F6368] mt-1.5"
+                        data-testid={`portfolio-counter-${card.entity_id}`}
+                      >
+                        +{card.other_active_count} autre{card.other_active_count > 1 ? 's' : ''} point
+                        {card.other_active_count > 1 ? 's' : ''} à suivre
+                      </p>
+                    )}
                   </div>
+                  {/* 7. Action unique */}
                   <button
                     type="button"
                     onClick={() => handlePrepareReview(card.entity_id)}

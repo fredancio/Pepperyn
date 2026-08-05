@@ -44,10 +44,15 @@ async def get_review_briefing(
     DecisionArc — jamais d'échéances comptables, fiscales ou administratives.
     """
     company_id, _plan, _auth_type = await _resolve_auth(authorization, x_auth_type)
+    # Borné littéralement à [0, 5] — corrige le même piège que Mission 5
+    # (Incrément 2 Portfolio) à ce niveau : `limit=0` demandé explicitement
+    # doit renvoyer zéro résultat, jamais retomber sur la valeur par défaut
+    # (l'ancien `if limit else 5` traitait 0 comme "non fourni", 0 étant
+    # falsy en Python).
     items = arc_service.build_review_briefing(
         company_id=company_id,
         entity_id=entity_id,
-        limit=min(limit, 5) if limit else 5,
+        limit=max(0, min(limit, 5)),
     )
     return {"items": items}
 
