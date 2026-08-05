@@ -98,7 +98,7 @@ export function PortfolioHome() {
   const summaryParts = [
     urgentCount > 0 ? `${urgentCount} urgente${urgentCount > 1 ? 's' : ''}` : null,
     toCheckCount > 0 ? `${toCheckCount} à vérifier` : null,
-    doneCount > 0 ? `${doneCount} confirmée${doneCount > 1 ? 's' : ''} récemment` : null,
+    doneCount > 0 ? `${doneCount} apprentissage${doneCount > 1 ? 's' : ''} à valider` : null,
   ].filter((p): p is string => p !== null);
 
   return (
