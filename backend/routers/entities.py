@@ -139,20 +139,23 @@ async def create_entity(
 
         workspace_id = ws.data[0]["id"]
 
-        result = (
-            supabase.from_("entities")
-            .insert({
-                "workspace_id": workspace_id,
-                "company_id": company_id,
-                "name": body.name.strip(),
-                "industry": body.industry,
-                "business_model": body.business_model,
-                "is_primary": False,
-                "relation_type": body.relation_type,
-            })
-            .execute()
+        # T2A (ADR-002) : création atomique de l'Entity ET de son Engagement,
+        # via la RPC create_entity_with_engagement() (migration v19).
+        # Remplace l'ancien insert direct sur `entities` seul, qui laissait
+        # une fenêtre non atomique — supabase-py ne supporte aucune
+        # transaction applicative multi-appels (T2A_Implementation_Plan.md §5).
+        from services.engagement_service import create_for_new_entity
+
+        entity_data = create_for_new_entity(
+            supabase=supabase,
+            workspace_id=workspace_id,
+            company_id=company_id,
+            name=body.name.strip(),
+            industry=body.industry,
+            business_model=body.business_model,
+            relation_type=body.relation_type,
         )
-        return {"success": True, "data": result.data[0] if result.data else {}}
+        return {"success": True, "data": entity_data}
 
     except HTTPException:
         raise
