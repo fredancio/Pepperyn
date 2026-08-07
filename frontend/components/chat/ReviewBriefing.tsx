@@ -43,6 +43,10 @@ export function ReviewBriefing({ entityId, onPrepareQuestion }: ReviewBriefingPr
   const [abandonState, setAbandonState] = useState<Record<string, AbandonUiState>>({});
   const [abandonError, setAbandonError] = useState<Record<string, string>>({});
   const [pendingReasonKey, setPendingReasonKey] = useState<Record<string, string | undefined>>({});
+  // Evidence Ledger Consumer #1 — replié par défaut, purement discret :
+  // ne doit jamais rivaliser visuellement avec le contenu principal du
+  // Briefing (why_it_matters / questions_to_ask).
+  const [evidenceExpanded, setEvidenceExpanded] = useState<Record<string, boolean>>({});
 
   const loadBriefing = useCallback(async () => {
     try {
@@ -138,6 +142,41 @@ export function ReviewBriefing({ entityId, onPrepareQuestion }: ReviewBriefingPr
                   {item.why_it_matters && (
                     <p className="text-xs text-[#1A1A2E] mt-2">{item.why_it_matters}</p>
                   )}
+
+                  {item.evidence_support &&
+                    (item.evidence_support.impacts.length > 0 || item.evidence_support.sheets.length > 0) && (
+                      <div className="mt-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEvidenceExpanded((prev) => ({ ...prev, [item.arc_id]: !prev[item.arc_id] }))
+                          }
+                          className="text-xs font-medium text-indigo-600 hover:text-indigo-800 underline"
+                          data-testid={`evidence-toggle-${item.arc_id}`}
+                        >
+                          {evidenceExpanded[item.arc_id] ? "Masquer les éléments de l'analyse source" : "Éléments de l'analyse source"}
+                        </button>
+
+                        {evidenceExpanded[item.arc_id] && (
+                          <div
+                            className="mt-1.5 rounded-lg border border-indigo-100 bg-white p-2.5 space-y-1"
+                            data-testid={`evidence-support-${item.arc_id}`}
+                          >
+                            {item.evidence_support.impacts.map((impact, idx) => (
+                              <p key={idx} className="text-xs text-[#1A1A2E]">
+                                {impact.metric_type_label} : {impact.amount.toLocaleString('fr-FR')} {impact.currency}
+                                <span className="text-[#5F6368]"> — {impact.qualifier}</span>
+                              </p>
+                            ))}
+                            {item.evidence_support.sheets.length > 0 && (
+                              <p className="text-xs text-[#5F6368]">
+                                Source{item.evidence_support.sheets.length > 1 ? 's' : ''} : {item.evidence_support.sheets.join(', ')}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                   {item.questions_to_ask.length > 0 && (
                     <div className="mt-3 space-y-1.5">

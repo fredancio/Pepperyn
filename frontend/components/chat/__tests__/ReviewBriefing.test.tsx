@@ -98,6 +98,60 @@ describe('ReviewBriefing — rendu', () => {
     ]);
   });
 
+  test("Evidence Ledger Consumer #1 : \"Éléments de l'analyse source\" absent quand evidence_support est null", async () => {
+    mockedFetch.mockResolvedValue([makeItem({ evidence_support: null })]);
+    render(<ReviewBriefing />);
+    await screen.findByText('Renégocier le contrat assurance');
+
+    expect(screen.queryByText("Éléments de l'analyse source")).not.toBeInTheDocument();
+  });
+
+  test("Evidence Ledger Consumer #1 : \"Éléments de l'analyse source\" affiché puis développe le contenu, sans fabrication, wording analysis-level (pas \"la preuve\")", async () => {
+    mockedFetch.mockResolvedValue([
+      makeItem({
+        evidence_support: {
+          status: 'available',
+          facts_count: 2,
+          sheets: ['P&L'],
+          impacts: [
+            {
+              amount: 50000,
+              currency: 'EUR',
+              metric_type_label: "Chiffre d'affaires",
+              confidence: 0.8,
+              qualifier: "élément structuré de l'analyse",
+            },
+          ],
+        },
+      }),
+    ]);
+    render(<ReviewBriefing />);
+    await screen.findByText('Renégocier le contrat assurance');
+
+    const toggle = screen.getByText("Éléments de l'analyse source");
+    // Correction post-revue adversariale : le libellé ne doit plus jamais
+    // contenir "la preuve" seule (implique une justification directe de la
+    // recommandation) ni "vérifiée" (implique une vérification indépendante).
+    expect(screen.queryByText('Voir la preuve')).not.toBeInTheDocument();
+    expect(screen.queryByText(/élément structuré de l'analyse/)).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(await screen.findByText(/élément structuré de l'analyse/)).toBeInTheDocument();
+    expect(screen.getByText("Masquer les éléments de l'analyse source")).toBeInTheDocument();
+    expect(screen.queryByText(/vérifiée/)).not.toBeInTheDocument();
+  });
+
+  test("Evidence Ledger Consumer #1 : evidence_support sans impacts ni sheets ne rend rien", async () => {
+    mockedFetch.mockResolvedValue([
+      makeItem({ evidence_support: { status: 'available', facts_count: 0, sheets: [], impacts: [] } }),
+    ]);
+    render(<ReviewBriefing />);
+    await screen.findByText('Renégocier le contrat assurance');
+
+    expect(screen.queryByText("Éléments de l'analyse source")).not.toBeInTheDocument();
+  });
+
   test('une carte "Clos" n\'affiche ni question ni action "Ne plus suivre"', async () => {
     mockedFetch.mockResolvedValue([
       makeItem({ arc_id: 'a4', priority: 'closed', title: 'Closed point', questions_to_ask: [] }),
