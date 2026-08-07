@@ -34,7 +34,7 @@ Convention des colonnes : **Effort** et **Risque** sur une échelle Faible / Moy
 | 11 | Renderers `export_pdf_service.py` / `export_pptx_service.py` / `excel_export.py` | Moteur de génération de `Deliverable` | **ADAPT** | Moyen | Faible *(si strangler fig respecté)* | Totale si bien séquencé |
 | 12 | `ExecutiveCaseJSON` (V1, `models/executive_case.py`) | Redondant avec EDM/Deliverable | **DELETE** *(sous réserve de vérification d'usage réel — voir §D.3)* | Faible | Faible | N/A |
 | 13 | `ExecutiveCase` V2 / `ConversationEngine` (Chat uniquement) | Read-model unique consommé par le Chat | **MERGE** dans le futur read-model de `Deliverable`/`Recommendation` | Faible-Moyen | Faible | Élevée |
-| 14 | `backend/epm/` (orphelin, hors Git) | Extracteur de `FinancialFact` (si adopté) | **EVOLVE** *(si adopté)* **ou DELETE** *(si abandonné — décision Fred déjà posée en Phase 1C)* | Faible (delete) / Moyen (adopt) | Faible | N/A |
+| 14 | `backend/epm/` (orphelin, hors Git) | **TRANCHÉ 2026-08-07** — DISMANTLE & HARVEST (voir `docs/Audit/EPM_FINAL_DISPOSITION.md`) : `ExecutivePerformanceModel` en tant que modèle de domaine autonome ne survit pas ; la logique d'extraction déterministe (catalogue de 14 KPI, calcul de marges, détection de métadonnées) est à récupérer comme fournisseur de `FinancialFact`, jamais comme entité concurrente | **HARVEST** (logique d'extraction) puis **DELETE** (module `epm/` lui-même, une fois la récupération faite) | Faible | Faible | N/A |
 | 15 | `usage_limits`/`usage_logs`, Stripe | Time & Billing (Generic) | **KEEP** | Faible | Faible | Totale |
 | 16 | `crm_service.py` (sync Airtable) | Périphérique Generic | **KEEP** | Faible | Faible | Totale |
 | 17 | `rate_limiter.py`, `anonymization_service.py`, `data_quality_gate.py` | Infrastructure transverse, hors du domaine métier | **KEEP** | Faible | Faible | Totale |
@@ -92,7 +92,7 @@ Principe directeur : **chaque phase se termine avec un produit strictement fonct
 ### Phase T0 — Vérifications et nettoyage sans risque (prérequis)
 - Vérifier l'usage réel d'`ExecutiveCaseJSON` V1 (§D.3).
 - Corriger la docstring d'EDM pour refléter la réalité (les renderers la lisent déjà) — changement de commentaire, zéro risque fonctionnel.
-- Trancher les décisions humaines déjà posées en Phase 1C (sort d'EPM, sous-projets redondants) — condition d'un dépôt propre avant de bâtir dessus.
+- Sort d'EPM **tranché le 2026-08-07** : DISMANTLE & HARVEST (voir `docs/Audit/EPM_FINAL_DISPOSITION.md`). Reste à trancher : sous-projets redondants restants (§D.3, `ExecutiveCaseJSON` V1).
 - **Produit à la fin de T0 :** strictement identique à aujourd'hui, mais avec un terrain vérifié.
 
 ### Phase T1 — Activer la couche de preuve dormante (`EvidenceLedger`)
@@ -123,7 +123,7 @@ Principe directeur : **chaque phase se termine avec un produit strictement fonct
 
 ### Phase T6 — Nettoyage final des représentations parallèles
 - Suppression d'`ExecutiveCaseJSON` V1 (si T0 confirme qu'il est mort) et fusion d'`ExecutiveCase` V2 dans le read-model unique consommé par le Chat.
-- Décision finale sur EPM (adoption dans la couche Evidence ou suppression).
+- EPM : suppression du module `backend/epm/` une fois la logique d'extraction (catalogue KPI, calcul de marges, détection de métadonnées) récupérée dans l'ingestion `FinancialFact` (décision déjà prise, exécution reportée à ce moment de la séquence T1-T6).
 - **Produit à la fin de T6 :** le modèle cible du document `IDEAL_DOMAIN_MODEL` est atteint pour son cœur (Evidence, Recommendation, Engagement, Attention), sans jamais être passé par un état de rupture.
 
 ---

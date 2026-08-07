@@ -36,7 +36,7 @@ Il n'y a **aucune notion de « client suivi dans le temps par un CFO externe »*
 | **Chat (Conversation Engine)** | Répondre aux questions du CEO sans jamais recalculer ni contredire | payload construit depuis `ExecutiveCase` V2 | Executive Reporting (lit un objet déjà construit) | `services/conversation_engine.py:1-14`, `models/executive_case_v2.py` |
 | **Billing** | Plans, quotas, paiement Stripe | `usage_limits`, `usage_logs`, `Plan` (enum) | Identity (company_id) | `routers/billing.py`, `services/billing_service.py`, `services/usage_service.py`, `config/product_catalog.py` |
 | **CRM / Growth (périphérique)** | Synchroniser Supabase → Airtable pour pilotage business | Aucun objet métier propre — miroir en lecture | Identity, Billing, Financial Analysis | `services/crm_service.py:1-17`, `routers/superadmin.py` |
-| **EPM (orphelin)** | Extraction déterministe de KPI depuis un fichier — **hors Git, non branché au produit (Phase 1B)** | `ExecutivePerformanceModel` et ses extracteurs | Aucune dépendance entrante depuis le produit | `backend/epm/` (non tracké), `backend/tools/epm_viewer.py` |
+| **EPM (orphelin, disposition tranchée)** | Extraction déterministe de KPI depuis un fichier — **hors Git, non branché au produit**. Disposition finale 2026-08-07 : DISMANTLE & HARVEST (voir `docs/Audit/EPM_FINAL_DISPOSITION.md`) — `ExecutivePerformanceModel` ne survit pas comme modèle autonome, sa logique d'extraction est récupérable pour l'ingestion `FinancialFact` | `ExecutivePerformanceModel` et ses extracteurs | Aucune dépendance entrante depuis le produit | `backend/epm/` (non tracké), `backend/tools/epm_viewer.py` |
 
 ---
 
