@@ -635,6 +635,11 @@ class ArcService:
             "entity_id": arc.get("entity_id"),
             "title": title,
             "learning_text": None,
+            # Interne uniquement — utilisé par _attach_evidence_support()
+            # pour résoudre la preuve Evidence Ledger de cet item, jamais
+            # exposé tel quel dans la réponse API finale (retiré avant
+            # retour par build_review_briefing, Evidence Consumer #1).
+            "_origin_analysis_id": arc.get("origin_analysis_id"),
         }
 
         if status == "intention":
@@ -761,7 +766,8 @@ class ArcService:
             .select(
                 "id, status, execution_status, recommendation_text, decision_text, "
                 "execution_notes, learning_text, created_at, updated_at, "
-                "decision_confirmed_at, execution_updated_at, closed_at, entity_id"
+                "decision_confirmed_at, execution_updated_at, closed_at, entity_id, "
+                "origin_analysis_id"
             )
             .eq("company_id", company_id)
             .neq("status", "abandoned")
@@ -779,10 +785,49 @@ class ArcService:
         # garantit l'exclusion même si la couche de mock/DB ne l'applique pas.
         arcs = [a for a in (result.data or []) if a.get("status") != "abandoned"]
         items = [self._arc_to_briefing_item(arc) for arc in arcs]
+        self._attach_evidence_support(items, company_id, supabase)
         items.sort(key=lambda item: BRIEFING_PRIORITY_ORDER.get(item["priority"], 99))
         if limit is None:
             return items
         return items[:limit]
+
+    def _attach_evidence_support(self, items: list[dict], company_id: str, supabase) -> None:
+        """
+        Evidence Ledger Consumer #1 — attache, en lecture seule, la preuve
+        canonique disponible pour chaque BriefingItem via son analyse
+        d'origine (decision_arcs.origin_analysis_id → evidence_ledger_entries
+        .analyse_id, déjà UNIQUE côté DB — pas besoin de résoudre par
+        Engagement/entity_id ici, cf. Mission 6 de la mission Evidence
+        Consumer #1 : la clé analyse_id est déjà unique et sans ambiguïté,
+        donc la question de cardinalité Entity:Engagement ne se pose même
+        pas pour ce chemin de lecture).
+
+        RÈGLE : aucun fallback vers analyses.analyse_json. Une analyse sans
+        ligne dans evidence_ledger_entries reçoit `evidence_support = None`
+        — jamais une preuve reconstruite depuis une autre source.
+
+        Mute `items` en place (ajoute "evidence_support", retire la clé
+        interne "_origin_analysis_id"). Ne lève jamais d'exception —
+        enrichissement optionnel, jamais un bloqueur du Briefing de revue.
+        """
+        analysis_ids = [item.get("_origin_analysis_id") for item in items]
+        support_by_analysis: dict = {}
+        try:
+            from services.evidence_query_service import get_evidence_support_by_analysis
+            support_by_analysis = get_evidence_support_by_analysis(
+                supabase=supabase,
+                analysis_ids=[a for a in analysis_ids if a],
+                company_id=company_id,
+            )
+        except Exception as e:
+            logger.error("[ARC] _attach_evidence_support — lookup failed: %s", e)
+            support_by_analysis = {}
+
+        for item in items:
+            origin_analysis_id = item.pop("_origin_analysis_id", None)
+            item["evidence_support"] = (
+                support_by_analysis.get(origin_analysis_id) if origin_analysis_id else None
+            )
 
     # ── Portfolio Intelligence — synthèse multi-clients (Incrément 1 + 2) ─────
 

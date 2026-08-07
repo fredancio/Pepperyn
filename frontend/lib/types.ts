@@ -149,6 +149,34 @@ export type BriefingPriority = 'urgent' | 'to_check' | 'done' | 'closed';
  * why_it_matters et questions_to_ask sont toujours templatés côté backend
  * (jamais générés par un LLM).
  */
+/**
+ * Un fait financier chiffré soutenant un BriefingItem, projeté depuis
+ * l'Evidence Ledger (Evidence Consumer #1). Jamais de fact_id, JSONB brut,
+ * ou enum interne (SourceType) exposé ici — voir
+ * backend/services/evidence_query_service.py::_project_evidence_row.
+ */
+export interface EvidenceImpact {
+  amount: number;
+  currency: string;
+  metric_type_label: string;
+  confidence: number | null;
+  /** Qualificatif honnête et professionnel (ex. "preuve vérifiée", "estimation non vérifiée"). */
+  qualifier: string;
+}
+
+/**
+ * Preuve Evidence Ledger disponible pour l'analyse d'origine d'un
+ * BriefingItem. Absent (undefined/null) signifie "aucune preuve
+ * structurée disponible" — jamais reconstruit depuis analyse_json
+ * (règle fondamentale, mission Evidence Consumer #1).
+ */
+export interface EvidenceSupport {
+  status: 'available';
+  facts_count: number;
+  sheets: string[];
+  impacts: EvidenceImpact[];
+}
+
 export interface BriefingItem {
   arc_id: string;
   source_type: 'decision_arc';
@@ -163,6 +191,8 @@ export interface BriefingItem {
   learning_text?: string | null;
   /** Ancienneté brute en jours — utilisée pour le tie-break de tri du Portfolio (Incrément 2). */
   age_days: number;
+  /** Evidence Ledger Consumer #1 — preuve canonique de l'analyse d'origine, si disponible. */
+  evidence_support?: EvidenceSupport | null;
 }
 
 /**

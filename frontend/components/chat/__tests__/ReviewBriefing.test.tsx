@@ -98,6 +98,55 @@ describe('ReviewBriefing — rendu', () => {
     ]);
   });
 
+  test('Evidence Ledger Consumer #1 : "Voir la preuve" absent quand evidence_support est null', async () => {
+    mockedFetch.mockResolvedValue([makeItem({ evidence_support: null })]);
+    render(<ReviewBriefing />);
+    await screen.findByText('Renégocier le contrat assurance');
+
+    expect(screen.queryByText('Voir la preuve')).not.toBeInTheDocument();
+  });
+
+  test('Evidence Ledger Consumer #1 : "Voir la preuve" affiché puis développe le contenu, sans fabrication', async () => {
+    mockedFetch.mockResolvedValue([
+      makeItem({
+        evidence_support: {
+          status: 'available',
+          facts_count: 2,
+          sheets: ['P&L'],
+          impacts: [
+            {
+              amount: 50000,
+              currency: 'EUR',
+              metric_type_label: "Chiffre d'affaires",
+              confidence: 0.8,
+              qualifier: 'preuve vérifiée',
+            },
+          ],
+        },
+      }),
+    ]);
+    render(<ReviewBriefing />);
+    await screen.findByText('Renégocier le contrat assurance');
+
+    const toggle = screen.getByText('Voir la preuve');
+    expect(screen.queryByText(/preuve vérifiée/)).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+
+    expect(await screen.findByText(/preuve vérifiée/)).toBeInTheDocument();
+    expect(screen.getByText('Masquer la preuve')).toBeInTheDocument();
+  });
+
+  test('Evidence Ledger Consumer #1 : evidence_support sans impacts ni sheets ne rend rien', async () => {
+    mockedFetch.mockResolvedValue([
+      makeItem({ evidence_support: { status: 'available', facts_count: 0, sheets: [], impacts: [] } }),
+    ]);
+    render(<ReviewBriefing />);
+    await screen.findByText('Renégocier le contrat assurance');
+
+    expect(screen.queryByText('Voir la preuve')).not.toBeInTheDocument();
+  });
+
   test('une carte "Clos" n\'affiche ni question ni action "Ne plus suivre"', async () => {
     mockedFetch.mockResolvedValue([
       makeItem({ arc_id: 'a4', priority: 'closed', title: 'Closed point', questions_to_ask: [] }),
