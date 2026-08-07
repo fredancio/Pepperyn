@@ -21,16 +21,39 @@
 - **Ordre relatif :** après cas vertical FTE Phidani, avant Recommendation/Decision/Attention. Position fixe dans la séquence posée par Fred, pas de date.
 
 ### 1.2 Engagement (T2A)
-- **Nature :** fondation bloquante.
-- **Source :** ADR-002 (ACCEPTED), branche `feature/t2a-engagement-persistence`.
-- **État réel (mise à jour 2026-08-07) :** T1C-A et T1C-B mergés dans `main` (`3b1b21a`, `0741a03`), ordre de récupération T1 avant T2 désormais exécuté. T2A en cours de reconstruction chirurgicale (pas de fusion de branche entière) — voir Mission Engagement du même jour pour le détail du tri KEEP/ADAPT/REJECT.
-- **Pourquoi différé :** fusion de branche entière écartée (127 fichiers dont 119 sans rapport, voir `T1_T2_RECOVERY_PLAN.md`) — reconstruction ciblée requise.
-- **Dépendances réelles :** aucune bloquante restante — plan de récupération déjà écrit et vérifié, T1 désormais mergé.
-- **Ce qu'il bloque :** rattachement `DecisionArc.engagement_id`, premier incrément FTE, Enterprise Familiarization.
-- **Déclencheur de réouverture :** deuxième GO explicite de Fred, après validation de `CANONICAL_DOCUMENT_SET_PROPOSAL.md`.
-- **Risque trop tôt :** aucun identifié — le chemin est déjà vérifié à faible risque technique.
-- **Risque trop tard :** tout le reste de la séquence (Evidence Ledger, FTE, agents) reste bloqué indéfiniment.
-- **Ordre relatif :** 1er, avant Evidence Ledger (ordre T1C-A → T1C-B → T2A déjà fixé dans `FOUNDATION_RECOVERY_REVIEW.md`).
+- **Nature :** fondation bloquante — **close (mise à jour 2026-08-07).**
+- **Source :** ADR-002 (ACCEPTED, cardinalité amendée §0), branche `implementation/t2a-engagement-2026-08-07` (harvest chirurgical de `feature/t2a-engagement-persistence`).
+- **État réel (mise à jour 2026-08-07) :** T1C-A, T1C-B et T2A tous mergés dans `main` (`3b1b21a`, `0741a03`, `f5f00bf`). Revue adversariale T2A (verdict A) puis arbitrage de cardinalité Entity:Engagement passés avant fusion. Table `engagements` réelle, création atomique Entity+Engagement câblée sur les deux chemins (RPC applicative, trigger d'inscription), backfill idempotent disponible. Baseline post-merge : 1028 passed / 8 échecs préexistants / 1 skip (988 + 40 nouveaux tests Engagement).
+- **Pourquoi différé :** n'est plus différé — fondation livrée. Les deux items ci-dessous (1.2.a, 1.2.b) sont les chantiers de suivi identifiés par l'arbitrage, pas des blocages restants sur T2A lui-même.
+- **Dépendances réelles :** aucune restante pour la fondation elle-même.
+- **Ce qu'il bloque :** plus rien directement — débloque `DecisionArc.engagement_id`, premier incrément FTE, Enterprise Familiarization.
+- **Ordre relatif :** 1er, avant Evidence Ledger — exécuté dans cet ordre (T1C-A → T1C-B → T2A).
+
+#### 1.2.a — Cardinalité Entity:Engagement : contrainte transitoire à relâcher plus tard
+- **Nature :** dette de suivi issue de l'arbitrage de cardinalité (2026-08-07), pas un défaut de T2A.
+- **Source :** Revue adversariale T2A pré-fusion + arbitrage dédié « Final Engagement Cardinality Arbitration » (2026-08-07) ; position canonique enregistrée dans ADR-002 §0.
+- **État réel :** `UNIQUE(entity_id)` sur `engagements` (migration v19) reste en place. Reclassé : ce n'est plus tenu pour un invariant de domaine permanent, seulement une contrainte d'implémentation transitoire — la vérité de domaine acceptée est **une Organisation peut avoir plusieurs Engagements au cours de sa vie**, l'identité d'un Engagement suivant la continuité du mandat professionnel, pas la durée de vie de l'Organisation.
+- **Pourquoi différé :** aucun chemin de code réel ne crée aujourd'hui un second Engagement pour une Entity existante — relâcher la contrainte maintenant serait une anticipation sans besoin démontré (Article IX).
+- **Dépendances réelles :** aucune technique — dépend uniquement de l'apparition d'un premier besoin produit réel.
+- **Ce qu'il bloque :** rien aujourd'hui.
+- **Déclencheur de réouverture :** **la première fonctionnalité qui a besoin de créer un second mandat professionnel pour une Organisation existante** (ex. : reprise de relation avec mandat matériellement différent, remplacement de CFO sans rupture, cas D/F du test de personas de l'arbitrage).
+- **Action requise à ce moment-là :** remplacer `UNIQUE(entity_id)` permanent par la stratégie retenue — plusieurs Engagements par Entity autorisés, mais au plus un Engagement courant/non-`churned` là où la sémantique de domaine l'exige (index unique partiel plutôt que contrainte absolue). Ceci est une direction, pas une autorisation d'implémentation. Réévaluer à ce moment si une chaîne de filiation explicite (`previous_engagement_id`) est réellement nécessaire — ne pas la construire avant.
+- **Risque trop tôt :** construire une cardinalité multiple et une logique de filiation sans aucun consommateur réel — sur-ingénierie spéculative, exactement le défaut initialement reproché à l'Alternative 4 rejetée.
+- **Risque trop tard :** un premier cas réel de mandat différent forcerait soit une mauvaise modélisation (fusion dans l'Engagement existant), soit une correction en urgence sous pression produit plutôt qu'une évolution planifiée.
+- **Ordre relatif :** aucun — attend son déclencheur, pas une place dans la séquence actuelle.
+
+#### 1.2.b — Perte de résolution Evidence/DecisionArc après suppression d'Entity
+- **Nature :** dette de suivi issue de la revue adversariale T2A (2026-08-07), héritée de T1 (non introduite ni aggravée par T2A).
+- **Source :** Revue adversariale T2A pré-fusion, Missions 7 et 15.
+- **État réel :** `engagements.entity_id` est `ON DELETE CASCADE` (v19) ; `evidence_ledger_entries.entity_id` et `decision_arcs.entity_id` sont `ON DELETE SET NULL` (v18, v16 — comportement pré-existant, inchangé par T2A). Conséquence : la suppression d'une Entity détruit son Engagement (CASCADE) tandis que les lignes Evidence/DecisionArc survivent avec `entity_id` à `NULL` — les faits bruts persistent (conforme à « la vérité financière persiste ») mais deviennent **définitivement non résolubles** vers un Engagement, même si celui-ci existait au moment de la suppression.
+- **Pourquoi différé :** aucun chemin de production ne dépend aujourd'hui de cette résolution (ADR-001 §8) — le risque est réel mais dormant.
+- **Dépendances réelles :** décision architecturale future sur l'ownership direct de l'Evidence Ledger par Engagement (ADR-001A).
+- **Ce qu'il bloque :** rien aujourd'hui ; bloquerait un futur audit ou une future reconstruction d'historique si la suppression d'Entity a déjà eu lieu.
+- **Déclencheur de réouverture :** le premier incrément qui fait de l'Evidence Ledger un consommateur réel (au même moment que 1.3), ou toute décision produit sur la suppression réelle de comptes utilisateurs (GDPR).
+- **Action requise à ce moment-là :** évaluer si Evidence/DecisionArc doivent recevoir une colonne `engagement_id` directe (plutôt que la résolution actuelle par jointure via `entity_id`), avec sa propre politique `ON DELETE` indépendante de celle d'Entity — une propriété directe par Engagement rendrait ce problème plus facile à résoudre proprement que la jointure dérivée actuelle, mais reste une décision architecturale à part entière, pas une correction technique mineure.
+- **Risque trop tôt :** aucun — rien à corriger sans consommateur réel.
+- **Risque trop tard :** une suppression réelle d'Entity avant la correction rendrait la perte d'historique irréversible pour les lignes déjà orphelines.
+- **Ordre relatif :** aligné sur 1.3 (Evidence Ledger — premier consommateur réel).
 
 ### 1.3 Evidence Ledger (T1)
 - **Nature :** fondation bloquante.
