@@ -1,5 +1,5 @@
 """
-evidence_ledger_service.py — T1C-A : persistance de l'Evidence Ledger (non-bloquant).
+evidence_ledger_service.py — T1C-A/T1C-B : persistance de l'Evidence Ledger (non-bloquant).
 
 Écrit dans evidence_ledger_entries (migration v18) le résultat de
 services/evidence_capture.py:capture_evidence(). Suit exactement le même
@@ -70,7 +70,14 @@ def save_evidence_capture(
             "unavailable_data": evidence_capture.get("unavailable_data") or [],
             "sheets_verified": evidence_capture.get("sheets_verified") or [],
             "quantified_impacts": evidence_capture.get("quantified_impacts") or [],
-            "capture_schema_version": "T1C-A-v1",
+            # T1C-B (2026-08-02) : les quantified_impacts portent désormais
+            # amount/currency atomiques et des source_references résolues
+            # (fact_id déterministe) au lieu du fallback legacy quasi-
+            # systématique de T1C-A. Anticipé par la migration v18 ("le schéma
+            # JSONB absorbera ce changement sans nouvelle migration") — seule
+            # cette version change, marquant sans ambiguïté quelles lignes
+            # précèdent/suivent T1C-B.
+            "capture_schema_version": "T1C-B-v1",
         }
         if entity_id is not None:
             insert_payload["entity_id"] = entity_id

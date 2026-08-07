@@ -1141,3 +1141,132 @@ class TestSourceTypeProvenance:
         qi_back = QuantifiedImpact.from_dict(serialized)
         assert len(qi_back.source_references) == 1
         assert qi_back.source_references[0].source_type == SourceType.LEGACY_PARSE
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# T1C-B — amount / currency / fact_ids atomiques
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestT1CBParserAtomicFields:
+    """
+    _parse_structured_impacts_section() lit désormais amount/currency/fact_ids
+    directement depuis le JSON — sans les résoudre (fact_ids reste une liste
+    brute d'étiquettes locales à ce stade, cf. docstring T1C-B).
+    """
+
+    def _parse(self, section_text: str) -> dict:
+        from services.llm_service import _parse_structured_impacts_section
+        return _parse_structured_impacts_section(section_text)
+
+    def _valid_section(self, items: list) -> str:
+        import json
+        return f"```json\n{json.dumps(items)}\n```"
+
+    def test_amount_and_currency_read_directly(self):
+        """amount/currency fournis par le LLM sont lus tels quels."""
+        items = [{"ref_type": "destroyer", "ref_index": 0,
+                  "metric_type": "EBITDA", "period_basis": "ANNUAL",
+                  "nature": "RECURRING", "confidence": 0.9,
+                  "is_current_period": True,
+                  "amount": 150000, "currency": "USD", "fact_ids": ["F001"]}]
+        result = self._parse(self._valid_section(items))
+        qi_dict = result[("destroyer", 0)]
+        assert qi_dict["amount"] == pytest.approx(150000.0)
+        assert qi_dict["currency"] == "USD"
+        assert qi_dict["fact_ids"] == ["F001"]
+
+    def test_amount_null_stays_none_never_zero(self):
+        """amount=null (données insuffisantes) → None, jamais 0.0."""
+        items = [{"ref_type": "quick_win", "ref_index": 0,
+                  "metric_type": "COST_SAVING", "period_basis": "ANNUAL",
+                  "nature": "RECURRING", "confidence": 0.6,
+                  "is_current_period": True,
+                  "amount": None, "currency": "EUR", "fact_ids": []}]
+        result = self._parse(self._valid_section(items))
+        assert result[("quick_win", 0)]["amount"] is None
+
+    def test_amount_invalid_type_falls_back_to_none(self):
+        """amount non numérique (chaîne non parsable) → None, aucune exception."""
+        items = [{"ref_type": "destroyer", "ref_index": 0,
+                  "metric_type": "EBITDA", "period_basis": "ANNUAL",
+                  "nature": "RECURRING", "confidence": 0.7,
+                  "is_current_period": True,
+                  "amount": "not_a_number"}]
+        result = self._parse(self._valid_section(items))
+        assert result[("destroyer", 0)]["amount"] is None
+
+    def test_amount_zero_is_preserved(self):
+        """amount=0 (vrai zéro observé) reste 0.0, jamais None."""
+        items = [{"ref_type": "destroyer", "ref_index": 0,
+                  "metric_type": "COST", "period_basis": "ANNUAL",
+                  "nature": "RECURRING", "confidence": 0.9,
+                  "is_current_period": True, "amount": 0}]
+        result = self._parse(self._valid_section(items))
+        assert result[("destroyer", 0)]["amount"] == 0.0
+
+    def test_currency_absent_defaults_to_eur(self):
+        """currency absent du JSON → "EUR" par défaut, appliqué explicitement
+        dans le parser (dict.get(..., default) de from_dict ne s'applique que
+        si la clé est absente, pas si elle vaut None — le défaut est donc
+        appliqué ici, pas laissé à from_dict)."""
+        items = [{"ref_type": "destroyer", "ref_index": 0,
+                  "metric_type": "EBITDA", "period_basis": "ANNUAL",
+                  "nature": "RECURRING", "confidence": 0.8,
+                  "is_current_period": True, "amount": 1000}]
+        result = self._parse(self._valid_section(items))
+        assert result[("destroyer", 0)]["currency"] == "EUR"
+        qi = QuantifiedImpact.from_dict(result[("destroyer", 0)])
+        assert qi.currency == "EUR"
+
+    def test_fact_ids_absent_returns_empty_list(self):
+        """fact_ids absent du JSON → liste vide, jamais d'exception."""
+        items = [{"ref_type": "quick_win", "ref_index": 0,
+                  "metric_type": "REVENUE", "period_basis": "ANNUAL",
+                  "nature": "RECURRING", "confidence": 0.5,
+                  "is_current_period": True}]
+        result = self._parse(self._valid_section(items))
+        assert result[("quick_win", 0)]["fact_ids"] == []
+
+    def test_fact_ids_non_list_returns_empty_list(self):
+        """fact_ids d'un type inattendu (pas une liste) → liste vide, jamais d'exception."""
+        items = [{"ref_type": "quick_win", "ref_index": 0,
+                  "metric_type": "REVENUE", "period_basis": "ANNUAL",
+                  "nature": "RECURRING", "confidence": 0.5,
+                  "is_current_period": True, "fact_ids": "F001"}]
+        result = self._parse(self._valid_section(items))
+        assert result[("quick_win", 0)]["fact_ids"] == []
+
+
+class TestBuildFactIdDeterminism:
+    """
+    build_fact_id() — déterminisme requis explicitement par Fred avant
+    implémentation de T1C-B (garantie 1 du GO IMPLEMENT).
+    """
+
+    def test_same_content_same_id(self):
+        """Même contenu (source_sheet/claim/source_context) → même fact_id."""
+        from models.financial_truth import build_fact_id
+        id1 = build_fact_id("P&L", "CA total = 1 200 000 €", "Ligne 'Total CA' = 1200000")
+        id2 = build_fact_id("P&L", "CA total = 1 200 000 €", "Ligne 'Total CA' = 1200000")
+        assert id1 == id2
+
+    def test_different_content_different_id(self):
+        """Contenu différent → fact_id différent (pas de collision triviale)."""
+        from models.financial_truth import build_fact_id
+        id1 = build_fact_id("P&L", "CA total = 1 200 000 €", "Ligne 'Total CA' = 1200000")
+        id2 = build_fact_id("Bilan", "Trésorerie = 50 000 €", "Ligne 'Cash' = 50000")
+        assert id1 != id2
+
+    def test_not_random_across_calls(self):
+        """Pas d'aléatoire : deux appels distincts sur le même contenu convergent."""
+        from models.financial_truth import build_fact_id
+        ids = {build_fact_id("P&L", "X", "Y") for _ in range(5)}
+        assert len(ids) == 1
+
+    def test_missing_fields_do_not_raise(self):
+        """Champs manquants (None) → pas d'exception, id stable quand même."""
+        from models.financial_truth import build_fact_id
+        id1 = build_fact_id(None, None, None)
+        id2 = build_fact_id(None, None, None)
+        assert id1 == id2
+        assert isinstance(id1, str) and len(id1) == 16

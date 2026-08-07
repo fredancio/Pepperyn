@@ -1,7 +1,7 @@
 """
-test_evidence_ledger_t1c_a.py — Tests T1C-A : capture + persistance Evidence Ledger.
+test_evidence_ledger_t1c_a.py — Tests T1C-A/T1C-B : capture + persistance Evidence Ledger.
 
-Périmètre couvert (T1C-A uniquement — ADR-001, ADR-001A) :
+Périmètre couvert (T1C-A — ADR-001, ADR-001A) :
   - services/evidence_capture.py : pur, sans I/O. Vérifie que rien n'est
     inventé (UNKNOWN ≠ 0), que la fuite documentée en T1B (quantified_impact
     perdu avant AnalysisResult) est bien contournée, et que la capture ne
@@ -9,6 +9,14 @@ Périmètre couvert (T1C-A uniquement — ADR-001, ADR-001A) :
   - services/evidence_ledger_service.py : persistance non-bloquante, mockée
     (aucune connexion réseau réelle — Supabase est en pause au moment de ce
     commit, cf. mémoire Phase 1B).
+
+Périmètre ajouté (T1C-B, 2026-08-02) :
+  - Résolution fact_ids → source_references déterministes (voir
+    TestFactIdResolution).
+  - Evidence Count Invariant : garantie explicitement demandée par Fred avant
+    implémentation — le nombre d'Evidence produites ne doit jamais changer
+    entre une capture "T1C-A-style" (sans amount/currency/fact_ids) et son
+    équivalent "T1C-B-style" (voir TestEvidenceCountInvariant).
 
 RÈGLE ABSOLUE de ces tests : ne vérifient PAS le comportement de production
 existant (schemas.py / AnalysisResult / exports) — celui-ci est déjà couvert
@@ -296,7 +304,7 @@ class TestSaveEvidenceCaptureNonBlocking:
         assert insert_call_args["analyse_id"] == "analyse-uuid-1"
         assert insert_call_args["company_id"] == "company-uuid-1"
         assert insert_call_args["entity_id"] == "entity-uuid-1"
-        assert insert_call_args["capture_schema_version"] == "T1C-A-v1"
+        assert insert_call_args["capture_schema_version"] == "T1C-B-v1"
         assert len(insert_call_args["quantified_impacts"]) == 3
 
     def test_none_entity_id_is_omitted_not_inserted_as_null(
@@ -365,6 +373,218 @@ class TestSaveEvidenceCaptureNonBlocking:
                 entity_id=None,
                 evidence_capture=capture,
             )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# T1C-B — résolution fact_ids → source_references déterministes
+# ─────────────────────────────────────────────────────────────────────────────
+
+@pytest.fixture
+def evidence_graph_t1cb_sample():
+    """Même fait que evidence_graph_sample (F001), pour tester la résolution."""
+    return {
+        "facts": [
+            {
+                "id": "F001",
+                "category": "observation",
+                "claim": "CA total exercice = 1 200 000 €",
+                "source_sheet": "P&L",
+                "source_context": "Ligne 'Total CA', valeur = 1200000",
+                "calculation": "Lecture directe",
+                "confidence": 1.0,
+            },
+        ],
+        "unavailable_data": [],
+        "sheets_verified": ["P&L"],
+    }
+
+
+@pytest.fixture
+def analysis_dict_t1cb_sample():
+    """Un destroyer avec amount/currency/fact_ids fournis directement par le LLM."""
+    return {
+        "value_destroyers": [
+            {
+                "name": "Retard de facturation clients",
+                "impact_annuel": "120 000 €",
+                "quantified_impact": {
+                    "metric_type": "REVENUE",
+                    "period_basis": "ANNUAL",
+                    "nature": "RECURRING",
+                    "confidence": 0.9,
+                    "is_current_period": True,
+                    "amount": 120000.0,
+                    "currency": "EUR",
+                    "fact_ids": ["F001"],
+                },
+            },
+        ],
+        "quick_wins": [],
+    }
+
+
+class TestFactIdResolution:
+
+    def test_resolved_fact_id_is_deterministic_hash_not_local_label(
+        self, evidence_graph_t1cb_sample, analysis_dict_t1cb_sample
+    ):
+        """Le fact_id persisté n'est JAMAIS l'étiquette locale ("F001") —
+        c'est un hash de contenu (build_fact_id)."""
+        from models.financial_truth import build_fact_id
+        result = capture_evidence(evidence_graph_t1cb_sample, analysis_dict_t1cb_sample)
+        refs = result["quantified_impacts"][0]["impact"]["source_references"]
+        assert len(refs) == 1
+        assert refs[0]["fact_id"] != "F001"
+        expected = build_fact_id("P&L", "CA total exercice = 1 200 000 €",
+                                  "Ligne 'Total CA', valeur = 1200000")
+        assert refs[0]["fact_id"] == expected
+        assert refs[0]["source_type"] == "CANONICAL_FACT"
+
+    def test_same_fact_content_different_local_label_same_fact_id(self):
+        """
+        Garantie de déterminisme (GO IMPLEMENT PR-T1C-B, garantie 1) : un même
+        fait réimporté sous une étiquette locale différente ("F003" au lieu de
+        "F001") produit le même fact_id.
+        """
+        graph_a = {"facts": [{
+            "id": "F001", "source_sheet": "P&L",
+            "claim": "CA total = 1 200 000 €", "source_context": "Total CA = 1200000",
+        }]}
+        graph_b = {"facts": [{
+            "id": "F003", "source_sheet": "P&L",
+            "claim": "CA total = 1 200 000 €", "source_context": "Total CA = 1200000",
+        }]}
+        analysis_a = {"value_destroyers": [{
+            "impact_annuel": "1 200 000 €",
+            "quantified_impact": {"metric_type": "REVENUE", "period_basis": "ANNUAL",
+                                   "nature": "RECURRING", "amount": 1200000.0,
+                                   "fact_ids": ["F001"]},
+        }], "quick_wins": []}
+        analysis_b = {"value_destroyers": [{
+            "impact_annuel": "1 200 000 €",
+            "quantified_impact": {"metric_type": "REVENUE", "period_basis": "ANNUAL",
+                                   "nature": "RECURRING", "amount": 1200000.0,
+                                   "fact_ids": ["F003"]},
+        }], "quick_wins": []}
+        result_a = capture_evidence(graph_a, analysis_a)
+        result_b = capture_evidence(graph_b, analysis_b)
+        fact_id_a = result_a["quantified_impacts"][0]["impact"]["source_references"][0]["fact_id"]
+        fact_id_b = result_b["quantified_impacts"][0]["impact"]["source_references"][0]["fact_id"]
+        assert fact_id_a == fact_id_b
+
+    def test_unresolved_fact_id_reference_is_silently_ignored(self):
+        """
+        Référence à une étiquette absente de l'Evidence Graph (hallucination du
+        LLM, ou Evidence Graph vide/échoué) : jamais d'identifiant fabriqué,
+        jamais d'exception — la référence est simplement omise.
+        """
+        evidence_graph = {"facts": [{"id": "F001", "source_sheet": "P&L",
+                                      "claim": "X", "source_context": "Y"}]}
+        analysis_dict = {"value_destroyers": [{
+            "impact_annuel": "50 000 €",
+            "quantified_impact": {"metric_type": "COST", "period_basis": "ANNUAL",
+                                   "nature": "ONE_TIME", "amount": 50000.0,
+                                   "fact_ids": ["F999"]},  # n'existe pas
+        }], "quick_wins": []}
+        result = capture_evidence(evidence_graph, analysis_dict)
+        impact = result["quantified_impacts"][0]["impact"]
+        assert impact is not None
+        assert impact["amount"] == 50000.0
+        assert impact["source_references"] == []
+
+    def test_empty_fact_ids_list_yields_no_source_references(self):
+        """fact_ids=[] (le LLM n'a identifié aucun fait précis) → aucune
+        SourceReference ajoutée, pas d'erreur."""
+        evidence_graph = {"facts": [{"id": "F001", "source_sheet": "P&L",
+                                      "claim": "X", "source_context": "Y"}]}
+        analysis_dict = {"value_destroyers": [{
+            "impact_annuel": "10 000 €",
+            "quantified_impact": {"metric_type": "COST", "period_basis": "ANNUAL",
+                                   "nature": "ONE_TIME", "amount": 10000.0,
+                                   "fact_ids": []},
+        }], "quick_wins": []}
+        result = capture_evidence(evidence_graph, analysis_dict)
+        assert result["quantified_impacts"][0]["impact"]["source_references"] == []
+
+    def test_missing_evidence_graph_does_not_crash_resolution(self):
+        """Evidence Graph vide (échec non-bloquant en amont) : fact_ids présents
+        mais aucun fait à résoudre → liste vide, pas d'exception."""
+        analysis_dict = {"value_destroyers": [{
+            "impact_annuel": "10 000 €",
+            "quantified_impact": {"metric_type": "COST", "period_basis": "ANNUAL",
+                                   "nature": "ONE_TIME", "amount": 10000.0,
+                                   "fact_ids": ["F001"]},
+        }], "quick_wins": []}
+        result = capture_evidence({}, analysis_dict)
+        assert result["quantified_impacts"][0]["impact"]["source_references"] == []
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# T1C-B — Evidence Count Invariant (garantie 2, GO IMPLEMENT PR-T1C-B)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestEvidenceCountInvariant:
+    """
+    « Le nombre d'Evidence produites doit rester identique avant/après
+    PR-T1C-B. La PR ne doit enrichir les faits existants que par amount /
+    currency / fact_ids. Aucune autre différence ne doit apparaître. »
+    (Fred, GO IMPLEMENT PR-T1C-B, 2026-08-02)
+    """
+
+    def test_same_entry_count_regardless_of_new_fields(
+        self, evidence_graph_sample, analysis_dict_sample, evidence_graph_t1cb_sample,
+        analysis_dict_t1cb_sample,
+    ):
+        """Le nombre d'entrées quantified_impacts/facts dépend uniquement du
+        nombre d'items narratifs et de facts en entrée — jamais du contenu
+        d'amount/currency/fact_ids."""
+        result_t1ca_style = capture_evidence(evidence_graph_sample, analysis_dict_sample)
+        result_t1cb_style = capture_evidence(evidence_graph_t1cb_sample, analysis_dict_t1cb_sample)
+        assert len(result_t1ca_style["quantified_impacts"]) == 3  # inchangé (cf. TestCaptureEvidenceNominal)
+        assert len(result_t1cb_style["quantified_impacts"]) == 1  # 1 destroyer, 0 quick win — construit ainsi
+        assert len(result_t1cb_style["facts"]) == len(evidence_graph_t1cb_sample["facts"])
+
+    def test_only_amount_currency_source_references_differ(self):
+        """
+        Comparaison directe : deux fixtures identiques à l'exception des 3
+        champs T1C-B. Seuls amount/currency/source_references sont autorisés
+        à différer dans le dict impact résultant — toutes les autres clés
+        doivent être strictement égales.
+        """
+        evidence_graph = {"facts": []}
+        base_qi = {
+            "metric_type": "EBITDA",
+            "period_basis": "ANNUAL",
+            "nature": "RECURRING",
+            "confidence": 0.85,
+            "source_period": "FY 2025",
+            "is_current_period": True,
+            "gross_margin": None,
+            "annualization": None,
+        }
+        analysis_t1ca_style = {"value_destroyers": [{
+            "impact_annuel": "200 000 €",
+            "quantified_impact": {**base_qi, "amount": None},
+        }], "quick_wins": []}
+        analysis_t1cb_style = {"value_destroyers": [{
+            "impact_annuel": "200 000 €",
+            "quantified_impact": {**base_qi, "amount": 200000.0, "currency": "EUR", "fact_ids": []},
+        }], "quick_wins": []}
+
+        impact_a = capture_evidence(evidence_graph, analysis_t1ca_style)["quantified_impacts"][0]["impact"]
+        impact_b = capture_evidence(evidence_graph, analysis_t1cb_style)["quantified_impacts"][0]["impact"]
+
+        allowed_diff_keys = {"amount", "currency", "source_references"}
+        for key in impact_a:
+            if key in allowed_diff_keys:
+                continue
+            assert impact_a[key] == impact_b[key], f"clé '{key}' ne devrait jamais différer"
+
+        # Les deux valent 200 000 € (l'une via legacy fallback, l'autre via
+        # amount atomique direct) — seule la provenance (source_references) diffère.
+        assert impact_a["amount"] == impact_b["amount"] == 200000.0
+        assert impact_a["source_references"][0]["source_type"] == "LEGACY_PARSE"
+        assert impact_b["source_references"] == []  # fact_ids=[] ici, aucune résolution
 
 
 if __name__ == "__main__":

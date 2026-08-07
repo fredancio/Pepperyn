@@ -574,3 +574,49 @@ def build_event_hash(
         event_category.upper(),
     ])
     return hashlib.sha256(canonical_key.encode()).hexdigest()[:16]
+
+
+def build_fact_id(
+    source_sheet: Optional[str],
+    claim: Optional[str],
+    source_context: Optional[str],
+) -> str:
+    """
+    Hash SHA-256 déterministe pour identifier un fait de l'Evidence Graph
+    (T1C-B — voir T1C-B Implementation Plan, section "Déterminisme des fact_id").
+
+    Même principe que build_event_hash() ci-dessus : même contenu → même
+    identifiant, jamais un identifiant aléatoire ou une étiquette arbitraire.
+
+    Pourquoi ce n'est PAS l'étiquette locale du LLM ("F001", "F002", ...) :
+    cette étiquette est attribuée librement par le modèle à chaque appel — elle
+    n'a aucune garantie de stabilité si le même document est réanalysé (le LLM
+    peut numéroter les mêmes faits différemment d'un appel à l'autre). Le hash
+    ci-dessous est calculé UNIQUEMENT à partir du contenu observable du fait
+    (feuille source, affirmation, contexte source) — un même fait, réimporté
+    sous une étiquette locale différente, produit donc toujours le même
+    fact_id. Ceci répond à ADR-001 §6 : "Un regroupement de faits [...] est
+    identifié de façon déterministe et reproductible, jamais attribué
+    arbitrairement" — le même principe déjà appliqué à build_event_hash().
+
+    company_id est délibérément exclu du hachage : l'identité d'un fait dépend
+    de son contenu, pas de qui l'a soumis. Une collision de contenu entre deux
+    entreprises n'a aucun impact fonctionnel — fact_id n'est pas une clé unique
+    en base (seule analyse_id l'est, migration v18), seulement un champ de
+    traçabilité à l'intérieur de source_references.
+
+    Args:
+        source_sheet:    feuille source du fait (ex : "P&L"), ou None.
+        claim:           affirmation textuelle du fait, ou None.
+        source_context:  contexte source (ligne, valeur), ou None.
+
+    Returns:
+        Hash hexadécimal tronqué à 16 caractères. Déterministe et stable pour
+        un même triplet (source_sheet, claim, source_context).
+    """
+    canonical_key = "|".join([
+        source_sheet or "",
+        claim or "",
+        source_context or "",
+    ])
+    return hashlib.sha256(canonical_key.encode()).hexdigest()[:16]

@@ -1066,7 +1066,10 @@ Pour chaque ligne de "CE QUI DETRUIT" et chaque ligne de "QUICK WINS" (dans le m
     "is_current_period": true,
     "gross_margin_rate": null,
     "gross_margin_source": null,
-    "ytd_periods_elapsed": null
+    "ytd_periods_elapsed": null,
+    "amount": null,
+    "currency": "EUR",
+    "fact_ids": []
   }}
 ]
 ```
@@ -1084,6 +1087,9 @@ Règles :
 - gross_margin_rate : taux de marge brute si connu explicitement (0.0-1.0), sinon null
 - gross_margin_source : "EXPLICIT_FILE" si fourni dans le document, "LLM_EXTRACTED" si estimé, null si inconnu
 - ytd_periods_elapsed : si period_basis=YTD, nombre de mois calendaires écoulés (ex : Jan-Sep = 9), sinon null
+- amount : montant atomique de l'impact, nombre pur (ex : 150000, jamais de texte ni de symbole €), signe négatif autorisé pour une perte. null si aucun montant fiable ne peut être établi — ne jamais deviner.
+- currency : code devise ISO 3 lettres (ex : "EUR"). "EUR" par défaut si le document ne précise aucune autre devise.
+- fact_ids : liste des "id" (ex : "F001") de l'EVIDENCE GRAPH ci-dessus qui prouvent ce montant. Liste vide si aucun fait précis ne le justifie directement — ne jamais inventer un id qui n'existe pas dans l'EVIDENCE GRAPH.
 - ref_type "quick_win" pour les QUICK WINS
 - Si incertitude totale sur un champ → UNKNOWN (jamais d'invention)
 
@@ -1222,8 +1228,17 @@ def _parse_structured_impacts_section(
       - Règle duplicate : first valid wins. Si deux items partagent le même
         (ref_type, ref_index), le premier dans le tableau JSON est retenu.
         Les doublons ultérieurs sont ignorés silencieusement.
-      - amount est toujours None dans le dict retourné ; il sera injecté par
-        _try_deserialize_qi() depuis le parseur legacy (Phase 4B).
+      - amount (T1C-B) : lu directement depuis le JSON (float ou None si
+        absent/invalide — jamais 0.0 par défaut). Si None, _try_deserialize_qi()
+        retombe sur le parseur legacy (Phase 4B, comportement T1C-A inchangé).
+      - currency (T1C-B) : chaîne telle quelle si fournie, sinon "EUR" par
+        défaut (appliqué ici explicitement, pas via QuantifiedImpact.from_dict()
+        — son propre défaut ne s'applique que si la clé est absente, pas si
+        elle vaut None, ce qui serait le cas si on la laissait passer telle quelle).
+      - fact_ids (T1C-B) : liste brute d'étiquettes locales de l'Evidence Graph
+        ("F001", ...), NON résolue ici (cette fonction ne voit pas
+        evidence_graph.facts). Résolution en fact_id déterministe faite par
+        evidence_capture.py (cf. T1C-B Implementation Plan).
       - Les enums inconnus (metric_type, period_basis, nature) sont conservés
         tels quels dans le dict ; _safe_enum() les convertit en UNKNOWN lors
         de QuantifiedImpact.from_dict().
@@ -1315,6 +1330,33 @@ def _parse_structured_impacts_section(
             except (TypeError, ValueError):
                 _conf = 0.5
 
+            # T1C-B — amount atomique : float robuste (None si absent/invalide,
+            # jamais 0.0 par défaut — cf. invariant "absence ≠ zéro", ADR-001 §6).
+            # Si absent ou non parsable ici, _try_deserialize_qi() retombe sur le
+            # parseur legacy (comportement T1C-A inchangé, cf. executive_decision_model.py).
+            _amount_raw = _item.get("amount")
+            try:
+                _amount = float(_amount_raw) if _amount_raw is not None else None
+            except (TypeError, ValueError):
+                _amount = None
+
+            # T1C-B — currency : chaîne telle quelle si fournie, sinon "EUR"
+            # (même défaut que QuantifiedImpact.from_dict(), appliqué ici
+            # explicitement — dict.get(..., "EUR") de from_dict ne s'applique
+            # que si la clé est ABSENTE, pas si elle vaut None).
+            _currency = _item.get("currency") or "EUR"
+
+            # T1C-B — fact_ids : liste brute d'étiquettes locales de l'Evidence
+            # Graph ("F001", ...) TELLE QUE fournie par le LLM. Volontairement PAS
+            # résolue ici : cette fonction ne voit que le texte de la section
+            # IMPACTS FINANCIERS STRUCTURÉS, jamais evidence_graph.facts. La
+            # résolution en fact_id déterministe (hash de contenu, jamais
+            # l'étiquette elle-même) a lieu dans evidence_capture.py, seul endroit
+            # où les deux structures coexistent (cf. T1C-B Implementation Plan,
+            # section "Déterminisme des fact_id").
+            _fact_ids_raw = _item.get("fact_ids")
+            _fact_ids = [str(f) for f in _fact_ids_raw if f] if isinstance(_fact_ids_raw, list) else []
+
             result[key] = {
                 "metric_type": _item.get("metric_type", "UNKNOWN"),
                 "period_basis": _item.get("period_basis", "UNKNOWN"),
@@ -1324,7 +1366,9 @@ def _parse_structured_impacts_section(
                 "is_current_period": bool(_item.get("is_current_period", True)),
                 "gross_margin": _gm,
                 "annualization": _ann,
-                "amount": None,  # Injecté par _try_deserialize_qi() depuis legacy
+                "amount": _amount,  # T1C-B : amount atomique LLM ; None → fallback legacy (_try_deserialize_qi)
+                "currency": _currency,  # T1C-B : None → défaut "EUR" appliqué par QuantifiedImpact.from_dict()
+                "fact_ids": _fact_ids,  # T1C-B : étiquettes brutes, résolues en aval (evidence_capture.py)
             }
 
     except Exception as _e:
