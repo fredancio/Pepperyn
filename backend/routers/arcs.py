@@ -10,6 +10,8 @@ GET  /api/review-briefing         — Briefing de revue (Capability 3)
 GET  /api/portfolio                — Portfolio Intelligence, Incrément 1 (Capability 7)
 GET  /api/admin/arcs/integrity    — compter les feedbacks sans arc (monitoring)
 POST /api/admin/arcs/backfill     — créer les arcs manquants (reconstruction idempotente)
+GET  /api/admin/evidence/integrity — compter les analyses sans Evidence Ledger (monitoring,
+                                      Evidence Consumer #1 — persistence integrity gate)
 """
 import logging
 from typing import Optional
@@ -246,3 +248,35 @@ async def backfill_arcs(
     await _resolve_auth(authorization, x_auth_type)
     result = arc_service.backfill_missing_arcs(company_id=company_id)
     return result
+
+
+@router.get("/admin/evidence/integrity")
+async def evidence_integrity(
+    company_id: Optional[str] = None,
+    authorization: Optional[str] = Header(default=None),
+    x_auth_type: Optional[str] = Header(default=None),
+):
+    """
+    Persistence Integrity Gate (Evidence Ledger Consumer #1) — compte les
+    analyses sans ligne evidence_ledger_entries correspondante.
+
+    Signal d'observabilité agrégé, PAS une classification par ligne :
+    ne distingue jamais analyse pré-Ledger / capture vide légitime / échec
+    d'écriture (structurellement indiscernables depuis cette seule table —
+    voir docs/Audit/STRATEGIC_DEFERRED_WORK_REGISTER.md). Sert à détecter
+    une régression d'écriture silencieuse via l'évolution de ce compteur
+    dans le temps (ex. pic après un déploiement), pas à diagnostiquer un
+    cas individuel. Même pattern que /api/admin/arcs/integrity — aucune
+    nouvelle infrastructure.
+
+    Ne crée jamais d'Evidence manquante — lecture seule, contrairement à
+    /api/admin/arcs/backfill qui a un équivalent en écriture. Un backfill
+    Evidence depuis analyse_json inventerait une preuve que le pipeline
+    T1C-A/T1C-B n'a jamais produite — explicitement hors périmètre.
+    """
+    await _resolve_auth(authorization, x_auth_type)
+    from main import get_supabase_service
+    from services.evidence_integrity_service import count_missing_evidence
+
+    supabase = get_supabase_service()
+    return count_missing_evidence(supabase=supabase, company_id=company_id)
