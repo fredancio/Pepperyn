@@ -12,10 +12,11 @@
 - **Portfolio Home Product Validation Report** — PASSED WITH MINOR RESERVATIONS. 48/48 tests ciblés, 943 passed / 8 échecs préexistants / 1 skip en suite complète, 30/30 frontend.
 - **Anonymisation Layer 1** — `anonymization_service.py`, mécanisme correct pour son périmètre déclaré (voir `ANONYMIZATION_CAPABILITY_REVIEW.md` — couverture incomplète, traité en réserve, pas en negation de ce qui est livré).
 - **Modèle Company/Entity/Workspace, PIN login, Billing/Stripe, exports PDF/PPTX/XLSX** — confirmés réels et câblés par `LEGACY_CAPABILITY_INVENTORY.md`.
+- **T1C-A (Evidence Ledger — capture)** — ADR-001/001A ACCEPTED, fusionné dans `main` le 2026-08-07 (commit `3b1b21a`, revue adversariale passée, verdict A — MERGE AS-IS). Table `evidence_ledger_entries` créée, strictement additive, non encore lue par aucun chemin de production. Baseline post-merge : 970 passed / 8 échecs préexistants / 6 erreurs de collection préexistantes / 1 skip.
 
 ## 2. ACCEPTED BUT NOT YET MERGED
 
-- **T1 (Evidence Ledger — T1C-A, T1C-B)** — ADR-001/001A ACCEPTED, code validé sur projet Supabase de test dédié, jamais fusionné dans `main`. Risque : faible, fusion standard recommandée (`FOUNDATION_RECOVERY_EXECUTION_ORDER.md`).
+- **T1C-B (Evidence Ledger — faits atomiques)** — en cours de reconstruction depuis l'état canonique courant, voir `Execution/FOUNDATION_RECOVERY_EXECUTION_ORDER.md`.
 - **T2 (Engagement — T2A)** — ADR-002 ACCEPTED, code réel sur branche, extraction ciblée de 8 fichiers requise (jamais fusion de branche entière — 119 fichiers hors périmètre).
 - **ADR-003 v3 (Financial Time Engine)** — conçu, auto-critiqué (9/10), jamais promu ACCEPTED. Reste ici, pas en section 3, tant qu'aucun GO n'a été donné.
 
@@ -23,7 +24,7 @@
 
 *(Un seul chantier principal autorisé — pas une liste.)*
 
-**Foundation documentaire canonique + T1 (Evidence Ledger, T1C-A puis T1C-B).** Justification de l'exclusivité : toute autre ouverture de chantier (Decision Follow-up, Trust Boundary, FTE) reste bloquée tant que Gate A-C (`PRE_IMPLEMENTATION_GATE_CHECKLIST.md`) ne sont pas passés. Voir `FOUNDATION_RECOVERY_EXECUTION_ORDER.md` pour la justification complète de cet ordre.
+**T1C-B (Evidence Ledger, faits atomiques)** — T1C-A mergé et validé (2026-08-07). Justification de l'exclusivité : toute autre ouverture de chantier (Decision Follow-up, Trust Boundary, FTE) reste bloquée tant que Gate A-C (`PRE_IMPLEMENTATION_GATE_CHECKLIST.md`) ne sont pas passés. Voir `FOUNDATION_RECOVERY_EXECUTION_ORDER.md` pour la justification complète de cet ordre.
 
 **Exception explicitement autorisée à avancer en parallèle** (justifiée dans `LEGACY_MIGRATION_REVIEW_REPORT.md` Mission 9 et confirmée ici) : correction du Trust Boundary (contournement d'anonymisation du Conversation Engine V2) — aucune dépendance technique avec la séquence ci-dessus, son report prolonge un écart déjà prouvé entre promesse et comportement réel.
 
@@ -41,7 +42,7 @@
 
 Par rapport à la version `main` : réintègre le North Star, la Vision et les règles de priorisation, absents de la version `main` alors que non contredits par le code. Par rapport à la version gouvernance (`dfb8a47`) : retire toute mention de Monthly Review Engine comme capability en cours (obsolète, contredite par le code — Portfolio Intelligence est la capacité réellement livrée) et toute métrique présentant T1/T2 comme validés sur `main` (faux — validés sur un projet de test, jamais fusionnés).
 
-**Une seule capacité ne peut jamais apparaître simultanément en section 1 et en section 4** — test de cohérence structurel : Portfolio Intelligence (section 1) n'apparaît nulle part dans le registre de chantiers différés ; T1/T2 (section 2, pas 1) apparaissent bien dans le registre différé pour tout ce qui les suit (Engagement, FTE), jamais pour eux-mêmes puisqu'ils sont ACCEPTED BUT NOT MERGED, pas différés.
+**Une seule capacité ne peut jamais apparaître simultanément en section 1 et en section 4** — test de cohérence structurel : Portfolio Intelligence et T1C-A (section 1) n'apparaissent nulle part dans le registre de chantiers différés ; T1C-B/T2 (section 2) apparaissent bien dans le registre différé pour tout ce qui les suit (Engagement, FTE), jamais pour eux-mêmes puisqu'ils sont ACCEPTED BUT NOT MERGED, pas différés.
 
 ---
 
