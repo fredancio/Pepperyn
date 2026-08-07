@@ -1,12 +1,30 @@
 """
-evidence_integrity_service.py — Persistence Integrity Gate (Evidence Ledger
+evidence_integrity_service.py — Persistence Observability (Evidence Ledger
 Consumer #1, Mission 14).
+
+Correction post-revue adversariale (mission Evidence Consumer #1, correction
+finale) : ce module était initialement nommé/documenté comme une "Persistence
+Integrity Gate". Ce nom sur-affirmait ce qu'un comptage d'absence peut
+réellement garantir. Renommé en OBSERVABILITY : ce module compte et rend
+visible, il ne garantit rien.
+
+Ce module FOURNIT : un signal agrégé, actionnable dans le temps (ex. pic
+après un déploiement), permettant de détecter qu'une régression d'écriture
+silencieuse s'est produite quelque part dans la fenêtre observée.
+
+Ce module NE FOURNIT PAS : une garantie qu'une Evidence donnée a été
+persistée (aucun blocage, aucune retry, aucun outbox) ; une classification
+par ligne (pré-Ledger / capture vide légitime / échec d'écriture restent
+structurellement indiscernables depuis ces seules données — voir
+docs/Audit/STRATEGIC_DEFERRED_WORK_REGISTER.md, gap "Evidence Capture
+Outcome Semantics") ; une correction ou un rattrapage de la perte constatée.
 
 T1C-A accepted non-blocking Evidence persistence
 (services/evidence_ledger_service.py:save_evidence_capture — try/except,
 log, never raise) ONLY because evidence_ledger_entries had zero real
 consumers (ADR-001 §8). Review Briefing becoming a real consumer ends that
-justification: Evidence loss must no longer be silent.
+justification: Evidence loss must no longer be silent — but "no longer
+silent" means "countable", not "prevented".
 
 Chosen minimal strategy (Mission 14, option C — "another existing
 repository-native reliability pattern", no new infrastructure): mirror the

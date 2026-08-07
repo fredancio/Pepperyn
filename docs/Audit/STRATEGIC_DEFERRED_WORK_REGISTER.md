@@ -76,6 +76,31 @@
 6. La persistance non-bloquante de l'Evidence Ledger doit être revue (retry durable ou blocage explicite) **avant** qu'un consommateur réel ne dépende de sa fiabilité — acceptable tant qu'ADR-001 §8 reste vrai (aucun chemin de production ne la lit). Propriétaire probable : Trust Platform / futur incrément Evidence.
 7. La propriété conceptuelle de l'Evidence Ledger reste l'Engagement (ADR-001A) ; l'ownership transitoire via `entity_id` doit être réattribuée explicitement dès qu'Engagement existe physiquement — **pas automatiquement lors de T2A** sauf si l'exécution de T2A le requiert explicitement.
 
+#### 1.3.a — Sémantique des issues de capture Evidence (Evidence Capture Outcome Semantics)
+- **Nature :** dette de suivi issue de la revue adversariale du premier consommateur réel de l'Evidence Ledger (Evidence Consumer #1, Review Briefing, 2026-08-07), pas un défaut de ce consommateur lui-même.
+- **Source :** Revue adversariale Evidence Consumer #1 pré-fusion (2026-08-07) + mission de correction finale associée.
+- **État réel :** confirmé structurellement, via table de vérité, que l'absence d'une ligne `evidence_ledger_entries` pour une analyse est aujourd'hui indiscernable entre trois causes distinctes : analyse antérieure à T1C-A (pré-Ledger), capture Evidence Graph légitimement vide, et échec d'écriture non-bloquant (`save_evidence_capture`). `evidence_integrity_service.py` (observabilité, voir 1.3 point 6) donne un signal agrégé, jamais une classification par ligne.
+- **Pourquoi différé :** aucun consommateur aujourd'hui ne dépend de la présence d'Evidence pour produire une décision — Evidence Consumer #1 (Review Briefing) est strictement optionnel et dégrade honnêtement en son absence (Mission 8 de sa mission d'implémentation). Construire un mécanisme d'état maintenant serait prématuré (Article IX) — aucun besoin démontré ne l'exige encore.
+- **Dépendances réelles :** aucune technique — dépend uniquement de l'apparition d'un premier consommateur dont la justesse dépend de la présence d'Evidence.
+- **Ce qu'il bloque :** rien aujourd'hui.
+- **Déclencheur de réouverture :** **avant tout futur consommateur dont la justesse dépend de la présence d'Evidence** (c'est-à-dire un consommateur qui ne peut pas simplement dégrader honnêtement en cas d'absence, contrairement à Review Briefing).
+- **Direction préférée à ce moment-là (non-autorisation d'implémentation) :** un mécanisme additif minimal enregistrant uniquement les issues non-succès (`empty`/`failed`) dans les branches `except`/retour anticipé déjà existantes de `save_evidence_capture` — le succès ne reçoit jamais de marqueur explicite, il reste toujours déduit de la seule existence de la ligne Evidence, pour ne jamais créer une deuxième source de vérité. Ceci est une direction nommée par la revue adversariale, **pas une autorisation d'implémentation** — à réévaluer au moment du déclencheur, pas à construire par anticipation.
+- **Risque trop tôt :** construire une table d'état pour un besoin encore hypothétique — sur-ingénierie spéculative.
+- **Risque trop tard :** un futur consommateur dont la correction dépend réellement de cette distinction hériterait silencieusement de la même ambiguïté que Review Briefing a pu se permettre d'ignorer sans risque.
+- **Ordre relatif :** aucun — attend son déclencheur, pas une place dans la séquence actuelle.
+
+#### 1.3.b — Provenance Evidence au niveau de l'assertion (Assertion-Level Evidence Linking)
+- **Nature :** dette de suivi issue de la revue adversariale d'Evidence Consumer #1 (2026-08-07), distinction centrale de cette revue.
+- **Source :** Revue adversariale Evidence Consumer #1 pré-fusion (2026-08-07) — distinction nommée explicitement par Fred avant même la revue : « cette preuve justifie cette recommandation précise » (niveau assertion) contre « cette preuve appartient à l'analyse dont cette recommandation est issue » (niveau contexte d'analyse).
+- **État réel :** aujourd'hui, `evidence_ledger_entries` se rattache à une analyse (`analyse_id`) — pas à une recommandation ni à une assertion individuelle. Evidence Consumer #1 (Review Briefing) ne peut donc légitimement offrir que du contexte au niveau de l'analyse, jamais une justification directe d'une recommandation précise. Corrigé dans la mission de correction finale : le libellé UI ne doit plus jamais impliquer le contraire (« Voir la preuve » → « Éléments de l'analyse source »).
+- **Pourquoi différé :** aucune fonctionnalité produit aujourd'hui ne revendique une provenance au niveau assertion/recommandation — construire ce lien maintenant n'aurait aucun consommateur réel.
+- **Dépendances réelles :** modèle de données reliant explicitement une recommandation/assertion à son ou ses faits sources (n'existe pas aujourd'hui).
+- **Ce qu'il bloque :** rien aujourd'hui.
+- **Déclencheur de réouverture :** **la première fonctionnalité produit qui revendique une provenance au niveau assertion ou recommandation** (ex. : « cette recommandation s'appuie précisément sur ce fait chiffré »). Jusqu'à ce moment, **toute UX Evidence doit rester au niveau contexte d'analyse**, jamais présentée comme justification directe d'une assertion précise.
+- **Risque trop tôt :** construire un lien recommandation→fait sans consommateur réel ni modèle de confiance éprouvé pour ce niveau de granularité.
+- **Risque trop tard :** une fonctionnalité future pourrait réutiliser par erreur le contexte d'analyse existant comme s'il constituait déjà une preuve au niveau assertion — répéter exactement le défaut nommé par cette revue.
+- **Ordre relatif :** aucun — attend son déclencheur, pas une place dans la séquence actuelle.
+
 ### 1.4 Vérité temporelle (Financial Time Engine)
 - **Nature :** fondation bloquante (kernel Supporting, pas Core — déjà tranché).
 - **Source :** ADR-003 v3, jamais promu ACCEPTED.

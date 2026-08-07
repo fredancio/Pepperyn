@@ -61,6 +61,15 @@ def _qualifier_for_source_types(source_references: list[Any]) -> str:
     professionnel honnête pour l'utilisateur — jamais l'enum brute
     (CANONICAL_FACT, LLM_EXTRACTED, LEGACY_PARSE, ...) exposée telle quelle.
 
+    Correction post-revue adversariale (mission Evidence Consumer #1,
+    correction finale) : aucun qualificatif ne doit employer le mot
+    « vérifié »/« vérifiée ». CANONICAL_FACT signifie « extrait et retenu
+    par l'Evidence Graph », pas « vérifié indépendamment » — l'Evidence
+    Graph reste une extraction LLM, jamais un audit externe. Utiliser
+    « vérifié » ici aurait affirmé une certitude que le pipeline ne
+    possède pas (Mission 10 — epistemic honesty), exactement le défaut
+    identifié par la revue adversariale sur "preuve vérifiée".
+
     Épistémologie (Mission 10) : le qualificatif le plus prudent présent
     l'emporte. LEGACY_PARSE (jamais certifié, financial_truth.py) domine
     tout le reste — un seul montant partiellement estimé rend l'ensemble
@@ -74,9 +83,9 @@ def _qualifier_for_source_types(source_references: list[Any]) -> str:
     if not types:
         return "non sourcé"
     if "LEGACY_PARSE" in types:
-        return "estimation non vérifiée"
+        return "estimation, non structurée"
     if "CANONICAL_FACT" in types:
-        return "preuve vérifiée"
+        return "élément structuré de l'analyse"
     if "LLM_EXTRACTED" in types:
         return "extraction automatique"
     if "DETERMINISTIC_CALCULATION" in types:

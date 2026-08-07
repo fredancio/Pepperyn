@@ -1,6 +1,8 @@
 """
-test_evidence_integrity_service.py — Persistence Integrity Gate
-(backend/services/evidence_integrity_service.py, Mission 14).
+test_evidence_integrity_service.py — Persistence Observability
+(backend/services/evidence_integrity_service.py, Mission 14). Renommé
+"integrity gate" → "observability" suite à la revue adversariale : ce
+module compte et rend visible, il ne garantit rien.
 
 Couvre :
   - comptage correct total / avec preuve / sans preuve ;

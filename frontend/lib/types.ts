@@ -160,7 +160,13 @@ export interface EvidenceImpact {
   currency: string;
   metric_type_label: string;
   confidence: number | null;
-  /** Qualificatif honnête et professionnel (ex. "preuve vérifiée", "estimation non vérifiée"). */
+  /**
+   * Qualificatif honnête et professionnel, jamais formulé comme une
+   * vérification indépendante (ex. "élément structuré de l'analyse",
+   * "estimation, non structurée", "extraction automatique", "calcul
+   * déterministe", "saisie utilisateur", "non sourcé"). Voir
+   * backend/services/evidence_query_service.py::_qualifier_for_source_types.
+   */
   qualifier: string;
 }
 

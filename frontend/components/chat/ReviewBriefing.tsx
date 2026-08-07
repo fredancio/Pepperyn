@@ -154,7 +154,7 @@ export function ReviewBriefing({ entityId, onPrepareQuestion }: ReviewBriefingPr
                           className="text-xs font-medium text-indigo-600 hover:text-indigo-800 underline"
                           data-testid={`evidence-toggle-${item.arc_id}`}
                         >
-                          {evidenceExpanded[item.arc_id] ? 'Masquer la preuve' : 'Voir la preuve'}
+                          {evidenceExpanded[item.arc_id] ? "Masquer les éléments de l'analyse source" : "Éléments de l'analyse source"}
                         </button>
 
                         {evidenceExpanded[item.arc_id] && (

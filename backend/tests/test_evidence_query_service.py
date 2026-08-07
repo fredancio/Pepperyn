@@ -101,16 +101,23 @@ class TestGetEvidenceSupportByAnalysis:
 
         assert ("company_id", "company-1") in sb.eq_calls
 
-    def test_cannot_retrieve_another_organisation_evidence(self):
+    def test_query_applies_company_scoping_and_never_cross_wires_results(self):
         """
-        Le double de test simule le comportement réel : la requête filtre
-        par company_id, donc une Evidence appartenant à une autre company
-        ne doit jamais apparaître dans le résultat projeté — même si le
-        transport mocké ici renvoie tout, le contrat de la fonction est de
-        ne jamais faire confiance à une ligne dont on ne peut pas garantir
-        le scoping. Ce test vérifie qu'au minimum le filtre est bien émis
-        (voir test précédent) ET que la projection ne fait aucune supposition
-        implicite de tenant à partir du contenu de la ligne elle-même.
+        Renommé suite à la revue adversariale (mission Evidence Consumer #1,
+        correction finale) : le nom précédent
+        ("test_cannot_retrieve_another_organisation_evidence") affirmait
+        plus que ce que ce test ne prouve réellement. Ce que ce test vérifie
+        effectivement : (1) la fonction émet bien un filtre company_id
+        explicite (voir test_scopes_query_by_company_id_explicitly) et (2)
+        la projection ne fait aucune correspondance implicite entre une
+        ligne renvoyée et un analysis_id demandé au-delà de son propre
+        analyse_id — pas de dict-keying accidentel qui rattacherait une
+        ligne à la mauvaise analyse. Il ne prouve PAS l'isolation tenant au
+        niveau ligne côté serveur (Postgres/Supabase) : comme le reste de
+        ce dépôt (ex. routers/arcs.py::get_arc), le code fait confiance à
+        ce que le filtre .eq("company_id", ...) soit correctement appliqué
+        par le transport réel — cette confiance n'est pas re-vérifiée en
+        Python ligne par ligne, ici ni ailleurs dans le dépôt.
         """
         sb = _ChainableSupabase({
             "evidence_ledger_entries": [make_evidence_row(analyse_id="analysis-org-b")]
@@ -132,7 +139,7 @@ class TestGetEvidenceSupportByAnalysis:
         assert impact["amount"] == 125000.0
         assert impact["currency"] == "EUR"
         assert impact["metric_type_label"] == "Chiffre d'affaires"
-        assert impact["qualifier"] == "preuve vérifiée"
+        assert impact["qualifier"] == "élément structuré de l'analyse"
         assert result["analysis-1"]["sheets"] == ["Bilan", "P&L"]
 
     def test_missing_evidence_handled_honestly(self):
@@ -223,20 +230,38 @@ class TestQualifierForSourceTypes:
             {"source_type": "CANONICAL_FACT"},
             {"source_type": "LEGACY_PARSE"},
         ])
-        assert qualifier == "estimation non vérifiée"
+        assert qualifier == "estimation, non structurée"
 
     def test_canonical_fact_alone(self):
-        assert _qualifier_for_source_types([{"source_type": "CANONICAL_FACT"}]) == "preuve vérifiée"
+        assert _qualifier_for_source_types([{"source_type": "CANONICAL_FACT"}]) == "élément structuré de l'analyse"
 
     def test_no_source_type_at_all(self):
         assert _qualifier_for_source_types([]) == "non sourcé"
 
     def test_llm_extracted_labeled_as_automatic_not_verified(self):
         """Ne doit jamais sur-vendre la certitude d'une extraction LLM
-        (Mission 10 — epistemic honesty) : jamais qualifiée "preuve vérifiée"."""
+        (Mission 10 — epistemic honesty) : jamais qualifiée comme vérifiée."""
         qualifier = _qualifier_for_source_types([{"source_type": "LLM_EXTRACTED"}])
         assert qualifier == "extraction automatique"
-        assert qualifier != "preuve vérifiée"
+
+    def test_no_qualifier_ever_claims_independent_verification(self):
+        """
+        Correction post-revue adversariale : aucun qualificatif, quel que
+        soit le source_type, ne doit contenir le mot « vérifié »/« vérifiée »
+        — CANONICAL_FACT reste une extraction LLM (Evidence Graph), jamais
+        un audit indépendant. Balaie systématiquement tous les SourceType
+        connus plutôt que d'en tester un seul.
+        """
+        all_source_types = [
+            "CANONICAL_FACT", "LEGACY_PARSE", "LLM_EXTRACTED",
+            "USER_PROVIDED", "DETERMINISTIC_CALCULATION",
+        ]
+        for source_type in all_source_types:
+            qualifier = _qualifier_for_source_types([{"source_type": source_type}])
+            assert "vérifi" not in qualifier, (
+                f"source_type={source_type} produit un qualificatif "
+                f"'{qualifier}' qui implique une vérification indépendante."
+            )
 
 
 class TestProjectEvidenceRow:
