@@ -39,3 +39,6 @@ lu*.tmp
 # Windows / macOS
 Thumbs.db
 Desktop.ini
+
+# Backup externe non versionné intentionnellement (Consolidation 2026-08-07)
+_BACKUP_EXTERNE_HORS_GIT/
