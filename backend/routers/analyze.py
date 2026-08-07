@@ -25,6 +25,7 @@ from services.excel_export import generate_excel_report
 # Le fingerprint est désormais calculé dans l'extracteur (Phase 9, KERNEL-INV-013)
 # et lu depuis decision_kernel.decision_fingerprint. Aucun calcul dans ce fichier.
 from services.decision_kernel_extractor import extract_decision_kernel  # WP5C
+from services.evidence_ledger_service import save_evidence_capture  # T1C-A
 from services.usage_service import UsageService
 from services.data_quality_gate import validate_excel_before_analysis
 from services.anonymization_service import (
@@ -752,6 +753,18 @@ async def _run_analysis_pipeline(
         plan=plan,
         source_data_hash=source_data_hash,
         decision_kernel=_decision_kernel,  # WP5C — None si extraction échouée/CA-2
+    )
+
+    # T1C-A — Evidence Ledger (ADR-001 / ADR-001A), écriture non-bloquante.
+    # Lit _evidence_capture attaché par run_full_pipeline (llm_service.py) sur
+    # result.__dict__ — déjà déanonymisé par deanonymize_recursive() ci-dessus,
+    # car cette attache a eu lieu AVANT ce passage. N'est lu par aucun chemin
+    # de production existant (ADR-001 §8) : son échec ne peut rien casser.
+    save_evidence_capture(
+        analyse_id=analyse_id,
+        company_id=company_id,
+        entity_id=entity_id,
+        evidence_capture=analysis_result.__dict__.get("_evidence_capture"),
     )
 
     # Save memory APRÈS _save_to_db (FK: financial_metrics.analyse_id → analyses.id)

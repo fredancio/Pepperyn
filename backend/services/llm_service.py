@@ -2196,6 +2196,15 @@ async def run_full_pipeline(
     verified_text = _apply_forbidden_terms(verified_text)   # filet de sécurité post-processing
     analysis_dict = _parse_v3_text(verified_text, doc_type, confidence)
 
+    # T1C-A — Evidence capture (ADR-001 / ADR-001A). Pur, additif, écriture
+    # seule : ne modifie ni evidence_graph ni analysis_dict, ne change rien au
+    # comportement existant, aucun nouveau champ demandé au LLM. Doit s'exécuter
+    # ICI — seul point du pipeline où evidence_graph et analysis_dict non filtré
+    # par Pydantic coexistent encore dans le même scope (cf. T1B, fuite
+    # documentée en aval de ce point pour quantified_impact).
+    from services.evidence_capture import capture_evidence
+    _evidence_capture = capture_evidence(evidence_graph, analysis_dict)
+
     # Calcul de coût réel (USD → EUR ×0.92) basé sur le modèle effectivement utilisé
     haiku_tokens_total = 600   # classification + scoring
     cost_usd = (
@@ -2224,6 +2233,12 @@ async def run_full_pipeline(
     # sérialisation ("Expected PlanActionItem but got dict") et un crash du stream.
     extra_only = {k: v for k, v in analysis_dict.items() if k not in AnalysisResult.model_fields}
     result.__dict__.update(extra_only)
+
+    # T1C-A — attache la capture Evidence sous forme de dict pur (pas
+    # d'instance dataclass), pour que deanonymize_recursive()
+    # (routers/analyze.py) la traverse automatiquement, exactement comme
+    # extra_only ci-dessus. N'est lu par aucun chemin de production existant.
+    result.__dict__["_evidence_capture"] = _evidence_capture
 
     return result, total_tokens, round(cost, 4)
 
