@@ -23,9 +23,9 @@
 ### 1.2 Engagement (T2A)
 - **Nature :** fondation bloquante.
 - **Source :** ADR-002 (ACCEPTED), branche `feature/t2a-engagement-persistence`.
-- **État réel :** approuvé, partiellement implémenté (code écrit, testé sur branche, jamais fusionné dans `main`).
-- **Pourquoi différé :** fusion de branche entière écartée (127 fichiers dont 119 sans rapport, voir `T1_T2_RECOVERY_PLAN.md`) — reconstruction ciblée requise, pas encore exécutée.
-- **Dépendances réelles :** aucune bloquante restante — plan de récupération déjà écrit et vérifié.
+- **État réel (mise à jour 2026-08-07) :** T1C-A et T1C-B mergés dans `main` (`3b1b21a`, `0741a03`), ordre de récupération T1 avant T2 désormais exécuté. T2A en cours de reconstruction chirurgicale (pas de fusion de branche entière) — voir Mission Engagement du même jour pour le détail du tri KEEP/ADAPT/REJECT.
+- **Pourquoi différé :** fusion de branche entière écartée (127 fichiers dont 119 sans rapport, voir `T1_T2_RECOVERY_PLAN.md`) — reconstruction ciblée requise.
+- **Dépendances réelles :** aucune bloquante restante — plan de récupération déjà écrit et vérifié, T1 désormais mergé.
 - **Ce qu'il bloque :** rattachement `DecisionArc.engagement_id`, premier incrément FTE, Enterprise Familiarization.
 - **Déclencheur de réouverture :** deuxième GO explicite de Fred, après validation de `CANONICAL_DOCUMENT_SET_PROPOSAL.md`.
 - **Risque trop tôt :** aucun identifié — le chemin est déjà vérifié à faible risque technique.
@@ -35,14 +35,23 @@
 ### 1.3 Evidence Ledger (T1)
 - **Nature :** fondation bloquante.
 - **Source :** ADR-001/001A, branches `feature/t1c-a-evidence-capture`, `feature/t1c-b-atomic-financial-facts`.
-- **État réel :** approuvé, partiellement implémenté, validé sur projet Supabase de test dédié, jamais fusionné dans `main`.
-- **Pourquoi différé :** ordre de récupération T1 avant T2 déjà fixé mais non exécuté ; dépend de la clôture de l'arbitrage documentaire.
-- **Dépendances réelles :** aucune bloquante technique restante.
+- **État réel (mise à jour 2026-08-07) :** T1C-A mergé (`3b1b21a`, revue adversariale verdict A) et T1C-B mergé (`0741a03`, revue adversariale verdict A). Table `evidence_ledger_entries` réelle sur `main`, strictement additive, non encore lue par aucun chemin de production (ADR-001 §8 toujours vrai). Baseline post-merge : 988 passed / 8 échecs préexistants / 1 skip.
+- **Pourquoi différé :** n'est plus différé pour la capture elle-même — reste différé pour son premier consommateur réel.
+- **Dépendances réelles :** aucune bloquante technique restante pour un premier consommateur.
 - **Ce qu'il bloque :** consommateur pilote (citation en lecture seule dans Review Briefing ou Decision Memory), premier incrément FTE.
-- **Déclencheur de réouverture :** immédiatement après Engagement (T2A), avec consommateur réel livré dans le même incrément — règle déjà posée dans `FOUNDATION_RECOVERY_REVIEW.md` pour éviter le sort de `financial_truth.py`.
+- **Déclencheur de réouverture (consommateur) :** immédiatement après Engagement (T2A), avec consommateur réel livré dans le même incrément — règle déjà posée dans `FOUNDATION_RECOVERY_REVIEW.md` pour éviter le sort de `financial_truth.py`.
 - **Risque trop tôt :** aucun.
 - **Risque trop tard :** `financial_truth.py` reste un précédent vivant de code dormant — répéter l'erreur devient plus probable plus on attend.
-- **Ordre relatif :** 2e.
+- **Ordre relatif :** 2e — désormais exécuté.
+
+**Dette de suivi issue de la revue adversariale T1C-A/T1C-B (2026-08-07), à ne pas perdre avant tout futur consommateur :**
+1. `fact_id` (T1C-B, `build_fact_id()`) est une **empreinte de contenu**, pas une identité métier — confirmé empiriquement (deux périodes distinctes avec un libellé générique identique produisent le même `fact_id`). **Aucune implémentation future ne doit utiliser l'égalité de `fact_id` comme preuve que deux faits financiers, à travers analyses/périodes/organisations/Engagements, sont le même fait métier** — ni l'inégalité comme preuve du contraire. Propriétaire probable : futur incrément Evidence / Exception & Reconciliation.
+2. `currency` retombe silencieusement sur `"EUR"` en l'absence de détection LLM, sans état `UNKNOWN` ni tag de source (contrairement au pattern déjà existant `GrossMarginSource` dans le même fichier). Propriétaire probable : futur incrément Evidence / Data ingestion.
+3. Désaccord entre `amount` structuré (LLM) et montant legacy parsé depuis le texte narratif n'est jamais détecté ni loggé. Propriétaire probable : Exception & Reconciliation.
+4. `fact_ids` dupliqués dans une même référence produisent des `SourceReference` dupliquées (inoffensif, non testé). Propriétaire probable : futur incrément Evidence.
+5. L'Evidence Graph n'a pas de champ période structuré — cause racine du point 1. Propriétaire probable : futur incrément Evidence (changement de prompt/schéma).
+6. La persistance non-bloquante de l'Evidence Ledger doit être revue (retry durable ou blocage explicite) **avant** qu'un consommateur réel ne dépende de sa fiabilité — acceptable tant qu'ADR-001 §8 reste vrai (aucun chemin de production ne la lit). Propriétaire probable : Trust Platform / futur incrément Evidence.
+7. La propriété conceptuelle de l'Evidence Ledger reste l'Engagement (ADR-001A) ; l'ownership transitoire via `entity_id` doit être réattribuée explicitement dès qu'Engagement existe physiquement — **pas automatiquement lors de T2A** sauf si l'exécution de T2A le requiert explicitement.
 
 ### 1.4 Vérité temporelle (Financial Time Engine)
 - **Nature :** fondation bloquante (kernel Supporting, pas Core — déjà tranché).
