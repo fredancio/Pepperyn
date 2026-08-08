@@ -26,6 +26,30 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
+def _validate_entity_scope(
+    entity_id: Optional[str],
+    entity_company_id: Optional[str],
+    expected_company_id: str,
+) -> Optional[str]:
+    """
+    Validation pure (aucun I/O) : n'accepte un entity_id que si son
+    company_id correspond exactement à expected_company_id.
+
+    Extrait de _resolve_current_engagement_id (mission Decision Memory
+    Integrity Repair, 2026-08-08) pour servir de SOURCE UNIQUE de validation
+    tenant, partagée par la résolution d'entity_id ET d'engagement_id sur
+    DecisionArc — Phase 8 : "Avoid two DB lookups that could theoretically
+    disagree." Aucune requête DB ici ; entity_id et entity_company_id
+    proviennent déjà de la même ligne `analyses` lue par l'appelant.
+
+    Returns:
+        entity_id si valide, sinon None (jamais une exception).
+    """
+    if not entity_id or entity_company_id != expected_company_id:
+        return None
+    return entity_id
+
+
 def _resolve_current_engagement_id(
     supabase,
     entity_id: Optional[str],
@@ -55,7 +79,8 @@ def _resolve_current_engagement_id(
     Engagement dont l'Entity résolue n'appartient pas à expected_company_id
     — même logique que evidence_query_service.py (filtre explicite même si
     la donnée amont est déjà supposée cohérente par construction ailleurs
-    dans le dépôt).
+    dans le dépôt). Réutilise désormais _validate_entity_scope (même
+    validation que celle appliquée à entity_id — Phase 8, source unique).
 
     Args:
         supabase: client Supabase (service role).
@@ -77,8 +102,10 @@ def _resolve_current_engagement_id(
         résolution est un enrichissement optionnel, elle ne doit jamais
         bloquer la création ou le backfill de l'arc.
     """
-    if not entity_id or entity_company_id != expected_company_id:
+    validated_entity_id = _validate_entity_scope(entity_id, entity_company_id, expected_company_id)
+    if not validated_entity_id:
         return None
+    entity_id = validated_entity_id
     try:
         result = (
             supabase.from_("engagements")
@@ -186,11 +213,18 @@ class ArcService:
                 f"Arc non créé."
             )
 
-        # Résolution Engagement (mission DecisionArc ↔ Engagement) — best
-        # effort, jamais bloquant. N'émet une requête `engagements` que si
-        # l'analyse d'origine porte un entity_id (voir docstring de
-        # _resolve_current_engagement_id pour pourquoi c'est analyses.entity_id,
-        # pas decision_arcs.entity_id, qui sert de source ici).
+        # Résolution Entity + Engagement (mission DecisionArc ↔ Engagement,
+        # étendue par Decision Memory Integrity Repair — défaut A) — best
+        # effort, jamais bloquant, SOURCE UNIQUE partagée
+        # (_validate_entity_scope) pour que entity_id et engagement_id ne
+        # puissent jamais diverger (Phase 8 : "avoid two DB lookups that
+        # could theoretically disagree"). N'émet une requête `engagements`
+        # que si l'analyse d'origine porte un entity_id valide.
+        resolved_entity_id = _validate_entity_scope(
+            entity_id=data.get("entity_id"),
+            entity_company_id=data.get("company_id"),
+            expected_company_id=company_id,
+        )
         engagement_id = _resolve_current_engagement_id(
             supabase=supabase,
             entity_id=data.get("entity_id"),
@@ -211,7 +245,16 @@ class ArcService:
             "status": "intention",
         }
         if entity_id:
+            # Valeur explicitement fournie par l'appelant — priorité
+            # inchangée (comportement historique préservé, même si aucun
+            # appelant réel ne l'utilise aujourd'hui).
             row["entity_id"] = entity_id
+        elif resolved_entity_id:
+            # RÉPARATION (défaut A, Decision Memory Integrity Repair) :
+            # résolu depuis analyses.entity_id quand l'appelant ne fournit
+            # rien — c'est le cas de l'unique appelant réel
+            # (routers/decision_memory.py::submit_decision_feedback).
+            row["entity_id"] = resolved_entity_id
         if engagement_id:
             row["engagement_id"] = engagement_id
 
@@ -1198,36 +1241,45 @@ class ArcService:
 
     def backfill_decision_arc_engagements(self) -> dict:
         """
-        Backfill idempotent de engagement_id pour les DecisionArc existants
-        (mission DecisionArc ↔ Engagement, Mission 8).
+        Backfill idempotent de entity_id ET engagement_id pour les
+        DecisionArc existants (mission DecisionArc ↔ Engagement, Mission 8 ;
+        étendu à entity_id par Decision Memory Integrity Repair, défaut A,
+        2026-08-08).
 
-        Résolution déterministe UNIQUEMENT : pour chaque arc sans
-        engagement_id, lit origin_analysis_id → analyses.(entity_id,
-        company_id), puis résout via _resolve_current_engagement_id (même
-        fonction que le chemin de création — voir sa docstring pour le
-        choix de analyses.entity_id plutôt que decision_arcs.entity_id).
-        Si non résolvable : reste NULL, jamais deviné (Mission 8 —
-        "Prefer NULL / unresolved over fabricated ownership").
+        Résolution déterministe UNIQUEMENT, à partir d'une SOURCE UNIQUE par
+        arc : lit origin_analysis_id → analyses.(entity_id, company_id) une
+        seule fois, puis dérive entity_id (_validate_entity_scope) et
+        engagement_id (_resolve_current_engagement_id) depuis cette même
+        lecture — jamais deux résolutions indépendantes qui pourraient
+        théoriquement diverger (Phase 8 de la mission de réparation). Si non
+        résolvable : reste NULL, jamais deviné (Mission 8 — "Prefer NULL /
+        unresolved over fabricated ownership").
 
-        Idempotent : un arc portant déjà un engagement_id n'est jamais relu
-        ni recalculé (même discipline que backfill_engagements pour
-        Engagement — note de revue n°2 de T2A, réappliquée ici).
+        Idempotent, champ par champ : un arc portant déjà entity_id n'a
+        jamais son entity_id relu ni recalculé ; un arc portant déjà
+        engagement_id n'a jamais son engagement_id relu ni recalculé — même
+        discipline que backfill_engagements pour Engagement (note de revue
+        n°2 de T2A, réappliquée ici). Un arc qui a DÉJÀ engagement_id mais
+        PAS ENCORE entity_id (ex. backfillé par une exécution antérieure à
+        cette réparation) reçoit désormais son entity_id sans jamais
+        toucher à son engagement_id existant — c'est précisément le défaut A
+        que cette extension corrige.
 
         Traitement arc par arc, sans transaction globale — une erreur
-        isolée n'annule pas le travail déjà fait sur les autres (même
-        principe que backfill_engagements).
+        isolée n'annule pas le travail déjà fait sur les autres.
 
         Note opérationnelle : les arcs CLOSED ne peuvent recevoir
-        engagement_id que grâce au carve-out étroit ajouté par
-        v21_decision_arc_engagement.sql à arc_immutability_guard() — sans
-        lui, cette UPDATE échouerait pour tout arc déjà CLOSED (voir
-        commentaire de la migration). Ce comportement ne peut être vérifié
-        que contre une vraie instance Postgres (le trigger n'existe pas
-        dans les doubles de test Python) — voir réserve nommée dans le
+        entity_id/engagement_id que grâce aux carve-outs étroits ajoutés à
+        arc_immutability_guard() par v21/v22 — sans eux, ces UPDATE
+        échoueraient pour tout arc déjà CLOSED. Ce comportement ne peut être
+        vérifié que contre une vraie instance Postgres (le trigger n'existe
+        pas dans les doubles de test Python) — voir réserve nommée dans le
         rapport final de la mission.
 
         Returns:
             {"resolved": int, "unresolved": int, "already_present": int, "errors": int}
+            "resolved" compte tout arc ayant reçu AU MOINS un des deux
+            champs lors de cet appel (pas nécessairement les deux).
         """
         supabase = self._get_supabase()
         if not supabase:
@@ -1238,7 +1290,7 @@ class ArcService:
         try:
             arcs_result = (
                 supabase.from_("decision_arcs")
-                .select("id, origin_analysis_id, company_id, engagement_id")
+                .select("id, origin_analysis_id, company_id, entity_id, engagement_id")
                 .execute()
             )
         except Exception as e:
@@ -1246,7 +1298,10 @@ class ArcService:
             return stats
 
         for arc in arcs_result.data or []:
-            if arc.get("engagement_id"):
+            needs_entity = not arc.get("entity_id")
+            needs_engagement = not arc.get("engagement_id")
+
+            if not needs_entity and not needs_engagement:
                 stats["already_present"] += 1
                 continue
 
@@ -1264,19 +1319,32 @@ class ArcService:
                 )
                 adata = analysis_result.data or {}
 
-                engagement_id = _resolve_current_engagement_id(
-                    supabase=supabase,
+                resolved_entity_id = _validate_entity_scope(
                     entity_id=adata.get("entity_id"),
                     entity_company_id=adata.get("company_id"),
                     expected_company_id=arc_company_id,
                 )
+                engagement_id = None
+                if needs_engagement:
+                    engagement_id = _resolve_current_engagement_id(
+                        supabase=supabase,
+                        entity_id=adata.get("entity_id"),
+                        entity_company_id=adata.get("company_id"),
+                        expected_company_id=arc_company_id,
+                    )
 
-                if not engagement_id:
+                update_payload: dict = {}
+                if needs_entity and resolved_entity_id:
+                    update_payload["entity_id"] = resolved_entity_id
+                if needs_engagement and engagement_id:
+                    update_payload["engagement_id"] = engagement_id
+
+                if not update_payload:
                     stats["unresolved"] += 1
                     continue
 
                 supabase.from_("decision_arcs").update(
-                    {"engagement_id": engagement_id}
+                    update_payload
                 ).eq("id", arc_id).execute()
                 stats["resolved"] += 1
 
