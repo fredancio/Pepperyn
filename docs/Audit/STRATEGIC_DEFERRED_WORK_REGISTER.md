@@ -124,8 +124,9 @@
 - **État réel :** `decision_arcs.origin_analysis_id` est déclaré `NOT NULL REFERENCES analyses(id) ON DELETE SET NULL` — combinaison contradictoire en Postgres. Un utilisateur ayant au moins un DecisionArc suivi ne peut aujourd'hui pas vider son historique d'analyses (l'opération échoue par violation de contrainte, transaction annulée).
 - **Dépendances réelles :** aucune — correction indépendante.
 - **Ce qu'il bloque :** `DELETE /api/analyses/history` pour tout utilisateur avec au moins un DecisionArc suivi.
-- **Réparation :** branche `implementation/decision-memory-integrity-repair-2026-08-08`, `origin_analysis_id` devient nullable (nouvelle migration additive, v16 non réécrite), avec vérification explicite de l'interaction entre l'action FK `ON DELETE SET NULL` et `arc_immutability_guard()` (une UPDATE déclenchée par Postgres sur un arc CLOSED doit rester possible pour ce champ précis).
-- **Ordre relatif :** en réparation immédiate, avec 1.6.a, avant tout chantier suivant.
+- **Réparation :** branche `implementation/decision-memory-integrity-repair-2026-08-08`, commit `91c7d65` — `origin_analysis_id` devient nullable (nouvelle migration additive `v22`, v16 non réécrite), avec un second carve-out dans `arc_immutability_guard()` séparé de celui de `v21`, permettant précisément la transition `origin_analysis_id : valeur → NULL` sur un arc CLOSED.
+- **RÉSERVE DE VALIDATION NON LEVÉE (2026-08-08) :** l'interaction FK/trigger est établie par relecture du SQL + réplique littérale du prédicat testée en Python pur, mais **pas exécutée contre un vrai moteur Postgres**. Tentative de validation sur le projet Supabase « Pepperyn Integration Test » (`ejixkplrgobgwqnhidwt`, INACTIVE) via `Restore project` — **refusée explicitement par Fred** (aucune action sur infrastructure réelle sans autorisation). Alternative locale (Postgres/Docker) indisponible dans le bac à sable (pas de droits root). **Cette migration ne doit pas être fusionnée vers `main` sans validation manuelle préalable contre un projet Postgres réel** — même gate que `v16`/`v18`/`v19`/`v20`/`v21`.
+- **Ordre relatif :** réparation applicative/tests terminée ; bloquée avant fusion par la réserve de validation ci-dessus, pas par du travail restant.
 
 ### 1.4 Vérité temporelle (Financial Time Engine)
 - **Nature :** fondation bloquante (kernel Supporting, pas Core — déjà tranché).
