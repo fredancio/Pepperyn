@@ -101,6 +101,32 @@
 - **Risque trop tard :** une fonctionnalité future pourrait réutiliser par erreur le contexte d'analyse existant comme s'il constituait déjà une preuve au niveau assertion — répéter exactement le défaut nommé par cette revue.
 - **Ordre relatif :** aucun — attend son déclencheur, pas une place dans la séquence actuelle.
 
+### 1.6 DecisionArc ↔ Engagement
+- **Nature :** fondation bloquante — **rattachement relationnel close (mise à jour 2026-08-08).**
+- **Source :** revue adversariale dédiée (2026-08-07/08), branche `implementation/decisionarc-engagement-2026-08-07`, mergée `8db6070`.
+- **État réel :** `decision_arcs.engagement_id` (nullable, additif) résolu de façon strictement déterministe (`origin_analysis_id → analyses.entity_id → engagements.entity_id`). DecisionArc reste son propre agrégat racine ; Engagement est une ancre de continuité, pas une composition (`ON DELETE SET NULL`). Backfill idempotent disponible. Baseline post-merge : 1076 passed / 8 échecs préexistants / 1 skip.
+- **Pourquoi différé :** n'est plus différé pour le rattachement lui-même — fondation livrée. Les deux défauts ci-dessous sont des chantiers de réparation identifiés PAR cette revue, préexistants, non introduits par elle.
+- **Ce qu'il bloque :** plus rien directement pour l'attachement lui-même.
+- **Ordre relatif :** exécuté juste après Evidence Consumer #1, avant FTE.
+
+#### 1.6.a — `decision_arcs.entity_id` jamais peuplé par le chemin de création réel
+- **Nature :** défaut d'intégrité préexistant, découvert (pas introduit) par la revue adversariale DecisionArc ↔ Engagement — **EN RÉPARATION ACTIVE**, pas un chantier différé en attente de déclencheur.
+- **Source :** revue adversariale DecisionArc ↔ Engagement (2026-08-08), confirmée empiriquement (`build_portfolio_briefing()` exécuté contre un arc façonné exactement comme le chemin de création réel produit → zéro carte).
+- **État réel :** `create_arc_from_feedback()` accepte `entity_id` en paramètre optionnel, mais son unique appelant réel (`routers/decision_memory.py::submit_decision_feedback`) ne le fournit jamais. Conséquence probable en production : Portfolio Intelligence vide, filtre `entity_id` du Briefing de revue sans effet.
+- **Dépendances réelles :** aucune — correction indépendante du reste de la séquence.
+- **Ce qu'il bloque :** Portfolio Intelligence, filtrage du Briefing de revue par client — potentiellement déjà cassés en production aujourd'hui.
+- **Réparation :** branche `implementation/decision-memory-integrity-repair-2026-08-08`, source de résolution = `origin_analysis_id → analyses.entity_id` (même mécanisme que la résolution `engagement_id`, pas un second mécanisme indépendant).
+- **Ordre relatif :** en réparation immédiate, avant tout chantier suivant.
+
+#### 1.6.b — `origin_analysis_id` : contradiction `NOT NULL` + `ON DELETE SET NULL`
+- **Nature :** défaut d'intégrité préexistant (v16), découvert par la revue adversariale DecisionArc ↔ Engagement — **EN RÉPARATION ACTIVE**.
+- **Source :** revue adversariale DecisionArc ↔ Engagement (2026-08-08), tracée jusqu'à la route réelle `DELETE /api/analyses/history`.
+- **État réel :** `decision_arcs.origin_analysis_id` est déclaré `NOT NULL REFERENCES analyses(id) ON DELETE SET NULL` — combinaison contradictoire en Postgres. Un utilisateur ayant au moins un DecisionArc suivi ne peut aujourd'hui pas vider son historique d'analyses (l'opération échoue par violation de contrainte, transaction annulée).
+- **Dépendances réelles :** aucune — correction indépendante.
+- **Ce qu'il bloque :** `DELETE /api/analyses/history` pour tout utilisateur avec au moins un DecisionArc suivi.
+- **Réparation :** branche `implementation/decision-memory-integrity-repair-2026-08-08`, `origin_analysis_id` devient nullable (nouvelle migration additive, v16 non réécrite), avec vérification explicite de l'interaction entre l'action FK `ON DELETE SET NULL` et `arc_immutability_guard()` (une UPDATE déclenchée par Postgres sur un arc CLOSED doit rester possible pour ce champ précis).
+- **Ordre relatif :** en réparation immédiate, avec 1.6.a, avant tout chantier suivant.
+
 ### 1.4 Vérité temporelle (Financial Time Engine)
 - **Nature :** fondation bloquante (kernel Supporting, pas Core — déjà tranché).
 - **Source :** ADR-003 v3, jamais promu ACCEPTED.
