@@ -26,6 +26,7 @@ from services.excel_export import generate_excel_report
 # et lu depuis decision_kernel.decision_fingerprint. Aucun calcul dans ce fichier.
 from services.decision_kernel_extractor import extract_decision_kernel  # WP5C
 from services.evidence_ledger_service import save_evidence_capture  # T1C-A
+from services.fte_minimal import resolve_newest_observed_period_end  # FTE v0
 from services.usage_service import UsageService
 from services.data_quality_gate import validate_excel_before_analysis
 from services.anonymization_service import (
@@ -760,11 +761,23 @@ async def _run_analysis_pipeline(
     # result.__dict__ — déjà déanonymisé par deanonymize_recursive() ci-dessus,
     # car cette attache a eu lieu AVANT ce passage. N'est lu par aucun chemin
     # de production existant (ADR-001 §8) : son échec ne peut rien casser.
+    #
+    # FTE v0 (migration v23) — observed_period_end dérivé de
+    # parsed_data["temporal_context"], déjà calculé par FileConnector.fetch()
+    # (ligne ~464 de ce même fichier) au tout début de cette requête ; aucun
+    # nouveau plumbing entre file_parser et ce point n'est nécessaire, la
+    # variable est déjà dans la portée de cette fonction. Purement
+    # déterministe (services/fte_minimal.py), zéro appel LLM, jamais
+    # QuantifiedImpact.temporal_role.
+    _observed_period_end = resolve_newest_observed_period_end(
+        parsed_data.get("temporal_context")
+    )
     save_evidence_capture(
         analyse_id=analyse_id,
         company_id=company_id,
         entity_id=entity_id,
         evidence_capture=analysis_result.__dict__.get("_evidence_capture"),
+        observed_period_end=_observed_period_end,
     )
 
     # Save memory APRÈS _save_to_db (FK: financial_metrics.analyse_id → analyses.id)

@@ -15,10 +15,19 @@ ADR-001A : entity_id est le rattachement TRANSITOIRE (voir migration v18) —
 nullable, en attendant que l'Engagement (T2) existe physiquement. Aucune
 décision de réattribution n'est prise ici ; ce module se contente d'écrire
 ce qu'on lui donne.
+
+FTE v0 (migration v23, docs/Architecture/FTE_MINIMAL_IMPLEMENTATION_CONTRACT.md) :
+observed_period_end est écrit UNIQUEMENT quand une ligne est de toute façon
+insérée (le early-return sur evidence_capture vide n'est pas modifié) —
+cette valeur est une métadonnée de l'enregistrement Evidence, pas une
+entité indépendante ; sans Evidence, pas de ligne, donc pas de période
+persistée non plus. Ce module ne calcule jamais cette valeur lui-même
+(voir services/fte_minimal.py, appelé par l'appelant de cette fonction).
 """
 from __future__ import annotations
 
 import logging
+from datetime import date
 from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -29,6 +38,7 @@ def save_evidence_capture(
     company_id: str,
     entity_id: Optional[str],
     evidence_capture: Optional[dict[str, Any]],
+    observed_period_end: Optional[date] = None,
 ) -> None:
     """
     Persiste une capture Evidence. Non-bloquant par construction : toute
@@ -48,6 +58,12 @@ def save_evidence_capture(
         entity_id:  rattachement transitoire (ADR-001A) — peut être None.
         evidence_capture: dict retourné par
                           services.evidence_capture.capture_evidence().
+        observed_period_end: FTE v0 (migration v23) — borne de fin de la
+                    période la plus récente déterministiquement observée
+                    dans le dataset de cette capture, ou None si aucune
+                    n'est résoluble. Calculé par l'appelant via
+                    services.fte_minimal.resolve_newest_observed_period_end()
+                    — jamais recalculé ici, jamais fabriqué si absent.
     """
     if not evidence_capture:
         return
@@ -81,6 +97,8 @@ def save_evidence_capture(
         }
         if entity_id is not None:
             insert_payload["entity_id"] = entity_id
+        if observed_period_end is not None:
+            insert_payload["observed_period_end"] = observed_period_end.isoformat()
 
         logger.debug("[EVIDENCE LEDGER] Insert capture analyse=%s", analyse_id)
         supabase.from_("evidence_ledger_entries").insert(insert_payload).execute()
