@@ -99,6 +99,15 @@ CREATE INDEX IF NOT EXISTS idx_decision_arcs_engagement_id
 -- valeur déjà résolue), et UNIQUEMENT si aucun autre champ ne change dans
 -- la même instruction. Toute autre tentative de modification sur un arc
 -- CLOSED reste refusée exactement comme avant (comportement v16 inchangé).
+--
+-- Correction post-revue adversariale (mission DecisionArc ↔ Engagement,
+-- verdict B — MERGE AFTER SMALL CORRECTIONS) : la première version de ce
+-- carve-out omettait company_id, created_at et updated_at de la liste des
+-- champs verrouillés. Aucun appelant réel n'exploite cette omission
+-- aujourd'hui (le seul appelant, le backfill, envoie une charge utile à
+-- une seule clé), mais elle contredisait l'intention déclarée ci-dessus
+-- ("aucun autre champ ne change"). Corrigée en verrouillant explicitement
+-- ces trois champs, sans élargir le carve-out par ailleurs.
 
 CREATE OR REPLACE FUNCTION public.arc_immutability_guard()
 RETURNS TRIGGER
@@ -111,6 +120,7 @@ BEGIN
     IF OLD.engagement_id IS NULL
        AND NEW.engagement_id IS NOT NULL
        AND NEW.status               IS NOT DISTINCT FROM OLD.status
+       AND NEW.company_id           IS NOT DISTINCT FROM OLD.company_id
        AND NEW.entity_id            IS NOT DISTINCT FROM OLD.entity_id
        AND NEW.origin_analysis_id   IS NOT DISTINCT FROM OLD.origin_analysis_id
        AND NEW.decision_fingerprint IS NOT DISTINCT FROM OLD.decision_fingerprint
@@ -130,11 +140,16 @@ BEGIN
        AND NEW.closed_at            IS NOT DISTINCT FROM OLD.closed_at
        AND NEW.abandoned_at         IS NOT DISTINCT FROM OLD.abandoned_at
        AND NEW.abandoned_reason     IS NOT DISTINCT FROM OLD.abandoned_reason
+       AND NEW.created_at           IS NOT DISTINCT FROM OLD.created_at
+       AND NEW.updated_at           IS NOT DISTINCT FROM OLD.updated_at
     THEN
       -- Rattachement relationnel pur : ne compte jamais comme une
-      -- modification de contenu décisionnel — updated_at n'est PAS touché
-      -- (reste égal à OLD.updated_at, puisque l'UPDATE appelant ne fixe
-      -- que engagement_id).
+      -- modification de contenu décisionnel. updated_at et created_at sont
+      -- désormais explicitement verrouillés ci-dessus (correction post-revue
+      -- adversariale) plutôt que simplement supposés inchangés par
+      -- construction de l'appelant — l'UPDATE appelant ne fixe en pratique
+      -- que engagement_id, donc NEW.updated_at == OLD.updated_at de toute
+      -- façon, mais le trigger ne dépend plus de cette hypothèse implicite.
       RETURN NEW;
     END IF;
 
