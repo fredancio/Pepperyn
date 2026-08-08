@@ -110,7 +110,7 @@
 - **Ordre relatif :** exécuté juste après Evidence Consumer #1, avant FTE.
 
 #### 1.6.a — `decision_arcs.entity_id` jamais peuplé par le chemin de création réel
-- **Nature :** défaut d'intégrité préexistant, découvert (pas introduit) par la revue adversariale DecisionArc ↔ Engagement — **EN RÉPARATION ACTIVE**, pas un chantier différé en attente de déclencheur.
+- **Nature :** défaut d'intégrité préexistant, découvert (pas introduit) par la revue adversariale DecisionArc ↔ Engagement — **RÉPARÉ ET TESTÉ, EN ATTENTE DE FUSION** (branche non fusionnée, décision de fusion réservée à Fred).
 - **Source :** revue adversariale DecisionArc ↔ Engagement (2026-08-08), confirmée empiriquement (`build_portfolio_briefing()` exécuté contre un arc façonné exactement comme le chemin de création réel produit → zéro carte).
 - **État réel :** `create_arc_from_feedback()` accepte `entity_id` en paramètre optionnel, mais son unique appelant réel (`routers/decision_memory.py::submit_decision_feedback`) ne le fournit jamais. Conséquence probable en production : Portfolio Intelligence vide, filtre `entity_id` du Briefing de revue sans effet.
 - **Dépendances réelles :** aucune — correction indépendante du reste de la séquence.
@@ -119,14 +119,14 @@
 - **Ordre relatif :** en réparation immédiate, avant tout chantier suivant.
 
 #### 1.6.b — `origin_analysis_id` : contradiction `NOT NULL` + `ON DELETE SET NULL`
-- **Nature :** défaut d'intégrité préexistant (v16), découvert par la revue adversariale DecisionArc ↔ Engagement — **EN RÉPARATION ACTIVE**.
+- **Nature :** défaut d'intégrité préexistant (v16), découvert par la revue adversariale DecisionArc ↔ Engagement — **RÉPARÉ ET VALIDÉ EMPIRIQUEMENT, EN ATTENTE DE FUSION**.
 - **Source :** revue adversariale DecisionArc ↔ Engagement (2026-08-08), tracée jusqu'à la route réelle `DELETE /api/analyses/history`.
 - **État réel :** `decision_arcs.origin_analysis_id` est déclaré `NOT NULL REFERENCES analyses(id) ON DELETE SET NULL` — combinaison contradictoire en Postgres. Un utilisateur ayant au moins un DecisionArc suivi ne peut aujourd'hui pas vider son historique d'analyses (l'opération échoue par violation de contrainte, transaction annulée).
 - **Dépendances réelles :** aucune — correction indépendante.
 - **Ce qu'il bloque :** `DELETE /api/analyses/history` pour tout utilisateur avec au moins un DecisionArc suivi.
 - **Réparation :** branche `implementation/decision-memory-integrity-repair-2026-08-08`, commit `91c7d65` — `origin_analysis_id` devient nullable (nouvelle migration additive `v22`, v16 non réécrite), avec un second carve-out dans `arc_immutability_guard()` séparé de celui de `v21`, permettant précisément la transition `origin_analysis_id : valeur → NULL` sur un arc CLOSED.
-- **RÉSERVE DE VALIDATION NON LEVÉE (2026-08-08) :** l'interaction FK/trigger est établie par relecture du SQL + réplique littérale du prédicat testée en Python pur, mais **pas exécutée contre un vrai moteur Postgres**. Tentative de validation sur le projet Supabase « Pepperyn Integration Test » (`ejixkplrgobgwqnhidwt`, INACTIVE) via `Restore project` — **refusée explicitement par Fred** (aucune action sur infrastructure réelle sans autorisation). Alternative locale (Postgres/Docker) indisponible dans le bac à sable (pas de droits root). **Cette migration ne doit pas être fusionnée vers `main` sans validation manuelle préalable contre un projet Postgres réel** — même gate que `v16`/`v18`/`v19`/`v20`/`v21`.
-- **Ordre relatif :** réparation applicative/tests terminée ; bloquée avant fusion par la réserve de validation ci-dessus, pas par du travail restant.
+- **RÉSERVE DE VALIDATION — LEVÉE (2026-08-08) :** validée empiriquement contre un vrai moteur Postgres, avec autorisation explicite et ponctuelle de Fred, sur le projet Supabase dédié « Pepperyn Integration Test » (`ejixkplrgobgwqnhidwt`, jamais le projet de production), migrations `v16` → `v21` → `v22` appliquées une par une avec vérification après chacune. Deux scénarios validés : (1) suppression d'une Analysis référencée par un DecisionArc CLOSED → suppression réussie, arc survivant, `origin_analysis_id = NULL`, tous les autres champs strictement inchangés (y compris `updated_at`) ; (2) tentative de modification d'un champ protégé non lié sur le même arc CLOSED → refusée par le trigger. Idempotence du DDL vérifiée. Données de test isolées, nettoyées ensuite ; données préexistantes du projet vérifiées identiques avant/après. Détail complet dans `backend/migrations/v22_decision_arc_origin_analysis_nullable.sql`.
+- **Ordre relatif :** réparation, tests et validation Postgres réelle terminés. Prêt pour revue de code et décision de fusion — aucune fusion n'a été effectuée par cette validation.
 
 ### 1.4 Vérité temporelle (Financial Time Engine)
 - **Nature :** fondation bloquante (kernel Supporting, pas Core — déjà tranché).

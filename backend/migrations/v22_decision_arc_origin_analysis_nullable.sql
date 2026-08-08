@@ -74,28 +74,37 @@
 --   fixent toujours origin_analysis_id depuis une Analysis vivante à
 --   l'INSERT (jamais NULL à la création).
 --
--- RÉSERVE DE VALIDATION (non levée, 2026-08-08) — l'interaction FK/trigger
---   ci-dessus (Phase 15) est établie par relecture du SQL et de la
---   sémantique documentée de Postgres (une action référentielle FK est
---   exécutée comme une UPDATE/DELETE sur la table référençante et déclenche
---   ses propres triggers), plus une réplique littérale du prédicat testée
---   en Python pur (voir tests/test_decision_memory_integrity_repair.py,
---   TestOriginAnalysisImmutabilityCarveOut) — mais N'A PAS été exécutée
---   contre un vrai moteur Postgres dans cette session :
---     1. Tentative d'utiliser l'outil Restore project sur le projet
---        Supabase dédié « Pepperyn Integration Test »
---        (ejixkplrgobgwqnhidwt, INACTIVE) — action explicitement refusée
---        par Fred (aucune action sur infrastructure Supabase réelle sans
---        autorisation explicite, quel que soit le projet visé).
---     2. Alternative locale (Postgres/Docker dans le bac à sable) —
---        indisponible : aucun paquet postgresql/docker installé, pas de
---        droits root, sudo désactivé dans cet environnement.
---   Cette réserve reste donc explicitement NON LEVÉE. Avant toute fusion
---   vers main et tout déploiement, cette migration doit être appliquée et
---   validée manuellement contre un projet Postgres réel (le projet
---   Integration Test existant, ou équivalent) — même gate que v16/v18/
---   v19/v20/v21 avant eux. Ne pas fusionner sur la seule base des tests
---   Python de ce dépôt.
+-- RÉSERVE DE VALIDATION — LEVÉE (2026-08-08) — l'interaction FK/trigger
+--   ci-dessus (Phase 15) a d'abord été établie par relecture du SQL et de
+--   la sémantique documentée de Postgres, plus une réplique littérale du
+--   prédicat testée en Python pur (tests/test_decision_memory_integrity_repair.py,
+--   TestOriginAnalysisImmutabilityCarveOut) — puis VALIDÉE EMPIRIQUEMENT
+--   contre un vrai moteur Postgres, avec autorisation explicite de Fred,
+--   sur le projet Supabase dédié « Pepperyn Integration Test »
+--   (ejixkplrgobgwqnhidwt — jamais le projet de production « Pepperyn »),
+--   migration par migration (v16 → v21 → v22, chacune vérifiée avant la
+--   suivante) :
+--     1. `origin_analysis_id` confirmé nullable (`is_nullable = YES`),
+--        les deux carve-outs confirmés présents dans `arc_immutability_guard()`.
+--     2. Scénario positif : un DecisionArc CLOSED avec `origin_analysis_id`
+--        renseigné → suppression de l'Analysis référencée → suppression
+--        réussie SANS erreur → arc survivant avec `origin_analysis_id = NULL`
+--        et STRICTEMENT tous les autres champs identiques au snapshot
+--        pré-suppression (y compris `updated_at`, non touché car l'action
+--        FK ne modifie que la colonne nullifiée).
+--     3. Scénario négatif : tentative de modification d'un champ protégé
+--        non lié (`decision_notes`, puis `execution_notes`) sur le même
+--        arc CLOSED → refusée par le trigger (`[ARC] Arc ... est CLOSED
+--        et immuable`), aucune donnée modifiée.
+--     4. Idempotence : le DDL (ALTER COLUMN DROP NOT NULL + CREATE OR
+--        REPLACE FUNCTION) a été ré-exécuté sans erreur.
+--     5. Toutes les données de test étaient isolées (préfixe `v22test`,
+--        UUID dédiés) et nettoyées après coup ; les données préexistantes
+--        du projet (2 companies, 4 entities, 1 analysis, 4 engagements)
+--        sont restées identiques avant/après, vérifié par comptage exact.
+--   Cette réserve est donc levée : la migration est prête pour fusion vers
+--   main, sous réserve de la revue de code habituelle (aucune fusion
+--   automatique décidée par cette validation).
 --
 -- Rollback : ALTER TABLE decision_arcs ALTER COLUMN origin_analysis_id SET NOT NULL;
 --            (échouera si des lignes orphelines existent déjà — attendu,

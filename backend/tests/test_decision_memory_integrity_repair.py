@@ -27,8 +27,16 @@ Réserve nommée (comme pour v21) : l'interaction entre l'action FK
 carve-out dédié à origin_analysis_id) ne peut être vérifiée que contre une
 vraie instance Postgres — aucun trigger SQL n'est exécuté par les doubles de
 test Python utilisés ici. La logique Python (résolution, backfill) est
-intégralement testée ; seul le trigger SQL lui-même reste à vérifier en
-environnement réel avant déploiement.
+intégralement testée ; le trigger SQL lui-même (TestOriginAnalysisImmutabilityCarveOut
+ci-dessous n'en teste qu'une réplique Python littérale) a ENSUITE été validé
+empiriquement contre un vrai moteur Postgres, avec autorisation explicite et
+ponctuelle de Fred, sur le projet Supabase dédié « Pepperyn Integration Test »
+(jamais production) : suppression d'une Analysis référencée par un DecisionArc
+CLOSED → succès, arc survivant, origin_analysis_id à NULL, tous les autres
+champs inchangés ; tentative de modification d'un champ protégé non lié sur
+le même arc CLOSED → refusée. Détail complet dans
+backend/migrations/v22_decision_arc_origin_analysis_nullable.sql et
+docs/Audit/STRATEGIC_DEFERRED_WORK_REGISTER.md §1.6.b.
 """
 from __future__ import annotations
 
