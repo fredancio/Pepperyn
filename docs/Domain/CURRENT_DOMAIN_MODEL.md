@@ -52,6 +52,18 @@ Seuls deux objets du code présentent une racine d'agrégat au sens strict (iden
 - **Services associés :** `arc_service.py` (`ArcService`).
 - **Persistance :** tables `decision_arcs`, `arc_analysis_links` (migration `v16_decision_arcs.sql`, confirmé Phase 1B).
 - **Cycle de vie CONFIRMÉ (code) :** `intention → decision → execution → consequences_linked → learning_proposed → closed` avec branche `abandoned` à tout moment. Invariants explicites dans le docstring de `arc_service.py` : « `decision_text IS NOT NULL` requis pour `CLOSED` », « un refus de lien ne ferme pas l'arc — il reste en EXECUTION ».
+- **INVARIANT DE CONTINUITÉ MÉMORIELLE (Decision Memory Integrity Repair, migration `v22`, 2026-08-08) :** `DecisionArc` est une mémoire décisionnelle professionnelle durable, indépendante de l'analyse ponctuelle qui l'a fait naître. `origin_analysis_id` (nullable depuis `v22`) n'exprime qu'une **provenance historique**, jamais une propriété ni une condition d'existence — test canonique : une recommandation de mars, acceptée en avril, exécutée en juin, dont l'effet est observé en septembre et l'apprentissage capturé en décembre ; si l'utilisateur supprime ensuite l'analyse de mars, la trajectoire décisionnelle ne doit **pas** disparaître. En conséquence : la suppression ORDINAIRE d'une `Analysis` (nettoyage d'historique, `DELETE /api/analyses/history`) met `origin_analysis_id` à `NULL` (`ON DELETE SET NULL`) sans jamais détruire le `DecisionArc` ; seule une érasure complète de la `Company` (RGPD, suppression de compte) détruit le `DecisionArc`, via `company_id ON DELETE CASCADE` (`v16`, inchangé) — ces deux formes de suppression restent explicitement distinctes. `entity_id` et `engagement_id` (résolus depuis `analyses.entity_id`/`engagements.entity_id` à la création, jamais depuis `origin_analysis_id` directement) ne sont pas affectés par la nullification de `origin_analysis_id` : seule la provenance disparaît, la mémoire (statut, décision, exécution, apprentissage, rattachement organisationnel) reste intacte.
+
+  **Quatre formes de suppression, quatre effets distincts sur `DecisionArc`** (Phase 11, Decision Memory Integrity Repair) :
+
+  | Suppression | Route / mécanisme | Effet sur `DecisionArc` | Statut |
+  |---|---|---|---|
+  | (A) Analysis ordinaire | `DELETE /api/analyses/history` (`routers/analyze.py:245`) | Survit ; `origin_analysis_id → NULL` (`ON DELETE SET NULL`, `v22`) | Réparé par cette mission |
+  | (B) Entity | Aucune route DELETE identifiée à ce jour (section D : « suppression INCONNU ») | Si/quand implémentée : `entity_id → NULL` (`ON DELETE SET NULL`, déjà correct depuis `v16`, aucune migration requise) | Schéma déjà correct, non exercé en pratique |
+  | (C) Engagement | Pas de route DELETE dédiée identifiée ; suppression via cascade Entity uniquement (`v19` : `engagements.entity_id … ON DELETE CASCADE`) | Survit ; `engagement_id → NULL` (`ON DELETE SET NULL`, `v21`) | Déjà correct (DecisionArc↔Engagement, 2026-08-07) |
+  | (D) Company (RGPD, suppression de compte) | `DELETE /api/auth/account` (`routers/auth.py:287`) | Détruit — `company_id ON DELETE CASCADE` (`v16`, inchangé) | Intentionnellement non affaibli par cette mission |
+
+  Principe commun : seule (D) — l'érasure complète du compte — détruit la mémoire décisionnelle. Toute suppression d'un objet *en amont* de `DecisionArc` (Analysis, Entity, Engagement) ne fait que délier une référence de provenance ou de rattachement, jamais la mémoire elle-même.
 
 ### Agrégat 2 — DecisionKernel
 - **Responsabilité :** structure racine canonique (« dk-1 ») regroupant les jugements dimensionnels dérivés d'une analyse.
@@ -76,7 +88,7 @@ Seuls deux objets du code présentent une racine d'agrégat au sens strict (iden
 | **Entity** | Filiale ou client suivi dans un workspace | `entities.id` | `workspace_id → workspaces`, `company_id → companies`, contrainte « un seul `is_primary=TRUE` par workspace », champ `relation_type` = `"filiale"` \| `"client"` \| `NULL` | Créée au trigger (entité primaire) ou via `POST /api/entities` (`routers/entities.py:102`, plan PRO+ requis) ; suppression **INCONNU** (pas de route DELETE trouvée) |
 | **Analysis** (`analyses`) | Résultat persisté d'une analyse d'un fichier | `analyses.id` (UUID) | `company_id → companies` (INFÉRENCE, non relu ligne à ligne dans cette phase), référencée par `decision_feedback.report_id` | Créée par `POST /api/analyze` (`routers/analyze.py:865`, insert) ; suppression en masse via `DELETE /analyses/history` (`routers/analyze.py:244`) |
 | **DecisionFeedback** | Retour utilisateur sur une recommandation précise | `decision_feedback.id` | `company_id`, `user_id → profiles` (nullable), `report_id → analyses.id` | Créée via `POST /api/decision-feedback` (`routers/decision_memory.py:74`) ; statuts `planned/done/partially_done/not_done/rejected/no_longer_relevant/unsure` (v17) |
-| **DecisionArc** | Voir agrégat 1 | `decision_arcs.id` | `origin_analysis_id → analyses.id`, `company_id`, `entity_id` (optionnel) | Voir section C |
+| **DecisionArc** | Voir agrégat 1 | `decision_arcs.id` | `origin_analysis_id → analyses.id` (optionnel depuis `v22`, `ON DELETE SET NULL`), `company_id` (`ON DELETE CASCADE`), `entity_id` (optionnel), `engagement_id → engagements.id` (optionnel, `ON DELETE SET NULL`, `v21`) | Voir section C |
 | **InvitedMember** | Membre invité dans une company | `invited_members.?` (structure exacte **INCONNU**, table confirmée par nom uniquement) | `company_id` (INFÉRENCE) | **INCONNU** en détail — pas de route dédiée identifiée dans les 10 routers lus |
 | **ContactRequest** | Demande de contact commerciale | `contact_requests.?` | Aucune (formulaire public) | Créée via `POST /api/contact` (`routers/contact.py:110`), consultée via `GET /api/contact/requests` |
 | **UsageLimits / UsageLogs** | Compteur d'usage par company/plan | `usage_limits`, `usage_logs` | `company_id` (INFÉRENCE) | Gérées par `usage_service.py`, alimentées à chaque analyse (`routers/analyze.py:873`, insert dans `usage_logs`) |
@@ -204,7 +216,7 @@ Règles Python (pas des prompts), avec leur source :
 
 **Fortement couplés :**
 - `AnalysisResult` ↔ `ExecutiveDecisionModel` ↔ les 3 renderers — couplage total et assumé (source unique, section H).
-- `DecisionArc` ↔ `analyses` — un arc n'existe pas sans une `origin_analysis_id` (clé étrangère `NOT NULL`).
+- `DecisionArc` ↔ `analyses` — couplage de **provenance seulement** depuis `v22` (`origin_analysis_id` nullable, `ON DELETE SET NULL`) : un arc peut survivre à la suppression de l'analyse qui l'a créé (voir invariant de continuité mémorielle, section C, Agrégat 1). Avant `v22`, la FK était `NOT NULL`, en contradiction non résolue avec sa propre action `ON DELETE SET NULL` — corrigé par migration additive, `v16` non modifiée.
 - `Entity` ↔ `Workspace` ↔ `Company` — hiérarchie stricte à 3 niveaux, toutes les FK sont `NOT NULL` avec `ON DELETE CASCADE`.
 - `export_pptx_service.py` / `test_rule_003_renderer_responsibility.py` / `test_edx_002.py` — couplage code/tests fortement documenté par convention `RULE NNN`, mais désynchronisé en pratique (Phase 1B : dérive du nombre de slides entre fichiers de test).
 

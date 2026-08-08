@@ -48,8 +48,17 @@ class DecisionArc(BaseModel):
     # jamais fabriqué. Voir services/arc_service.py::_resolve_current_engagement_id.
     engagement_id: Optional[UUID] = None
 
-    # Origine (IMMUTABLE)
-    origin_analysis_id: UUID
+    # Origine (IMMUTABLE tant que non-NULL — voir garde ci-dessous)
+    # Nullable depuis v22 (Decision Memory Integrity Repair, 2026-08-08) :
+    # provenance historique, PAS une identité ni une propriété. La
+    # suppression ordinaire de l'Analysis d'origine (nettoyage d'historique,
+    # DELETE /api/analyses/history) met ce champ à NULL sans jamais détruire
+    # le DecisionArc — la mémoire décisionnelle professionnelle survit à la
+    # disparition de son point de départ. Seule une érasure complète de la
+    # company (GDPR) détruit le DecisionArc, via company_id ON DELETE
+    # CASCADE (v16, inchangé). Voir CURRENT_DOMAIN_MODEL.md, section
+    # DecisionArc, invariant de continuité mémorielle.
+    origin_analysis_id: Optional[UUID] = None
     decision_fingerprint: str
     recommendation_id: str
     decision_source: Literal["plan_action_haute", "plan_action"]

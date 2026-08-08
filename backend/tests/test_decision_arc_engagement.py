@@ -386,9 +386,18 @@ class TestBackfillDecisionArcEngagements:
 
     def test_already_resolved_engagement_never_recalculated(self):
         """
-        Un arc portant déjà engagement_id ne doit jamais être relu, même si
-        l'Engagement résolu aujourd'hui serait différent (même discipline
-        que backfill_engagements pour T2A — note de revue n°2).
+        Un arc portant déjà engagement_id ne doit jamais voir CE CHAMP relu
+        ni recalculé, même si l'Engagement résolu aujourd'hui serait
+        différent (même discipline que backfill_engagements pour T2A — note
+        de revue n°2).
+
+        Mise à jour (Decision Memory Integrity Repair, 2026-08-08, défaut A)
+        : la fixture ci-dessous ne porte pas encore d'entity_id — un arc
+        dans cet état (engagement_id déjà résolu par une exécution
+        antérieure, entity_id jamais renseigné) doit désormais recevoir son
+        entity_id lors de cette réparation, SANS jamais toucher à
+        engagement_id — c'est exactement ce que ce test vérifie maintenant :
+        le champ déjà résolu reste intact, le champ manquant est complété.
         """
         fake = FakeSupabase({
             "decision_arcs": [
@@ -402,8 +411,12 @@ class TestBackfillDecisionArcEngagements:
 
         stats = svc.backfill_decision_arc_engagements()
 
-        assert stats == {"resolved": 0, "unresolved": 0, "already_present": 1, "errors": 0}
+        assert stats == {"resolved": 1, "unresolved": 0, "already_present": 0, "errors": 0}
+        # Invariant central inchangé : engagement_id déjà présent -> jamais
+        # relu, jamais recalculé, jamais réécrit avec "engagement-DIFFERENT".
         assert fake.store["decision_arcs"][0]["engagement_id"] == "engagement-ALREADY-SET"
+        # Nouveau : entity_id, absent, est désormais complété.
+        assert fake.store["decision_arcs"][0]["entity_id"] == "entity-1"
 
     def test_isolated_error_does_not_abort_other_arcs(self):
         fake = FakeSupabase({
