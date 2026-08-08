@@ -132,8 +132,22 @@ def resolve_previous_observed_period_end(
     entity_id: Optional[str],
 ) -> Optional[date]:
     """
-    Reads the most recently persisted observed_period_end for this
-    Engagement scope, excluding NULLs, ordered by created_at descending.
+    Reads the most advanced (greatest) persisted observed_period_end for
+    this Engagement scope, excluding NULLs, ordered by observed_period_end
+    descending — i.e. by BUSINESS TIME, not by insertion order.
+
+    Corrected 2026-08-08 per the independent adversarial pre-merge review:
+    this previously ordered by created_at DESC (KNOWLEDGE TIME — when
+    Pepperyn learned the row), which is the wrong clock for this function's
+    responsibility. This function's job is to find the most advanced prior
+    known business-time boundary, not the most recently ingested row — the
+    two diverge whenever analyses are uploaded out of business-time order
+    (e.g. an older-period file uploaded after a newer-period file was
+    already captured). Selecting by created_at in that scenario could
+    silently regress the "previous known period" baseline to a less-
+    advanced business-time fact, undermining exactly the OUT_OF_ORDER
+    detection classify_period_relationship() exists to provide. See
+    tests/test_fte_minimal.py::TestPreviousPeriodSelectionIsBusinessTime.
 
     Scoping (contract §6, mission Phase 12): entity_id today, because
     Entity:Engagement is transitionally 1:1 (STRATEGIC_DEFERRED_WORK_
@@ -158,7 +172,7 @@ def resolve_previous_observed_period_end(
             .select("observed_period_end")
             .eq("company_id", company_id)
             .not_.is_("observed_period_end", "null")
-            .order("created_at", desc=True)
+            .order("observed_period_end", desc=True)
             .limit(1)
         )
         if entity_id:
@@ -203,13 +217,22 @@ def classify_period_relationship(
     monthly (mission Phase 9 — "do not infer monthly cadence merely
     because dates look monthly").
     """
-    if previous_period_end is None:
-        # No prior observed period at all — nothing to compare against.
-        # The current information is, by definition, new.
-        return "NEW"
     if current is None:
         # Current dataset's period could not be determined deterministically.
+        # This must be checked BEFORE the previous-period check: an unknown
+        # current period stays UNKNOWN regardless of what history holds —
+        # it must never be reported as "NEW" merely because no prior period
+        # happens to exist either (Article III: absence is never upgraded
+        # into a positive claim). Corrected 2026-08-08 per the independent
+        # adversarial pre-merge review, which found this exact case reached
+        # via real-file Golden Case Phidani replay (unresolved YYYY-MM
+        # headers → current=None, no prior history → previous=None → the
+        # old check order returned the fabricated "NEW").
         return "UNKNOWN"
+    if previous_period_end is None:
+        # Current period IS known, but nothing to compare against yet —
+        # the current information is, by definition, new.
+        return "NEW"
     if current.end == previous_period_end:
         return "DUPLICATE"
     if current.end < previous_period_end:

@@ -45,6 +45,48 @@ def make_supabase_mock(rows=None):
     return mock
 
 
+class _OrderAwareSupabaseMock:
+    """A plain chainable MagicMock (make_supabase_mock above) cannot prove
+    WHICH column governs row selection, because it never actually sorts —
+    it just returns whatever `rows` list it was handed. This fixture
+    simulates real Postgres `ORDER BY <column> DESC LIMIT 1` behavior by
+    recording the column name passed to .order() and sorting the fixture
+    rows by that column before returning — letting
+    TestPreviousPeriodSelectionIsBusinessTime fail loudly if the
+    implementation ever regresses to ordering by the wrong clock again."""
+
+    def __init__(self, rows):
+        self._rows = rows
+        self._order_col = None
+
+    def from_(self, *_a, **_k):
+        return self
+
+    def select(self, *_a, **_k):
+        return self
+
+    def eq(self, *_a, **_k):
+        return self
+
+    def limit(self, *_a, **_k):
+        return self
+
+    @property
+    def not_(self):
+        return self
+
+    def is_(self, *_a, **_k):
+        return self
+
+    def order(self, column, desc=True):
+        self._order_col = column
+        return self
+
+    def execute(self):
+        rows = sorted(self._rows, key=lambda r: r[self._order_col], reverse=True)
+        return MagicMock(data=rows)
+
+
 # Real-world monthly header sets, resolvable end-to-end by temporal_normalizer
 # (named-month French labels — the format temporal_normalizer's month regex
 # already supports; see TestPhidaniRealFile below for the exact-real-file
@@ -98,6 +140,29 @@ class TestUnknownStaysUnknown:
 
     def test_current_none_yields_unknown_relationship(self):
         assert fte.classify_period_relationship(None, date(2019, 8, 31)) == "UNKNOWN"
+
+    def test_current_none_and_previous_none_yields_unknown_not_new(self):
+        """Corrected 2026-08-08 per the independent adversarial pre-merge
+        review: classify_period_relationship((current=None, previous=None))
+        must never return 'NEW'. The prior implementation checked
+        'previous_period_end is None' before 'current is None', so a
+        completely unresolvable current period with no prior history
+        fabricated a positive 'NEW' claim instead of the honest 'UNKNOWN'.
+        This exact scenario is reached by the real Phidani.xlsx replay
+        (YYYY-MM headers unresolved by temporal_normalizer, no history
+        yet persisted) — see TestPhidaniRealFile below, which now asserts
+        this same invariant against the real file end-to-end."""
+        assert fte.classify_period_relationship(None, None) == "UNKNOWN"
+
+    def test_known_current_and_no_prior_is_new_not_unknown(self):
+        """The companion positive case: UNKNOWN must not overreach either
+        — a genuinely resolvable current period with no prior history is
+        correctly 'NEW' (mirrors TestComparisonStates::
+        test_no_prior_observed_period_is_new; kept here too so the three
+        required precedence cases from the correction mission read as one
+        group)."""
+        current = fte.CurrentPeriodBounds(start=date(2019, 9, 1), end=date(2019, 9, 30))
+        assert fte.classify_period_relationship(current, None) == "NEW"
 
     def test_absent_period_never_silently_becomes_current(self):
         """An empty/unparseable dataset must never be reported as 'this is
@@ -377,6 +442,44 @@ class TestPersistence:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# 14b. Previous-period selection uses BUSINESS TIME, never KNOWLEDGE TIME
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TestPreviousPeriodSelectionIsBusinessTime:
+    """Corrected 2026-08-08 per the independent adversarial pre-merge
+    review: resolve_previous_observed_period_end previously ordered
+    candidate rows by created_at DESC (Knowledge Time — when Pepperyn
+    learned the row) instead of observed_period_end DESC (Business Time —
+    the period the row actually describes). The two diverge whenever
+    analyses are ingested out of business-time order; ordering by the
+    wrong clock can silently select a LESS advanced business-time
+    baseline than one that genuinely exists earlier in the ledger,
+    undermining OUT_OF_ORDER detection across analyses."""
+
+    def test_row_with_greater_business_time_wins_even_if_ingested_earlier(self):
+        # Row A: ingested (created_at) AFTER Row B, but describes an
+        # OLDER business period.
+        row_a = {"observed_period_end": "2019-08-31", "created_at": "2026-08-08T12:00:00Z"}
+        # Row B: ingested BEFORE Row A, but describes a NEWER business
+        # period — this is the one the function must select.
+        row_b = {"observed_period_end": "2019-09-30", "created_at": "2026-08-01T09:00:00Z"}
+        sb = _OrderAwareSupabaseMock([row_a, row_b])
+        result = fte.resolve_previous_observed_period_end(sb, "c1", "e1")
+        assert result == date(2019, 9, 30)  # Row B wins — business time, not knowledge time
+
+    def test_query_orders_by_observed_period_end_not_created_at(self):
+        """Direct proof of the query construction itself, independent of
+        the sorting simulation above."""
+        sb = make_supabase_mock(rows=[{"observed_period_end": "2019-09-30"}])
+        fte.resolve_previous_observed_period_end(sb, "c1", "e1")
+        order_call = sb.order.call_args
+        assert order_call is not None
+        assert order_call.args[0] == "observed_period_end"
+        assert order_call.kwargs.get("desc") is True
+        assert order_call.args[0] != "created_at"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # 16/21. temporal_role is never canonical FTE input
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -620,3 +723,38 @@ class TestPhidaniRealFile:
         ctx_new = _ctx(headers_new)
         assert ctx_new["detected_current_year"] == 2019
         assert "2019-09" in ctx_new["columns_by_role"].get("CURRENT_ACTUAL", [])
+
+    @pytest.mark.skipif(
+        not os.path.exists(_REAL_FILE), reason="Phidani.xlsx not present in this checkout"
+    )
+    def test_real_file_yields_unknown_relationship_never_a_false_new(self):
+        """Regression test added 2026-08-08 per the independent adversarial
+        pre-merge review + FTE V0 FINAL CORRECTIONS mission (Mission 3).
+
+        The prior test in this class stopped at proving
+        resolve_current_period_bounds() honestly returns None against the
+        real file's unresolved 'YYYY-MM' headers — it never carried that
+        honest None through to classify_period_relationship(), which is
+        exactly where the (None, None) → 'NEW' precedence bug hid. This
+        test closes that gap end-to-end against the REAL file (no
+        synthetic substitute — Golden Case discipline): with no prior
+        observed_period_end persisted yet (a fresh Engagement), the real
+        Phidani headers must yield UNKNOWN, never the fabricated 'NEW'.
+
+        This must keep failing loudly if classify_period_relationship ever
+        regresses to checking previous_period_end before current."""
+        headers_new = self._real_headers("2019-09")
+        ctx_new = _ctx(headers_new)
+        current = fte.resolve_current_period_bounds(ctx_new)
+        assert current is None  # honest gap, unchanged — see test above
+
+        previous_period_end = None  # no prior history for this Engagement
+        relationship = fte.classify_period_relationship(current, previous_period_end)
+        assert relationship == "UNKNOWN", (
+            "Real Phidani.xlsx replay with no prior history must classify as "
+            "UNKNOWN (nothing is actually known), never as 'NEW' (a positive "
+            "claim the data does not support). The result is allowed to "
+            "remain UNKNOWN until temporal_normalizer's YYYY-MM gap is "
+            "repaired in a separate, narrowly-scoped mission — see "
+            "STRATEGIC_DEFERRED_WORK_REGISTER.md."
+        )
