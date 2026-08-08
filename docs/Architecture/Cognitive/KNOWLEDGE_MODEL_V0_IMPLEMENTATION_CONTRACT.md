@@ -2,153 +2,146 @@
 
 **Status:** PROPOSED, read-only architecture mission — not approved, not implemented.
 **Branch:** `architecture/knowledge-model-v0-2026-08-08` (not merged).
-**Relationship to prior work:** operationalizes `KnowledgeModel` as already named (not invented) in `docs/Architecture/Cognitive/COGNITIVE_CAPABILITY_MAP.md` (faculté 2, "Comprendre l'organisation" — property of Engagement, states *Fact/Confirmed Context/Candidate Context/Unknown/Contradiction*, each carrying origin/date/confidence/scope), and supplies the missing mechanism that document already flagged without designing: *"Promotion Candidate Context → Confirmed Context... LLM interdit pour la décision finale — validation humaine ou règle déterministe explicite requise."* Applies the same shrink-to-minimal discipline that produced FTE v0.
+**Revision history:** v1 (commit `d522476`) proposed Engagement ownership, a persisted CANDIDATE status, an opaque `scope_key`, and dual timestamps. **v2 (this revision) — Final Contract Adversarial Arbitration** — corrects all four after direct challenge: true ownership is Entity, not Engagement; CANDIDATE is never persisted (KnowledgeModel only ever stores confirmed facts); `scope_key` is removed in favor of the explicit `entity_id` FK; `confirmed_at`/`created_at` collapse into one field. These are corrections, not a reopening of the overall direction, which the arbitration mission explicitly reaffirmed as accepted.
+**Relationship to prior work:** operationalizes `KnowledgeModel` as already named (not invented) in `docs/Architecture/Cognitive/COGNITIVE_CAPABILITY_MAP.md` (faculté 2, "Comprendre l'organisation" — states *Fact/Confirmed Context/Candidate Context/Unknown/Contradiction*, each carrying origin/date/confidence/scope), and supplies the missing mechanism that document already flagged without designing: *"Promotion Candidate Context → Confirmed Context... LLM interdit pour la décision finale — validation humaine ou règle déterministe explicite requise."*
 
 ---
 
 ## 1. Professional responsibility
 
-Learn a durable, reusable interpretive convention about a specific organisation; recall it before ever asking again; detect when new evidence no longer fits it; and revise without erasing what was true before. Not "remember everything" — remember exactly what a competent controller would carry forward from one engagement to the next.
+Learn a durable, reusable interpretive convention about a specific organisation; recall it before ever asking again; detect when new evidence no longer fits it; and revise without erasing what was true before.
 
 ## 2. Boundary vs. Evidence / DecisionArc / chat
 
-- **Not Evidence.** Evidence = "what did we observe" (immutable source fact). Knowledge = "how should we interpret this organisation." Knowledge may be *supported by* Evidence; it is never a second Evidence Ledger (§33 below).
-- **Not chat history.** A transcript is not knowledge. The domain event `HumanConfirmedInterpretation` — not the sentence that produced it — is what may justify a Knowledge row. Raw conversation is never persisted here to fake memory.
-- **Not LLM memory.** An LLM hypothesis is, at best, a Candidate. It cannot self-promote to Confirmed — inherited, unweakened, from the rule already fixed in `COGNITIVE_CAPABILITY_MAP.md` (§1 above).
-- **Not DecisionArc.** DecisionArc tracks commitments and their trajectory. Knowledge tracks interpretive convention. A decision may later produce a learning that becomes Knowledge, but that is a separate, future act, not this contract's concern.
+- **Not Evidence.** Evidence = what was observed. Knowledge = how to interpret it. Knowledge may be *supported by* Evidence; never a second Evidence Ledger.
+- **Not chat history.** The domain event `HumanConfirmedInterpretation` — not the sentence that produced it — is what may justify a Knowledge row. Raw conversation is never persisted here.
+- **Not LLM memory.** An LLM hypothesis never reaches this table at all in v0 (§3) — it is ephemeral input to Epistemic Dialogue, not a KnowledgeModel object.
+- **Not DecisionArc.** DecisionArc tracks commitments. Knowledge tracks interpretive convention.
 
-## 3. Epistemic lifecycle
+## 3. Epistemic lifecycle — corrected: KnowledgeModel v0 has no persisted CANDIDATE status
 
-Two row-bearing statuses only: **CANDIDATE** and **CONFIRMED**. *Unknown* is not persisted — per Constitution Article III, absence stays absence; the lack of a row already means Unknown, and inventing a row to say "we don't know" would itself be a fabricated presence. **Contradiction is not a third status** — this repository's own `ContradictionRecord` framing already settled this: *"objet orthogonal, pas un 5e statut."* A contradiction is represented as a new CANDIDATE row that references the CONFIRMED row it conflicts with (§16).
+**Arbitration finding (Q3):** the v1 contract's CANDIDATE status created an unresolvable tension with immutability (confirming K1 would require either an illegal UPDATE or an awkward two-row dance for every single confirmation). Re-examining the professional question directly: does KnowledgeModel itself need to *store* an unconfirmed hypothesis, or can the hypothesis remain entirely inside Epistemic Dialogue's own ephemeral `ClarificationNeed` (already declared, in the v1 contract's own §2 boundary and §25 of the FRU/Epistemic Dialogue mission, to belong to Epistemic Dialogue, not here) until the moment it is actually confirmed?
 
-## 4. Ownership
+**Resolution: it can, and should.** KnowledgeModel v0 stores exactly one row-bearing state: **CONFIRMED.** A candidate interpretation is never written to this table. It is proposed by FRU, held and reasoned about by Epistemic Dialogue, and only reaches KnowledgeModel at the instant a human (or, conditionally, a deterministic rule — §12) actually confirms it — at which point exactly one row is inserted, fully formed, already CONFIRMED. *Unknown* is still never persisted (absence of a row means Unknown, Article III). Contradiction is still not a status (§16) — it is a live comparison Epistemic Dialogue performs between new evidence and RECALL's result; it never requires KnowledgeModel to hold an intermediate "disputed" row.
 
-Owner: **Engagement** — unchanged from existing doctrine, by the same reasoning already applied to `BusinessHistory` ("même logique... pas un objet flottant global"). Ownership (who is accountable for the row's lifecycle) and scope of applicability (how narrowly it is trusted to apply) are different questions — see §5.
+This closes the immutability tension directly: there is no CANDIDATE→CONFIRMED transition inside this table to represent, because nothing is ever written before confirmation.
 
-## 5. Scope — minimum model for v0
+## 4. Ownership — corrected: Entity, not Engagement
 
-**Engagement only.** No first-class `ReportingContext`/`SourceContext`/`TemplateContext` object for v0 — confirmed via direct repository search that no such concept has ever been proposed here; inventing one now, before a real multi-sheet/multi-template case exists in a Golden Case, would be speculative. Phidani itself is a single-sheet workbook — the two-sheet-divergent-convention scenario named in the mission brief does not arise in the actual first Golden Case.
+**Arbitration finding (Q1):** the v1 contract said "owner = Engagement" while proposing `engagement_id ON DELETE SET NULL` — an owner whose own deletion doesn't delete what it owns is not actually the owner. Tested against the professional scenario the arbitration posed directly: Engagement A learns "this company displays expenses positively"; Engagement A ends; Engagement B begins with the same company. A competent controller returning to a client after a gap does not relearn how that client's own reports are built — that knowledge belongs to the *organisation itself*, not to the professional mandate that happened to be active when it was learned.
 
-**Not a dead end:** the scope is stored as an opaque `scope_key` (v0 value: `engagement_id` alone), not hard-coded as "engagement_id column, full stop." A future template-level discriminator can compose into the same key (e.g. `engagement_id + template_fingerprint`) without a schema rewrite — satisfies the complexity test (§45 of the mission brief): removing a first-class `ReportingContext` object leaves the v0 loop fully intact; keeping the key opaque-but-composable avoids blocking its later reintroduction.
+**Resolution:**
+- **TRUE OWNER = Entity.** `entity_id`, `NOT NULL`, `ON DELETE CASCADE` — mirrors `engagements.entity_id`'s own precedent exactly (a true owning FK cascades; a transitional attachment doesn't). Verified: `entities.company_id ON DELETE CASCADE NOT NULL` (`v6_workspaces_entities.sql:75`) — so Entity deletion already cascades from Company deletion, and Knowledge cascades from Entity deletion, giving a full, transitive GDPR-safe chain with **no separate `company_id` column needed** (same reasoning `engagements` itself already relies on for omitting it).
+- **ACQUISITION CONTEXT = Engagement.** `engagement_id`, nullable, `ON DELETE SET NULL` — records *which* professional mandate was active when the knowledge was learned, for audit/display only. Its deletion must never delete the knowledge itself.
+- **APPLICABILITY SCOPE v0 = Entity** (§5) — for v0, scope and ownership now coincide, which is what makes `scope_key` (v1's abstraction) unnecessary (§5).
 
-## 6. Temporal validity
+## 5. Scope — corrected: SCOPE_KEY = REMOVE
 
-Two clocks, never conflated (same discipline as FTE's Business Time vs. Knowledge Time):
-- `confirmed_at` — **knowledge time**: when Pepperyn learned this. Explicit, set only on promotion to CONFIRMED, never a bare `created_at` default (mirrors `observed_period_end`'s "explicit, never a DB default" rule).
-- Business-time applicability (`valid_from_business_time`/`valid_to_business_time`, e.g. "this convention held from July onward") is **deferred**, not designed now — the v0 test contract (§ Test Contract) does not require retroactive dating, and adding a nullable date column later is additive, not destructive. Explicitly not a dead end.
+**Arbitration finding (Q2):** v1 described scope as "Engagement-only" in prose but as an "opaque composable `scope_key`" conceptually, while the actual field list never included `scope_key` at all — the contract told two stories. Re-derived from §4's ownership correction: since the true applicability scope for v0 is now Entity (the same object that owns the row), **no separate scope abstraction is needed at all** — `entity_id` *is* the scope. Complexity test: does the four-upload loop need anything beyond the explicit `entity_id` column to resolve correctly? No. **SCOPE_KEY: REMOVE.** A future template/sheet-level discriminator (FRU matrix case 11) remains a legitimate future need, but is deferred to when a real multi-template Golden Case exists — Phidani is single-sheet and does not require it now, and adding a second discriminating column later (e.g. a nullable `template_fingerprint`) is additive, not a schema rewrite, so nothing is foreclosed.
 
-## 7. Provenance / authority
+## 6. Temporal validity — corrected: one timestamp, not two
 
-`provenance` is a small controlled enum: `HUMAN_CONFIRMATION` (only value actually exercised by v0) plus `DETERMINISTIC_RULE` (reserved, admitted by the enum, not implemented — see §12). Never `LLM_HYPOTHESIS` as a promotion-capable provenance — an LLM hypothesis is input to REASON, never a provenance value a CONFIRMED row can carry. `confirmed_by` (actor identity, nullable, required when provenance = HUMAN_CONFIRMATION) is included now — cheap, and forward-compatible with future multi-user authority (§37 of the brief); role-based enforcement is explicitly deferred.
+**Arbitration finding (Q9, complexity attack):** with CANDIDATE removed (§3), row creation and confirmation are now the same event — `created_at` and `confirmed_at` would always be identical in v0, making one of them dead weight. **Resolution:** a single field, `confirmed_at`, explicit (not a bare framework default — same discipline as FTE's `observed_period_end`), doubles as both "row exists" and "knowledge time." If a future increment reintroduces async candidate persistence (e.g. a `ClarificationNeed` that outlives a session before resolution), a separate `created_at` should be reintroduced at that point — a clean, additive change, not a redesign.
 
-## 8. Resolution rules
+Business-time applicability (`valid_from_business_time`/`valid_to_business_time`) remains **deferred**, unchanged from v1 — not required by the test contract, additive later.
 
-Given `(engagement_id, subject)`, return the single most recent CONFIRMED row (by `confirmed_at`) with no unresolved CANDIDATE referencing it via `relates_to_knowledge_id` (§16). If an unresolved reference exists, resolution returns **ambiguous / pending** rather than silently trusting the old CONFIRMED value — directly enforces "must not silently adapt" (mission brief §16). No scoring engine; with exactly one scope level in v0, the "narrower scope wins" precedence question (mission brief §36) is **structurally inapplicable** — named for future design, not built now.
+## 7. Provenance / authority — corrected: DETERMINISTIC_RULE removed from v0's enum
 
-**Database-architect review caught a real trap here, worth naming explicitly:** do NOT add a uniqueness constraint like "at most one CONFIRMED row per `(engagement_id, subject)`." That would break supersession outright — superseded rows must remain CONFIRMED forever (§17's own "old knowledge remains historically true"); only the *resolution rule's* recency ordering determines which one is "current," never a DB constraint. The only safe uniqueness guarantee is "at most one row is the resolution result," which is a query-time property, not a storage-time one.
+**Arbitration finding (Q9):** the four-upload test loop (§13) never exercises deterministic-only promotion — every confirmation in the required test contract is human-mediated. Per the complexity test, an enum value the loop never uses is over-provisioning, not future-proofing (adding one enum literal later, when deterministic promotion is actually built, is a trivial migration, not a dead end). **Resolution: `provenance` is fixed to `HUMAN_CONFIRMATION` for v0** (technically no longer needs to be an enum with unused members — kept as a single-value controlled field rather than a boolean, so the future addition is a value, not a type change). `confirmed_by` (actor identity) is now `NOT NULL` — every row is a confirmed fact by construction (§3), so an actor always exists. Not redundant with `provenance`: `provenance` names the mechanism (currently always human), `confirmed_by` names who — a real, distinct need already validated in the original adversarial review and unchanged by this arbitration.
 
-## 9. Supersession / contradiction — one field, two meanings by row status
+## 8. Resolution rule — corrected: chain-head, not "most recent"
 
-A single nullable self-referencing column, `relates_to_knowledge_id`, serves both:
-- On a **CANDIDATE** row: "this challenges that existing CONFIRMED row" → an active, unresolved contradiction.
-- On a **CONFIRMED** row: "this supersedes that formerly-CONFIRMED row" → history preserved, not rewritten.
+**Arbitration finding (Q7):** "most recent CONFIRMED by `confirmed_at`" is fragile — a superseded row could reappear if a later row is ever deleted, filtered incorrectly, or inserted with clock-skewed timestamps. **Resolution:** given `(entity_id, subject)`, the applicable Knowledge is **the unique CONFIRMED row that no other CONFIRMED row for the same `(entity_id, subject)` references via `relates_to_knowledge_id`** — the head of the supersession chain, a structural property, not a timestamp comparison. If no CONFIRMED row exists at all → Unknown, clarification permitted. `confirmed_at` remains useful for display/audit ordering but is no longer the resolution mechanism.
 
-Rejected a second dedicated `supersedes_knowledge_id` field: the complexity test (§45) shows the v0 loop (TEST 1–5) is fully satisfied by one field: the CANDIDATE-with-reference *is* the contradiction record; once confirmed, the same reference *becomes* the supersession record. No `UPDATE` ever touches a CONFIRMED row.
+No unique DB constraint on `(entity_id, subject, status=CONFIRMED)` — that would break supersession outright, since superseded rows correctly remain CONFIRMED forever. Uniqueness is a query-time property (the chain has one head), never a storage-time one.
+
+Multi-scope conflict resolution (mission §36 of the original brief) remains structurally inapplicable — v0 has one scope level.
+
+## 9. Contradiction / supersession — one field, now unambiguous
+
+**Arbitration finding (Q3):** with CANDIDATE removed, `relates_to_knowledge_id` no longer needs a status-dependent dual meaning. On the only status that exists, CONFIRMED, it means exactly one thing: **this row supersedes that row.** Contradiction itself is not a KnowledgeModel-visible write at all — it is Epistemic Dialogue detecting, at RECALL time, that newly observed evidence disagrees with the resolved CONFIRMED row, and raising a targeted question *before* anything is written here. Nothing is persisted for an unresolved contradiction; if the human confirms the change, exactly one new CONFIRMED row is inserted, with `relates_to_knowledge_id` pointing at the row it supersedes.
 
 ## 10. Minimal persistence design
 
-**PERSISTENCE REQUIRED: YES.** Without it, "never ask twice" cannot hold structurally — this is the mission's own stated reason for existing (§0) and is not weakened by anything found in this analysis.
+**PERSISTENCE REQUIRED: YES** — unchanged; without it, never-ask-twice cannot hold.
 
-**Immutability:** rows are insert-only, mirroring `evidence_ledger_entries`' unconditional `BEFORE UPDATE` trigger (`evidence_ledger_immutability_guard`, v18) exactly — no partial precedent for "revise in place" exists anywhere in this repository, and inventing one here would be a new, unjustified pattern. Revision = new row + `relates_to_knowledge_id` (§9).
+**Immutability:** insert-only, mirroring `evidence_ledger_entries`' unconditional `BEFORE UPDATE` trigger (v18) exactly. With CANDIDATE removed, this is now trivially satisfiable — there is no in-table transition to forbid, only ordinary inserts.
 
-**Schema shape — three options evaluated:**
-- **A. Fully generic** (free-text subject, JSONB value) — rejected: becomes an uncontrolled semantic dumping ground, the exact risk the mission brief names in §21.
-- **B. Typed-but-constrained** (small curated `subject` enum, extended deliberately with each reviewed migration; plain-string `value`, not JSONB) — **chosen.** One table serves every future knowledge type without becoming a triple store; no `predicate` column — for v0's single subject (`expense_sign_convention`), `subject` already fully disambiguates what `value` means; a `predicate` field is deferred until a second subject actually needs one (complexity test again).
-- **C. One dedicated table per knowledge type** (e.g. `expense_sign_conventions`) — rejected outright: mission brief §21 explicitly forbids a new table per concept.
+**Schema shape:** unchanged from v1's conclusion — one typed-but-constrained table (curated `subject` enum, plain-string `value`, no JSONB, no `predicate`), rejecting both a fully generic triple-store and a table-per-knowledge-type.
+
+**Semantic safety (Q5, new):** `value` is not an unconstrained string in practice. Each `subject` maps to its own small, closed set of legal `value`s via an application-level registry (v0: `EXPENSE_SIGN_CONVENTION → {ABSOLUTE_POSITIVE, SIGNED_NATURAL}`, exactly two legal values), mirrored by a DB `CHECK` constraint enumerating the current legal `(subject, value)` pairs. This prevents synonym drift (`"positive"` vs `"ABSOLUTE_POSITIVE"` never both existing as competing truths) without building a generic ontology — extending to a second subject means adding one registry entry and one `CHECK` clause, never a schema change.
 
 ## 11. Minimal data contract
 
-| Field | Meaning | Why required now | Nullable | Immutable | Reads | Writes |
-|---|---|---|---|---|---|---|
-| `id` | PK | Identity | No | Yes | all | system |
-| `company_id` | Tenant, direct CASCADE | **Not** mirrored from `engagements` (which omits it) — deliberately. `engagement_id` uses SET NULL (§ deletion semantics below), which would break the CASCADE chain a GDPR company erasure needs. A direct, hard `company_id` FK is the only way to guarantee full erasure regardless of what happens to `engagement_id`. Matches `decision_arcs`/`evidence_ledger_entries` precedent, not `engagements`' precedent. | No | Yes | all | system |
-| `engagement_id` | Owner | §4 | Yes (`ON DELETE SET NULL`, matching `decision_arcs.engagement_id` precedent — knowledge outlives an orphaned Engagement reference the same way Evidence/DecisionArc already do) | Yes | all | system |
-| `subject` | Constrained enum, "what this is about" | §5/§21 boundary | No | Yes | all | system |
-| `value` | The assertion (plain string for v0) | §10 | No | Yes | all | system |
-| `status` | CANDIDATE / CONFIRMED | §3 | No | Yes (new row on transition, never UPDATE) | all | system |
-| `relates_to_knowledge_id` | Self-FK, §9 | Contradiction + supersession, one mechanism | Yes | Yes | all | system |
-| `provenance` | HUMAN_CONFIRMATION / DETERMINISTIC_RULE (reserved) | §7 | No | Yes | all | system |
-| `confirmed_by` | Actor identity | §7/§37 — not redundant with `provenance`: `provenance` names the *mechanism* (human vs. deterministic rule), `confirmed_by` names *who*, needed for forward-compatible authority/audit even though v0 has a single-user assumption today | Yes | Yes | all | system |
-| `confirmed_at` | Knowledge time | §6 | Yes (null while CANDIDATE) | Yes | all | system |
-| `created_at` | Row insertion time, DB default | Repo-wide convention | No | Yes | all | system |
+| Field | Meaning | Nullable | Writes |
+|---|---|---|---|
+| `id` | PK | No | system |
+| `entity_id` | **True owner** (§4), `ON DELETE CASCADE` | No | system |
+| `engagement_id` | Acquisition context only (§4), `ON DELETE SET NULL` | Yes | system |
+| `subject` | Constrained enum, "what this is about" | No | system |
+| `value` | The assertion, constrained per-subject (§10) | No | system |
+| `relates_to_knowledge_id` | Self-FK — supersession only, unambiguous (§9) | Yes | system |
+| `provenance` | Fixed `HUMAN_CONFIRMATION` for v0 (§7) | No | system |
+| `confirmed_by` | Actor identity, now required (§7) | No | system |
+| `confirmed_at` | Single explicit timestamp, doubles as knowledge time (§6) | No | system |
 
-Fields explicitly removed after the "first-slice justification" test (§41 of the brief): `analysis_id`/`evidence_ids` (§33 — Knowledge must not copy Evidence; a future consumer can join through Evidence's own `analyse_id` if truly needed — not required for TEST 1–5), `valid_from_business_time`/`valid_to_business_time` (§6), `predicate` (§10).
+All reads/writes server-side only (unchanged from v1) — no client-facing table access.
 
-**Writes are server-side only** — no client-facing table access, mirroring `save_evidence_capture`'s existing discipline. This is a Trust/privacy requirement (§27 of the brief), not an implementation detail.
+**Removed since v1** (all failed the complexity test — §9 of the arbitration mission): `company_id` (transitively covered by `entity_id` CASCADE, §4), `scope_key` (§5), `status` (only CONFIRMED exists, §3), `created_at` (merged into `confirmed_at`, §6), `DETERMINISTIC_RULE` enum member (§7).
 
-## 12. Deterministic promotion — CONDITIONAL
+## 12. Deterministic promotion — unchanged: CONDITIONAL
 
-Not a blanket yes or no. When a deterministic signal (arithmetic/subtotal check, account-code range — per the FRU foundation document) closes with **no residual ambiguity** (FRU matrix Case 2: signed Belgian COA, arithmetic resolves cleanly), direct promotion to CONFIRMED without asking is legitimate — a competent controller would not interrupt anyone for a fact the numbers already prove outright. When the signal is present but not fully closing (FRU matrix Case 1: Phidani itself — positive-display convention, arithmetic corroborates but doesn't independently prove sign direction with certainty), human confirmation remains required. The condition is completeness of proof, not convenience.
+When a deterministic signal closes with no residual ambiguity, direct promotion without asking is legitimate; when merely corroborating, human confirmation remains required. **LLM promotion: NO — absolute.** (v0's actual test loop, §13, only exercises the human path; deterministic promotion remains a named, allowed-but-unexercised capability, not a v0 deliverable.)
 
-**LLM promotion: NO — absolute, no condition.**
+## 13. First Phidani learning loop (revised for the corrected model)
 
-## 13. First Phidani learning loop
+**Upload 1.** No prior Knowledge. FRU proposes (ephemeral, held by Epistemic Dialogue, never written here) `EXPENSE_SIGN_CONVENTION = ABSOLUTE_POSITIVE`. RECALL(entity=Phidani, subject=EXPENSE_SIGN_CONVENTION) → no CONFIRMED row → nothing. Epistemic Dialogue asks for confirmation. Human: yes. **STORE:** exactly one row —
+`K1 = {id, entity_id=Phidani, engagement_id=A, subject=EXPENSE_SIGN_CONVENTION, value=ABSOLUTE_POSITIVE, relates_to_knowledge_id=NULL, provenance=HUMAN_CONFIRMATION, confirmed_by=user, confirmed_at=t1}`.
 
-1. FRU (simulated input for this contract — not built here) proposes CANDIDATE: `subject=expense_sign_convention, value=ABSOLUTE_POSITIVE`.
-2. RECALL: no CONFIRMED row exists for `(engagement_id, expense_sign_convention)` → resolution returns nothing.
-3. Epistemic Dialogue raises one ClarificationNeed (owned by Epistemic Dialogue, not this contract — §25 of the brief; Knowledge Model only needs to answer RECALL, it does not own the question object).
-4. Human confirms → CANDIDATE promoted to **new CONFIRMED row**, `provenance=HUMAN_CONFIRMATION`, `confirmed_at` set.
-5. Second equivalent upload: RECALL finds the CONFIRMED row → no clarification raised. **This is the enforceable core of "never ask twice"** — RECALL is a mandatory, structural pre-condition of ASK, not a prompt instruction.
-6. Contradictory fixture (signed values appear): FRU proposes a new CANDIDATE with `relates_to_knowledge_id` pointing at the existing CONFIRMED row → resolution now returns *ambiguous/pending*, not the stale CONFIRMED value. Epistemic Dialogue raises a targeted change question. Human confirms → the new row is promoted to CONFIRMED (`relates_to_knowledge_id` now reads as supersession); the old CONFIRMED row is untouched, still queryable, still historically true for its own `confirmed_at` window.
+**Upload 2.** Same convention. RECALL → chain-head is K1 (no row references it) → returns `ABSOLUTE_POSITIVE`. New evidence agrees. **ASK does not occur.**
 
-## 14. Never-ask-twice invariant
+**Upload 3.** Contradictory signed-expense fixture. RECALL → still returns K1. New evidence's inferred value (`SIGNED_NATURAL`) disagrees with K1 → Epistemic Dialogue detects the contradiction as a live comparison — **nothing is written to KnowledgeModel at this point.** Targeted question raised: "Until now, this reporting presented expenses as positive values. In this file, several are negative. Has the convention changed?" Human: "Yes, since this file." **STORE:**
+`K2 = {id, entity_id=Phidani, engagement_id=A, subject=EXPENSE_SIGN_CONVENTION, value=SIGNED_NATURAL, relates_to_knowledge_id=K1.id, provenance=HUMAN_CONFIRMATION, confirmed_by=user, confirmed_at=t3}`.
+K1 is untouched, still independently queryable by `id`.
 
-Structural, not aspirational: ASK cannot legally fire without a prior RECALL call against this contract's resolution rule (§8). The v0 test contract's TEST 3 is the direct proof of this — see Test Contract below.
+**Upload 4.** Signed convention continues. RECALL(Phidani, EXPENSE_SIGN_CONVENTION) → K2 is the chain-head (nothing references it; K1 is referenced by K2, so it is excluded) → returns `SIGNED_NATURAL`. K1 remains historically inspectable (direct lookup, or by following `relates_to_knowledge_id` backward from K2) but is never again returned by ordinary RECALL. **FOUR-UPLOAD LOOP: PASS.**
 
-## 15. Failure semantics (mission §44, condensed to what changes v0's design)
+## 14. Never-ask-twice — corrected claim (Q4)
 
-- Knowledge applied too broadly → guarded by Engagement-only scope (§5) plus the explicit non-dead-end `scope_key`.
-- Same question repeated → guarded structurally by §14.
-- Stale knowledge applied forever → guarded by §9/§16's contradiction mechanism; **named limitation**, not solved: a detector that misses a contradiction (signal doesn't trip) leaves stale knowledge silently applied — same class of limitation already named in the Epistemic Dialogue foundation document.
-- LLM silently promotes → structurally impossible, `provenance` enum has no LLM-capable value (§12).
-- Human answer overwrites history → impossible by construction, rows are insert-only (§10).
-- Two conflicting CONFIRMED rows at the same scope → cannot occur in v0: promotion always inserts a fresh row referencing the one it replaces (§9); the resolution rule (§8) only ever surfaces the newest. Multi-scope conflict (mission §36) is out of scope for v0 (§8).
-- Missing/unknown reporting context → non-issue, v0 has no such object (§5).
-- Analysis deleted → non-issue by design: no `analysis_id` FK exists on this table (§11).
-- Entity/Engagement deleted → row survives (`engagement_id` SET NULL), same precedent as Evidence/DecisionArc.
-- Company/GDPR deleted → row is purged (direct `company_id` CASCADE — §11, the one deliberate departure from the "mirror `engagements`" instinct).
-- Second Engagement, different sheet convention → correctly produces two independent rows, no cross-contamination (Engagement-scoped by construction).
-- Temporary exception mistaken for permanent rule → **named, not solved**: v0 has no "this confirmation is explicitly temporary" flag; a human answering "yes, but only this once" would still be recorded as an ordinary CONFIRMED row. Deferred to a future increment, flagged honestly rather than silently ignored.
+**Arbitration finding:** the v1 contract's "structurally enforceable" claim overreached. KnowledgeModel v0 can guarantee exactly one thing: **RECALL is deterministic** — given the same stored state, it always returns the same, correct, currently-applicable answer (or honestly nothing). It **cannot**, by itself, guarantee that Epistemic Dialogue actually *calls* RECALL before raising a question — that discipline lives entirely in Epistemic Dialogue's own code and belongs to its own test contract (e.g. a call-graph-level test asserting ASK never fires without a preceding RECALL in the same reasoning trace). **RECALL-BEFORE-ASK OWNER: Epistemic Dialogue, not KnowledgeModel.** This is a narrower, more honest claim than the original.
 
-## 16. Contradiction — mechanics recap
+## 15. Provenance sufficiency (Q6)
 
-Created by: a new observation's CANDIDATE carrying `relates_to_knowledge_id` pointing at an existing CONFIRMED row with a *different* `value` for the same `(engagement_id, subject)`. References: the conflicting CONFIRMED row plus the new observation that triggered it. Before human resolution: the old CONFIRMED row remains queryable and answers RECALL as "ambiguous/pending" (§8) — never silently trusted, never silently discarded.
+`confirmed_by` + `confirmed_at` + `provenance` answers "why do we believe this" completely for v0's professional question (who, when, by what mechanism) without storing raw chat or linking to the originating analysis. Explicitly, no `analysis_id`/dialogue-event FK — Knowledge must survive deletion of any source analysis, and does, by never referencing one. Deeper "show me the exact conversation" traceability, if ever wanted, is Epistemic Dialogue's own future domain-event log to build — not this table's job.
 
-## 17. Explicit OUT (v0)
+## 16. Failure semantics (condensed, re-verified against the corrected model)
 
-Multi-scope hierarchy beyond Engagement; `ReportingContext`/template discriminator as a first-class object; `predicate` field; business-time retroactive validity; deterministic promotion for anything short of complete proof; any LLM call; any client-writable path; repeated-observation-without-human promotion (BusinessHistory's INV-HISTORY-1 threshold is explicitly **not** reused here — the mission brief itself warns against leaking one domain's unvalidated heuristic into another; v0's loop does not need this promotion path at all); Familiarization bulk-ingestion optimization; linkage to Evidence/Analysis rows; role-based write authority beyond "server-side only."
+Knowledge applied too broadly → Entity-scoped by construction, `entity_id` not `engagement_id`, corrects a v1 gap where Engagement-scoping would have wrongly forgotten knowledge across Engagement boundaries. Same question repeated → guarded by RECALL determinism (§14), enforcement lives in Epistemic Dialogue. Stale knowledge applied forever → guarded by the contradiction comparison at RECALL time; **named limitation unchanged from v1**: a detector that never trips leaves stale knowledge silently applied. LLM silently promotes → structurally impossible, no LLM-capable provenance value exists. Human answer overwrites history → impossible, insert-only. Two conflicting CONFIRMED chain-heads → cannot occur: every new CONFIRMED insert for an existing `(entity_id, subject)` requires a `relates_to_knowledge_id` pointing at the prior head, by construction of the confirmation flow (§13) — there is exactly one head at all times. Entity deleted → Knowledge is correctly purged too now (§4 — a deliberate correction from v1, where knowledge would have wrongly survived an Entity that no longer exists; institutional knowledge about an organisation that has been fully removed has no remaining subject). Engagement deleted → Knowledge survives (`engagement_id` SET NULL), directly satisfying the arbitration's own professional scenario (Engagement B still benefits from what Engagement A learned). Company/GDPR deleted → purged transitively via `entity_id` CASCADE → `entities.company_id` CASCADE, verified in migration. Concurrent contradictory uploads → still deferred, unchanged from v1.
 
-**Named, deferred concern (AI-reliability-persona review):** two concurrent uploads producing contradicting CANDIDATEs against the same CONFIRMED row at nearly the same time is not addressed by this contract — v0 assumes sequential, single-session confirmation. Concurrency handling is deferred, not silently assumed away.
+## 17. Explicit OUT (v0) — updated
 
-## 18. Open blockers
+Everything from v1's OUT list, plus (newly excluded by this arbitration): a persisted CANDIDATE status; a separate `scope_key` abstraction; a second timestamp column; an unused `DETERMINISTIC_RULE` enum member; a direct `company_id` column.
 
-- FRU's real detector does not exist yet (by design — this contract accepts a *properly structured* candidate from any future FRU provider; it is not blocked on FRU's implementation, per mission brief §24).
-- Epistemic Dialogue's `ClarificationNeed` object is not designed here — owned by that companion mission, not this one (§25 of the brief).
-- Trust Gateway remains unimplemented — irrelevant to this specific contract since v0 has zero LLM involvement, but blocks any *future* increment that adds LLM-assisted hypothesis generation upstream of this table.
+## 18. Open blockers — unchanged
 
-## 19. Test contract
+FRU's real detector; Epistemic Dialogue's `ClarificationNeed` object and its own RECALL-before-ASK enforcement (now explicitly its responsibility, §14, not assumed here); Trust Gateway (irrelevant to v0's zero-LLM design, blocks future increments only).
 
-- **TEST 1** — no CONFIRMED row exists → RECALL returns nothing → clarification permitted.
-- **TEST 2** — human confirms → CONFIRMED row created, `confirmed_at`/`confirmed_by`/`provenance` set.
-- **TEST 3** — same `(engagement_id, subject)` queried again → RECALL resolves the CONFIRMED row → clarification forbidden. *(Direct proof of §14.)*
-- **TEST 4** — contradictory CANDIDATE with `relates_to_knowledge_id` inserted → RECALL returns ambiguous/pending, not the stale value → change-clarification permitted.
-- **TEST 5** — human confirms the change → new CONFIRMED row exists; original CONFIRMED row is unmodified and still independently queryable (by `id`, not by RECALL) → history preserved, not rewritten.
-- **Immutability** — any attempted `UPDATE` on an existing row is rejected (mirrors the Evidence Ledger trigger test pattern exactly).
-- **Tenant isolation** — a row created under one `company_id`/`engagement_id` is never returned by a RECALL scoped to another.
-- **No-LLM** — AST-based import check (not substring — the lesson already applied twice in this repository) proving zero LLM-service import in whatever module implements resolution/promotion.
+## 19. Test contract — updated for the corrected model
+
+- **TEST 1** — no CONFIRMED row for `(entity_id, subject)` → RECALL returns nothing → clarification permitted.
+- **TEST 2** — human confirms → exactly one CONFIRMED row inserted directly (no prior row of any kind existed).
+- **TEST 3** — same `(entity_id, subject)` recalled again → resolves to the same row → clarification forbidden.
+- **TEST 4** — contradictory evidence compared against RECALL's result *outside* this table → disagreement detected → **no row written** → change-clarification permitted.
+- **TEST 5** — human confirms the change → new CONFIRMED row inserted with `relates_to_knowledge_id` pointing at the prior head → prior row unmodified, independently queryable, no longer returned by RECALL.
+- **Chain-head correctness** — with three or more chained rows, RECALL always returns the one row nothing else references, never influenced by `confirmed_at` ordering alone (proves §8's correction).
+- **Cross-Engagement persistence** — knowledge confirmed under Engagement A is returned by RECALL under Engagement B for the same Entity (direct proof of §4's ownership correction).
+- **Entity-deletion purge** — deleting the owning Entity removes its Knowledge rows (direct proof of §16's corrected deletion semantics).
+- **Immutability** — any attempted `UPDATE` on an existing row is rejected.
+- **Semantic safety** — an attempt to write a `value` not in the registered set for its `subject` is rejected at the service layer and by the DB `CHECK` constraint (§10).
+- **No-LLM** — AST-based import check, zero LLM-service import in the resolution/promotion module.
 
 ---
 
 ## GO / NO-GO
 
-**GO WITH RESERVATIONS.** The contract is minimal, tested against real precedent (Evidence Ledger's immutability, `engagements`'/`decision_arcs`' deletion semantics), and passes its own complexity test — every field traces to a specific test in §19; nothing was included by convenience. The reservation: this is architecture only. The two real blockers before code — FRU's actual detector and Epistemic Dialogue's `ClarificationNeed` design — belong to their own missions, not this one, and this contract's persistence layer should not be built in isolation from at least a stub of both, or v0 risks becoming exactly the kind of dormant, unconsumed table this engagement has repeatedly named and avoided (`financial_truth.py`'s own history is the standing warning).
+**GO.** All five arbitration questions resolved with corrections, not workarounds; the ownership fix in particular (§4) was load-bearing — the v1 contract would have silently broken the exact professional scenario ("Engagement B should still benefit from what Engagement A learned") this whole mission exists to encode. The contract is smaller than v1 (five fields removed, none added), and every remaining field and rule traces to a specific test in §19. Same reservation as before, restated because it remains true: build this only alongside at least a stub of FRU's detector and Epistemic Dialogue's `ClarificationNeed`, never in isolation.
