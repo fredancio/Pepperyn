@@ -43,6 +43,10 @@ class DecisionArc(BaseModel):
     id: UUID
     company_id: UUID
     entity_id: Optional[UUID] = None
+    # Rattachement Engagement (v21) — résolu à la création quand possible
+    # via origin_analysis_id → analyses.entity_id → engagements.entity_id,
+    # jamais fabriqué. Voir services/arc_service.py::_resolve_current_engagement_id.
+    engagement_id: Optional[UUID] = None
 
     # Origine (IMMUTABLE)
     origin_analysis_id: UUID

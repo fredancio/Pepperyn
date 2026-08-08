@@ -25,6 +25,78 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+
+def _resolve_current_engagement_id(
+    supabase,
+    entity_id: Optional[str],
+    entity_company_id: Optional[str],
+    expected_company_id: str,
+) -> Optional[str]:
+    """
+    Résout l'Engagement courant d'une Entity, de façon strictement
+    déterministe — jamais une heuristique (mission DecisionArc ↔ Engagement,
+    Mission 10 : "no date-gap inference. No fact_id inference. No
+    Analysis-text inference. Only deterministic current domain relationships").
+
+    Hypothèse explicite, valable AUJOURD'HUI uniquement : la contrainte SQL
+    UNIQUE(entity_id) sur engagements (v19) garantit qu'au plus un
+    Engagement existe par Entity — cette fonction retourne donc, sans
+    ambiguïté, LE seul Engagement possible pour cette Entity. Cette
+    hypothèse cessera d'être vraie le jour où la cardinalité sera relâchée
+    (déclencheur déjà nommé : STRATEGIC_DEFERRED_WORK_REGISTER.md §1.2.a —
+    "la première fonctionnalité qui a besoin de créer un second mandat
+    professionnel pour une Organisation existante"). Cette fonction devra
+    alors être revue pour résoudre l'Engagement COURANT (actif/non-churned)
+    plutôt que "l'Engagement" au singulier — non construit par anticipation
+    ici (Article IX), `.limit(1)` documente explicitement cette hypothèse
+    plutôt que de la laisser implicite.
+
+    Défense en profondeur tenant (Mission 17) : n'attache jamais un
+    Engagement dont l'Entity résolue n'appartient pas à expected_company_id
+    — même logique que evidence_query_service.py (filtre explicite même si
+    la donnée amont est déjà supposée cohérente par construction ailleurs
+    dans le dépôt).
+
+    Args:
+        supabase: client Supabase (service role).
+        entity_id: entity_id de l'analyse d'origine (analyses.entity_id),
+                   PAS decision_arcs.entity_id — voir note du module
+                   arc_service et v21_decision_arc_engagement.sql sur le
+                   non-peuplement de ce dernier par le chemin de création réel.
+        entity_company_id: company_id porté par la même ligne `analyses`
+                            que entity_id (déjà lu dans la même requête par
+                            l'appelant — aucune requête `entities`
+                            supplémentaire nécessaire).
+        expected_company_id: company_id attendu (celui de l'arc en cours de
+                              création/backfill).
+
+    Returns:
+        L'id de l'Engagement résolu, ou None (jamais une exception, jamais
+        une valeur fabriquée) si : entity_id absent, mismatch de company,
+        aucun Engagement trouvé, ou toute erreur de lecture — cette
+        résolution est un enrichissement optionnel, elle ne doit jamais
+        bloquer la création ou le backfill de l'arc.
+    """
+    if not entity_id or entity_company_id != expected_company_id:
+        return None
+    try:
+        result = (
+            supabase.from_("engagements")
+            .select("id")
+            .eq("entity_id", entity_id)
+            .limit(1)
+            .execute()
+        )
+        rows = result.data or []
+        return rows[0]["id"] if rows else None
+    except Exception as e:
+        logger.warning(
+            "[ARC] Résolution Engagement échouée pour entity_id=%s : %s",
+            entity_id, e,
+        )
+        return None
+
+
 # ── Review Briefing — classification et gabarits (Capability 3) ──────────────
 #
 # Toute cette section est déterministe et testable sans base de données :
@@ -81,10 +153,16 @@ class ArcService:
             return {"created": False, "arc_id": None, "arc_status": None}
 
         # ── Guard DCT : Situation doit être explicitement référencée ──────────
+        # entity_id/company_id ajoutés au select (mission DecisionArc ↔
+        # Engagement) uniquement pour résoudre engagement_id ci-dessous —
+        # aucune requête supplémentaire nécessaire pour cette lecture.
+        # Rétrocompatible : les fixtures de test existantes ne portent pas
+        # ces clés, .get() renvoie alors None et la résolution est
+        # simplement sautée (voir _resolve_current_engagement_id).
         try:
             analysis_result = (
                 supabase.from_("analyses")
-                .select("decision_kernel, decision_fingerprint")
+                .select("decision_kernel, decision_fingerprint, entity_id, company_id")
                 .eq("id", origin_analysis_id)
                 .single()
                 .execute()
@@ -108,6 +186,18 @@ class ArcService:
                 f"Arc non créé."
             )
 
+        # Résolution Engagement (mission DecisionArc ↔ Engagement) — best
+        # effort, jamais bloquant. N'émet une requête `engagements` que si
+        # l'analyse d'origine porte un entity_id (voir docstring de
+        # _resolve_current_engagement_id pour pourquoi c'est analyses.entity_id,
+        # pas decision_arcs.entity_id, qui sert de source ici).
+        engagement_id = _resolve_current_engagement_id(
+            supabase=supabase,
+            entity_id=data.get("entity_id"),
+            entity_company_id=data.get("company_id"),
+            expected_company_id=company_id,
+        )
+
         # ── Insertion idempotente ─────────────────────────────────────────────
         row = {
             "company_id": company_id,
@@ -122,6 +212,8 @@ class ArcService:
         }
         if entity_id:
             row["entity_id"] = entity_id
+        if engagement_id:
+            row["engagement_id"] = engagement_id
 
         try:
             result = (
@@ -1101,6 +1193,106 @@ class ArcService:
             created, skipped, failed,
         )
         return {"created": created, "failed": failed, "skipped": skipped}
+
+    # ── DecisionArc ↔ Engagement — backfill historique ─────────────────────────
+
+    def backfill_decision_arc_engagements(self) -> dict:
+        """
+        Backfill idempotent de engagement_id pour les DecisionArc existants
+        (mission DecisionArc ↔ Engagement, Mission 8).
+
+        Résolution déterministe UNIQUEMENT : pour chaque arc sans
+        engagement_id, lit origin_analysis_id → analyses.(entity_id,
+        company_id), puis résout via _resolve_current_engagement_id (même
+        fonction que le chemin de création — voir sa docstring pour le
+        choix de analyses.entity_id plutôt que decision_arcs.entity_id).
+        Si non résolvable : reste NULL, jamais deviné (Mission 8 —
+        "Prefer NULL / unresolved over fabricated ownership").
+
+        Idempotent : un arc portant déjà un engagement_id n'est jamais relu
+        ni recalculé (même discipline que backfill_engagements pour
+        Engagement — note de revue n°2 de T2A, réappliquée ici).
+
+        Traitement arc par arc, sans transaction globale — une erreur
+        isolée n'annule pas le travail déjà fait sur les autres (même
+        principe que backfill_engagements).
+
+        Note opérationnelle : les arcs CLOSED ne peuvent recevoir
+        engagement_id que grâce au carve-out étroit ajouté par
+        v21_decision_arc_engagement.sql à arc_immutability_guard() — sans
+        lui, cette UPDATE échouerait pour tout arc déjà CLOSED (voir
+        commentaire de la migration). Ce comportement ne peut être vérifié
+        que contre une vraie instance Postgres (le trigger n'existe pas
+        dans les doubles de test Python) — voir réserve nommée dans le
+        rapport final de la mission.
+
+        Returns:
+            {"resolved": int, "unresolved": int, "already_present": int, "errors": int}
+        """
+        supabase = self._get_supabase()
+        if not supabase:
+            return {"resolved": 0, "unresolved": 0, "already_present": 0, "errors": 0}
+
+        stats = {"resolved": 0, "unresolved": 0, "already_present": 0, "errors": 0}
+
+        try:
+            arcs_result = (
+                supabase.from_("decision_arcs")
+                .select("id, origin_analysis_id, company_id, engagement_id")
+                .execute()
+            )
+        except Exception as e:
+            logger.error("[ARC] backfill_decision_arc_engagements — fetch arcs failed: %s", e)
+            return stats
+
+        for arc in arcs_result.data or []:
+            if arc.get("engagement_id"):
+                stats["already_present"] += 1
+                continue
+
+            arc_id = arc.get("id")
+            origin_analysis_id = arc.get("origin_analysis_id")
+            arc_company_id = arc.get("company_id")
+
+            try:
+                analysis_result = (
+                    supabase.from_("analyses")
+                    .select("entity_id, company_id")
+                    .eq("id", origin_analysis_id)
+                    .single()
+                    .execute()
+                )
+                adata = analysis_result.data or {}
+
+                engagement_id = _resolve_current_engagement_id(
+                    supabase=supabase,
+                    entity_id=adata.get("entity_id"),
+                    entity_company_id=adata.get("company_id"),
+                    expected_company_id=arc_company_id,
+                )
+
+                if not engagement_id:
+                    stats["unresolved"] += 1
+                    continue
+
+                supabase.from_("decision_arcs").update(
+                    {"engagement_id": engagement_id}
+                ).eq("id", arc_id).execute()
+                stats["resolved"] += 1
+
+            except Exception as e:
+                logger.error(
+                    "[ARC] backfill_decision_arc_engagements — arc_id=%s failed: %s",
+                    arc_id, e,
+                )
+                stats["errors"] += 1
+
+        logger.info(
+            "[ARC] Backfill DecisionArc↔Engagement terminé — résolus=%d "
+            "non-résolus=%d déjà-présents=%d erreurs=%d",
+            stats["resolved"], stats["unresolved"], stats["already_present"], stats["errors"],
+        )
+        return stats
 
     # ── Integrity check ───────────────────────────────────────────────────────
 
