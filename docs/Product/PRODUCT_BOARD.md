@@ -31,13 +31,18 @@
 
 ## 2. ACCEPTED BUT NOT YET MERGED
 
-*(Rien actuellement — ADR-003 v3 est superseded par `docs/Architecture/FTE_MINIMAL_IMPLEMENTATION_CONTRACT.md`, contrat canonique désormais fusionné dans `main`, dont FTE v0 ci-dessus est la première implémentation.)*
+*(Rien en code actuellement — ADR-003 v3 est superseded par `docs/Architecture/FTE_MINIMAL_IMPLEMENTATION_CONTRACT.md`, contrat canonique désormais fusionné dans `main`, dont FTE v0 ci-dessus est la première implémentation.)*
+
+**Architecture canonique, implémentation non commencée** — fusionnés dans `main` le 2026-08-08 (`ea4a137`, `3be19e4`) :
+- **FRU FOUNDATION** (`docs/Architecture/Cognitive/FINANCIAL_REPRESENTATION_UNDERSTANDING_FOUNDATION.md`) — CANONICAL.
+- **EPISTEMIC DIALOGUE FOUNDATION** (`docs/Architecture/Cognitive/EPISTEMIC_DIALOGUE_FOUNDATION.md`) — CANONICAL.
+- **KNOWLEDGE MODEL V0 CONTRACT** (`docs/Architecture/Cognitive/KNOWLEDGE_MODEL_V0_IMPLEMENTATION_CONTRACT.md`, arbitrage final inclus) — CANONICAL / IMPLEMENTATION NOT STARTED.
 
 ## 3. ACTIVE NEXT STEP
 
 *(Un seul chantier principal autorisé — pas une liste.)*
 
-**Aucun chantier d'implémentation actif.** Avec FTE v0 fusionné (section 1), Pepperyn dispose désormais d'un kernel temporel déterministe gouverné — établissant une règle d'architecture durable : un LLM peut interpréter le temps, mais il ne peut jamais définir le temps canonique. Deux chantiers de suivi restent nommés et différés, pas engagés (`Audit/STRATEGIC_DEFERRED_WORK_REGISTER.md` §1.4.a, §1.4.b — voir section 4 ci-dessous). **Aucun chantier suivant ne démarre automatiquement** — cette section reste sans chantier actif jusqu'à autorisation explicite de Fred.
+**Knowledge Model v0 implementation.** Contrat canonique arbitré deux fois (`docs/Architecture/Cognitive/KNOWLEDGE_MODEL_V0_IMPLEMENTATION_CONTRACT.md`). Portée : une seule table, ownership Entity, une seule connaissance de test (`EXPENSE_SIGN_CONVENTION`), zéro LLM. FRU/Epistemic Dialogue restent architecture de référence, non implémentées elles-mêmes dans ce chantier.
 
 **Exception explicitement autorisée à avancer en parallèle** (justifiée dans `LEGACY_MIGRATION_REVIEW_REPORT.md` Mission 9 et confirmée ici) : correction du Trust Boundary (contournement d'anonymisation du Conversation Engine V2) — aucune dépendance technique avec la séquence ci-dessus, son report prolonge un écart déjà prouvé entre promesse et comportement réel.
 
