@@ -311,6 +311,20 @@ def build_temporal_context(headers: list[str]) -> dict:
     """
     Build a dict suitable for injection into the LLM context.
     Tells the LLM which columns are current vs historical vs budget.
+
+    "actual_periods" (FTE v0, additive) — one {"year", "month"} entry per
+    column classified CURRENT_ACTUAL or HISTORICAL_ACTUAL, i.e. real
+    observed periods (never BUDGET/FORECAST/PRIOR_YEAR/YTD/UNKNOWN
+    columns). "month" is None when the header only resolves a year.
+    Exists so FTE (services/fte_minimal.py) can determine the newest
+    deterministically observed business-time boundary without
+    re-implementing header parsing itself — see
+    docs/Architecture/FTE_MINIMAL_IMPLEMENTATION_CONTRACT.md §8/§17
+    (Phase 6 of the FTE v0 mission: "do not duplicate temporal_normalizer's
+    parsing/classification logic inside FTE" — this is the one minimal,
+    additive exposure that makes that possible without a second parser).
+    Classification logic itself is untouched; this only exposes slightly
+    more of what classify_columns() already computes.
     """
     cols = classify_columns(headers)
     current_year = _determine_current_year(cols)
@@ -320,9 +334,17 @@ def build_temporal_context(headers: list[str]) -> dict:
         role = col.period_role.value
         by_role.setdefault(role, []).append(col.header)
 
+    actual_periods = [
+        {"year": col.year, "month": col.month}
+        for col in cols
+        if col.period_role in (PeriodRole.CURRENT_ACTUAL, PeriodRole.HISTORICAL_ACTUAL)
+        and col.year is not None
+    ]
+
     result: dict = {
         "detected_current_year": current_year,
         "columns_by_role": by_role,
+        "actual_periods": actual_periods,
         "classification_note": (
             "Classification dynamique (sans hardcoding d'années). "
             "CURRENT_ACTUAL = exercice en cours (données réalisées). "

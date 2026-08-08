@@ -142,17 +142,43 @@
 - **Ordre relatif :** aucun — attend son déclencheur.
 
 ### 1.4 Vérité temporelle (Financial Time Engine)
-- **Nature :** fondation bloquante (kernel Supporting, pas Core — déjà tranché).
-- **Source :** ADR-003 v3, jamais promu ACCEPTED.
-- **État réel :** conçu (design complet, 9 sections), revu (auto-critique 9/10), non approuvé formellement, non implémenté.
-- **Pourquoi différé :** doctrine prête mais implémentation jugée prématurée avant Engagement et Evidence Ledger réels.
-- **Dépendances réelles :** Engagement restauré et consommé, Evidence Ledger restauré et consommé, normalisation des périodes.
+- **Nature :** fondation bloquante (kernel Supporting, pas Core — déjà tranché) — **FTE v0 (kernel déterministe minimal) close (mise à jour 2026-08-08).**
+- **Source :** ADR-003 v3 (jamais promu ACCEPTED), `docs/Architecture/FTE_MINIMAL_IMPLEMENTATION_CONTRACT.md` (contrat canonique, mergé sur `main`, rétréci deux fois par arbitrage explicite), branche `implementation/fte-v0-2026-08-08`.
+- **État réel (mise à jour 2026-08-08) :** kernel déterministe FTE v0 mergé sur `main` — cinq états de comparaison (`NEW`/`DUPLICATE`/`GAP`/`OUT_OF_ORDER`/`UNKNOWN`), un seul champ persisté (`evidence_ledger_entries.observed_period_end DATE NULL`, migration v23, validée sur Postgres réel), YTD et rolling-12 honnêtes, zéro appel LLM, `QuantifiedImpact.temporal_role` isolé (test AST dédié). Revue adversariale indépendante pré-fusion (verdict B — fusion après petites corrections) a trouvé et fait corriger deux défauts avant fusion (voir 1.4.a note de correction ci-dessous, historique conservé) : précédence `UNKNOWN` dans `classify_period_relationship` (le cas `(current=None, previous=None)` renvoyait à tort `NEW`) et sélection du point historique précédent par temps de connaissance (`created_at`) plutôt que par temps métier (`observed_period_end`) dans `resolve_previous_observed_period_end`. Les deux corrigés, testés, mergés dans le même incrément — **pas** une dette différée, une correction pré-fusion normale.
+- **Pourquoi différé :** n'est plus différé pour le kernel lui-même — fondation livrée. Reste différé pour la normalisation réelle des en-têtes numériques (1.4.a) et pour la réconciliation de la vérité temporelle legacy (1.4.b), deux chantiers de suivi identifiés PAR la revue adversariale, pas des défauts de FTE v0 lui-même.
+- **Dépendances réelles :** aucune restante pour le kernel lui-même.
 - **Mise à jour (Canonical Foundation & Execution Orchestration Sprint) :** `temporal_normalizer.py` audité en profondeur — voir `TEMPORAL_NORMALIZER_VS_FTE_REVIEW.md`. **Risque de doublon levé : ce n'est pas un doublon**, c'est un classificateur d'en-têtes de colonnes (couche Percevoir), fournisseur naturel du futur `PeriodObservation`, pas un concurrent du FTE. Gate E du `PRE_IMPLEMENTATION_GATE_CHECKLIST.md` est passé sur cette base.
-- **Ce qu'il bloque :** cas vertical Phidani, indirectement l'architecture des agents (contexte temporel dans leurs contrats de sortie).
-- **Déclencheur de réouverture :** cas vertical Phidani, limité à `PeriodObservation`/`FiscalPeriod` — pas `BusinessHistory`, pas `FutureBusinessMoment` (déjà tranché dans `FOUNDATION_RECOVERY_REVIEW.md`). Séquencement précisé dans `FOUNDATION_RECOVERY_EXECUTION_ORDER.md` : T1C-A → T1C-B → T2A avant ce chantier, par risque d'exécution croissant, pas par importance relative.
-- **Risque trop tôt :** construire sur un modèle abstrait plutôt que sur des données réelles d'un client réel.
-- **Risque trop tard :** aucun risque de doublon résiduel — seul risque restant : `temporal_normalizer.py` n'est pas encore explicitement branché comme fournisseur du FTE au moment de l'implémentation (action technique simple, pas un arbitrage).
-- **Ordre relatif :** 3e, avant l'architecture des agents.
+- **Ce qu'il bloque :** plus rien directement pour le kernel. **Important : la conformité temporelle réelle du cas Phidani reste incomplète** — le kernel produit honnêtement `UNKNOWN` sur le fichier réel (en-têtes `YYYY-MM` non résolues par `temporal_normalizer`, voir 1.4.a) ; ne pas confondre « kernel FTE livré » avec « cas vertical Phidani entièrement démontré de bout en bout ».
+- **Déclencheur de réouverture :** sans objet pour le kernel — livré. Les deux items ci-dessous ont leurs propres déclencheurs.
+- **Risque trop tôt :** construire sur un modèle abstrait plutôt que sur des données réelles d'un client réel — risque déjà écarté, l'implémentation s'est appuyée sur le fichier Phidani.xlsx réel, pas une reconstruction synthétique.
+- **Risque trop tard :** aucun résiduel pour le kernel.
+- **Ordre relatif :** 3e, avant l'architecture des agents — exécuté.
+
+#### 1.4.a — `temporal_normalizer.py` : formats de mois numériques non reconnus (YYYY-MM et apparentés)
+- **Nature :** dette de suivi issue de la revue adversariale indépendante pré-fusion de FTE v0 (2026-08-08), pas un défaut de FTE v0 lui-même — le kernel dégrade honnêtement (`UNKNOWN`), il ne fabrique jamais de valeur.
+- **Source :** revue adversariale FTE v0 (2026-08-08), confirmée par exécution directe contre le fichier réel `Phidani.xlsx` (en-têtes `2019-01`…`2019-12`) et par une matrice de formats.
+- **État réel :** `_extract_month()` exige un caractère `/` ou `m` immédiatement avant le chiffre du mois ; échoue sur `YYYY-MM`, `MM/YYYY`, `MM-YYYY`, `YYYY.MM` — tout format numérique sans ce marqueur immédiatement précédent. Résout correctement `YYYY/MM`, `/MM/`, les mois nommés (français/anglais, complets/abrégés). Ne produit jamais une valeur fausse — seulement `None` (honnête).
+- **Pourquoi différé :** corriger `temporal_normalizer.py` sort du périmètre strict de la mission de correction FTE v0 (« corrections exactes : uniquement précédence UNKNOWN + tri temps métier ») — toucher ce fichier partagé, hors de la frontière du module `fte_minimal.py`, mérite sa propre mission ciblée plutôt qu'un embarquement dans cette correction-ci.
+- **Dépendances réelles :** aucune technique — correction de regex ciblée, indépendante du reste de la séquence.
+- **Ce qu'il bloque :** la démonstration complète de bout en bout du cas vertical Phidani (le kernel FTE reste correct, mais ne peut pas positivement classifier le fichier réel tant que ce gap persiste) ; toute revendication de conformité temporelle réelle sur des en-têtes numériques `YYYY-MM`/apparentés en production.
+- **Déclencheur de réouverture :** avant de revendiquer la conformité temporelle réelle du cas Phidani, ou avant toute dépendance produit plus large à des en-têtes de période numériques.
+- **Action requise à ce moment-là :** étendre étroitement la regex de `_extract_month()` pour accepter `-` et `.` comme séparateurs et l'ordre mois-premier, tout en préservant `UNKNOWN` honnête pour les formes réellement ambiguës — ceci est une direction nommée par la revue, pas une autorisation d'implémentation.
+- **Risque trop tôt :** aucun majeur — mais toucher `temporal_normalizer.py` sans mission dédiée réintroduirait un changement non tracé dans un fichier partagé par plusieurs consommateurs (classification LLM incluse).
+- **Risque trop tard :** le cas vertical Phidani reste non démontré de bout en bout sur données réelles, malgré un kernel FTE correct — écart entre « le moteur temporel existe » et « le moteur temporel fonctionne sur le client réel qui a motivé sa création ».
+- **Ordre relatif :** immédiatement après FTE v0, avant toute revendication de conformité Phidani complète.
+
+#### 1.4.b — `QuantifiedImpact.is_current_period` : vérité temporelle legacy concurrente, non réconciliée avec FTE
+- **Nature :** dette de suivi issue de la revue adversariale indépendante pré-fusion de FTE v0 (2026-08-08), défaut préexistant (pas introduit ni aggravé par FTE v0).
+- **Source :** revue adversariale FTE v0 (2026-08-08), Mission « temporal source of truth » — recherche explicite de vérités temporelles concurrentes au-delà du `temporal_role` déjà connu et isolé.
+- **État réel :** `financial_truth.py::QuantifiedImpact.is_current_period` (bool, défaut `True`) est peuplé par le LLM sur instruction de prompt explicite (`llm_service.py:1086`) et activement consommé en aval (`financial_truth.py:314`, `executive_decision_model.py:76` — exclusion des totaux courants). Complètement indépendant et non réconcilié avec la classification déterministe de FTE v0 — contrairement à `temporal_role` (dormant, isolé par test AST), ce champ est réellement lu en production aujourd'hui.
+- **Pourquoi différé :** hors périmètre strict de FTE v0 et de sa mission de correction — réconcilier ou déprécier ce champ toucherait `llm_service.py`/`financial_truth.py`/`executive_decision_model.py`, largement au-delà de la frontière `fte_minimal.py`.
+- **Dépendances réelles :** FTE v0 doit exister et être stable comme référence déterministe avant toute réconciliation (dépendance désormais levée — FTE v0 livré).
+- **Ce qu'il bloque :** toute revendication d'une interprétation canonique unique de « période courante » à travers le produit — aujourd'hui, deux vérités temporelles coexistent (LLM/`is_current_period` vs déterministe/FTE), non signalées comme divergentes à l'utilisateur.
+- **Déclencheur de réouverture :** avant qu'un composant quelconque revendique une interprétation canonique unique de « période courante » sur l'ensemble du produit.
+- **Action requise à ce moment-là :** réconcilier ou déprécier `is_current_period` face à la classification FTE — décision architecturale à part entière, pas une correction technique mineure.
+- **Risque trop tôt :** toucher `llm_service.py`/`financial_truth.py` sans mission dédiée, hors du périmètre volontairement étroit de FTE v0.
+- **Risque trop tard :** les deux vérités temporelles divergent silencieusement en production sans qu'aucun composant ne le signale — risque déjà réel aujourd'hui, pas hypothétique.
+- **Ordre relatif :** non fixé — attend son déclencheur, pas une place dans la séquence actuelle.
 
 ### 1.5 Anonymisation et Trust & Platform
 - **Nature :** fondation bloquante — **nouvellement qualifiée comme telle par cette session**, elle n'était pas dans la liste initiale de Fred sous cette étiquette précise.
