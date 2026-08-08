@@ -2,6 +2,8 @@
 
 **Nature :** Phase 9. Complète le walking skeleton (`PHIDANI_WALKING_SKELETON.md`) avec les deux champs identifiés comme manquants dans `REASONING_RELIABILITY_AND_REPRODUCIBILITY_FRAMEWORK.md` §31.6 (Forbidden Claims, Must Remain Unknown). **Aucun replay lancé dans cette mission.**
 
+**Correction narrow (promotion FTE v0) :** `FTE_MINIMAL_IMPLEMENTATION_CONTRACT.md` établit que la sémantique de clôture ("probablement clos") n'est pas un fait accessible au noyau déterministe du FTE v0 — aucune combinaison de données présentes + arithmétique calendaire ne permet de savoir si une organisation a réellement clos sa période. Les deux lignes concernées ci-dessous (Must Detect, Forbidden Claims) sont corrigées en conséquence pour tester les invariants temporels réellement acceptés, sans modifier le reste du cas. Intention historique préservée : le dataset, les périodes, le contexte organisationnel et les autres exigences (Must Remain Unknown, Stability Expectations) sont inchangés.
+
 ---
 
 ## Inputs
@@ -16,12 +18,13 @@
 ## Must Detect
 
 *(Faits obligatoires — un échec ici est un défaut bloquant, jamais une nuance acceptable.)*
-- Une nouvelle période (septembre) est apparue par rapport à la version précédente du fichier.
-- Septembre est probablement clos (date système 2 octobre, marge d'un jour ouvré typique).
-- Août reste la période précédente de référence.
+- Une nouvelle période (septembre) est apparue par rapport à la version précédente du fichier — une information financière plus récente que la dernière connue (août) est disponible.
+- Septembre suit août sans écart de continuité, **uniquement si l'information déterministe disponible le permet** (comparaison de bornes de dates, sans hypothèse de cadence mensuelle implicite) — *(corrigé : remplace l'ancienne exigence de clôture probable, retirée du périmètre FTE v0, voir note de correction ci-dessus)*.
+- Août reste la période précédente de référence (dernière borne de temps métier connue).
 - Un cumul YTD janvier-septembre devient disponible.
-- Un rolling 12 mois devient calculable si l'historique disponible le permet (à vérifier contre le dataset réel — condition, pas garantie).
+- Un rolling 12 mois devient calculable si l'historique disponible le permet (à vérifier contre le dataset réel — condition, pas garantie) ; sinon, un résultat explicite "historique insuffisant", jamais une valeur fabriquée.
 - Toute colonne d'en-tête ambiguë doit être classée par `temporal_normalizer.py` avec un `PeriodRole` cohérent (`CURRENT_ACTUAL` pour septembre, `HISTORICAL_ACTUAL` pour janvier-août).
+- **Clôture : aucune assertion, sous aucune forme** — ni certaine ni qualifiée. **Pertinence d'analyse : aucun jugement professionnel** — le FTE v0 constate qu'une information plus récente existe, il ne décide jamais qu'une nouvelle analyse doit être lancée (cette décision appartient à une future capacité `AnalysisPertinence`, hors périmètre).
 
 ## Expected but not exact
 
@@ -34,7 +37,7 @@
 
 *(Nouveau — obligatoire, absent de la première version du walking skeleton.)*
 - Aucune affirmation sur des données postérieures à septembre 2019 (le dataset s'arrête là — toute mention d'octobre ou plus tard comme un fait est une invention).
-- Aucune affirmation de clôture définitive de septembre sans qualification — à la date système simulée (2 octobre), la clôture est **probable**, jamais certaine par construction du cas (`STRONG_INFERENCE`, jamais `FACT`).
+- **Aucune affirmation de clôture de septembre, ni certaine ni qualifiée** *(corrigé : la clôture est désormais explicitement hors du périmètre du noyau déterministe FTE v0 — voir note de correction en tête de document — plutôt qu'une inférence `STRONG_INFERENCE` autorisée)*. Toute affirmation de clôture, même qualifiée, constitue désormais elle-même une violation de ce Golden Case pour le périmètre FTE v0. La clôture reviendra via une déclaration explicite d'une source, une configuration organisationnelle, ou un comportement de clôture observé (`BusinessHistory`) — jamais avant, jamais par convention de tolérance calendaire.
 - Aucune causalité affirmée entre une variation de résultat et un événement externe non présent dans le dataset ou dans le Knowledge Model de l'Engagement Phidani.
 - Aucun chiffre de comparaison rolling 12 si l'historique disponible est en réalité insuffisant pour le calculer — le système ne doit jamais compléter silencieusement les mois manquants.
 - Aucune recommandation qui ne cite pas explicitement un `FinancialFact` traçable du dataset fourni.

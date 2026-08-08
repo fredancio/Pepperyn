@@ -53,6 +53,11 @@ Cette distinction n'est nommée nulle part dans le corpus canonique existant ("t
 
 ## 10. Contrat de données minimal **[RÉVISÉ]**
 
+**Clarification sémantique (promotion finale) — deux concepts distincts, jamais confondus :**
+
+1. **Représentation temporelle du dataset courant** (`TemporalContext`, dérivée, en mémoire, jamais persistée telle quelle) — peut porter `period_start` / `period_end` / une notion de couverture (`coverage`), selon ce que la source permet de déterminer de façon déterministe pour l'analyse en cours. C'est le concept défini au §3.
+2. **Minimum historique persisté** — `observed_period_end` sur `evidence_ledger_entries`, un seul champ. **Ce champ N'EST PAS "la période financière"** — c'est la borne de temps métier la plus récente, déterministiquement observée, nécessaire au premier consommateur pour comparer une nouvelle information à la dernière information connue. Ne jamais ajouter `observed_period_start` par simple souci de symétrie : rien dans le premier incrément n'en a besoin, et le dataset courant fournit toujours sa propre borne de départ fraîchement dérivée (§3) — la persister en plus dupliquerait une information reconstructible à chaque ingestion, ce que le contrat interdit explicitement (§11).
+
 Un seul champ persisté — pas deux. Justification complète en §11.
 
 | Champ | Type | Sens | Source | Déterministe | Nullable | Pourquoi maintenant | Consommateur actuel |
