@@ -1,8 +1,8 @@
 # EPISTEMIC_DIALOGUE_V0_IMPLEMENTATION_CONTRACT.md
 
-**Status:** PROPOSED — architecture/documentation mission, read-only, not yet approved, not yet implemented.
-**Branch:** `architecture/epistemic-dialogue-v0-2026-08-09` (not merged).
-**Depends on:** `docs/Architecture/Cognitive/KNOWLEDGE_MODEL_V0_IMPLEMENTATION_CONTRACT.md` — MERGED, CANONICAL, `main` commit `773cb0b` (migrations v24/v25, `services/knowledge_model_service.py`, adversarially reviewed, structurally protected against branching). This document does not reopen, re-derive, or restate Knowledge Model's own design — it treats `confirm()`/`recall()` as a fixed, trusted API.
+**Status:** PROPOSED — architecture/documentation mission, read-only, not yet approved, not yet implemented. **Final Contract Arbitration pass completed 2026-08-09** (this revision): the Case-B concurrent-first-confirmation reservation named below is now closed by canonical Knowledge Model v0; verdict raised from B to A accordingly (see Final Report).
+**Branch:** `architecture/epistemic-dialogue-v0-2026-08-09` (promoted to `main` in this arbitration pass).
+**Depends on:** `docs/Architecture/Cognitive/KNOWLEDGE_MODEL_V0_IMPLEMENTATION_CONTRACT.md` — MERGED, CANONICAL, `main` commits `773cb0b` (base: migrations v24/v25, `services/knowledge_model_service.py`, adversarially reviewed, structurally protected against successor branching) and `a7a1049` (root-uniqueness repair: migration v26, `UNIQUE(entity_id, subject) WHERE relates_to_knowledge_id IS NULL`, closes the concurrent-first-confirmation race, validated live on real PostgreSQL including genuine two-thread concurrency). This document does not reopen, re-derive, or restate Knowledge Model's own design — it treats `confirm()`/`recall()` as a fixed, trusted API.
 **Companion documents (doctrinally reconciled 2026-08-09, surgical corrections only):** `FINANCIAL_REPRESENTATION_UNDERSTANDING_FOUNDATION.md`, `EPISTEMIC_DIALOGUE_FOUNDATION.md`, `FRU_EPISTEMIC_FIRST_VERTICAL_SLICE.md`.
 
 ---
@@ -97,6 +97,8 @@ This sequence survives the analysis with one clarification, not a rejection: **C
 
 `ClarificationNeed` is never itself passed to `KnowledgeModel` — it is consumed entirely within Epistemic Dialogue and produces, at most, one `confirm()` call.
 
+**Re-attacked against six adversarial cases (final arbitration, 2026-08-09):** (1) knows-nothing → Case B, `recalled_value=None`; (2) already-knows-same → Case A, no object constructed; (3) new-evidence-contradicts → Case C; (4) evidence-insufficient-for-a-candidate → no `candidate_value` exists, so no `ClarificationNeed` is constructed at all (§6, detector-`UNKNOWN` case) — a precondition, not a fifth field; (5) human-confirms → `candidate_value` passed directly to `confirm()`; (6) human-rejects-and-supplies-an-alternative → the alternative value (`CORRECT_TO(value)`, §9) is a **transient** part of the answer-handling flow, consumed directly by the `confirm()` call in the same turn — it is never written back into `ClarificationNeed`, which represents the *question* state, not the *answer* state. All six resolve within the existing four fields; none forces a fifth.
+
 ## 5. Persistence question — examined, resolved: NOT persisted in v0
 
 Tested against every listed consequence, and every one resolves cleanly under a purely **ephemeral, freshly-regenerated** model — the same discipline already applied to Candidate inside `KnowledgeModel` itself, not a new pattern invented here:
@@ -105,7 +107,7 @@ Tested against every listed consequence, and every one resolves cleanly under a 
 - **Returns tomorrow** — same reasoning; regeneration is idempotent, not a re-ask of something already settled, because nothing was ever settled.
 - **Multiple uploads intervene** — an ephemeral model naturally uses only the *latest* upload's candidate; there is no stale, accumulating queue of unresolved questions to reconcile.
 - **New Evidence makes the question moot** — the next loop run re-checks RECALL fresh; if knowledge now exists (someone else answered, or a deterministic promotion occurred), Case A fires and no new `ClarificationNeed` is even created.
-- **Another user of the same Entity answers first** — same mechanism: whoever's answer reaches `confirm()` first is reflected in RECALL for everyone afterward. (The write-time race this implies is a real, separate concern — see §13 case 11 and the Biggest Risk in the final report; it is a `KnowledgeModel`-layer question, not solved by Epistemic Dialogue's own persistence choice.)
+- **Another user of the same Entity answers first** — same mechanism: whoever's answer reaches `confirm()` first is reflected in RECALL for everyone afterward. **Closed 2026-08-09** (previously the contract's largest named reservation, see §13 case "two humans answer differently" and §9's new paragraph on `ConcurrentRootConflictError`): `KnowledgeModel` v26 now makes this structurally impossible to race — the second, losing `confirm()` call receives a named rejection from PostgreSQL itself, not a silent double-write.
 - **Question becomes obsolete / convention changes** — both handled for free by fresh COMPARE on every run; no staleness-tracking logic needs to be built.
 
 **Conclusion: persistence is not introduced because no real professional need forces it.** All the scenarios that *sound* like they need durable state are actually solved by cheap, correct regeneration. A future session-level UX convenience (e.g., not losing an unanswered prompt if the user navigates away mid-review) is a presentation-surface concern (§11) that can be added later without touching this domain model — it would not retroactively justify canonical persistence of `ClarificationNeed` itself.
@@ -136,6 +138,11 @@ The identity of a "question," for the purpose of this rule, is exactly the canon
 - **New subject** — a different tuple entirely, trivially independent.
 - **Corrupt/ambiguous Knowledge** (Case D) — never conflated with either "repeat" or "new" — its own distinct escalation path (§6).
 
+**Falsifiability checks (final arbitration, 2026-08-09)** — made explicit rather than left implicit:
+
+- **Same convention, months later, not just "tomorrow"** — `recall()`'s chain-head resolution is purely graph-structural (`relates_to_knowledge_id`), never `confirmed_at`-based (§6, §7); no code path reads elapsed time. A confirmation from months ago is exactly as authoritative as one from seconds ago — "never ask twice" does not decay.
+- **New Entity does not inherit another Entity's suppression** — `recall()` is always scoped by `entity_id` (`services/knowledge_model_service.py`: `.eq("entity_id", entity_id)`, confirmed by direct reading, unchanged by this arbitration). A brand-new Entity's first upload always resolves `recalled_value=None` regardless of what any other Entity has confirmed for the same subject — Case B fires independently, the question is never suppressed by a different company's history.
+
 ## 8. Question quality — domain content vs. presentation wording
 
 **Structure is domain; phrasing is presentation.** `ClarificationNeed`'s four fields (§4) guarantee that *any* future rendering surface can construct a question containing all three required epistemic components — **OBSERVATION** (what was seen/recalled), **HYPOTHESIS** (the candidate), **MINIMAL CONFIRMATION REQUEST** (a yes/no or a correction, never an open interrogative) — without needing anything beyond those four fields. That guarantee belongs to the domain.
@@ -146,6 +153,8 @@ The exact sentence is presentation, and for v0 is a **deterministic Python strin
 - Case C (contradiction-form): *"Jusqu'ici vos charges étaient présentées en valeurs positives. Ce fichier semble utiliser des signes négatifs. Cette convention a-t-elle changé ?"* — generated from both `recalled_value` and `candidate_value`, explicitly naming what changed rather than repeating the generic original question (this is also what keeps Case C from *reading* like "asking twice," even though it touches the same tuple).
 
 A future LLM-generated variant may replace the template's wording later (§10) without changing what `ClarificationNeed` must structurally guarantee.
+
+**Structural requirements, derived (final arbitration, 2026-08-09):** a good question must (1) state what Pepperyn observed, (2) state its interpretation, (3) expose uncertainty honestly, (4) request confirmation narrowly, (5) never ask the user to explain accounting fundamentals Pepperyn should infer itself. (1)/(2)/(4) map directly to OBSERVATION/HYPOTHESIS/CONFIRMATION-REQUEST above. (3) is satisfied by construction, not a fourth missing component: the HYPOTHESIS is always phrased non-assertively ("il semble que," "appears to be"), never as a flat claim — honesty about uncertainty is the phrasing convention, not a separate field. (5) is not this section's concern at all — it is the *decision to ask* (§4 of the foundation document, "when Pepperyn must not ask"), already governing *whether* a question exists before this section ever decides *how* to phrase it; re-litigating it here would blur content and wording exactly as this section warns against.
 
 ## 9. Human authority — four boundary stages, one gate
 
@@ -158,6 +167,8 @@ A human can confirm, correct, indicate a convention change, or provide context a
 
 **No LLM can reach stage 4 alone**, even where an LLM assists at stage 2 (§10): an LLM's interpretation is itself treated as another candidate requiring the same legality/unambiguity gate as any other input, never trusted as a direct authorization to call `confirm()`.
 
+**New: handling `ConcurrentRootConflictError` at the stage-4 call site (final arbitration, 2026-08-09).** Now that `KnowledgeModel` v26 structurally rejects a losing concurrent `confirm()` call rather than silently allowing it, Epistemic Dialogue's own confirm-call site must define what happens when its `confirm()` call is the one rejected. Required behavior: catch the exception, call `recall()` again immediately, and treat whatever it now returns as authoritative — i.e. re-enter Case A (§6) with the winning value. Explicitly forbidden: retrying the write with the same value (the DB already told us a different value won), presenting this to the human as if *their* answer was rejected (it wasn't wrong — someone else's confirmation simply landed first), or silently discarding the event without re-checking RECALL. This mirrors `ConcurrentRootConflictError`'s own docstring instruction (`services/knowledge_model_service.py`): "the caller must call recall() again to see the canonical value that won, never assume its own value was the one confirmed." No winner-selection logic is introduced here — PostgreSQL already chose; Epistemic Dialogue only has to notice and recover, cleanly, into the exact behavior it already has for Case A.
+
 ## 10. LLM role — and why v0 has none
 
 Candidate future responsibilities: reformulating a hypothesis in natural language, phrasing the confirmation question, interpreting free-text answers, explaining *why* Pepperyn is uncertain. Forbidden, permanently: creating canonical truth alone, bypassing RECALL, bypassing Evidence, promoting Knowledge, inventing a company convention that wasn't actually observed or confirmed.
@@ -169,6 +180,8 @@ Candidate future responsibilities: reformulating a hypothesis in natural languag
 **Proposition:** chat is a presentation-and-interaction surface for epistemic events, not the domain itself. **Test:** can a `ClarificationNeed` be created, evaluated, and resolved into a `confirm()` call with zero chat UI involved? Yes — nothing in §4 through §9 references a chat surface, a message, or a conversation. The Golden Loop (§12) is driven entirely by a simulated human answer, exactly matching how every other "first slice" in this engagement has been proven (FTE's Walking Skeleton, Knowledge Model's own Phidani loop test) — through a test harness, not a UI.
 
 **Removing chat does not destroy Epistemic Dialogue.** The reverse test the mission proposes — "if removing the chat UI destroys the architecture, the architecture is probably wrong" — passes: `ClarificationNeed`, RECALL-before-ASK, COMPARE, materiality-by-subject, and the confirm-gating logic in §9 all function identically whether the question is ultimately delivered via chat, an upload-confirmation banner, an onboarding step, a review-screen prompt, or a notification. Chat is one interchangeable delivery mechanism among several, not Epistemic Dialogue's identity.
+
+**Directly verified against the real file (final arbitration, 2026-08-09), not just argued:** `backend/services/conversation_engine.py` was read in full. It contains zero references to `KnowledgeModel`, `ClarificationNeed`, or any dialogue-type concept — confirming the foundation document's claim (§2) that today's chat has no coupling to this domain to break. It also contains no anonymization call before building its LLM payload, independently corroborating the already-named, already-tracked Trust Boundary bypass (`EPISTEMIC_DIALOGUE_FOUNDATION.md` §11) — inspected here only to confirm the risk is real and correctly named, not repaired in this mission.
 
 ## 12. First Phidani loop — the Golden Loop, walked through and internally consistent
 
@@ -198,7 +211,7 @@ The walkthrough is internally consistent with every rule stated above — no rul
 | User contradicts themselves across turns | **Safe to defer** | Requires session-level state tracking beyond v0's single-turn, ephemeral `ClarificationNeed`. |
 | Question ignored | **Required now, free** | Already correctly handled by §5's ephemeral design — no new code needed. |
 | New Evidence arrives before answer | **Required now, free** | Same reason — fresh RECALL on every run. |
-| Two humans answer differently | **Safe to defer, but named precisely** | For Case C (supersession), `KnowledgeModel`'s `UNIQUE(relates_to_knowledge_id)` (v25) already prevents two competing successors. For Case B (two people confirming a **brand-new** subject simultaneously — two competing `NULL`-predecessor roots), no equivalent protection exists yet at the `KnowledgeModel` layer; this is an inherited, previously-named residual gap (KM v0's adversarial review), not a new discovery, and not something Epistemic Dialogue can close on its own. See Biggest Risk in the final report. |
+| Two humans answer differently | **Required now — now structurally closed, not deferred** (updated 2026-08-09) | For Case C (supersession), `KnowledgeModel`'s `UNIQUE(relates_to_knowledge_id)` (v25) prevents two competing successors. For Case B (two people confirming a **brand-new** subject simultaneously — two competing `NULL`-predecessor roots), `KnowledgeModel` v26 (`UNIQUE(entity_id, subject) WHERE relates_to_knowledge_id IS NULL`, root-uniqueness repair, validated live including genuine two-thread concurrency) now closes this too. Both cases: the losing `confirm()` call is rejected by PostgreSQL, not silently allowed — Epistemic Dialogue's own recovery behavior for the rejection is specified in §9. |
 | Same Entity, future multiple Engagements | **Required now, already correct** | Everything is scoped by `entity_id`, never `engagement_id` — Engagement is recorded only as acquisition context on the eventual `confirm()` call. |
 | Convention differs by sheet/template | **Architectural blocker, deferred upstream** | Requires a scope dimension `KnowledgeModel` v0 explicitly does not have (its own §5) — not solvable inside Epistemic Dialogue. |
 | Knowledge exists but scope becomes insufficient | **Architectural blocker, deferred upstream** | Same reason. |
@@ -233,6 +246,27 @@ FRU deterministic detector (STUB, per FRU's own not-yet-built first slice)
 - **Inability to handle "I don't know"?** Explicitly designed for (`DECLINE`, §9, §13), not an oversight discovered late.
 
 **What makes this more than a conditional form:** a clever form doesn't refuse to exist without first consulting memory. §6's RECALL-before-ASK, made structurally testable rather than merely documented, is the one property here a form-based system would have no reason to build. That is the genuine, defensible claim — not that Epistemic Dialogue v0 already understands materiality or company culture broadly, which it honestly does not yet.
+
+## 16. Adversarial matrix A–L (final arbitration, 2026-08-09)
+
+Every outcome below is derived from rules already established in §3–§15 — no new rule is introduced except where explicitly cross-referenced (§9's `ConcurrentRootConflictError` handling, item K).
+
+| # | Scenario | Outcome |
+|---|---|---|
+| A | No prior knowledge + strong candidate | **ASK** — Case B (§6), confirmation-form (§8). |
+| B | Same prior knowledge + same candidate | **DO NOT ASK** — Case A (§6); no `ClarificationNeed` constructed. |
+| C | Prior knowledge + contradictory candidate | **ASK** — Case C (§6), contradiction-form (§8). |
+| D | No prior knowledge + no defensible candidate | **REMAIN UNKNOWN** — FRU returns `UNKNOWN`, no `candidate_value` exists, no `ClarificationNeed` constructed (§13, detector-`UNKNOWN` row). |
+| E | Human confirms candidate | **CONFIRM** — stage 4 (§9); `SUPERSEDE` variant if this was Case C (`relates_to_knowledge_id` set). |
+| F | Human rejects candidate, supplies valid alternative | **CONFIRM** (with the human-supplied value, §4 Case-6 note) — `SUPERSEDE` if a prior row existed. |
+| G | Human gives ambiguous answer | **REMAIN UNKNOWN** — `UNINTERPRETABLE` (§9); no `confirm()` call, nothing persisted. |
+| H | Second upload after confirmation | **DO NOT ASK** — `recall()` now returns the confirmed row → Case A (§12 Upload 2/4). |
+| I | Different Entity | **ASK** — `recall()` scoped by `entity_id` returns `None` regardless of other Entities' knowledge → Case B, never suppressed (§7 falsifiability note). |
+| J | Different subject | **ASK or DO NOT ASK, independently** — each `(entity_id, subject)` tuple resolves its own Case A–E entirely independently of any other subject (§7). |
+| K | Concurrent human confirmation | **CONFIRM (one writer) + re-RECALL→Case A (the other)** — now structurally protected by `KnowledgeModel` v25 (successor race) and v26 (root race, closed 2026-08-09); the losing `confirm()` call is rejected by PostgreSQL and recovered exactly as specified in §9's new paragraph, never retried, never reported to the human as their answer being wrong. |
+| L | Knowledge changes legitimately over time | **SUPERSEDE** — this is Case C under a different name; identical to item C/E, included here for completeness against the mission's own list. |
+
+No ambiguous outcome found. Item K is the only row whose outcome changed by this arbitration pass (previously would have read "structurally unprotected, see Biggest Risk" — see §5/§9/§13 updates above).
 
 ---
 
@@ -280,9 +314,11 @@ UNKNOWN BEHAVIOR:                    Absence of a KnowledgeModel row = Unknown; 
 AMBIGUOUS KNOWLEDGE BEHAVIOR:        KnowledgeChainIntegrityError must never be treated as Case B; distinct
                                       escalation path required, ordinary question forbidden
 IGNORED QUESTION:                    Handled for free by ephemeral design — no special-case code needed
-MULTIPLE HUMAN ANSWERS:              Case C protected by KnowledgeModel's existing UNIQUE constraint (v25);
-                                      Case B (competing brand-new confirmations) NOT yet protected — named,
-                                      inherited, not solved here
+MULTIPLE HUMAN ANSWERS:              Case C protected by KnowledgeModel's UNIQUE constraint (v25); Case B
+                                      (competing brand-new confirmations) now ALSO protected (v26, closed
+                                      2026-08-09) — the losing confirm() call is rejected by PostgreSQL and
+                                      recovered via re-RECALL, never retried, never reported as the human's
+                                      answer being wrong (§9, §16 item K)
 NEW EVIDENCE BEFORE ANSWER:          Handled for free by ephemeral design — fresh RECALL every run
 FIRST IMPLEMENTATION SLICE:          FRU stub detector -> Epistemic Dialogue (new logic) -> KnowledgeModel
                                       recall()/confirm() (unchanged) -> simulated human answer
@@ -291,25 +327,35 @@ NEW MIGRATION REQUIRED:              NO
 NEW LLM CALL REQUIRED:               NO
 TRUST BOUNDARY IMPACT:               NONE for v0 (zero LLM calls); Trust Gateway remains a hard blocker for any
                                       future LLM-assisted phrasing/interpretation
-ARCHITECTURAL CONFLICT:              NONE found against Knowledge Model v0 or the reconciled foundations
-BIGGEST RISK:                        Case-B concurrent-first-confirmation race at the KnowledgeModel layer
-                                      (two competing NULL-predecessor roots for a brand-new (entity, subject))
-                                      is not closed by the existing UNIQUE(relates_to_knowledge_id) constraint,
-                                      which only protects successor branching — inherited, named, not invented
-                                      here, not solved in this document
+ARCHITECTURAL CONFLICT:              NONE found against Knowledge Model v0 (base + root-uniqueness repair) or
+                                      the reconciled foundations
+BIGGEST RISK (PREVIOUSLY):           Case-B concurrent-first-confirmation race at the KnowledgeModel layer —
+                                      CLOSED 2026-08-09 by migration v26 (UNIQUE(entity_id, subject) WHERE
+                                      relates_to_knowledge_id IS NULL), proven live including genuine two-
+                                      thread concurrency against real PostgreSQL (local + Pepperyn Integration
+                                      Test). This document's own §5/§9/§13/§16 updated to describe the
+                                      resulting architecture, not merely mark the old risk "resolved."
+REMAINING RESIDUAL ITEM:             Not a defect: §9's ConcurrentRootConflictError recovery behavior (catch
+                                      → re-RECALL → treat as Case A) is a v0 design decision correctly derived
+                                      from KnowledgeModel's own exception contract, but has not yet been
+                                      exercised by a real test — normal pre-implementation status, to be
+                                      covered by the first implementation slice's own test contract, not a
+                                      reason to withhold promotion (matches the precedent set by every other
+                                      contract promoted to canonical in this engagement before its own
+                                      implementation phase)
 BIGGEST COMPETITIVE OPPORTUNITY:     RECALL-before-ASK as a structural, code-shape guarantee rather than a
                                       convention — most conversational AI either always asks or never
                                       remembers; a provably-enforced memory-before-question invariant is a
                                       genuine, demonstrable differentiator once wired to a real surface
-IMPLEMENTATION READINESS:            Contract is implementable as specified; one named, non-blocking residual
-                                      risk (Case B race) to weigh before or shortly after a first implementation
+IMPLEMENTATION READINESS:            Contract is implementable as specified; no blocking architectural gap
+                                      remains — the one prior blocking reservation (Case B race) is closed
 DOCUMENT:                            docs/Architecture/Cognitive/EPISTEMIC_DIALOGUE_V0_IMPLEMENTATION_CONTRACT.md
 BRANCH:                              architecture/epistemic-dialogue-v0-2026-08-09
 CURRENT BRANCH:                      main (after this mission)
-FINAL VERDICT:                       B — READY WITH NAMED RESERVATIONS
+FINAL VERDICT:                       A — CANONICAL AND READY FOR IMPLEMENTATION
 ```
 
-**Why B, not A:** every phase resolved to a specific, testable design with no unresolved architectural question — except the Case-B concurrent-first-confirmation gap, which this document correctly refuses to silently paper over (consistent with the discipline this whole engagement has followed) and correctly refuses to solve unilaterally, since it belongs to `KnowledgeModel`'s own migration surface, not to this document's scope. That single named reservation, not any doubt about the loop's own design, is what keeps this at B.
+**Why A, not B (revised 2026-08-09):** the single reservation that kept the prior arbitration at B — the Case-B concurrent-first-confirmation gap — is now structurally closed by canonical Knowledge Model v0 (migration v26), proven live including genuine two-thread concurrency, not merely asserted closed. This arbitration pass re-attacked every other section (§3–§15) against the mission's own fresh adversarial demands (RECALL-before-ASK ownership, `ClarificationNeed`'s six-case re-attack, never-ask-twice falsifiability, the human-authority gate, contradiction/supersession sequencing, question-quality structure, the chat boundary — independently verified against the real `conversation_engine.py`, not just argued — the LLM boundary, the first slice, and a full A–L adversarial matrix, §16) and found no new blocking gap, only small clarifications worth making explicit (§4, §7, §8) and one genuinely new, correctly-scoped design decision (§9's `ConcurrentRootConflictError` recovery). Nothing here was marked "resolved" without describing the architecture that now actually exists — matching this engagement's own established discipline of not papering over the difference between a reservation being closed and a reservation being ignored.
 
 ---
 *Companion documents (doctrinally corrected 2026-08-09): `FINANCIAL_REPRESENTATION_UNDERSTANDING_FOUNDATION.md`, `EPISTEMIC_DIALOGUE_FOUNDATION.md`, `FRU_EPISTEMIC_FIRST_VERTICAL_SLICE.md`.*
