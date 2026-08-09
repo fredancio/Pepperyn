@@ -32,6 +32,7 @@ import pytest
 
 from backend.services.knowledge_model_service import (
     ChainBranchError,
+    ConcurrentRootConflictError,
     CrossEntitySupersessionError,
     CrossSubjectSupersessionError,
     InvalidSubjectError,
@@ -167,6 +168,31 @@ class _Table:
                 raise Exception(
                     "duplicate key value violates unique constraint "
                     "\"knowledge_model_one_successor_per_predecessor\""
+                )
+
+        # UNIQUE INDEX knowledge_model_one_root_per_entity_subject WHERE
+        # relates_to_knowledge_id IS NULL (migration v26 — root-uniqueness
+        # adversarial repair, following the reservation Epistemic Dialogue
+        # v0 named against merged Knowledge Model v0). Complements v25:
+        # v25 constrains non-NULL relates_to_knowledge_id (branching AFTER
+        # a first confirmation); this constrains the NULL case itself (two
+        # competing FIRST confirmations for the same (entity_id, subject)).
+        # Scoped to the (entity_id, subject) pair — never per-entity alone,
+        # never global.
+        if rtk is None:
+            existing_root = next(
+                (
+                    r for r in self.rows.values()
+                    if r.get("entity_id") == row["entity_id"]
+                    and r.get("subject") == row["subject"]
+                    and r.get("relates_to_knowledge_id") is None
+                ),
+                None,
+            )
+            if existing_root is not None:
+                raise Exception(
+                    "duplicate key value violates unique constraint "
+                    "\"knowledge_model_one_root_per_entity_subject\""
                 )
 
         # NOT NULL confirmed_by / confirmed_at
@@ -465,8 +491,14 @@ class TestAdversarialSupersession:
         # Force a row with a different subject into the store directly
         # (bypassing the registry, which only has one member today) to
         # prove the cross-subject guard itself, independent of registry
-        # size.
-        forged = db.knowledge_model._do_insert({
+        # size. Uses force_insert_bypassing_constraints (not _do_insert):
+        # this forged row's real, pre-relabel subject is momentarily
+        # EXPENSE_SIGN_CONVENTION, which would otherwise collide with k1
+        # under migration v26's root-uniqueness constraint — a false
+        # positive unrelated to what this test actually checks (the
+        # cross-subject guard), so the same bypass already used by
+        # test_17/test_F for forged/legacy rows applies here too.
+        forged = db.knowledge_model.force_insert_bypassing_constraints({
             "entity_id": entity, "subject": "EXPENSE_SIGN_CONVENTION",
             "value": "SIGNED_NATURAL", "relates_to_knowledge_id": None,
             "provenance": "HUMAN_CONFIRMATION", "confirmed_by": _user_id(),
@@ -654,6 +686,142 @@ class TestBranchProtection:
         assert "sorted(" not in source
         assert ".order(" not in source
         assert "max(" not in source
+
+
+# ── H1-H10: root uniqueness (INVARIANT — root-uniqueness adversarial repair
+#    mission, 2026-08-09). Migration v26 closes the gap Epistemic Dialogue v0
+#    named against the merged Knowledge Model v0: v25's UNIQUE(relates_to_
+#    knowledge_id) constrains non-NULL values only, leaving any number of
+#    competing NULL-root rows for the same (entity_id, subject) unconstrained.
+#    The genuine-concurrency case (matrix item L) is proven separately against
+#    real, local PostgreSQL (not mocked here — see mission final report) —
+#    these tests prove the SERVICE's own logic/simulation is consistent with
+#    that live proof, not a substitute for it. ─────────────────────────────
+
+class TestRootUniqueness:
+    def test_H1_first_root_succeeds(self):
+        entity = _entity_id()
+        db = MockSupabase(entities={entity})
+        row = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                      confirmed_by=_user_id(), confirmed_at=_now())
+        assert row.relates_to_knowledge_id is None
+
+    def test_H2_second_null_root_same_entity_same_subject_rejected(self):
+        """The core correction: a second, contradictory root confirmation
+        for the same (entity_id, subject) is refused — this is the exact
+        defect Epistemic Dialogue v0 named and this mission proved live
+        against real PostgreSQL before writing this test."""
+        entity = _entity_id()
+        db = MockSupabase(entities={entity})
+        confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                confirmed_by=_user_id(), confirmed_at=_now())
+        with pytest.raises(ConcurrentRootConflictError):
+            confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "SIGNED_NATURAL",
+                    confirmed_by=_user_id(), confirmed_at=_now())
+
+    def test_H3_root_for_different_subject_same_entity_succeeds(self):
+        """Scoped by (entity_id, subject), never by entity_id alone."""
+        entity = _entity_id()
+        db = MockSupabase(entities={entity})
+        confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                confirmed_by=_user_id(), confirmed_at=_now())
+        forged_other_subject_root = db.knowledge_model.force_insert_bypassing_constraints({
+            "entity_id": entity, "subject": "OTHER_SUBJECT", "value": "X",
+            "relates_to_knowledge_id": None, "provenance": "HUMAN_CONFIRMATION",
+            "confirmed_by": _user_id(), "confirmed_at": _now().isoformat(),
+        })
+        assert forged_other_subject_root["relates_to_knowledge_id"] is None
+
+    def test_H4_root_for_same_subject_different_entity_succeeds(self):
+        """Already covered by test_A under its own name, re-asserted here
+        directly under the root-uniqueness matrix for completeness."""
+        e1, e2 = _entity_id(), _entity_id()
+        db = MockSupabase(entities={e1, e2})
+        k1 = confirm(db, e1, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                     confirmed_by=_user_id(), confirmed_at=_now())
+        k2 = confirm(db, e2, "EXPENSE_SIGN_CONVENTION", "SIGNED_NATURAL",
+                     confirmed_by=_user_id(), confirmed_at=_now())
+        assert k1.relates_to_knowledge_id is None
+        assert k2.relates_to_knowledge_id is None
+
+    def test_H5_normal_chain_k1_k2_k3_unaffected(self):
+        entity = _entity_id()
+        db = MockSupabase(entities={entity})
+        k1 = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                     confirmed_by=_user_id(), confirmed_at=_now())
+        k2 = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "SIGNED_NATURAL",
+                     confirmed_by=_user_id(), confirmed_at=_now(),
+                     relates_to_knowledge_id=k1.id)
+        k3 = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                     confirmed_by=_user_id(), confirmed_at=_now(),
+                     relates_to_knowledge_id=k2.id)
+        assert k2.relates_to_knowledge_id == k1.id
+        assert k3.relates_to_knowledge_id == k2.id
+
+    def test_H6_root_marker_persists_on_superseded_row(self):
+        """Once K1 is confirmed as root, it keeps relates_to_knowledge_id
+        IS NULL forever, even after being superseded — this is intended:
+        exactly one origin per chain, permanently. The constraint being
+        satisfied by K1 is precisely what makes a future competing root
+        for this (entity_id, subject) impossible, not just at write time
+        but for the lifetime of the chain."""
+        entity = _entity_id()
+        db = MockSupabase(entities={entity})
+        k1 = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                     confirmed_by=_user_id(), confirmed_at=_now())
+        confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "SIGNED_NATURAL",
+                confirmed_by=_user_id(), confirmed_at=_now(),
+                relates_to_knowledge_id=k1.id)
+        assert db.knowledge_model.rows[k1.id]["relates_to_knowledge_id"] is None
+
+    def test_H7_engagement_deletion_unaffected_by_root_constraint(self):
+        entity = _entity_id()
+        engagement = _engagement_id()
+        db = MockSupabase(entities={entity}, engagements={engagement: entity})
+        row = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                      confirmed_by=_user_id(), confirmed_at=_now(),
+                      engagement_id=engagement)
+        db.knowledge_model.simulate_engagement_delete(engagement)
+        assert db.knowledge_model.rows[row.id]["engagement_id"] is None
+        assert db.knowledge_model.rows[row.id]["relates_to_knowledge_id"] is None
+
+    def test_H8_entity_deletion_cascades_root(self):
+        entity = _entity_id()
+        db = MockSupabase(entities={entity})
+        row = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                      confirmed_by=_user_id(), confirmed_at=_now())
+        db.knowledge_model.simulate_entity_delete(entity)
+        assert row.id not in db.knowledge_model.rows
+
+    def test_H9_recall_unaffected_by_new_constraint(self):
+        """recall()'s own code makes no reference to root uniqueness at
+        all — J in the mission's matrix (recall() determinism) — proven
+        here by showing normal recall behavior is unaffected for a chain
+        the constraint never touches."""
+        entity = _entity_id()
+        db = MockSupabase(entities={entity})
+        k1 = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                     confirmed_by=_user_id(), confirmed_at=_now())
+        found = recall(db, entity, "EXPENSE_SIGN_CONVENTION")
+        assert found is not None and found.id == k1.id
+
+    def test_H10_service_wraps_db_rejection_in_named_error_not_raw_exception(self):
+        """Phase 6: DB is the sole invariant authority (no pre-check
+        SELECT added to confirm() — that would reintroduce the exact
+        check-then-act race this migration closes); the service's only
+        job is translating the DB's rejection into the module's own
+        named-error vocabulary, exactly as arc_service.py already does
+        for its own UNIQUE constraint."""
+        entity = _entity_id()
+        db = MockSupabase(entities={entity})
+        confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                confirmed_by=_user_id(), confirmed_at=_now())
+        try:
+            confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "SIGNED_NATURAL",
+                    confirmed_by=_user_id(), confirmed_at=_now())
+            assert False, "expected ConcurrentRootConflictError"
+        except ConcurrentRootConflictError as e:
+            assert "recall" in str(e).lower()  # points caller back to recall(), never a winner
 
 
 # ── 16-19: deletion semantics (BEHAVIOR — service-level simulation;

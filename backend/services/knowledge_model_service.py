@@ -111,6 +111,28 @@ class KnowledgeChainIntegrityError(KnowledgeModelError):
     """
 
 
+class ConcurrentRootConflictError(KnowledgeModelError):
+    """
+    Write-time structural guarantee (migration v26,
+    knowledge_model_one_root_per_entity_subject): at most one root
+    Knowledge row (relates_to_knowledge_id IS NULL) may ever exist per
+    (entity_id, subject). Raised when the database rejects an insert
+    because a root already exists for this pair — including the case of
+    two genuinely concurrent first confirmations racing for the same
+    (entity_id, subject) (root-uniqueness adversarial repair mission,
+    2026-08-09).
+
+    This module never pre-checks for an existing root before inserting —
+    a SELECT-then-INSERT check here would reintroduce exactly the
+    check-then-act race that made this migration necessary in the first
+    place (see migration v25's own history). PostgreSQL is the sole race
+    arbiter; this exception only translates its rejection into the
+    module's own named-error vocabulary. No winner is ever chosen here —
+    the caller must call recall() again to see the canonical value that
+    won, never assume its own value was the one confirmed.
+    """
+
+
 @dataclass(frozen=True)
 class KnowledgeRow:
     """Read-only projection of a knowledge_model row."""
@@ -253,7 +275,31 @@ def confirm(
         "[KNOWLEDGE MODEL] CONFIRM entity=%s subject=%s relates_to=%s",
         entity_id, subject, relates_to_knowledge_id,
     )
-    result = supabase.from_("knowledge_model").insert(insert_payload).execute()
+    try:
+        result = supabase.from_("knowledge_model").insert(insert_payload).execute()
+    except Exception as e:
+        # DB = sole invariant authority (migration v26); this module never
+        # pre-checks for an existing root (that would reintroduce a
+        # check-then-act race). We only translate a root-uniqueness
+        # rejection into a clean, named domain error — string-matched the
+        # same way arc_service.py already does for its own UNIQUE
+        # constraint (services/arc_service.py, create_arc_from_decision),
+        # not a new pattern invented here.
+        err_str = str(e)
+        if relates_to_knowledge_id is None and (
+            "knowledge_model_one_root_per_entity_subject" in err_str
+            or "unique" in err_str.lower()
+            or "duplicate" in err_str.lower()
+        ):
+            raise ConcurrentRootConflictError(
+                f"A root Knowledge row already exists for entity_id="
+                f"{entity_id} subject={subject}. Refusing to create a "
+                f"second, competing origin — this may be a genuine "
+                f"concurrent first confirmation. Call recall() again to "
+                f"see the value that was actually confirmed; never assume "
+                f"this call's own value won."
+            ) from e
+        raise
     return KnowledgeRow.from_row(result.data[0])
 
 
