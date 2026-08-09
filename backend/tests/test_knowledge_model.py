@@ -152,6 +152,23 @@ class _Table:
             raise Exception(f"insert or update on table \"knowledge_model\" "
                              f"violates foreign key constraint (entity_id)")
 
+        # UNIQUE knowledge_model_one_successor_per_predecessor (migration
+        # v25 — branch-protection correction from the pre-merge adversarial
+        # review). Postgres UNIQUE semantics: NULL is never equal to NULL,
+        # so only non-NULL relates_to_knowledge_id values are constrained —
+        # any number of independent root rows (NULL) remain unrestricted.
+        rtk = row.get("relates_to_knowledge_id")
+        if rtk is not None:
+            existing_successor = next(
+                (r for r in self.rows.values() if r.get("relates_to_knowledge_id") == rtk),
+                None,
+            )
+            if existing_successor is not None:
+                raise Exception(
+                    "duplicate key value violates unique constraint "
+                    "\"knowledge_model_one_successor_per_predecessor\""
+                )
+
         # NOT NULL confirmed_by / confirmed_at
         if not row.get("confirmed_by"):
             raise Exception("null value in column \"confirmed_by\" violates not-null constraint")
@@ -192,6 +209,26 @@ class _Table:
             f"[KNOWLEDGE MODEL] row {row_id} is immutable — UPDATE rejected "
             f"by knowledge_model_immutability_guard trigger"
         )
+
+    def force_insert_bypassing_constraints(self, payload: dict) -> dict:
+        """
+        Writes a row directly, skipping ALL constraint simulation
+        (registry, provenance, self-supersession, FK, NOT NULL, and the
+        v25 UNIQUE branch-protection constraint added below). Represents
+        data that predates a constraint (e.g. rows written before
+        migration v25 existed) or a raw bypass of the service entirely —
+        the only way, once v25 is applied, that two CONFIRMED rows could
+        ever legitimately be found both referencing the same predecessor.
+        Used exclusively to prove recall()'s fail-safe still fires against
+        such historical/corrupted state — never to prove new writes can
+        still branch (they can't, see TestBranchProtection).
+        """
+        row = dict(payload)
+        row["id"] = row.get("id") or str(uuid.uuid4())
+        row.setdefault("engagement_id", None)
+        row.setdefault("relates_to_knowledge_id", None)
+        self.rows[row["id"]] = row
+        return row
 
     def simulate_entity_delete(self, entity_id: str) -> None:
         """ON DELETE CASCADE via entity_id."""
@@ -457,22 +494,25 @@ class TestAdversarialSupersession:
                     relates_to_knowledge_id=k1.id)
 
     def test_17_branching_read_time_fails_safe_never_picks_a_winner(self):
-        """If branching occurs anyway (direct write bypassing confirm()'s
-        guard — e.g. a future concurrent-write race), RECALL must raise,
-        never silently resolve via confirmed_at or insertion order."""
+        """Since migration v25 (UNIQUE(relates_to_knowledge_id)), two new
+        CONFIRMED rows can no longer both reference the same predecessor —
+        see TestBranchProtection. This test now proves the OTHER case:
+        recall()'s fail-safe still fires against historical/corrupted data
+        that predates the constraint (force_insert_bypassing_constraints
+        represents exactly that — never reachable via confirm() today,
+        but not something a constraint can retroactively repair either).
+        Never silently resolved via confirmed_at or insertion order."""
         entity = _entity_id()
         db = MockSupabase(entities={entity})
         k1 = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
                      confirmed_by=_user_id(), confirmed_at=_now())
-        # Bypass confirm()'s guard entirely — direct table write, exactly
-        # what a genuine race condition would look like.
-        db.knowledge_model._do_insert({
+        db.knowledge_model.force_insert_bypassing_constraints({
             "entity_id": entity, "subject": "EXPENSE_SIGN_CONVENTION",
             "value": "SIGNED_NATURAL", "relates_to_knowledge_id": k1.id,
             "provenance": "HUMAN_CONFIRMATION", "confirmed_by": _user_id(),
             "confirmed_at": datetime(2020, 1, 1, tzinfo=timezone.utc).isoformat(),
         })
-        db.knowledge_model._do_insert({
+        db.knowledge_model.force_insert_bypassing_constraints({
             "entity_id": entity, "subject": "EXPENSE_SIGN_CONVENTION",
             "value": "ABSOLUTE_POSITIVE", "relates_to_knowledge_id": k1.id,
             "provenance": "HUMAN_CONFIRMATION", "confirmed_by": _user_id(),
@@ -488,6 +528,132 @@ class TestAdversarialSupersession:
             confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "SIGNED_NATURAL",
                     confirmed_by=_user_id(), confirmed_at=_now(),
                     relates_to_knowledge_id=str(uuid.uuid4()))
+
+
+# ── Branch protection (migration v25) — pre-merge review correction #1 ─────
+# Mission test contract A-G. The mock's _do_insert now simulates the real
+# UNIQUE(relates_to_knowledge_id) constraint (see _Table._do_insert above),
+# so these tests exercise the same code paths as before — the DB-level
+# guarantee is what changed, not the service's own logic. Deliberately NOT
+# a concurrency simulation (no threads, no async) per the mission's own
+# instruction: the constraint IS the concurrency guarantee: Postgres's
+# unique-index machinery serializes concurrent inserts targeting the same
+# value natively. Proving that requires a real database, not a Python
+# mock — see the live Postgres validation for the actual concurrency proof.
+
+class TestBranchProtection:
+    def test_A_multiple_null_roots_remain_allowed(self):
+        """UNIQUE(relates_to_knowledge_id) never constrains NULL — any
+        number of independent root confirmations (across different
+        Entities and/or subjects) must remain unaffected."""
+        e1, e2 = _entity_id(), _entity_id()
+        db = MockSupabase(entities={e1, e2})
+        k1 = confirm(db, e1, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                     confirmed_by=_user_id(), confirmed_at=_now())
+        k2 = confirm(db, e2, "EXPENSE_SIGN_CONVENTION", "SIGNED_NATURAL",
+                     confirmed_by=_user_id(), confirmed_at=_now())
+        assert k1.relates_to_knowledge_id is None
+        assert k2.relates_to_knowledge_id is None
+        assert k1.id != k2.id
+
+    def test_B_single_successor_allowed(self):
+        entity = _entity_id()
+        db = MockSupabase(entities={entity})
+        k1 = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                     confirmed_by=_user_id(), confirmed_at=_now())
+        k2 = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "SIGNED_NATURAL",
+                     confirmed_by=_user_id(), confirmed_at=_now(),
+                     relates_to_knowledge_id=k1.id)
+        assert k2.relates_to_knowledge_id == k1.id
+
+    def test_C_second_successor_of_same_predecessor_rejected_at_db_level(self):
+        """The core correction: even bypassing confirm()'s own
+        application-level guard entirely (direct table insert), the
+        simulated UNIQUE constraint itself rejects a second row
+        referencing the same predecessor. This is what closes the
+        genuine concurrent-write race the application-level check alone
+        could not — see migration v25."""
+        entity = _entity_id()
+        db = MockSupabase(entities={entity})
+        k1 = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                     confirmed_by=_user_id(), confirmed_at=_now())
+        db.knowledge_model._do_insert({
+            "entity_id": entity, "subject": "EXPENSE_SIGN_CONVENTION",
+            "value": "SIGNED_NATURAL", "relates_to_knowledge_id": k1.id,
+            "provenance": "HUMAN_CONFIRMATION", "confirmed_by": _user_id(),
+            "confirmed_at": _now().isoformat(),
+        })
+        with pytest.raises(Exception, match="knowledge_model_one_successor_per_predecessor"):
+            db.knowledge_model._do_insert({
+                "entity_id": entity, "subject": "EXPENSE_SIGN_CONVENTION",
+                "value": "ABSOLUTE_POSITIVE", "relates_to_knowledge_id": k1.id,
+                "provenance": "HUMAN_CONFIRMATION", "confirmed_by": _user_id(),
+                "confirmed_at": _now().isoformat(),
+            })
+
+    def test_D_normal_three_generation_chain_still_allowed(self):
+        """The constraint is per-predecessor, not per-chain — a normal
+        linear chain (each row superseding a DIFFERENT predecessor) must
+        remain entirely unaffected."""
+        entity = _entity_id()
+        db = MockSupabase(entities={entity})
+        k1 = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                     confirmed_by=_user_id(), confirmed_at=_now())
+        k2 = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "SIGNED_NATURAL",
+                     confirmed_by=_user_id(), confirmed_at=_now(),
+                     relates_to_knowledge_id=k1.id)
+        k3 = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                     confirmed_by=_user_id(), confirmed_at=_now(),
+                     relates_to_knowledge_id=k2.id)
+        assert k2.relates_to_knowledge_id == k1.id
+        assert k3.relates_to_knowledge_id == k2.id
+
+    def test_E_recall_still_returns_correct_chain_head(self):
+        entity = _entity_id()
+        db = MockSupabase(entities={entity})
+        k1 = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                     confirmed_by=_user_id(), confirmed_at=_now())
+        k2 = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "SIGNED_NATURAL",
+                     confirmed_by=_user_id(), confirmed_at=_now(),
+                     relates_to_knowledge_id=k1.id)
+        found = recall(db, entity, "EXPENSE_SIGN_CONVENTION")
+        assert found is not None and found.id == k2.id
+
+    def test_F_historical_branch_fail_safe_still_present(self):
+        """Re-affirms test_17's finding under the new constraint: recall()
+        keeps its own independent fail-safe for data that predates v25 or
+        bypasses it entirely — the constraint prevents NEW branching, it
+        cannot repair a historically corrupted chain, so the read-time
+        detection remains necessary defense in depth, unchanged."""
+        entity = _entity_id()
+        db = MockSupabase(entities={entity})
+        k1 = confirm(db, entity, "EXPENSE_SIGN_CONVENTION", "ABSOLUTE_POSITIVE",
+                     confirmed_by=_user_id(), confirmed_at=_now())
+        db.knowledge_model.force_insert_bypassing_constraints({
+            "entity_id": entity, "subject": "EXPENSE_SIGN_CONVENTION",
+            "value": "SIGNED_NATURAL", "relates_to_knowledge_id": k1.id,
+            "provenance": "HUMAN_CONFIRMATION", "confirmed_by": _user_id(),
+            "confirmed_at": _now().isoformat(),
+        })
+        db.knowledge_model.force_insert_bypassing_constraints({
+            "entity_id": entity, "subject": "EXPENSE_SIGN_CONVENTION",
+            "value": "ABSOLUTE_POSITIVE", "relates_to_knowledge_id": k1.id,
+            "provenance": "HUMAN_CONFIRMATION", "confirmed_by": _user_id(),
+            "confirmed_at": _now().isoformat(),
+        })
+        with pytest.raises(KnowledgeChainIntegrityError):
+            recall(db, entity, "EXPENSE_SIGN_CONVENTION")
+
+    def test_G_no_confirmed_at_arbitration_introduced(self):
+        """Structural check: this correction must not have added any
+        confirmed_at-based sorting/tie-breaking to recall(). Complements
+        the existing runtime proof (test_10b's clock-skew case, unchanged
+        by this migration)."""
+        import inspect
+        source = inspect.getsource(recall)
+        assert "sorted(" not in source
+        assert ".order(" not in source
+        assert "max(" not in source
 
 
 # ── 16-19: deletion semantics (BEHAVIOR — service-level simulation;
