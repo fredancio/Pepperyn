@@ -93,12 +93,32 @@ from typing import Optional
 _CHARGE_CODE_PREFIXES = {"60", "61", "62", "63", "64", "65", "66"}
 
 # Majority threshold for the code-range signal: >=90% non-negative ->
-# ABSOLUTE_POSITIVE; <=10% non-negative (i.e. >=90% negative) ->
-# SIGNED_NATURAL; anything genuinely mixed in between -> signal absent
-# (never guesses). Chosen because it tolerates the real file's own
-# documented exceptions (2.1% negative) without being fooled by a
-# genuinely different convention.
-_NONNEG_MAJORITY_THRESHOLD = 0.9
+# ABSOLUTE_POSITIVE; >=90% negative -> SIGNED_NATURAL; anything genuinely
+# mixed in between -> signal absent (never guesses). Chosen because it
+# tolerates the real file's own documented exceptions (2.1% negative)
+# without being fooled by a genuinely different convention.
+#
+# Numeric representation (repaired 2026-08-09, "FRU SIGN CONVENTION STUB —
+# 90% NUMERIC BOUNDARY REPAIR" mission): the 90% business threshold itself
+# is unchanged. What changed is HOW the two symmetric comparisons
+# (non-negative majority / negative majority) are computed. The prior
+# implementation derived the negative-side bound via floating-point
+# subtraction (`1 - _NONNEG_MAJORITY_THRESHOLD`), which is not exactly 0.1
+# in IEEE 754 (`1 - 0.9 == 0.09999999999999998`) — this silently broke
+# symmetry at exactly the 90% boundary: the ABSOLUTE_POSITIVE side (a
+# direct `ratio >= 0.9` comparison) fired correctly at exactly 90%, but
+# the SIGNED_NATURAL side (`ratio <= 1 - 0.9`) did not, because
+# `0.1 <= 0.09999999999999998` is False. The threshold is now expressed
+# as an exact integer fraction (NUM/DEN = 9/10) and both comparisons are
+# performed via integer cross-multiplication on exact integer COUNTS
+# (`nonneg`, and `neg = total - nonneg`, itself exact integer subtraction)
+# — never via a derived floating-point ratio or a floating-point
+# subtraction of the threshold. This makes the two comparisons
+# mathematically, not just intentionally, symmetric at any exact
+# threshold expressible as a small integer fraction.
+_NONNEG_MAJORITY_THRESHOLD_NUM = 9
+_NONNEG_MAJORITY_THRESHOLD_DEN = 10
+_NONNEG_MAJORITY_THRESHOLD = _NONNEG_MAJORITY_THRESHOLD_NUM / _NONNEG_MAJORITY_THRESHOLD_DEN  # 0.9, retained for documentation/introspection only — no comparison uses this float
 
 ABSOLUTE_POSITIVE = "ABSOLUTE_POSITIVE"
 SIGNED_NATURAL = "SIGNED_NATURAL"
@@ -114,17 +134,35 @@ class Candidate:
 
 
 def _code_range_signal(charge_values: list[float]) -> Optional[str]:
-    """Majority/consistency signal (candidate signal 1, module docstring).
+    """
+    Majority/consistency signal (candidate signal 1, module docstring).
     Returns None (signal absent) if there is no data, or if the
     distribution is genuinely mixed with no clear majority either way —
-    never guesses."""
+    never guesses.
+
+    Numeric method (repaired 2026-08-09 — see
+    `_NONNEG_MAJORITY_THRESHOLD_NUM`/`_DEN`'s own comment for the full
+    root-cause explanation): both branches compare exact integer COUNTS
+    via cross-multiplication against the exact integer threshold
+    fraction, never a derived floating-point ratio and never a
+    floating-point subtraction of the threshold. `neg` is computed as
+    `total - nonneg` — exact integer subtraction, not `1 - <float ratio>`
+    — which is what makes the two branches provably symmetric at exactly
+    the threshold, not merely symmetric by intention.
+    """
     if not charge_values:
         return None
+    total = len(charge_values)
     nonneg = sum(1 for v in charge_values if v >= 0)
-    ratio = nonneg / len(charge_values)
-    if ratio >= _NONNEG_MAJORITY_THRESHOLD:
+    neg = total - nonneg
+    # nonneg/total >= NUM/DEN  <=>  nonneg*DEN >= NUM*total (exact, integer).
+    if nonneg * _NONNEG_MAJORITY_THRESHOLD_DEN >= _NONNEG_MAJORITY_THRESHOLD_NUM * total:
         return ABSOLUTE_POSITIVE
-    if ratio <= (1 - _NONNEG_MAJORITY_THRESHOLD):
+    # neg/total >= NUM/DEN  <=>  neg*DEN >= NUM*total (exact, integer) —
+    # the mirror-image comparison, structurally identical in form to the
+    # one above, on `neg` rather than `nonneg`. This is the fix: previously
+    # this branch used `ratio <= (1 - _NONNEG_MAJORITY_THRESHOLD)`.
+    if neg * _NONNEG_MAJORITY_THRESHOLD_DEN >= _NONNEG_MAJORITY_THRESHOLD_NUM * total:
         return SIGNED_NATURAL
     return None
 
