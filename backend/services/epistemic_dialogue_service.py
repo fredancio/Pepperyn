@@ -33,8 +33,22 @@ WHAT THIS MODULE DOES:
     (contract §9's new paragraph, final arbitration 2026-08-09): never
     retries with the same value, never invents a winner — re-RECALLs
     and reconciles against whatever PostgreSQL actually confirmed.
+    CORRECTED (post-review, 2026-08-09): the recovered value is compared
+    against what this actor was itself trying to confirm, so the caller
+    can distinguish benign reconciliation (someone else confirmed the
+    SAME value) from a genuine conflict (someone else confirmed a
+    DIFFERENT value) — see `ResolutionResult` and `resolve_clarification`.
   - A deterministic question-rendering helper (contract §8) — presentation
     wording, kept separate from the domain decision above it.
+
+DELIBERATE V0 BOUNDARY (Case D / FRU-UNKNOWN — named explicitly per the
+independent adversarial review, 2026-08-09, correction 3): when FRU's
+Candidate is UNKNOWN, this module stays silent — it never asks an
+open-ended question. This is a deliberate v0 limitation, NOT the
+intended final professional behavior. See `EpistemicOutcome`'s
+"UNRESOLVED_NO_CANDIDATE" docstring below for the full statement of
+what a future Epistemic Dialogue must eventually be able to do here,
+and why it is correctly excluded from v0.
 
 WHAT THIS MODULE NEVER DOES (negative contract):
   - No LLM call, anywhere, for any reason (verified structurally,
@@ -103,8 +117,42 @@ class EpistemicOutcome:
         with the candidate. "Never ask twice" in its purest form.
       - "UNRESOLVED_NO_CANDIDATE": mission Phase 5 Case D — FRU's own
         Candidate is UNKNOWN. No ClarificationNeed is even constructed;
-        asking "is nothing true?" would be nonsensical, not cautious.
+        no confirmation question is asked, because there is no candidate
+        value to phrase a targeted confirm/correct question around.
         No persistence invented for this case (mission's own instruction).
+
+        EXPLICIT V0 BOUNDARY (independent adversarial review, correction
+        3, 2026-08-09): this silence is a deliberate v0 limitation, NOT
+        the intended final professional behavior. There are two distinct
+        forms of epistemic humility a competent professional needs, and
+        v0 only implements the first two of what will eventually be
+        three:
+          1. "Je pense avoir compris ; confirmez-moi." (Case A/B — this
+             module already does this.)
+          2. "Ce que je comprends maintenant contredit ce que vous
+             m'aviez appris ; est-ce que la convention a changé ?"
+             (Case C — this module already does this.)
+          3. "Je n'arrive pas à former une hypothèse suffisamment solide
+             pour vous poser une question fermée. Aidez-moi à comprendre
+             votre convention." (Case D / FRU-UNKNOWN — NOT implemented
+             in v0.)
+        A future Epistemic Dialogue must be capable of something
+        equivalent to: "Je ne parviens pas à déterminer de manière
+        suffisamment fiable la convention utilisée pour ces montants.
+        Pouvez-vous m'indiquer comment ils doivent être interprétés ?" —
+        an open-ended question, asked only when uncertainty is material,
+        deterministic reasoning has been exhausted, RECALL contains no
+        answer, and no sufficiently defensible candidate exists. That
+        future capability must preserve the same governing principle
+        already proven end-to-end by this v0 slice: competence first ->
+        uncertainty recognized -> relevant human question -> answer
+        remembered -> question not repeated unless evidence changes.
+        Building it now would require a general natural-language
+        question engine and free-text answer interpretation, both
+        explicitly out of scope for this vertical slice (contract §8,
+        §10) — deferred, not abandoned. Documented here explicitly so
+        "UNKNOWN -> silence" is never later mistaken for the desired
+        final architecture.
       - "INTEGRITY_ESCALATION": contract §6 Case D — RECALL found a
         corrupted/ambiguous chain (`KnowledgeChainIntegrityError`). Never
         treated as "no knowledge" — a distinct, named outcome, routed
@@ -176,6 +224,21 @@ def interpret_human_answer(
 
     An answer proposing anything outside the subject's legal registry
     is never coerced — it is UNINTERPRETABLE, per contract §9 stage 3.
+
+    NOTE on the DECLINE vocabulary (clarified post-review, correction 4,
+    2026-08-09): "I_DONT_KNOW" and "JE_NE_SAIS_PAS" are UI enum/button
+    values, not free-text patterns — contract §9 stage 1 already states
+    v0's input is "a constrained yes/no/correction signal, not free
+    text." Naturally typed text such as "I don't know" or "je ne sais
+    pas" does NOT normalize to these underscored tokens (an apostrophe
+    and spaces are not collapsed to underscores) and safely falls
+    through to UNINTERPRETABLE instead — never fabricating a DECLINE it
+    wasn't asked for, and never silently writing anything. This module
+    deliberately does not build free-text/NLP normalization to make
+    these tokens reachable from typed prose; a future surface wiring
+    real chat input would need its own explicit mapping step (or an
+    LLM-assisted interpretation stage, contract §10) before calling this
+    function, not a change to this function's own vocabulary.
     """
     if raw_answer is None:
         return InterpretedAnswer(outcome="DECLINE")
@@ -197,9 +260,50 @@ def interpret_human_answer(
 
 @dataclass(frozen=True)
 class ResolutionResult:
-    """Outcome of attempting to resolve a `ClarificationNeed` against a
-    human answer (mission Phase 6/10)."""
-    status: str  # "CONFIRMED" | "NO_WRITE_DECLINED" | "NO_WRITE_AMBIGUOUS" | "RECONCILED_TO_EXISTING"
+    """
+    Outcome of attempting to resolve a `ClarificationNeed` against a
+    human answer (mission Phase 6/10).
+
+    status is exactly one of:
+      "CONFIRMED"              — this actor's confirm() call succeeded.
+      "NO_WRITE_DECLINED"      — human declined; nothing written.
+      "NO_WRITE_AMBIGUOUS"     — human's answer was uninterpretable;
+                                  nothing written.
+      "RECONCILED_TO_EXISTING" — CORRECTED (post-review, 2026-08-09):
+                                  this actor's confirm() call was
+                                  rejected because another actor's
+                                  confirmation landed first, AND that
+                                  actor confirmed the SAME value this
+                                  actor was itself trying to confirm.
+                                  Benign reconciliation — nothing to
+                                  reconcile in substance, the canonical
+                                  value already matches what this human
+                                  answered.
+      "CONCURRENT_CONFLICT"    — NEW (post-review, 2026-08-09): this
+                                  actor's confirm() call was rejected
+                                  because another actor's confirmation
+                                  landed first, and that actor confirmed
+                                  a DIFFERENT value than this actor was
+                                  trying to confirm. This is NOT benign —
+                                  Pepperyn must never claim or imply this
+                                  human's answer was confirmed. The
+                                  actual canonical value is carried in
+                                  `knowledge_row` for the caller to
+                                  present honestly (e.g. "someone else
+                                  already confirmed a different answer to
+                                  this question — here is what is now
+                                  canonical").
+
+    Both `RECONCILED_TO_EXISTING` and `CONCURRENT_CONFLICT` always carry
+    the actual DB winner in `knowledge_row` — the distinction is never
+    computed by choosing a winner, guessing, or using a timestamp; it is
+    a simple, honest comparison of the already-canonical `winner.value`
+    (from a fresh recall(), per contract §9) against the value this
+    actor itself attempted to confirm. KnowledgeModel remains the sole
+    arbiter of which value actually won; this module only reports the
+    comparison.
+    """
+    status: str  # "CONFIRMED" | "NO_WRITE_DECLINED" | "NO_WRITE_AMBIGUOUS" | "RECONCILED_TO_EXISTING" | "CONCURRENT_CONFLICT"
     knowledge_row: Optional[KnowledgeRow] = None
 
 
@@ -253,8 +357,22 @@ def resolve_clarification(
         # one, never tell the human their answer was "wrong" (it wasn't;
         # someone else's confirmation simply landed first). Re-RECALL and
         # reconcile against whatever is now canonical.
+        #
+        # CORRECTED (independent adversarial review, correction 1,
+        # 2026-08-09): re-RECALL alone is not sufficient — the review
+        # proved that reporting the identical status regardless of
+        # whether the winner's value matches this actor's own attempted
+        # value makes benign reconciliation and a genuine contradictory
+        # answer indistinguishable to the caller. Explicitly compare
+        # winner.value to value_to_confirm; still never choose a winner,
+        # never use a timestamp, never write anything further —
+        # KnowledgeModel already decided, this only reports honestly
+        # which of the two situations actually happened.
         winner = recall(supabase, need.entity_id, need.subject)
-        return ResolutionResult(status="RECONCILED_TO_EXISTING", knowledge_row=winner)
+        winner_value = winner.value if winner is not None else None
+        if winner_value == value_to_confirm:
+            return ResolutionResult(status="RECONCILED_TO_EXISTING", knowledge_row=winner)
+        return ResolutionResult(status="CONCURRENT_CONFLICT", knowledge_row=winner)
 
 
 def render_clarification_question(need: ClarificationNeed) -> str:

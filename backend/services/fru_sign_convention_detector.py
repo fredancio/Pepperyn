@@ -34,18 +34,36 @@ final report for exact evidence, not asserted from memory):
 
   1. ACCOUNT-CODE-RANGE SIGNAL — rows whose account code falls in the
      Belgian PCMN charge range (60-66, `_CHARGE_CODE_PREFIXES` below).
-     Real Phidani.xlsx: 289 charge-coded observations across the sheet,
-     283 (97.9%) non-negative. The 6 negative observations are legitimate
-     documented exceptions (e.g. "Utilisations et reprises (-)",
-     "Récupération précompte professionnel" — refunds/reversals, whose
-     own label in the source already flags them as an adjustment) —
-     NOT evidence of a different sign convention for ordinary charges.
-     This is exactly why the signal is a MAJORITY/consistency check
-     (`_NONNEG_MAJORITY_THRESHOLD`), never an "any negative disqualifies"
-     rule — a single-exception veto would be fragile and would
-     misclassify this real file. A genuinely mixed distribution (no
-     clear majority either way) still correctly degrades to "signal
-     absent" rather than guessing.
+     Real Phidani.xlsx: roughly 190 charge-coded rows per period column
+     pass the prefix filter, of which a small number (verified: 2 for
+     period column C — row 163 code '630' formula '=C162'; row 231 code
+     '650' formula '=SUM(C174:C230)', aggregating 57 other rows) are
+     NOT independent leaf observations — CORRECTED (independent
+     adversarial review, correction 2, 2026-08-09): these are
+     formula-derived aggregate/rollup rows that happen to carry an
+     in-range account code, and are now structurally excluded (see
+     `detect_expense_sign_convention_from_workbook` below) — not by
+     hardcoding their codes, but by checking whether the row's own
+     period-column cell is itself a formula (derived) rather than a
+     literal value (a genuine leaf observation). The prior version of
+     this module only special-cased the literal string "60"; this
+     generalizes that same principle to any charge-coded row, whatever
+     its code. Among the remaining genuine leaf observations, a small
+     minority are negative — legitimate documented exceptions (e.g.
+     "Utilisations et reprises (-)", "Récupération précompte
+     professionnel" — refunds/reversals, whose own label in the source
+     already flags them as an adjustment) — NOT evidence of a different
+     sign convention for ordinary charges. This is exactly why the
+     signal is a MAJORITY/consistency check (`_NONNEG_MAJORITY_THRESHOLD`),
+     never an "any negative disqualifies" rule — a single-exception veto
+     would be fragile and would misclassify this real file. A genuinely
+     mixed distribution (no clear majority either way) still correctly
+     degrades to "signal absent" rather than guessing.
+     NOTE: this signal's observations are drawn from one sheet/company's
+     real leaf rows — they are independent in the sense of "not
+     mathematically derived from each other," not in a formal statistical
+     sense; no claim of i.i.d. sampling is made or needed for a
+     majority/consistency check.
   2. ARITHMETIC/SUBTOTAL SIGNAL — Phidani.xlsx has a row whose account
      code is the bare aggregate `"60"` (charges subtotal, e.g.
      `=SUM(C32:C33)`), and a later "Marge brute" row whose formula
@@ -163,6 +181,22 @@ def detect_expense_sign_convention_from_workbook(
 
     `period_column` is a 1-indexed column number (e.g. 3 for column C),
     matching openpyxl's own convention.
+
+    STRUCTURAL, NOT SEMANTIC, ROLLUP EXCLUSION (correction 2, independent
+    adversarial review, 2026-08-09): a row is treated as a genuine leaf
+    observation only if its own period-column cell holds a literal
+    numeric value in the FORMULAS-mode workbook (i.e. the cell is not
+    itself a formula). A row whose period-column cell IS a formula
+    (`=C162`, `=SUM(C174:C230)`, ...) is, by definition, derived from
+    other cells and is excluded from `charge_values` regardless of what
+    its own account code happens to be — this is a structural test on
+    the cell's own nature (formula vs. literal), never a hardcoded list
+    of "known" rollup codes, and never an attempt to parse or understand
+    what the formula computes (no general Excel semantic engine). The
+    bare "60" aggregate row is still special-cased separately below
+    because it additionally supplies the cell reference the arithmetic
+    signal searches for — that role is independent of leaf-exclusion and
+    is unchanged by this correction.
     """
     import openpyxl  # local import: this module's pure core has zero
     # dependency on openpyxl; only this adapter function does.
@@ -194,6 +228,14 @@ def detect_expense_sign_convention_from_workbook(
             continue
         prefix = str(icode)[:2]
         if prefix not in _CHARGE_CODE_PREFIXES:
+            continue
+        # Structural rollup exclusion (correction 2): a formula in this
+        # row's own period-column cell means the value is derived from
+        # other rows, not an independent leaf observation — exclude it
+        # regardless of its account code, never by hardcoding which
+        # codes are "known" rollups.
+        period_cell_formula = ws_f.cell(row=cell.row, column=period_column).value
+        if isinstance(period_cell_formula, str) and period_cell_formula.startswith("="):
             continue
         v = ws_v.cell(row=cell.row, column=period_column).value
         if isinstance(v, (int, float)):

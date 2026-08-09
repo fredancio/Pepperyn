@@ -14,6 +14,23 @@ Test classification (same discipline as `test_knowledge_model.py`):
     proof of runtime semantics on their own.
   REAL-FILE — Phase 14/Q: the actual canonical Phidani.xlsx, not a
     synthetic reconstruction.
+
+POST-REVIEW CORRECTIONS (independent adversarial review, 2026-08-09,
+"EPISTEMIC DIALOGUE v0 — FINAL CORRECTIONS BEFORE MERGE"):
+  Correction 1 — TestConcurrencyRecovery's test_L is now the
+    different-value case (CONCURRENT_CONFLICT); test_L2 adds the
+    same-value case (RECONCILED_TO_EXISTING) that was previously
+    conflated with it.
+  Correction 2 — TestWorkbookAdapterSynthetic's rollup-exclusion test
+    reproduces the real Phidani.xlsx subtotal-contamination finding
+    (rows 163/231) in a controlled synthetic fixture.
+  Correction 3 — no test change (documentation-only, see
+    epistemic_dialogue_service.py and the canonical contract §13).
+  Correction 4 — TestIntegrityEscalation (previously-unexercised
+    INTEGRITY_ESCALATION path), TestThresholdBoundary (89/90/91%),
+    TestWorkbookAdapterSynthetic's formula-sign-inversion tests, and
+    test_G3 (documents natural decline phrases as UNINTERPRETABLE, not
+    a silently-broken DECLINE match).
 """
 from __future__ import annotations
 
@@ -138,6 +155,27 @@ class TestHumanAnswerGate:
         assert result.status == "NO_WRITE_DECLINED"
         assert db.knowledge_model.rows == {}
 
+    def test_G3_naturally_typed_decline_phrases_are_uninterpretable_not_decline(self):
+        """Correction 4 (documented, not implemented as NLP): the
+        DECLINE vocabulary's snake_case tokens ("I_DONT_KNOW",
+        "JE_NE_SAIS_PAS") are UI enum/button values, not free-text
+        patterns -- naturally typed prose does not normalize to them
+        (an apostrophe and spaces are never collapsed to underscores).
+        This is a deliberate, documented v0 boundary (see
+        interpret_human_answer's docstring), guarded here so a future
+        change cannot silently start treating typed decline phrases as
+        DECLINE without an explicit decision to do so. Either way,
+        nothing is ever written -- both outcomes refuse confirm()."""
+        for raw in ("je ne sais pas", "I don't know", "I DON'T KNOW"):
+            answer = interpret_human_answer(raw, candidate_value=ABSOLUTE_POSITIVE)
+            assert answer.outcome == "UNINTERPRETABLE", (
+                f"{raw!r} unexpectedly matched a DECLINE token"
+            )
+        # The programmatic enum forms (as a UI button would send) still work.
+        for raw in ("IDK", "I_DONT_KNOW", "JE_NE_SAIS_PAS", "je_ne_sais_pas"):
+            answer = interpret_human_answer(raw, candidate_value=ABSOLUTE_POSITIVE)
+            assert answer.outcome == "DECLINE", f"{raw!r} should be DECLINE"
+
 
 # ── Phase 7: never-ask-twice, executable four-upload proof (BEHAVIOR) ──────
 
@@ -239,9 +277,14 @@ class TestSubjectIsolation:
 
 
 # ── L: Concurrency recovery (BOUNDARY, contract §9's new paragraph) ────────
+# CORRECTED post-review (correction 1, 2026-08-09): same-value and
+# different-value concurrent outcomes must be distinguishable, not both
+# reported as "RECONCILED_TO_EXISTING".
 
 class TestConcurrencyRecovery:
-    def test_L_concurrent_first_confirmation_reconciles_to_db_winner(self):
+    def test_L_concurrent_first_confirmation_different_value_is_a_conflict(self):
+        """Different-value winner: Actor 2 must NEVER see this reported as
+        benign reconciliation -- it is a genuine, honestly-labeled conflict."""
         entity = _entity_id()
         db = MockSupabase(entities={entity})
 
@@ -253,13 +296,16 @@ class TestConcurrencyRecovery:
         # Actor 2's ClarificationNeed was built from the SAME pre-write
         # RECALL state (recalled_value=None) -- simulating the genuine
         # race window two concurrent first confirmations would share.
+        # Actor 2 attempts a DIFFERENT value than the one that actually won.
         need_2 = ClarificationNeed(entity, _SUBJECT, SIGNED_NATURAL, None)
         result_2 = resolve_clarification(db, need_2, "SIGNED_NATURAL", confirmed_by=_user_id(), confirmed_at=_now())
 
         # Never a second canonical root, never a fabricated winner, never
-        # a retry with Actor 2's own value -- reconciled to whoever the DB
-        # actually confirmed first.
-        assert result_2.status == "RECONCILED_TO_EXISTING"
+        # a retry with Actor 2's own value, and -- the correction -- never
+        # reported as if it were benign: the winner's value (ABSOLUTE_POSITIVE)
+        # differs from what Actor 2 attempted (SIGNED_NATURAL), so this must
+        # be the distinct CONCURRENT_CONFLICT outcome, not RECONCILED_TO_EXISTING.
+        assert result_2.status == "CONCURRENT_CONFLICT"
         assert result_2.knowledge_row.value == ABSOLUTE_POSITIVE
 
         # Exactly one root row exists for this (entity, subject) — proven,
@@ -271,6 +317,77 @@ class TestConcurrencyRecovery:
         ]
         assert len(roots) == 1
         assert roots[0]["value"] == ABSOLUTE_POSITIVE
+
+    def test_L2_concurrent_first_confirmation_same_value_is_benign(self):
+        """Same-value winner (correction 1's other named case): Actor 2's
+        own attempted value happens to match whoever actually won. This
+        must be reported as benign reconciliation, NOT as a conflict --
+        nothing contradictory actually happened from Actor 2's point of
+        view, even though their own write was rejected."""
+        entity = _entity_id()
+        db = MockSupabase(entities={entity})
+
+        need_1 = ClarificationNeed(entity, _SUBJECT, ABSOLUTE_POSITIVE, None)
+        result_1 = resolve_clarification(db, need_1, "YES", confirmed_by=_user_id(), confirmed_at=_now())
+        assert result_1.status == "CONFIRMED"
+
+        # Actor 2 also attempted ABSOLUTE_POSITIVE -- the SAME value that won.
+        need_2 = ClarificationNeed(entity, _SUBJECT, ABSOLUTE_POSITIVE, None)
+        result_2 = resolve_clarification(db, need_2, "YES", confirmed_by=_user_id(), confirmed_at=_now())
+
+        assert result_2.status == "RECONCILED_TO_EXISTING"
+        assert result_2.knowledge_row.value == ABSOLUTE_POSITIVE
+
+        roots = [
+            r for r in db.knowledge_model.rows.values()
+            if r["entity_id"] == entity and r["subject"] == _SUBJECT
+            and r["relates_to_knowledge_id"] is None
+        ]
+        assert len(roots) == 1
+
+
+# ── Case D (KnowledgeChainIntegrityError) → INTEGRITY_ESCALATION ───────────
+# Correction 4: this path existed in code since the original implementation
+# but was never exercised by any test until now.
+
+class TestIntegrityEscalation:
+    def test_corrupted_chain_never_treated_as_case_b(self):
+        from backend.services.knowledge_model_service import confirm as km_confirm
+
+        entity = _entity_id()
+        db = MockSupabase(entities={entity})
+        k1 = km_confirm(db, entity, _SUBJECT, ABSOLUTE_POSITIVE, confirmed_by=_user_id(), confirmed_at=_now())
+        # Forge TWO rows both claiming to supersede K1 -- bypassing the v25
+        # UNIQUE(relates_to_knowledge_id) constraint the same way
+        # test_knowledge_model.py's own corrupted-chain tests do, since a
+        # live constraint would never let this state arise through the
+        # service itself. This simulates historical/pre-migration corruption.
+        # recall()'s chain-head rule is "not referenced by anyone else" --
+        # a single forged successor would itself become the one clean head
+        # (K1 becomes the referenced, non-head row); it takes TWO rows both
+        # referencing K1 to produce two competing heads and trigger the
+        # integrity error.
+        db.knowledge_model.force_insert_bypassing_constraints({
+            "entity_id": entity, "subject": _SUBJECT,
+            "value": SIGNED_NATURAL, "relates_to_knowledge_id": k1.id,
+            "provenance": "HUMAN_CONFIRMATION", "confirmed_by": _user_id(),
+            "confirmed_at": _now().isoformat(),
+        })
+        db.knowledge_model.force_insert_bypassing_constraints({
+            "entity_id": entity, "subject": _SUBJECT,
+            "value": ABSOLUTE_POSITIVE, "relates_to_knowledge_id": k1.id,
+            "provenance": "HUMAN_CONFIRMATION", "confirmed_by": _user_id(),
+            "confirmed_at": _now().isoformat(),
+        })
+
+        candidate = Candidate(value=ABSOLUTE_POSITIVE, tier="STRONG_INFERENCE")
+        outcome = reason_recall_compare(db, entity, _SUBJECT, candidate)
+
+        # Must never silently degrade to "no knowledge" (Case B / ASK) --
+        # a distinct, named escalation outcome, with no ClarificationNeed
+        # ever constructed (nothing a human could meaningfully confirm here).
+        assert outcome.status == "INTEGRITY_ESCALATION"
+        assert outcome.clarification_need is None
 
 
 # ── O: raw chat never stored (BOUNDARY) ─────────────────────────────────────
@@ -463,3 +580,184 @@ class TestDetectorPureCore:
         values = [100.0] * 50 + [-100.0] * 50  # perfectly mixed, no majority
         c = detect_expense_sign_convention(values, charges_subtracted_in_margin_formula=None)
         assert c == Candidate(None, "UNKNOWN")
+
+
+# ── Correction 4: threshold boundary tests (89% / 90% / 91% negative) ──────
+# Independently re-derives the exact boundary the adversarial review probed
+# by hand (ad hoc script) -- now a committed regression guard.
+
+class TestThresholdBoundary:
+    def _values(self, pct_negative: float) -> list[float]:
+        n_neg = round(100 * pct_negative)
+        n_pos = 100 - n_neg
+        return [10.0] * n_pos + [-10.0] * n_neg
+
+    def test_at_90_percent_negative_signal_still_fires(self):
+        # 10% negative == 90% non-negative, the inclusive boundary.
+        c = detect_expense_sign_convention(self._values(0.10), charges_subtracted_in_margin_formula=None)
+        assert c.value == ABSOLUTE_POSITIVE
+        assert c.tier == "HYPOTHESIS"  # only one signal present here
+
+    def test_just_below_90_percent_signal_absent(self):
+        # 11% negative == 89% non-negative -- genuinely mixed, no majority.
+        c = detect_expense_sign_convention(self._values(0.11), charges_subtracted_in_margin_formula=None)
+        assert c == Candidate(None, "UNKNOWN")
+
+    def test_just_above_90_percent_signal_fires_more_strongly(self):
+        # 9% negative == 91% non-negative.
+        c = detect_expense_sign_convention(self._values(0.09), charges_subtracted_in_margin_formula=None)
+        assert c.value == ABSOLUTE_POSITIVE
+        assert c.tier == "HYPOTHESIS"
+
+    def test_symmetric_boundary_for_signed_natural(self):
+        # 91% negative -- clearly past the mirror-image boundary for the
+        # opposite convention (not exactly 90%: at exactly 90% negative,
+        # `ratio <= (1 - _NONNEG_MAJORITY_THRESHOLD)` hits a floating-point
+        # representation edge -- 0.1 <= (1 - 0.9) is False in IEEE 754,
+        # since `1 - 0.9` is not exactly 0.1 -- a genuine, minor asymmetry
+        # in the detector's own threshold check, incidentally discovered
+        # while adding this test. Out of scope for this correction pass
+        # (not named by the adversarial review, not one of the four
+        # authorized corrections, never manifests on the real Phidani file
+        # which sits at 97.8%) -- named here, not silently fixed.
+        c = detect_expense_sign_convention(self._values(0.91), charges_subtracted_in_margin_formula=None)
+        assert c.value == SIGNED_NATURAL
+        assert c.tier == "HYPOTHESIS"
+
+
+# ── Correction 4: formula sign inversion + subtotal/rollup contamination ───
+# Synthetic, in-memory workbooks (built with openpyxl, not the real Phidani
+# file) so these two structural properties are proven as committed,
+# deterministic regression guards rather than only having been checked by
+# the adversarial review's own ad hoc scripts against the real file.
+
+class TestWorkbookAdapterSynthetic:
+    @staticmethod
+    def _build_workbook(tmp_path, rows: list[tuple], subtotal_formula: str) -> str:
+        """
+        rows: list of (account_code, column_C_formula_or_value) tuples,
+        starting at sheet row 4 (mirrors the real file's own layout: a
+        header/title region in rows 1-3).
+        subtotal_formula: the formula placed in column C of the bare "60"
+        aggregate row, whatever row that ends up on.
+        """
+        import openpyxl
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "PHIDANI"
+        r = 4
+        for code, val in rows:
+            ws.cell(row=r, column=1, value=code)
+            ws.cell(row=r, column=3, value=val)
+            r += 1
+        # Bare "60" charges-subtotal row, referenced by the margin formula.
+        subtotal_row = r
+        ws.cell(row=subtotal_row, column=1, value="60")
+        ws.cell(row=subtotal_row, column=3, value="=SUM(C4:C%d)" % (subtotal_row - 1))
+        r += 1
+        # "Marge brute" row -- the arithmetic signal's own target.
+        ws.cell(row=r, column=1, value="B0")
+        ws.cell(row=r, column=2, value="Marge brute")
+        ws.cell(row=r, column=3, value=subtotal_formula % f"C{subtotal_row}")
+
+        path = str(tmp_path / "synthetic.xlsx")
+        wb.save(path)
+        return path
+
+    def test_formula_sign_subtraction_means_absolute_positive(self, tmp_path):
+        # Leaf charge rows, all positive -- code-range signal alone -> HYPOTHESIS.
+        # Margin formula SUBTRACTS the charges subtotal -> arithmetic signal
+        # -> ABSOLUTE_POSITIVE. Both agree -> STRONG_INFERENCE.
+        rows = [(604000, 100.0), (611001, 200.0), (622000, 50.0)]
+        path = self._build_workbook(tmp_path, rows, subtotal_formula="=C31-%s")
+        # revenue row untouched here -- only the subtraction pattern matters.
+        c = detect_expense_sign_convention_from_workbook(path, period_column=3)
+        assert c.value == ABSOLUTE_POSITIVE
+        assert c.tier == "STRONG_INFERENCE"
+
+    def test_formula_sign_addition_means_signed_natural(self, tmp_path):
+        # Same leaf rows, but the margin formula ADDS the charges subtotal
+        # instead of subtracting it -- only arithmetically sound if charges
+        # are themselves stored as negative numbers (SIGNED_NATURAL).
+        # Code-range signal alone (all positive leaf values) would say
+        # ABSOLUTE_POSITIVE (HYPOTHESIS); arithmetic signal says
+        # SIGNED_NATURAL -- signals DISAGREE -> UNKNOWN, never guesses.
+        rows = [(604000, 100.0), (611001, 200.0), (622000, 50.0)]
+        path = self._build_workbook(tmp_path, rows, subtotal_formula="=C31+%s")
+        c = detect_expense_sign_convention_from_workbook(path, period_column=3)
+        assert c == Candidate(None, "UNKNOWN")
+
+    def test_formula_sign_addition_agrees_when_leaf_values_are_negative(self, tmp_path):
+        # Same addition formula, but this time the leaf values are
+        # genuinely negative -- now both signals agree on SIGNED_NATURAL.
+        rows = [(604000, -100.0), (611001, -200.0), (622000, -50.0)]
+        path = self._build_workbook(tmp_path, rows, subtotal_formula="=C31+%s")
+        c = detect_expense_sign_convention_from_workbook(path, period_column=3)
+        assert c.value == SIGNED_NATURAL
+        assert c.tier == "STRONG_INFERENCE"
+
+    def test_rollup_row_excluded_from_leaf_observations(self, tmp_path):
+        """Correction 2's own regression guard: a row whose account code
+        falls in the charge range, but whose period-column cell is itself
+        a formula (a rollup of other rows), must never be counted as an
+        independent leaf observation -- reproduces, in a controlled
+        synthetic fixture, exactly the real Phidani.xlsx contamination
+        the adversarial review found at rows 163/231 (codes '630'/'650')."""
+        import openpyxl
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "PHIDANI"
+        # Three genuine leaf charge rows, all positive.
+        ws.cell(row=4, column=1, value=604000); ws.cell(row=4, column=3, value=100.0)
+        ws.cell(row=5, column=1, value=611001); ws.cell(row=5, column=3, value=200.0)
+        ws.cell(row=6, column=1, value=622000); ws.cell(row=6, column=3, value=50.0)
+        # A rollup row: an in-range charge code (630) whose OWN period-column
+        # cell is a formula summing the leaf rows above -- exactly the shape
+        # of the real file's row 231 ('650', '=SUM(C174:C230)').
+        ws.cell(row=7, column=1, value=630)
+        ws.cell(row=7, column=3, value="=SUM(C4:C6)")
+        # Bare "60" subtotal (feeds the arithmetic signal, independent role).
+        ws.cell(row=8, column=1, value="60")
+        ws.cell(row=8, column=3, value="=SUM(C4:C7)")
+        ws.cell(row=9, column=1, value="B0")
+        ws.cell(row=9, column=3, value="=C31-C8")
+        path = str(tmp_path / "synthetic_rollup.xlsx")
+        wb.save(path)
+
+        # Independently re-derive charge_values the same way the adapter
+        # does, to assert the rollup row (630) is excluded by count, not
+        # merely by final classification (which could mask the defect if
+        # the rollup's sign happened to agree, as correction 2's own
+        # finding on the real file showed).
+        wb_f = openpyxl.load_workbook(path, data_only=False)
+        ws_f = wb_f.active
+        leaf_rows_seen = []
+        for row in ws_f.iter_rows(min_col=1, max_col=1):
+            cell = row[0]
+            code = cell.value
+            if code is None or (isinstance(code, str) and code.strip() in ("60", "B0")):
+                continue
+            try:
+                icode = int(code)
+            except (TypeError, ValueError):
+                continue
+            if icode <= 99:
+                continue
+            period_formula = ws_f.cell(row=cell.row, column=3).value
+            if isinstance(period_formula, str) and period_formula.startswith("="):
+                continue
+            leaf_rows_seen.append(cell.row)
+
+        assert leaf_rows_seen == [4, 5, 6]  # row 7 (the '630' rollup) excluded
+        assert 7 not in leaf_rows_seen
+
+        # And the classification itself remains correct and robust --
+        # STRONG_INFERENCE / ABSOLUTE_POSITIVE, unaffected by the rollup's
+        # exclusion (all three leaf rows and the rollup itself happen to
+        # be positive here, exactly mirroring why the real Phidani file's
+        # own contamination never flipped its classification either).
+        c = detect_expense_sign_convention_from_workbook(path, period_column=3)
+        assert c.value == ABSOLUTE_POSITIVE
+        assert c.tier == "STRONG_INFERENCE"
