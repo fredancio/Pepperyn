@@ -582,9 +582,17 @@ class TestDetectorPureCore:
         assert c == Candidate(None, "UNKNOWN")
 
 
-# ── Correction 4: threshold boundary tests (89% / 90% / 91% negative) ──────
-# Independently re-derives the exact boundary the adversarial review probed
-# by hand (ad hoc script) -- now a committed regression guard.
+# ── Threshold boundary tests (89% / 90% / 91%, BOTH directions) ────────────
+# CORRECTED ("FRU SIGN CONVENTION STUB — 90% NUMERIC BOUNDARY REPAIR"
+# mission, 2026-08-09): the detector's two symmetric comparisons
+# (non-negative majority / negative majority) are now computed via exact
+# integer cross-multiplication (see `_code_range_signal`'s own comment),
+# never via a derived floating-point ratio or `1 - <float>` subtraction.
+# Previously, the exact-90%-negative case fell through to UNKNOWN due to
+# `1 - 0.9 == 0.09999999999999998` in IEEE 754 -- silently asymmetric
+# with the exact-90%-non-negative case, which worked correctly because it
+# compared directly against the threshold rather than a derived value.
+# These tests now prove BOTH directions are exactly symmetric at 89/90/91%.
 
 class TestThresholdBoundary:
     def _values(self, pct_negative: float) -> list[float]:
@@ -592,37 +600,66 @@ class TestThresholdBoundary:
         n_pos = 100 - n_neg
         return [10.0] * n_pos + [-10.0] * n_neg
 
-    def test_at_90_percent_negative_signal_still_fires(self):
+    # ── non-negative (ABSOLUTE_POSITIVE) side ──
+    def test_89_percent_nonnegative_signal_absent(self):
+        # 11% negative == 89% non-negative -- genuinely mixed, no majority.
+        c = detect_expense_sign_convention(self._values(0.11), charges_subtracted_in_margin_formula=None)
+        assert c == Candidate(None, "UNKNOWN")
+
+    def test_90_percent_nonnegative_signal_fires(self):
         # 10% negative == 90% non-negative, the inclusive boundary.
         c = detect_expense_sign_convention(self._values(0.10), charges_subtracted_in_margin_formula=None)
         assert c.value == ABSOLUTE_POSITIVE
         assert c.tier == "HYPOTHESIS"  # only one signal present here
 
-    def test_just_below_90_percent_signal_absent(self):
-        # 11% negative == 89% non-negative -- genuinely mixed, no majority.
-        c = detect_expense_sign_convention(self._values(0.11), charges_subtracted_in_margin_formula=None)
-        assert c == Candidate(None, "UNKNOWN")
-
-    def test_just_above_90_percent_signal_fires_more_strongly(self):
+    def test_91_percent_nonnegative_signal_fires(self):
         # 9% negative == 91% non-negative.
         c = detect_expense_sign_convention(self._values(0.09), charges_subtracted_in_margin_formula=None)
         assert c.value == ABSOLUTE_POSITIVE
         assert c.tier == "HYPOTHESIS"
 
-    def test_symmetric_boundary_for_signed_natural(self):
-        # 91% negative -- clearly past the mirror-image boundary for the
-        # opposite convention (not exactly 90%: at exactly 90% negative,
-        # `ratio <= (1 - _NONNEG_MAJORITY_THRESHOLD)` hits a floating-point
-        # representation edge -- 0.1 <= (1 - 0.9) is False in IEEE 754,
-        # since `1 - 0.9` is not exactly 0.1 -- a genuine, minor asymmetry
-        # in the detector's own threshold check, incidentally discovered
-        # while adding this test. Out of scope for this correction pass
-        # (not named by the adversarial review, not one of the four
-        # authorized corrections, never manifests on the real Phidani file
-        # which sits at 97.8%) -- named here, not silently fixed.
+    # ── negative (SIGNED_NATURAL) side -- the previously-broken mirror ──
+    def test_89_percent_negative_signal_absent(self):
+        c = detect_expense_sign_convention(self._values(0.89), charges_subtracted_in_margin_formula=None)
+        assert c == Candidate(None, "UNKNOWN")
+
+    def test_90_percent_negative_signal_fires(self):
+        """The exact case that was previously broken: at exactly 90%
+        negative, the old `ratio <= (1 - 0.9)` comparison silently failed
+        (`0.1 <= 0.09999999999999998` is False) and returned UNKNOWN
+        instead of SIGNED_NATURAL, breaking symmetry with the
+        non-negative side's identical 90% boundary. Now fixed via exact
+        integer cross-multiplication -- this must fire, matching
+        test_90_percent_nonnegative_signal_fires exactly."""
+        c = detect_expense_sign_convention(self._values(0.90), charges_subtracted_in_margin_formula=None)
+        assert c.value == SIGNED_NATURAL
+        assert c.tier == "HYPOTHESIS"
+
+    def test_91_percent_negative_signal_fires(self):
         c = detect_expense_sign_convention(self._values(0.91), charges_subtracted_in_margin_formula=None)
         assert c.value == SIGNED_NATURAL
         assert c.tier == "HYPOTHESIS"
+
+    # ── explicit symmetry proof, both sides in the same test ──
+    def test_symmetry_between_absolute_positive_and_signed_natural(self):
+        """The invariant this whole repair exists to guarantee: for any
+        of the three boundary percentages, the non-negative-side and
+        negative-side candidates must be exact mirror images (same tier,
+        opposite value) -- proven together, not just separately, so a
+        future regression that breaks only one side cannot hide."""
+        for pct in (0.89, 0.90, 0.91):
+            nonneg_side = detect_expense_sign_convention(
+                self._values(1 - pct), charges_subtracted_in_margin_formula=None
+            )
+            neg_side = detect_expense_sign_convention(
+                self._values(pct), charges_subtracted_in_margin_formula=None
+            )
+            assert nonneg_side.tier == neg_side.tier, f"tier asymmetry at {pct}"
+            if nonneg_side.tier != "UNKNOWN":
+                assert nonneg_side.value == ABSOLUTE_POSITIVE
+                assert neg_side.value == SIGNED_NATURAL
+            else:
+                assert nonneg_side.value is None and neg_side.value is None
 
 
 # ── Correction 4: formula sign inversion + subtotal/rollup contamination ───
