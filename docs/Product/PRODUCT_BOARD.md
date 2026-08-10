@@ -41,11 +41,13 @@
 
 *(KNOWLEDGE MODEL V0 CONTRACT n'apparaît plus ici — implémenté et fusionné, voir section 1. EPISTEMIC DIALOGUE V0 IMPLEMENTATION CONTRACT n'apparaît plus ici non plus — arbitrage final effectué et fusionné, voir section 1.)*
 
+- **OBSERVATION STRUCTURE v0 CONTRACT** (`docs/Architecture/Cognitive/OBSERVATION_STRUCTURE_V0_IMPLEMENTATION_CONTRACT.md`) — **CANONICAL**, fusionné dans `main` le 2026-08-10 (`b53c68b`). Revue adversariale indépendante pré-implémentation passée (verdict B — corrections documentaires appliquées avant fusion, commit `6e6b0cc`). Décompose la capacité « Detail vs Aggregate vs Derived » (issue de `FINANCIAL_FILE_UNDERSTANDING_PROFESSION_MODEL.md`, également CANONICAL) en deux dimensions orthogonales par observation `(row, column)` : `structural_role` (`LEAF`/`AGGREGATE`/`KPI`/`SECTION_HEADER`, `KPI` plafonné à `HYPOTHESIS`) et `derivation_status` (`SOURCE_VALUE`/`DERIVED`/`NOT_APPLICABLE`/`UNKNOWN`, `UNKNOWN` traité fail-closed). Golden Case sur le vrai `Phidani.xlsx`. IMPLÉMENTATION NON COMMENCÉE.
+
 ## 3. ACTIVE NEXT STEP
 
 *(Un seul chantier principal autorisé — pas une liste.)*
 
-**Epistemic Dialogue v0 implementation.** Mémoire (Knowledge Model v0, à tête unique par `(entity_id, subject)`) et contrat cognitif (Epistemic Dialogue v0, verdict A) sont désormais tous deux canoniques et fusionnés dans `main`. Prochaine étape : implémenter la plus petite tranche verticale du contrat — détecteur FRU-stub → `ClarificationNeed` → `KnowledgeModel.recall()/confirm()` → réponse humaine simulée (pas de chat réel, pas de LLM, pas de nouvelle persistance). C'est le premier moment où le chat cesse d'être une fonctionnalité annexe pour devenir une interface d'apprentissage organisationnel — mais cette implémentation n'a pas encore commencé.
+**Observation Structure v0 implementation.** Le contrat (`OBSERVATION_STRUCTURE_V0_IMPLEMENTATION_CONTRACT.md`, section 1 ci-dessus) est désormais canonique, adversarialement revu (verdict B, corrections appliquées) et fusionné dans `main` (`b53c68b`). Prochaine étape : implémenter le noyau déterministe row-axis-seulement — un nouveau module dédié de lecture de formule (`openpyxl data_only=False`, lecture additionnelle unique, `file_parser.py` intouché) puis un nouveau noyau pur `observation_structure` produisant `structural_role`/`derivation_status` par observation `(row, column)`, `Phidani.xlsx` comme Golden Case, fail-closed partout où la structure n'est pas démontrée (`UNKNOWN` jamais traité comme sûr). Pas de persistance, pas de LLM. Cette implémentation n'a pas encore commencé.
 
 **Exception explicitement autorisée à avancer en parallèle** (justifiée dans `LEGACY_MIGRATION_REVIEW_REPORT.md` Mission 9 et confirmée ici) : correction du Trust Boundary (contournement d'anonymisation du Conversation Engine V2) — aucune dépendance technique avec la séquence ci-dessus, son report prolonge un écart déjà prouvé entre promesse et comportement réel.
 
