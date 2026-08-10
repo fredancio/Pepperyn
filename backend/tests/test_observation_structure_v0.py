@@ -80,7 +80,7 @@ class TestRealPhidaniGoldenCase:
         r = self._classify(ws, 134)
         assert r.structural_role == "LEAF"
         assert r.structural_role_tier == "STRONG_INFERENCE"
-        assert r.derivation_status == "SOURCE_VALUE"
+        assert r.derivation_status == "NO_OBSERVED_FORMULA"
         assert r.formula_text is None
 
     def test_row_161_aggregate_derived_sum_range(self, ws):
@@ -193,9 +193,9 @@ def test_row_163_structural_role_and_derivation_status_are_independently_asserte
 
 
 class TestFailClosedIndependence:
-    def test_source_value_is_independent(self):
+    def test_no_observed_formula_is_independent(self):
         r = classify_observation("620250", _fe(is_formula=False, has_literal_value=True))
-        assert r.derivation_status == "SOURCE_VALUE"
+        assert r.derivation_status == "NO_OBSERVED_FORMULA"
         assert r.is_arithmetically_independent() is True
 
     def test_derived_is_not_independent(self):
@@ -230,13 +230,13 @@ class TestFailClosedIndependence:
         assert correct_check is False  # the fix: fail-closed says "not safe"
         assert naive_check != correct_check
 
-    def test_synthetic_whole_file_no_formula_export_every_row_unknown_or_source_value(self):
+    def test_synthetic_whole_file_no_formula_export_every_row_unknown_or_independent(self):
         """Case G/L: a materialised/flattened export. Every row that would
         normally carry a formula (aggregate/KPI-shaped codes) degrades to
-        UNKNOWN; genuine leaf-shaped codes still resolve to SOURCE_VALUE
-        (no formula was ever expected for them). No row is wrongly
-        upgraded to "independent" merely because the whole file lacks
-        formulas."""
+        UNKNOWN; genuine leaf-shaped codes still resolve to
+        NO_OBSERVED_FORMULA (no formula was ever expected for them). No
+        row is wrongly upgraded to "independent" merely because the whole
+        file lacks formulas."""
         synthetic_rows = [
             ("620250", _fe(is_formula=False, has_literal_value=True)),  # leaf-shaped
             ("62", _fe(is_formula=False, has_literal_value=True)),  # aggregate-shaped, no formula
@@ -284,6 +284,44 @@ class TestSectionHeaderInvariant:
                     f"row {row} violates the SECTION_HEADER/NOT_APPLICABLE invariant"
                 )
 
+    def test_malformed_code_blank_column_is_not_a_false_positive_section_header(self):
+        """Found 2026-08-10 by direct perturbation during the independent
+        adversarial pre-merge review — NOT caught by any test that existed
+        before this one. Real row 234's malformed code
+        (72.44444444444444) always co-occurs with a formula in Phidani, so
+        the original Case O test never exercised this cell blank. But a
+        malformed/unparseable CODE ATTEMPT is evidence of a data row, not
+        a section title — generalised to a hypothetical blank period for
+        that same row (or any other row with an unrecognized-but-present
+        code), this must classify UNKNOWN role + NOT_APPLICABLE
+        derivation, never SECTION_HEADER (which would wrongly assert a
+        structural boundary a future Reporting Structure capability,
+        contract §8, would consume as ground truth)."""
+        r_malformed_float = classify_observation(
+            72.44444444444444, _fe(is_formula=False, has_literal_value=False)
+        )
+        assert r_malformed_float.structural_role != "SECTION_HEADER"
+        assert r_malformed_float.structural_role == "UNKNOWN"
+        assert r_malformed_float.derivation_status == "NOT_APPLICABLE"
+
+        r_unrecognized_digit_code = classify_observation(
+            "6200", _fe(is_formula=False, has_literal_value=False)
+        )
+        assert r_unrecognized_digit_code.structural_role != "SECTION_HEADER"
+
+    def test_genuine_free_text_caption_still_produces_section_header(self):
+        """Companion to the above: the fix must not overcorrect. Real
+        rows 3/369 (pure prose captions, no digit character anywhere)
+        must still classify SECTION_HEADER when blank."""
+        r_row3_shape = classify_observation(
+            "Compte de résultats", _fe(is_formula=False, has_literal_value=False)
+        )
+        assert r_row3_shape.structural_role == "SECTION_HEADER"
+        r_row369_shape = classify_observation(
+            "PASSIF", _fe(is_formula=False, has_literal_value=False)
+        )
+        assert r_row369_shape.structural_role == "SECTION_HEADER"
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 16-category adversarial fixture matrix, A-P (implementation mission §20;
@@ -295,7 +333,7 @@ class TestFixtureAdversarialMatrix:
     def test_a_leaf_direct(self):
         r = classify_observation("705000", _fe(is_formula=False, has_literal_value=True))
         assert r.structural_role == "LEAF" and r.structural_role_tier == "STRONG_INFERENCE"
-        assert r.derivation_status == "SOURCE_VALUE"
+        assert r.derivation_status == "NO_OBSERVED_FORMULA"
 
     def test_b_formula_aggregate_sum_range(self):
         r = classify_observation("61", _fe(is_formula=True, formula_text="=SUM(C10:C20)"))
@@ -323,9 +361,12 @@ class TestFixtureAdversarialMatrix:
         assert r.derivation_status == "NOT_APPLICABLE"
 
     def test_f_hardcoded_subtotal_no_formula(self):
-        """Contract §12 fixture F, followed over §2's conflicting
-        illustrative example — see observation_structure.py's module
-        docstring for the discovered tension and why F/§16 was chosen."""
+        """Contract §12 fixture F. §2's original illustrative example
+        (hardcoded total -> SOURCE_VALUE) was arbitrated as substantively
+        wrong, not a documentary style difference, and corrected to match
+        F/§16 directly in the contract (independent adversarial pre-merge
+        review, 2026-08-10) — see observation_structure.py's module
+        docstring for the full arbitration."""
         r = classify_observation("62", _fe(is_formula=False, has_literal_value=True))
         assert r.derivation_status == "UNKNOWN"
         assert r.structural_role == "AGGREGATE"
@@ -337,7 +378,7 @@ class TestFixtureAdversarialMatrix:
             classify_observation("62", _fe(is_formula=False, has_literal_value=True)),
             classify_observation("60/64", _fe(is_formula=False, has_literal_value=True)),
         ]
-        assert rows[0].derivation_status == "SOURCE_VALUE"
+        assert rows[0].derivation_status == "NO_OBSERVED_FORMULA"
         assert rows[1].derivation_status == "UNKNOWN"
         assert rows[2].derivation_status == "UNKNOWN"
 
@@ -365,11 +406,11 @@ class TestFixtureAdversarialMatrix:
         r_elsewhere = classify_observation("61", fe)
         assert r_first == r_elsewhere
 
-    def test_j_zero_valued_leaf_is_source_value_not_absence(self):
+    def test_j_zero_valued_leaf_is_no_observed_formula_not_absence(self):
         """Article III: a true zero is a fact, never confused with
         "nothing here." """
         r = classify_observation("620999", _fe(is_formula=False, has_literal_value=True))
-        assert r.derivation_status == "SOURCE_VALUE"
+        assert r.derivation_status == "NO_OBSERVED_FORMULA"
 
     def test_k_blank_future_period_cell(self):
         r = classify_observation("620250", _fe(is_formula=False, has_literal_value=False))

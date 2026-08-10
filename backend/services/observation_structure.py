@@ -8,8 +8,29 @@ contract's two orthogonal row-axis dimensions:
   - `structural_role`  — WHAT ROLE this observation plays in the report's
     own structure (LEAF / AGGREGATE / KPI / SECTION_HEADER / UNKNOWN).
   - `derivation_status` — HOW the observation's value was produced, as
-    observable from within this file (SOURCE_VALUE / DERIVED /
+    observable from within this file (NO_OBSERVED_FORMULA / DERIVED /
     NOT_APPLICABLE / UNKNOWN).
+
+RENAMED 2026-08-10 (independent adversarial pre-merge review): the value
+originally called `SOURCE_VALUE` is renamed `NO_OBSERVED_FORMULA`. Pure
+rename, zero behaviour change — every classification decision, every test
+assertion's outcome, and the fail-closed independence rule are unchanged.
+Rationale: "SOURCE_VALUE" is a loaded term in financial/data-lineage
+contexts — it invites a future reader (a consumer author, a future
+Economic Nature/Reporting Structure contract, a future prompt to this
+same system) to infer "origin of truth" / "elementary source-system fact"
+/ "safe to treat as independent," none of which this classifier can
+actually prove. What this module observes and can prove is narrower and
+purely mechanical: no formula string was found in this cell, in this
+file. The old name fought its own caveat paragraph (§3.2's honesty note);
+the new name states exactly, and only, what was checked. Three future
+consumers (FRU's eventual refactor, Economic Nature, Reporting Structure)
+will all read this vocabulary — the cost of a misleading name compounds
+with each one, and this is the cheapest point in the system's life to fix
+it (before any consumer is wired in at all). `is_arithmetically_independent()`
+below remains a separate, explicit policy layered on top of this raw
+signal, not a restatement of it — renaming makes that layering more
+visible, not less.
 
 Both dimensions apply to a (row, column) observation — a single cell within
 one period column — never to "a row" as a row-level constant (contract §2's
@@ -42,22 +63,38 @@ EVIDENCE USED (contract §5), IN ORDER:
      a Belgian universal signal" caveat, extended here to the numeric-code
      length heuristic below) — flagged, never claimed universal.
 
-A DISCOVERED CONTRACT TENSION, RESOLVED CONSERVATIVELY (documented here,
-not silently papered over — see the implementation mission's final report
-for the full account): contract §2 illustrates dimension-orthogonality with
-a "hardcoded manual Excel total" example asserting
-`structural_role = AGGREGATE` + `derivation_status = SOURCE_VALUE`. Contract
+A DISCOVERED CONTRACT TENSION, ARBITRATED FROM FIRST PRINCIPLES (independent
+adversarial pre-merge review, 2026-08-10 — not merely papered over with the
+implementation's own preference, re-derived independently): contract §2
+illustrated dimension-orthogonality with a "hardcoded manual Excel total"
+example asserting `structural_role = AGGREGATE` +
+`derivation_status = SOURCE_VALUE` (now `NO_OBSERVED_FORMULA`). Contract
 §12's own adversarial fixture F ("hardcoded subtotal, no formula") instead
 requires `derivation_status = UNKNOWN`, `structural_role` at best
 HYPOTHESIS — and §16 makes fixture F part of the binding test contract.
-These two passages of the same canonical document are not reconcilable as
-literally worded for the same scenario. This implementation follows §12/§16
-(the fail-closed answer: an aggregate-shaped row with no formula backing is
-UNKNOWN, never silently SOURCE_VALUE) because it is the more specific,
-deliberately-adversarial, test-contract-binding statement, and because it
-is the direction consistent with every other fail-closed correction applied
-to this contract on 2026-08-10 — never the direction that risks a
-consumer treating an unproven row as safe to sum.
+These two passages of the same canonical document were not reconcilable as
+literally worded for the same scenario.
+
+Arbitration: what can Pepperyn actually know when it sees an
+aggregate-shaped row with no formula? Only that no Excel-formula mechanism
+is present in this one file. It cannot distinguish a human-typed total, a
+paste-as-values of a formula that used to be there, an ERP-precomputed
+figure that duplicates leaves shown elsewhere in this same file, from the
+one case where the figure genuinely is an independent source fact that
+happens to sit at an aggregate-shaped position. The first three
+possibilities all mean "not safe to sum without double-counting"; only the
+fourth is safe — and this file's evidence cannot tell them apart. Between
+(a) wrongly treating a real rollup as independent — silent, financially
+wrong, undetectable downstream — and (b) wrongly treating a genuinely
+independent figure as unproven — visible, honest, correctable by a later
+capability — (a) is categorically worse. §12/§16's `UNKNOWN` answer is
+therefore the epistemically correct one, not a documentary quirk to defer
+to for consistency's sake; §2's illustrative sentence was substantively
+wrong, not just differently worded. §2 is corrected to match §12/§16 as
+part of this review (contract commit, not this module). This module always
+implemented §12/§16's behaviour (the fail-closed answer: an aggregate- or
+KPI-shaped row with no formula backing is UNKNOWN, never silently treated
+as a plain absence of formula) — the correction here is documentary only.
 """
 from __future__ import annotations
 
@@ -73,7 +110,7 @@ from services.formula_evidence import CellFormulaEvidence
 # new scoring engine (contract §10, "Confidence vocabulary").
 
 STRUCTURAL_ROLE_VALUES = ("LEAF", "AGGREGATE", "KPI", "SECTION_HEADER", "UNKNOWN")
-DERIVATION_STATUS_VALUES = ("SOURCE_VALUE", "DERIVED", "NOT_APPLICABLE", "UNKNOWN")
+DERIVATION_STATUS_VALUES = ("NO_OBSERVED_FORMULA", "DERIVED", "NOT_APPLICABLE", "UNKNOWN")
 TIER_VALUES = ("STRONG_INFERENCE", "HYPOTHESIS", "UNKNOWN")
 
 
@@ -92,17 +129,30 @@ class ObservationClassification:
     formula_text: Optional[str]
 
     def is_arithmetically_independent(self) -> bool:
-        """Convenience derivation (contract §2, §10) — fail-closed.
+        """Convenience derivation (contract §2, §10) — fail-closed and,
+        explicitly, a POLICY layered on top of raw evidence, not a
+        restatement of it. `NO_OBSERVED_FORMULA` means only "no formula
+        string was found in this cell in this file" — it does not by
+        itself prove the value is safe to sum. This method is the place
+        where that additional, deliberate judgment call is made: treat
+        the absence of an observed formula as the (fail-closed, best
+        available) proxy for arithmetic independence, given v0 has no
+        stronger signal. A future capability with more evidence (upstream
+        ERP lineage, hierarchy reconstruction) could refine this without
+        changing what `NO_OBSERVED_FORMULA` itself means.
 
         Corrected 2026-08-10 (independent adversarial pre-implementation
-        review): must be `== SOURCE_VALUE`, never `!= DERIVED`. The latter
-        would silently treat NOT_APPLICABLE and, critically, UNKNOWN as
-        "safe to sum" — on a no-formula-cached export every observation
-        degrades to UNKNOWN, and `!= DERIVED` would then treat the whole
-        file as safe, reintroducing the exact rollup double-counting
-        defect this capability exists to prevent (protects FRU, §7).
+        review): must be `== NO_OBSERVED_FORMULA` (originally named
+        `SOURCE_VALUE` — renamed same day, independent adversarial
+        pre-merge review, pure rename, see module docstring), never
+        `!= DERIVED`. The latter would silently treat NOT_APPLICABLE and,
+        critically, UNKNOWN as "safe to sum" — on a no-formula-cached
+        export every observation degrades to UNKNOWN, and `!= DERIVED`
+        would then treat the whole file as safe, reintroducing the exact
+        rollup double-counting defect this capability exists to prevent
+        (protects FRU, §7).
         """
-        return self.derivation_status == "SOURCE_VALUE"
+        return self.derivation_status == "NO_OBSERVED_FORMULA"
 
 
 def _classify_code_shape(code: Union[str, int, float, None]) -> str:
@@ -165,6 +215,36 @@ def _classify_code_shape(code: Union[str, int, float, None]) -> str:
     return "UNRECOGNIZED"
 
 
+def _looks_like_free_text_caption(code: Union[str, int, float, None]) -> bool:
+    """Distinguish a genuine free-text section caption (real Phidani rows
+    3/369: `"Compte de résultats"`, `"PASSIF"` — prose, no digit character
+    anywhere) from a malformed/unparseable CODE ATTEMPT (real Phidani row
+    234: the corrupted float `72.44444444444444` — still evidence this
+    cell was meant to hold a code, not a section title).
+
+    Added 2026-08-10 (independent adversarial pre-merge review) — found by
+    direct perturbation, not by an existing test: without this
+    distinction, a row with a malformed/unrecognized account code that is
+    also blank in some period column (Case O's shape, generalised to a
+    column the real file doesn't happen to leave blank) would have been
+    misclassified `SECTION_HEADER`, wrongly asserting a structural
+    boundary that a future Reporting Structure capability (contract §8)
+    would consume as ground truth. `code is None` (true absence) is
+    handled separately by `_classify_code_shape` returning `"NONE"` and is
+    always eligible; this function only adjudicates the `"UNRECOGNIZED"`
+    bucket.
+    """
+    if code is None:
+        return True
+    if isinstance(code, (int, float)):
+        # A number, however malformed, is evidence of a code attempt, not
+        # prose — never eligible for SECTION_HEADER.
+        return False
+    if isinstance(code, str):
+        return not any(ch.isdigit() for ch in code)
+    return False
+
+
 def classify_observation(
     code: Union[str, int, float, None],
     formula: CellFormulaEvidence,
@@ -198,7 +278,18 @@ def classify_observation(
     # SECTION_HEADER (real Phidani row 256, "B3", blank in some columns —
     # contract §2's structural_role/derivation_status divergence proof;
     # must never collapse into SECTION_HEADER).
-    if code_shape in ("NONE", "UNRECOGNIZED") and not formula.is_formula and not formula.has_literal_value:
+    #
+    # Corrected 2026-08-10 (independent adversarial pre-merge review): the
+    # UNRECOGNIZED bucket alone is not sufficient — it also contains
+    # malformed/unparseable CODE ATTEMPTS (real row 234's corrupted float
+    # "72.44444444444444"), which are evidence of a data row, not a
+    # section title. Only free-text-shaped UNRECOGNIZED codes (no digit
+    # character anywhere, e.g. genuine prose captions) are eligible; see
+    # _looks_like_free_text_caption.
+    section_header_eligible = code_shape == "NONE" or (
+        code_shape == "UNRECOGNIZED" and _looks_like_free_text_caption(code)
+    )
+    if section_header_eligible and not formula.is_formula and not formula.has_literal_value:
         return ObservationClassification(
             structural_role="SECTION_HEADER",
             structural_role_tier="STRONG_INFERENCE",
@@ -213,13 +304,14 @@ def classify_observation(
         derivation_status = "NOT_APPLICABLE"
     else:
         # No formula, but a literal value is present. Fail-closed per the
-        # discovered §2/§12 tension (module docstring): an aggregate- or
+        # arbitrated §2/§12 tension (module docstring): an aggregate- or
         # KPI-shaped code with no formula backing it is suspicious, not
-        # safely SOURCE_VALUE (contract §12 fixture F / §16 test contract).
+        # safely NO_OBSERVED_FORMULA (contract §12 fixture F / §16 test
+        # contract).
         if code_shape in ("AGGREGATE_SHAPED", "KPI_SHAPED"):
             derivation_status = "UNKNOWN"
         else:
-            derivation_status = "SOURCE_VALUE"
+            derivation_status = "NO_OBSERVED_FORMULA"
 
     # structural_role.
     if code_shape == "LEAF_SHAPED":
