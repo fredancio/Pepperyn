@@ -109,14 +109,13 @@ Tested both options the mission names. **Choice: declare both `AuthorityType` va
 
 **Original claim (now falsified):** single-hop forward extraction suffices for the core `MISMATCH` determination. **Falsified by the Composition Completeness / False-Mismatch Adversarial Review (2026-08-11), CASE B:** `EBITDA = Revenue - OPEX_TOTAL`, `OPEX_TOTAL = ExternalCosts + PersonnelCost`. A single-hop extractor sees only `OPEX_TOTAL` as EBITDA's direct reference. If `OPEX_TOTAL` is classified as its own concept (not `PERSONNEL_COST`), the old logic (`missing = {PERSONNEL_COST} - {OPEX_TOTAL}` is non-empty, and `unclassified_references` is empty because `OPEX_TOTAL` *was* successfully classified — just not as `PERSONNEL_COST`) returns **`MISMATCH`**, even though `PersonnelCost` is genuinely, transitively present one level down. This is a false `MISMATCH`, and it directly violates this document's own governing invariant (§37 amendment, below): *a `MISMATCH` may be emitted only when a required concept is proven absent from the economically relevant composition, not merely absent from direct formula references.* The original claim's error was conflating two independent facts (see §16, corrected): "this reference has been identified as concept X" does **not** imply "this reference's own internal composition has been fully examined for other concepts."
 
-**Corrected design:** the extractor is retained as a primitive (`extract_cell_references`, single-hop, unchanged, still useful and still the base case) but is now invoked **recursively**, forming a **bounded forward dependency closure** — not a graph engine (§33 reaffirms why not; see also Q6/Q8 in the amendment record). Every cell reachable by repeatedly following formula references from the root cell is visited; recursion terminates at any cell with no formula (a `RAW_INPUT` cell, per Observation Structure v0's own `derivation_status`, which already exists and is reused here without modification) and is bounded defensively by a `max_depth` (chosen generously, e.g. 8, well beyond any realistic Phidani nesting) and a `visited`/on-stack cycle guard (a detected cycle marks the closure incomplete, never crashes, never silently ignores the cycle):
+**Corrected design:** the extractor is retained as a primitive (`extract_cell_references`, single-hop, unchanged, still useful and still the base case) but is now invoked **recursively**, forming a **forward dependency closure** — not a graph engine (§33 reaffirms why not; see also Q6/Q8 in the §38 amendment record). Every cell reachable by repeatedly following formula references from the root cell is visited; recursion terminates at any cell with no formula (a `RAW_INPUT` cell, per Observation Structure v0's own `derivation_status`, which already exists and is reused here without modification) and is guarded by a `visited`/on-stack cycle detector (a detected cycle marks the closure incomplete, never crashes, never silently ignores the cycle):
 
 ```python
 def resolve_composition(
     root_cell: str,
     get_formula: Callable[[str], str | None],   # None => RAW_INPUT, terminal
     classify_cell: Callable[[str], ConceptId | None],  # None => unclassifiable
-    max_depth: int = 8,
 ) -> "ObservedComposition":
     resolved: set[ConceptId] = set()
     unclassified: set[str] = set()
@@ -124,12 +123,12 @@ def resolve_composition(
     on_stack: set[str] = set()
     done: set[str] = set()
 
-    def expand(cell: str, depth: int) -> None:
+    def expand(cell: str) -> None:
         nonlocal complete
         if cell in done:
             return                      # diamond dependency, already fully resolved -- not a cycle
-        if cell in on_stack or depth > max_depth:
-            complete = False            # true cycle, or pathological depth -- fail closed, never guess
+        if cell in on_stack:
+            complete = False            # true cycle -- fail closed, never guess, never loop
             return
         on_stack.add(cell)
         concept = classify_cell(cell)
@@ -141,14 +140,14 @@ def resolve_composition(
         formula = get_formula(cell)
         if formula is not None:         # FORMULA_DERIVED: must expand fully, regardless of
             for ref in extract_cell_references(formula):   # its own classification (§16) --
-                expand(ref, depth + 1)                       # an aggregate label never excuses
+                expand(ref)                                   # an aggregate label never excuses
         on_stack.discard(cell)                                # skipping its own composition
         done.add(cell)
 
     root_formula = get_formula(root_cell)
     if root_formula is not None:
         for ref in extract_cell_references(root_formula):
-            expand(ref, 1)
+            expand(ref)
     return ObservedComposition(
         directly_referenced_concepts=frozenset(resolved),
         unclassified_references=frozenset(unclassified),
@@ -156,7 +155,25 @@ def resolve_composition(
     )
 ```
 
-**Deterministic, terminating, single-direction (forward only), no fixed-point iteration, no backward inference.** This is what Q6/Q8 of the amendment record calls "bounded recursive dependency traversal," explicitly distinguished from a graph engine. **The backward ("referenced-by") index remains out of scope, unchanged from the original contract** — it was never the gap CASE B exposed; the gap was insufficient forward depth, not a missing direction.
+**[CORRECTED 2026-08-11 Final Semantic Arbitration] No `max_depth` parameter.** The original design carried an unjustified constant (`max_depth: int = 8`) with no evidence behind the specific value — a real defect the mission asked to either justify or remove; no justification exists, so it is removed from the domain contract entirely (see §13a below for the full termination-mechanism derivation). Termination is now guaranteed solely by the `on_stack` cycle guard plus the `done` memoization operating over any real workbook's finite cell universe — no depth bound is needed for correctness.
+
+**Terminology corrected:** the prior draft called this "single-direction DAG traversal with a fail-closed cycle guard" — self-contradictory, since a true DAG has no cycles and would need no guard against them. Corrected, precise name: **forward dependency traversal with cycle detection**. The input is *expected* to be acyclic (Excel disallows circular references by default), but this is not *assumed* — the cycle guard exists precisely because that expectation is not itself proven for every possible input file (a legacy file with iterative calculation enabled, or a corrupted/hand-edited file, could violate it), and a violation must fail closed (`UNKNOWN`), not crash or silently misreport.
+
+**Deterministic, terminating, single-direction (forward only), no fixed-point iteration, no backward inference** — still not a graph engine (§33). **The backward ("referenced-by") index remains out of scope, unchanged from the original contract** — it was never the gap CASE B exposed; the gap was insufficient forward depth, not a missing direction.
+
+## 13a. Termination mechanism — derived, not assumed [2026-08-11 Final Semantic Arbitration]
+
+**Question:** is a `visited`/`on_stack` cycle guard, operating over a finite workbook cell universe, already sufficient to guarantee termination, without any depth constant? **Answer: yes, derived as follows.** Any real workbook contains a finite number of cells, `N`. `resolve_composition`'s recursion visits a given cell at most once per active call stack (`on_stack` guard: a repeat within the current path stops immediately) and, once fully resolved, never re-expands it from a different path (`done` memoization: a repeat via a different path is a diamond dependency, not a cycle, and is skipped without re-walking its subtree). Therefore the total number of `expand()` invocations across an entire `resolve_composition` call is bounded by `N`, regardless of the reference graph's shape — acyclic, cyclic, deeply chained, or richly diamond-shaped. No depth constant is required to prove this; it follows directly from the two set-guards plus the finiteness of the workbook.
+
+**What, if anything, remains a legitimate concern?** Only a *runtime engineering* one, entirely separate from domain semantics: a sufficiently large or pathologically shaped real-world workbook could still make a naive **recursive** (call-stack-based) Python implementation hit Python's own interpreter stack-depth limit (independent of any cycle — a very long but perfectly valid, finite, acyclic chain could do this) before it hits any semantic obstacle. This is a property of the chosen implementation technique (recursive function calls), not of the domain problem — an iterative, explicit-stack traversal (a straightforward, well-known rewrite of the same `expand()` logic using a manual stack instead of the Python call stack) sidesteps it entirely and is left as an implementation choice, out of scope for a documentation-only contract. **If, and only if, a future implementation chooses a recursive technique and therefore wants a defensive cutoff, that cutoff must be: (1) not a contract-level semantic constant — no number belongs in this document; (2) framed explicitly as an engineering safety limit, never as "financial doctrine"; (3) required, without exception, to yield `UNKNOWN` (via `composition_complete=False`) if triggered, never to be silently treated as proof of absence.** This document does not specify such a cutoff, does not need to, and explicitly declines to invent one merely to have a number on the page.
+
+## 13b. Required-concept-scoped completeness — challenged and rejected for v0 [2026-08-11 Final Semantic Arbitration]
+
+**Question:** must `composition_complete` require *every* reachable node to carry *some* classification, or could it require only that *no unresolved reachable node could still conceal a required concept* — e.g. treating a node classified `TAX` or `DEPRECIATION` as irrelevant to a `PERSONNEL_COST` membership test, and not demanding its own children be resolved?
+
+**The narrower formulation is the semantically correct target** — it is precisely what a human professional means by "I've looked everywhere payroll could plausibly be." **It is not achievable in v0 without fabricating knowledge Pepperyn does not have.** To treat a `TAX`-classified branch as safely ignorable for a `PERSONNEL_COST` check requires asserting that `TAX` and `PERSONNEL_COST` are semantically disjoint — that no `TAX`-labeled aggregate could ever, in any real file, nest a reference to personnel cost. That is a taxonomy-level disjointness relation, and Concept Vocabulary v0 is deliberately flat with no is-a or exclusion relations (§9, §24) — inventing one here, even implicitly, to shrink the completeness check, would reintroduce exactly the premature ontology this whole document line has repeatedly rejected. Nor is it structurally safe to substitute "classified as something else" for "provably cannot contain X": a classification only names a cell's own identity; per §16, it says nothing about whether that cell's own formula (if it has one) has been examined — so even a `TAX`-classified aggregate cell must still have its own composition expanded before it can be excluded from suspicion, exactly as any other aggregate.
+
+**Resolution: retain the conservative global rule** — `composition_complete` requires every reachable node in the closure to be classified (and no cycle to remain unresolved), full stop, with no concept-specific narrowing. **This is not the same failure the MATCH/MISMATCH asymmetry (§16a) already avoids**: §16a's shortcut is a purely logical one (an existential claim needs only one witness) that requires no semantic knowledge at all; the narrowing challenged here would require *domain* knowledge about which concepts can and cannot co-occur, which is a different, and currently unavailable, kind of fact. The mission's own instruction is followed exactly: the narrower formulation is impossible to prove without a taxonomy, so it is not fabricated, and the conservative global rule is retained. The practical cost is bounded and already the safe direction to err: some closures that a human would call "obviously complete enough" will still report `UNKNOWN` in v0 rather than `MISMATCH` — never the reverse.
 
 ## 14. Economic Meaning prerequisite — resolved via test fixture, not a classifier
 
@@ -204,13 +221,13 @@ def compare_against_doctrine(
 
 **[AMENDED 2026-08-11]** The branch condition changed from testing `unclassified_references` directly to testing `composition_complete`. The two are related but not identical: `composition_complete` is `False` whenever *any* cell in the closure is unclassified, *or* a depth limit was hit, *or* a cycle was detected — a strict superset of failure modes `unclassified_references` alone could signal. Using the narrower field as the gate (the original design) would have let a depth-cutoff or cycle silently fall through to `MISMATCH` — a second false-mismatch path, distinct from CASE B, closed by this same correction.
 
-**Definitions, rigorous, matching the mission's own required precision [corrected 2026-08-11]:**
-- **`MATCH`:** the doctrine entry's concept applies (`candidate_concept == doctrine.concept`), and every required prior deduction is confirmed present *anywhere in the fully expanded forward closure* (not just the root's direct references).
-- **`MISMATCH`:** the concept applies, at least one required prior deduction is confirmed *absent from the entire closure* — proven only once the closure is fully resolved (`composition_complete == True`) — and no unresolved branch could be hiding it.
+**Definitions, rigorous, matching the mission's own required precision [corrected 2026-08-11; asymmetry made explicit 2026-08-11 Final Semantic Arbitration]:**
+- **`MATCH`:** the doctrine entry's concept applies (`candidate_concept == doctrine.concept`), and every required prior deduction is confirmed present *somewhere in the (possibly still-incomplete) forward closure*. **`composition_complete` is never consulted for `MATCH`** — positive proof does not require global completeness (§16a).
+- **`MISMATCH`:** the concept applies, at least one required prior deduction is confirmed *absent from the entire closure* — provable only once the closure is fully resolved (`composition_complete == True`) — and no unresolved branch could be hiding it.
 - **`NOT_APPLICABLE`:** the candidate concept confidently differs from the doctrine entry's own concept — the wrong entry to even ask.
-- **`UNKNOWN`:** the concept applies, but the comparison cannot be completed honestly because the closure is incomplete (an unclassified cell, a depth cutoff, or a cycle — `composition_complete == False`).
+- **`UNKNOWN`:** the concept applies, but absence cannot be proven honestly because the closure is incomplete (an unclassified cell or a detected cycle — `composition_complete == False`).
 
-**No numeric confidence anywhere in this function or its inputs.**
+**No numeric confidence anywhere in this function or its inputs.** **Formalization, validated (not merely accepted) by CASE A/B/C of the 2026-08-11 Final Semantic Arbitration:** `required ⊆ observed → MATCH`; `required ⊄ observed AND composition_complete → MISMATCH`; `required ⊄ observed AND NOT composition_complete → UNKNOWN`. This is set-notation for exactly the `missing`-based logic already in the pseudocode above — confirmed equivalent, not a new rule.
 
 ## 16. MISMATCH safety — the load-bearing distinction, corrected and made structural [CORRECTED 2026-08-11]
 
@@ -219,6 +236,18 @@ def compare_against_doctrine(
 **Derived answer to "does a classified aggregate imply its children are fully known?" — NO**, and this must be derived, not assumed: concept identity (*what a cell represents*) and composition resolution (*whether that cell's own formula has been fully expanded*) are orthogonal facts. Classifying a cell is necessary but not sufficient to rule out nested occurrences of the required concept beneath it.
 
 **Corrected representation:** `composition_complete: bool` (§15) is the single, load-bearing decision field, produced only by fully expanding the forward closure (§13) — never by inspecting the root formula's direct references alone, and never inferred from a reference's own concept label. `unclassified_references` is retained but demoted to a diagnostic/explanatory field only. `directly_referenced_concepts` is retained but its scope is corrected from "root formula's direct references" to "every concept found anywhere in the closure." This remains the smallest representation that preserves the distinction: two sets plus one boolean, no epistemic graph, no per-concept confidence score, no fixed-point computation.
+
+## 16a. MATCH/MISMATCH asymmetry — required and derived [2026-08-11 Final Semantic Arbitration]
+
+**Question attacked:** must `composition_complete` be required equally for `MATCH` and `MISMATCH`? **Strong hypothesis under attack:** positive proof of a required concept is sufficient for `MATCH` even when unrelated composition remains incomplete. **Survives the attack — confirmed true, derived from professional semantics, not assumed:**
+
+Proving a required concept is *present* is an **existential** claim — "personnel cost appears somewhere in this composition" — settled the instant one confirmed occurrence is found; nothing else in the closure needs to be looked at. Proving a required concept is *absent* is a **universal** claim — "personnel cost appears nowhere in this composition" — which cannot be honestly settled until every branch that could conceivably contain it has been examined. This is the same asymmetry a human reviewer applies: an accountant who spots a payroll line item already subtracted does not need to also classify every other line on the statement to conclude payroll was deducted; but to conclude payroll was **never** deducted, the same accountant must have looked at (or have good reason to trust the absence from) the whole calculation, not just part of it.
+
+**Consequence, already present but not previously made explicit:** `compare_against_doctrine` (§15) checks `missing = required - observed` and returns `MATCH` immediately if empty — **before** `composition_complete` is ever read. This was already the code's behavior; this arbitration makes it an explicit, justified design rule rather than an implicit side effect of statement ordering, and adds CASE A (§20a) as the regression test that pins it down.
+
+**CASE A worked example:** `EBITDA → OPEX_TOTAL → {PERSONNEL_COST (found), UNKNOWN_COMPONENT (unresolved)}`. `directly_referenced_concepts = {OPEX_TOTAL, PERSONNEL_COST}`, `unclassified_references = {<UNKNOWN_COMPONENT cell>}`, `composition_complete = False`. `required = {PERSONNEL_COST}`. `missing = {PERSONNEL_COST} - {OPEX_TOTAL, PERSONNEL_COST} = ∅` → `MATCH`, `composition_complete`'s `False` value is computed but never consulted. Correct: the unresolved, unrelated `UNKNOWN_COMPONENT` cannot retroactively un-find personnel cost.
+
+**Does this let "irrelevant" incompleteness leak into a false MISMATCH anywhere?** No — by construction, `composition_complete` is only ever consulted in the branch where `missing` is non-empty, i.e. exactly when a genuine open question remains about whether an unresolved part of the closure could still contain a required concept. It is never consulted, and therefore never at risk of over-demanding irrelevant completeness, in the branch where the answer is already positively known.
 
 ## 17. Row 133 — the Golden Case, fully specified
 
@@ -323,10 +352,14 @@ resolve_composition(...) == ObservedComposition(
 **CASE E — multiple levels.** `EBITDA -> OPERATING_COSTS -> STAFF_AND_SERVICES -> PERSONNEL_COST`, three hops deep.
 ```python
 # resolve_composition recurses through OPERATING_COSTS and STAFF_AND_SERVICES in turn;
-# PERSONNEL_COST is found at depth 3, well within max_depth=8.
+# PERSONNEL_COST is found at depth 3. [2026-08-11: no max_depth constant exists any
+# longer, per §13/§13a -- termination is guaranteed by the cycle guard alone, so depth
+# 3 requires no special headroom check at all.]
 # -> MATCH, by the same unmodified recursive mechanism -- no case-specific handling.
 ```
-CASE E's only purpose is to confirm the bound (§13's `max_depth`) is not accidentally fixed at one or two hops — the mechanism is depth-generic, not case-specific.
+CASE E's only purpose is to confirm the mechanism is depth-generic, not case-specific — it was never gated by any fixed hop count, and, after the §13 correction, is not gated by any constant at all.
+
+**CASE A — MATCH despite an irrelevant incomplete branch [2026-08-11 Final Semantic Arbitration].** `EBITDA → OPEX_TOTAL → {PERSONNEL_COST (found), UNKNOWN_COMPONENT (unresolved)}`. Worked in full in §16a. `composition_complete=False` (the `UNKNOWN_COMPONENT` branch), yet the result is `MATCH`, because `compare_against_doctrine` never consults `composition_complete` once `missing` is already empty. This is the regression test proving the MATCH/MISMATCH asymmetry (§16a) is real, not accidental.
 
 ## 21. Enterprise convention compatibility — preserved, not integrated
 
@@ -372,9 +405,11 @@ Financial-domain-literate curator + PR review, identical discipline to `CANONICA
 14. **[NEW 2026-08-11] Nested UNKNOWN (CASE C)** — an unresolvable component inside `OPEX_TOTAL` forces `composition_complete=False` → `UNKNOWN`, never `MISMATCH`.
 15. **[NEW 2026-08-11] Nested MISMATCH (CASE D)** — `OPEX_TOTAL` fully resolved, contains only `EXTERNAL_COSTS` → `composition_complete=True`, `PERSONNEL_COST` absent from the full closure → `MISMATCH`.
 16. **[NEW 2026-08-11] Multi-level closure (CASE E)** — a three-hop chain resolves `PERSONNEL_COST` at depth 3 without depth-specific code paths → `MATCH`.
-17. **[NEW 2026-08-11] Cycle guard** — a synthetic self-referencing or mutually-referencing formula pair does not infinite-loop; `composition_complete=False`, function returns, never raises `RecursionError`.
-18. **[NEW 2026-08-11] Depth-bound guard** — a chain deeper than `max_depth` returns `composition_complete=False` rather than raising or silently truncating into a false `MISMATCH`.
+17. **[NEW 2026-08-11] Cycle guard** — a synthetic self-referencing or mutually-referencing formula pair does not infinite-loop; `composition_complete=False`, function returns, never raises `RecursionError` (proves the `on_stack` guard alone is sufficient — no depth constant involved, §13a).
+18. **[CORRECTED 2026-08-11 Final Semantic Arbitration] Deep-but-valid finite chain terminates without a depth constant** — a synthetic acyclic chain of at least 9 hops (deliberately exceeding the old, now-removed, `max_depth=8`) resolves correctly to `MATCH`/`MISMATCH` as appropriate, proving termination and correctness do not depend on any fixed hop count. (Replaces the original "depth-bound guard" test, which tested a constant this correction removes.)
 19. **[NEW 2026-08-11] Diamond dependency is not miscounted as a cycle** — the same cell referenced from two different branches of the same closure is resolved once (memoized via `done`), and does **not** set `composition_complete=False`.
+20. **[NEW 2026-08-11 Final Semantic Arbitration] MATCH ignores an irrelevant incomplete branch (CASE A, §20a)** — a required concept found positively, alongside a separate unresolved/unclassifiable branch, still yields `MATCH`; asserts `composition_complete=False` was computed but did not gate the result. **This is the test that pins down the MATCH/MISMATCH asymmetry (§16a) as an explicit, protected contract, not an accident of statement ordering.**
+21. **[NEW 2026-08-11 Final Semantic Arbitration] `resolve_composition` accepts no `max_depth` parameter** — a structural/introspection test asserting the function's signature carries no depth-related parameter, keeping the domain contract honest that no such constant exists.
 
 ## 28. Estimated production file impact (future implementation, not built here)
 
@@ -404,8 +439,8 @@ No external calls, no customer data stored in Vocabulary/Doctrine (both are prod
 ## 33. Fail-closed rules, made structural (not merely stated)
 
 - Unknown concept (no `candidate_concept` at all) → the comparison function is never called; this is a caller-side precondition (§15's own signature requires a non-optional `ConceptId`), never a silent fallback inside the function.
-- Unknown or incomplete prerequisite classification → `UNKNOWN`, enforced by `composition_complete` [corrected 2026-08-11 — was `unclassified_references` alone, which did not also fail closed on a depth-cutoff or a cycle; both now do, per §15/§16].
-- A depth-cutoff or a detected cycle during forward closure expansion → `composition_complete=False`, never a crash, never a silent truncation misreported as a resolved closure (§13, tests 17-18, §27).
+- Unknown or incomplete prerequisite classification → `UNKNOWN`, enforced by `composition_complete`, but **only when a required concept has not already been positively found** — `composition_complete` is never consulted once `missing` is empty (§16a: existential proof needs no completeness check; only the universal "confirmed absent" claim does).
+- A detected cycle during forward closure expansion → `composition_complete=False`, never a crash, never a silent misreport (§13, §13a, tests 17/19, §27). **[CORRECTED 2026-08-11 Final Semantic Arbitration]** No depth-cutoff exists any longer — termination is guaranteed by the cycle guard alone (§13a); if a future implementation adds an engineering-only recursion-depth safety cutoff, it must independently fail closed to `UNKNOWN` and must never appear as a domain-level constant in this contract.
 - Missing doctrine entry for a concept → a registry lookup returning nothing; the caller must not fabricate a `MATCH` — out of this slice's tested surface but structurally impossible to get wrong given the registry's own plain-dict shape (a missing key is a `KeyError`/`None`, never silently treated as `MATCH`).
 - Multiple applicable doctrine entries for the same concept → **structurally prevented at registry construction time** (§12, §27 test 7), not handled at comparison time.
 - Malformed doctrine reference (a `required_prior_deductions` entry naming a `ConceptId` absent from Vocabulary) → a contract/test-time validation failure, never a silent runtime pass-through — enforced by construction-time cross-validation between the two registries (named as a reservation, §35, since it requires the two modules to know about each other at build time — a small, explicit, tested coupling, not a hidden one).
@@ -443,12 +478,14 @@ No answer exposed a defect requiring revision of this contract's substantive sha
 - The construction-time cross-validation between Vocabulary and Doctrine registries (§33, "malformed doctrine reference") introduces a small, explicit build-time coupling between two otherwise-separate modules — named, not hidden, and testable, but worth flagging as the one place these two small registries must agree with each other.
 - `applicability` moved out of the executable object entirely (§12, corrected 2026-08-11) — its eventual computable form remains genuinely undesigned, now even more clearly deferred since it is not even a data field to design around.
 - The backward ("referenced-by") dependency index remains named but unbuilt (§13) — a real, if optional, enhancement to future explanation quality, not required for correctness; **reaffirmed unchanged by this review**, since the CASE B gap was forward-depth, not direction.
-- **[NEW 2026-08-11]** `max_depth`'s default (8) is a chosen safety constant, not a value derived from any real Phidani measurement — reasonable headroom, not a proven bound. If a future real file needs deeper nesting, this is a one-line constant change, not a redesign.
-- **[NEW 2026-08-11]** Diamond-dependency memoization (`done` set in `resolve_composition`) is an implementation-level correctness detail for this contract's own pseudocode, not a new architectural concept — flagged so a future implementer does not mistake ordinary DAG memoization for graph-engine machinery.
+- **[REMOVED 2026-08-11 Final Semantic Arbitration]** The prior reservation about `max_depth=8` being an unjustified constant is now moot — the constant itself was removed from the domain contract (§13/§13a), not merely re-justified. No depth constant remains anywhere in this document.
+- **[NEW 2026-08-11]** If a future *implementation* chooses a recursive (rather than iterative/explicit-stack) technique for `resolve_composition` and therefore wants a defensive recursion-depth safety cutoff for engineering reasons, that cutoff is an implementation-level concern, must never be presented as a domain/semantic constant, and must fail closed to `UNKNOWN` if triggered (§13a). This document deliberately specifies no such number.
+- **[NEW 2026-08-11]** The narrower, required-concept-scoped completeness definition (§13b) — "no unresolved node could conceal a required concept" — is the semantically ideal target but is not provable in v0 without a concept-disjointness/taxonomy fact Pepperyn does not have. Named as a real, deliberately deferred future refinement, not fabricated now.
+- Diamond-dependency memoization (`done` set in `resolve_composition`) is an implementation-level correctness detail for this contract's own pseudocode, not a new architectural concept — flagged so a future implementer does not mistake ordinary DAG memoization for graph-engine machinery.
 
-## 37. Implementation recommendation [reaffirmed 2026-08-11]
+## 37. Implementation recommendation [reaffirmed 2026-08-11, twice]
 
-**GO — with this contract now correcting one materially unsound decision found by direct adversarial attack** (§13/§15/§16: single-hop forward extraction produced a false `MISMATCH` under CASE B's nested composition; corrected to a bounded recursive forward closure, still deterministic, still not a graph engine). Every field, every function, every test case (including the five new ones added by this review) traces to a specific requirement demonstrated by the row-133 experiment or an adversarial counter-case; nothing is speculative. The correction was caught and fixed *before* any implementation — exactly the value of documentation-only contract review preceding code.
+**GO — with two rounds of adversarial attack now completed and two real defects corrected before any code was written.** Round 1 (§13/§15/§16) found and fixed a false-`MISMATCH` path under nested composition. Round 2 (§16a, §13/§13a/§13b) found and fixed an unjustified `max_depth` constant (removed entirely, replaced by a derived termination proof) and made an already-correct-but-implicit MATCH/MISMATCH asymmetry explicit, tested, and protected against regression. No further semantic gap was found; the narrower, taxonomy-dependent completeness refinement (§13b) was deliberately not built, for the same reason no ontology has been built anywhere in this document line — it is not yet demonstrated necessary or safely provable. Every field, every function, every test case traces to a specific requirement demonstrated by the row-133 experiment or an adversarial counter-case; nothing is speculative, and nothing remaining is arbitrary.
 
 ---
 
@@ -476,4 +513,35 @@ No answer exposed a defect requiring revision of this contract's substantive sha
 
 ---
 
-**CANONICAL_FINANCIAL_DOCTRINE_V0_IMPLEMENTATION_CONTRACT — ESTABLISHED, CORRECTED 2026-08-11. NO CODE WRITTEN. NO MERGE.**
+## 39. AMENDMENT — Composition Completeness Final Semantic Arbitration (2026-08-11)
+
+Target of this review: the correction committed at `ecdfe97`. Two newly introduced assumptions were tested to falsification-or-survival before any implementation could be authorized.
+
+**1 — MATCH/MISMATCH asymmetry.** Survives: `composition_complete` is not, and must not be, required for `MATCH` — only for `MISMATCH`/`UNKNOWN`. Derived from the existential/universal proof asymmetry (§16a), not assumed. CASE A added as the protecting regression test (§20a, test 20, §27). The subset formulation `required ⊆ observed → MATCH; required ⊄ observed AND complete → MISMATCH; required ⊄ observed AND NOT complete → UNKNOWN` is confirmed equivalent to the existing `missing`-based pseudocode, not a new rule layered on top.
+
+**2 — `max_depth=8`.** No justifying evidence existed. Removed entirely from the domain contract (§13, §13a) — not re-derived to a different number. Termination is guaranteed by the `on_stack` cycle guard plus `done` memoization operating over any real workbook's finite cell universe; this was proven, not assumed (§13a). Any future recursion-depth safety cutoff, if an implementation needs one for engineering reasons, is explicitly named as out-of-domain, must fail closed to `UNKNOWN`, and is not specified here.
+
+**3 — DAG terminology.** Corrected throughout to "forward dependency traversal with cycle detection" (§13) — the prior "DAG traversal with a fail-closed cycle guard" was self-contradictory.
+
+**4 — Required-concept-scoped completeness.** Challenged directly (§13b). The narrower formulation is the correct semantic target but is not provable in v0 without concept-disjointness/taxonomy knowledge that does not exist and was not fabricated. The conservative global completeness rule is retained, with the cost (occasional `UNKNOWN` where a human might feel confident) named as the deliberately safe direction to err.
+
+```
+POSITIVE PROOF SUFFICIENT FOR MATCH: YES
+MATCH REQUIRES GLOBAL COMPLETENESS: NO
+MISMATCH REQUIRES COMPLETENESS: YES
+COMPLETENESS DEFINITION: entire reachable forward dependency closure classified (global, conservative) — not scoped to doctrine-relevant concepts only, per §13b
+IRRELEVANT UNKNOWN COMPONENT: does not block MATCH (resolved by the §16a asymmetry, not by narrowing completeness); still blocks MISMATCH/UNKNOWN determination, since it cannot be ruled out without fabricated disjointness knowledge
+REQUIRED-CONCEPT-SCOPED COMPLETENESS POSSIBLE: NO, not provable in v0 without a taxonomy -- conservative global rule retained
+MAX_DEPTH_8 JUSTIFIED: NO evidence existed -- constant removed entirely, not re-justified
+DEPTH LIMIT DOMAIN SEMANTIC: NO -- any depth-related cutoff, if ever added, is engineering-only, never domain semantics
+TERMINATION MECHANISM: on_stack cycle guard + done memoization over a finite workbook cell universe -- proven sufficient without any depth constant
+CYCLE BEHAVIOR: composition_complete=False, fail closed to UNKNOWN, never raises, never loops
+DAG TERMINOLOGY: corrected to "forward dependency traversal with cycle detection" -- acyclicity is expected, not assumed
+CONTRACT CORRECTION REQUIRED: YES -- applied in place on the same branch/document (§13, §13a, §13b, §15, §16a, §20a, §27, §33, §36, §37, this §39)
+IMPLEMENTATION READINESS: GO
+FINAL VERDICT: A
+```
+
+---
+
+**CANONICAL_FINANCIAL_DOCTRINE_V0_IMPLEMENTATION_CONTRACT — ESTABLISHED, CORRECTED 2026-08-11 (twice). NO CODE WRITTEN. NO MERGE.**
