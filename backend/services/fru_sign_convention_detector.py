@@ -84,8 +84,25 @@ present but disagree, or neither present -> UNKNOWN, candidate value None.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 from typing import Optional
+
+from .candidate import Candidate
+
+# RELOCATED 2026-08-11 (PERSONNEL_COST_CLASSIFIER_V0_IMPLEMENTATION_CONTRACT.md
+# §3, implementation mission §4 — "relocate, do not duplicate"): `Candidate`
+# now lives in `services/candidate.py`, imported here rather than redefined,
+# because `personnel_cost_classifier.py` is a second real consumer that
+# needs the same shape plus a bounded extension (CONTRADICTION tier,
+# evidence lists) `Candidate` could not previously represent. Nothing about
+# FRU's own behavior changes: this module never sets `tier="CONTRADICTION"`
+# and never populates the evidence-list fields (both default to `()`), so
+# every existing call site (`Candidate(value=..., tier=...)` below) and
+# every existing consumer (`epistemic_dialogue_service.py`,
+# `backend/tests/test_epistemic_dialogue_v0.py`, both of which import
+# `Candidate` from *this* module) continues to work unchanged — the name
+# `Candidate` is re-exported from this module's own namespace by this
+# import, so `from backend.services.fru_sign_convention_detector import
+# Candidate` still resolves.
 
 # Belgian PCMN charge-account prefixes (classes 60-66) — the minimum
 # needed to interpret Phidani's own codes (mission-scoped, not a general
@@ -122,15 +139,6 @@ _NONNEG_MAJORITY_THRESHOLD = _NONNEG_MAJORITY_THRESHOLD_NUM / _NONNEG_MAJORITY_T
 
 ABSOLUTE_POSITIVE = "ABSOLUTE_POSITIVE"
 SIGNED_NATURAL = "SIGNED_NATURAL"
-
-
-@dataclass(frozen=True)
-class Candidate:
-    """FRU's output for the REASON step (contract §3) — internal to the
-    detector/orchestration boundary, never itself persisted or passed to
-    KnowledgeModel. `value` is None exactly when `tier == "UNKNOWN"`."""
-    value: Optional[str]
-    tier: str  # "STRONG_INFERENCE" | "HYPOTHESIS" | "UNKNOWN"
 
 
 def _code_range_signal(charge_values: list[float]) -> Optional[str]:
