@@ -85,6 +85,46 @@ class TestExtractCellReferences:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Known limitations — pinning tests, NOT correctness assertions that the
+# fabricated tokens below are desirable. Added 2026-08-11 (independent
+# adversarial pre-merge review, "Formula reference extraction" §3):
+# extract_cell_references has no awareness of Excel quoted-string-literal
+# boundaries or the SheetName! cross-sheet prefix, and can therefore
+# fabricate a reference-like token from either. Both cases were verified
+# empirically to have ZERO exposure in the real Phidani.xlsx Golden Case
+# (all 6042 formula cells scanned: single sheet, SUM()+arithmetic only,
+# no quotes, no cross-sheet syntax). These tests exist so a future change
+# to the extractor's parsing strategy is a deliberate, reviewed decision,
+# never a silent behavior drift. See formula_reference_extractor.py's
+# module docstring for the full named-limitation statement.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestKnownLimitations:
+    def test_quoted_string_can_produce_spurious_token(self):
+        """BOUNDARY / KNOWN LIMITATION — pinning test, not a correctness
+        assertion. Documents the CURRENT, ACCEPTED behavior: text inside a
+        quoted string literal that happens to be cell-shaped is extracted
+        as if it were a real reference."""
+        refs = extract_cell_references('=IF(A1="TAXE5",1,0)')
+        assert refs == frozenset({"A1", "AXE5"})  # "AXE5" is spurious,
+        # fabricated from inside the quoted string literal "TAXE5" — NOT
+        # a real reference in this formula. Pinned as known behavior.
+
+    def test_cross_sheet_reference_can_produce_spurious_token(self):
+        """BOUNDARY / KNOWN LIMITATION — pinning test, not a correctness
+        assertion. Documents the CURRENT, ACCEPTED behavior: a fragment of
+        a `SheetName!` prefix can be mis-extracted as if it were a
+        same-sheet cell reference. Real Phidani.xlsx has exactly one
+        sheet ("PHIDANI") — cross-sheet formulas are structurally
+        impossible in the actual Golden Case data."""
+        refs = extract_cell_references("=Sheet2!C35")
+        assert refs == frozenset({"C35", "eet2"})  # "eet2" is spurious,
+        # fabricated from inside the sheet name "Sheet2" — NOT a real
+        # reference in this formula. Pinned as known behavior.
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # resolve_composition
 # ─────────────────────────────────────────────────────────────────────────────
 

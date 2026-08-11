@@ -28,6 +28,37 @@ Doctrine-agnostic by design: this module has no knowledge of
 DoctrineStatement, required_prior_deductions, or comparison semantics — it
 only resolves which concepts are reachable from a root cell's forward
 formula references, and whether that resolution is complete.
+
+NAMED v0 LIMITATION (added 2026-08-11, independent adversarial pre-merge
+review — not a silent capability claim, a documented boundary of what this
+minimal regex extractor is validated for):
+
+  `extract_cell_references` is validated only for the formula syntax
+  actually present in the v0 Golden Case — bare cell references, single-
+  column SUM ranges, and plain arithmetic operators/constants. It does
+  NOT parse quoted Excel string literals and does NOT parse sheet-
+  qualified references safely. Because the regex has no awareness of
+  string-literal boundaries or the `SheetName!` prefix syntax, it CAN
+  fabricate a reference-like token from text that merely happens to look
+  like a cell address:
+
+    extract_cell_references('=IF(A1="TAXE5",1,0)') includes a spurious
+    "AXE5" token, fabricated from inside the quoted string literal.
+    extract_cell_references("=Sheet2!C35") includes a spurious "eet2"
+    token, fabricated from inside the sheet name "Sheet2".
+
+  This was empirically checked against all 6042 formula cells in the real
+  Phidani.xlsx workbook (single sheet, "PHIDANI"): every one of them uses
+  only `SUM(...)` and plain arithmetic on bare cell references — zero
+  quoted-string formulas, zero cross-sheet formulas, zero other function
+  names. The limitation above therefore has ZERO exposure in the v0
+  Golden Case as verified, but is real for any future, non-Phidani
+  workbook that uses quoted text or cross-sheet references inside a
+  formula reachable by a doctrine comparison. Pinned, not fixed, by
+  test_formula_reference_extractor.py::TestKnownLimitations — building a
+  full formula parser to close this gap is explicitly deferred, not
+  performed here (out of scope: this remains a minimal regex extractor,
+  not a parser).
 """
 from __future__ import annotations
 
@@ -69,6 +100,14 @@ def extract_cell_references(formula: Optional[str]) -> frozenset:
     Absolute-reference markers ("$C$35") are normalized to their bare
     column-row form. Cross-sheet references are out of scope for the
     Golden Case and are not specially handled.
+
+    NAMED v0 LIMITATION (see module docstring for the full statement,
+    added 2026-08-11): this function does not parse quoted string
+    literals or `SheetName!` prefixes, and can fabricate a spurious
+    reference-like token from text inside either. Verified absent from
+    all 6042 real Phidani formula cells (single-sheet, SUM+arithmetic
+    only) — pinned, not fixed, by
+    test_formula_reference_extractor.py::TestKnownLimitations.
     """
     if not formula:
         return frozenset()
