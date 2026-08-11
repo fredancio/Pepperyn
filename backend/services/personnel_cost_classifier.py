@@ -40,27 +40,23 @@ PARENT_CAPTION'S ROLE (contract §6, corrected by the Signal Family Model
 Final Adversarial Review): a position-consistency check only, never an
 independent keyword-matching vote (the original design shared
 `CAPTION_LEXICAL`'s own keyword mechanism, a real circularity found and
-fixed). This module resolves a genuine remaining ambiguity in the
-contract's text: §9/§10/§11's per-signal walkthroughs describe
-`PARENT_CAPTION` as "recorded as corroborating context" in the evidence
-lists, but every one of the contract's five worked "Expected:" Golden
-Case tuples (§9, §10 "all three", §11 "all three", §12, §12a) in fact
-lists only `ACCOUNT_CODE_FAMILY`/`STRUCTURAL_POSITION`/`CAPTION_LEXICAL`
-— none of the five ever includes a `PARENT_CAPTION` item. This is treated
-here as the internal contradiction the implementation mission's own entry
-gate authorizes resolving via executable/textual evidence (mission
-preamble: "Do not redesign... unless executable evidence demonstrates
-that the canonical contract is... internally contradictory"): the
-concrete, testable "Expected:" tuples are followed exactly (they are what
-the Golden Case tests must match), and `PARENT_CAPTION` is implemented as
-a real, computed, non-lexical consistency check
-(`_parent_caption_confirms_position`, presence-only, never content-based)
-whose result is intentionally not wired to change `value`/`tier`/evidence
-lists in v0 — no Golden Case or synthetic case in the contract specifies
-anomalous behavior for it, and inventing one here would be exactly the
-"PARENT_CAPTION becomes an independent voting signal" failure mode both
-the contract and the implementation mission explicitly forbid. See
-`test_parent_caption_never_changes_output`.
+fixed). **[CORRECTED, independent adversarial pre-merge review, 2026-08-11]**
+An earlier version of this module computed a `_parent_caption_confirms_position`
+helper for this role, but the review proved by direct behavioral deletion
+test (forcing its return value to its opposite across all five real
+Golden Cases) that the result had zero causal effect on any `Candidate`
+output, evidence list, tier, or professional invariant — the contract's
+five worked "Expected:" Golden Case tuples (§9, §10, §11, §12, §12a)
+never include a `PARENT_CAPTION` `EvidenceItem`, and no case specifies
+anomalous behavior for a missing/inconsistent parent caption. Per the
+review's own deletion-test framework ("if NO capability is lost, remove
+it — do not retain dead code merely because the contract mentions the
+concept historically"), the computation is removed entirely rather than
+kept inert. `PARENT_CAPTION` therefore contributes nothing to this v0
+kernel's actual behavior — a named, honest simplification, not a silent
+omission (see `TestParentCaptionRoleRemoved` in the test suite, which
+pins this decision and would fail if `PARENT_CAPTION` ever silently
+reappeared as a voting signal).
 
 WHAT THIS MODULE NEVER DOES (contract §2/§13):
   - No LLM call, anywhere, for any reason (contract §26).
@@ -282,31 +278,6 @@ def _resolve_family(direction_a: Optional[str], direction_b: Optional[str]) -> O
     return None  # INTERNALLY_INCONSISTENT
 
 
-def _parent_caption_confirms_position(
-    structural_state: Optional[str], parent_caption_text: Optional[str]
-) -> bool:
-    """`PARENT_CAPTION`'s corrected role (contract §6): a
-    position-consistency check only — deliberately non-lexical, checking
-    only *presence*, never caption *content* (checking content would
-    reintroduce the exact circularity with `CAPTION_LEXICAL` the Signal
-    Family Model Final Adversarial Review found and fixed). Returns
-    `True` when there is nothing to confirm (`structural_state` is
-    `None`, no usable claim) or when a parent caption is present; `False`
-    only when `STRUCTURAL` is directional and the parent caption is
-    absent/empty — an anomaly no Golden Case in the canonical contract
-    exercises (none of rows 122/134/52/151/131 has a missing parent
-    caption).
-
-    The boolean result is intentionally NOT wired to change `value`,
-    `tier`, or either evidence list in v0 (see module docstring) — kept
-    because the mission (§5) requires the role to exist, not because
-    anything consumes it yet.
-    """
-    if structural_state is None:
-        return True
-    return bool(parent_caption_text and parent_caption_text.strip())
-
-
 # Direct, literal transcription of contract §7's 9-row table — the sole
 # source of `value`/`tier`. A categorical (family-presence,
 # family-agreement) lookup, no numeric threshold, no majority vote
@@ -338,11 +309,6 @@ def _extract_evidence(
         obs.position_cell, obs.personnel_cost_range, obs.other_range
     )
     structural_state = _resolve_family(code_direction, position_direction)
-
-    # PARENT_CAPTION: computed for its authorized role (see module
-    # docstring); result intentionally unused beyond this call.
-    _parent_caption_confirms_position(structural_state, obs.parent_caption_text)
-
     lexical_state = _caption_direction(obs.own_caption_text)
 
     supporting: list[EvidenceItem] = []

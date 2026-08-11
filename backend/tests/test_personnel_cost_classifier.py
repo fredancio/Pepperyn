@@ -4,19 +4,24 @@ services/candidate.py.
 
 Canonical contract: docs/Architecture/Cognitive/PERSONNEL_COST_CLASSIFIER_V0_IMPLEMENTATION_CONTRACT.md
 (established 5dfde8c; corrected 669b44b; corrected c547ee5; row-149 tier
-fix 01b0c9e — all on branch
-architecture/personnel-cost-classifier-v0-contract-2026-08-11).
+fix 01b0c9e; row-122-ablation tier fix fa75ea1 — merged to main as of the
+independent adversarial pre-merge review, 2026-08-11).
 
 Covers: five real-file Golden Cases (rows 122/134/52/151/131, plus the
 keyword-boundary guard on row 149), independently re-derived from the
 real Phidani.xlsx in this file (not copied from the contract's prose);
 ablations (contract §31/mission §10); structural internal-conflict
 synthetics (mission §11); out-of-vocabulary captions (mission §12);
-`PARENT_CAPTION`'s non-voting role; no-row-number-branch proof; the
-`Candidate`/`EvidenceItem` shape and relocation/backward-compatibility;
+`PARENT_CAPTION`'s role (removed entirely post-review — proven dead by a
+direct behavioral deletion test; see `TestParentCaptionRoleRemoved`);
+no-row-number-branch proof; the `Candidate`/`EvidenceItem` shape and
+relocation/backward-compatibility (including via the real production
+consumer's own `backend.services.X` import path, not only `services.X`);
 import/governance boundaries (no LLM, no Doctrine, no KnowledgeModel, no
 Epistemic Dialogue, no Concept Vocabulary semantic matching); no hidden
-numeric score; impossible-state guards.
+numeric score; impossible-state guards; a pinned, known, non-blocking v0
+limitation (plural keyword forms not recognized, `TestKnownLimitation
+PluralKeywordsNotRecognized`).
 
 Classification (mission §15, same discipline as `test_financial_doctrine.py`
 and `test_observation_structure_v0.py`): each test is tagged INVARIANT,
@@ -283,11 +288,15 @@ class TestNoRowNumberBranch:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PARENT_CAPTION never independently votes (mission §5/§17)
+# PARENT_CAPTION: role removed entirely (independent adversarial pre-merge
+# review, 2026-08-11 — proven dead by direct behavioral deletion test; see
+# personnel_cost_classifier.py's own module docstring). This class pins
+# that decision: parent_caption_text is still accepted as an input field
+# (a real caller-supplied fact), but must never affect output.
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-class TestParentCaptionNeverVotes:
+class TestParentCaptionRoleRemoved:
     def _obs(self, *, parent_caption_text):
         return LeafObservation(
             account_code_cell="A1",
@@ -304,9 +313,13 @@ class TestParentCaptionNeverVotes:
     def test_parent_caption_present_vs_absent_identical_output(self):
         """INVARIANT. Same leaf, only `parent_caption_text` varies
         (present vs. None vs. empty) — Candidate output (value, tier, and
-        both evidence lists) must be byte-identical, proving
-        PARENT_CAPTION never independently asserts a direction and never
-        appears as a stored EvidenceItem."""
+        both evidence lists) must be byte-identical. `parent_caption_text`
+        is accepted on `LeafObservation` as a real caller-supplied fact
+        but is never read by the kernel (the computation that once
+        inspected it, `_parent_caption_confirms_position`, was removed
+        entirely after this review's own deletion test proved it had zero
+        causal effect — see `personnel_cost_classifier.py`'s module
+        docstring)."""
         c_present = classify_personnel_cost(self._obs(parent_caption_text="B. Services — Biens Divers"))
         c_absent = classify_personnel_cost(self._obs(parent_caption_text=None))
         c_empty = classify_personnel_cost(self._obs(parent_caption_text=""))
@@ -509,6 +522,51 @@ class TestStructuralInternalConflict:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# KNOWN LIMITATION, pinned (independent adversarial pre-merge review,
+# 2026-08-11) — plural keyword forms are not recognized
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestKnownLimitationPluralKeywordsNotRecognized:
+    """The review found, and this pins, a real but non-blocking gap: the
+    word-boundary keyword match (`\\b<keyword>\\b`) requires an EXACT whole
+    word, so plural forms of the personnel keywords ("rémunérations",
+    "salaires") and the non-personnel keyword ("téléphones") do NOT match
+    — the trailing "s" breaks the closing `\\b` boundary. This is a v0
+    LIMITATION, not a defect: it fails SAFE (produces no usable LEXICAL
+    claim, never a false positive in either direction), and a fresh
+    cross-check of the real Phidani.xlsx (independent review, 2026-08-11)
+    found exactly two plural occurrences in the whole file — row 161 (an
+    AGGREGATE's own parent caption, "C. Rémunérations - Charges Sociales -
+    Pensions", never lexically matched by this classifier at all) and row
+    492 ("Rémunérations - Charges sociales", itself a formula-derived
+    balance-sheet aggregate, `=SUM(C484:C491)`, PCMN class 45 — outside
+    this classifier's P&L-leaf scope entirely) — so this gap affects zero
+    real, in-scope Golden Case today. Per the mission's explicit
+    instruction: do NOT broaden the matcher (no stemming, no plural
+    normalization, no synonyms, no translation, no LLM) — this class only
+    PINS the current, honest boundary so a future regression or a future
+    broadening decision has a documented starting point."""
+
+    def test_plural_remuneration_not_recognized(self):
+        assert _caption_direction("Charges de rémunérations") is None
+
+    def test_plural_salaires_not_recognized(self):
+        assert _caption_direction("Salaires bruts") is None
+
+    def test_plural_telephones_not_recognized(self):
+        assert _caption_direction("Frais de téléphones") is None
+
+    def test_singular_forms_still_recognized_not_a_general_regression(self):
+        """Guards against ever "fixing" this by accidentally breaking the
+        singular match instead — the singular forms (which every real
+        Golden Case actually uses) must keep working."""
+        assert _caption_direction("Rémunération brute") == "PERSONNEL_COST"
+        assert _caption_direction("Salaire brut") == "PERSONNEL_COST"
+        assert _caption_direction("Frais de téléphone") == "OTHER"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Out-of-vocabulary captions (mission §12)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -691,6 +749,28 @@ class TestCandidateShapeAndRelocation:
 
         assert FRUCandidate is Candidate
 
+    def test_fru_candidate_identity_via_real_consumer_import_path(self):
+        """INVARIANT — regression guard (independent adversarial pre-merge
+        review, 2026-08-11). This codebase mixes two import conventions
+        (`services.X`, reached when `backend/` is on `sys.path`, vs.
+        `backend.services.X`, reached when the repo root is on `sys.path`)
+        across different test files. The review found that these are two
+        distinct module objects when both are exercised in one process —
+        `services.candidate.Candidate is not backend.services.candidate.Candidate`
+        — a pre-existing, repo-wide characteristic, NOT solved here (out of
+        scope for this mission). This test instead narrowly guards the one
+        thing that actually matters: the real production consumer chain
+        (`epistemic_dialogue_service.py` -> `fru_sign_convention_detector.py`
+        -> `candidate.py`) is internally self-consistent via the EXACT
+        import path it actually uses (`backend.services.X`), not merely via
+        the `services.X` path this test file itself happens to use
+        elsewhere. If this ever breaks, FRU's real consumers break with
+        it."""
+        import backend.services.candidate as backend_candidate_mod
+        from backend.services.fru_sign_convention_detector import Candidate as BackendFRUCandidate
+
+        assert BackendFRUCandidate is backend_candidate_mod.Candidate
+
     def test_fru_own_behavior_unchanged_after_relocation(self):
         """INVARIANT. FRU's own detector still produces the same shape of
         result it always did — the relocation is purely additive from
@@ -725,16 +805,6 @@ class TestCandidateShapeAndRelocation:
 
 
 class TestImpossibleStates:
-    @pytest.mark.parametrize("value", ["PERSONNEL_COST", "OTHER"])
-    def test_never_produces_resolved_value_with_contradiction_tier(self, value):
-        """INVARIANT. Exhaustively runs every reachable (structural,
-        lexical) combination via the public API and asserts the
-        impossible states (§28's rejected rows) never occur."""
-        # Covered structurally by TestArbitrationTableCompleteness below;
-        # this test asserts the specific named-impossible pairing never
-        # appears across the full real-file Golden Case sweep.
-        pass  # see TestArbitrationTableCompleteness for the exhaustive proof
-
     def test_arbitration_table_has_no_impossible_state(self):
         """INVARIANT (contract §28). Every one of the 9 rows in
         `_TIER_TABLE` produces a value/tier combination that is NOT in
