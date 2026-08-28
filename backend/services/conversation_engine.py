@@ -206,18 +206,13 @@ async def get_chat_response(
 
     Returns (response_text, model_used)
     """
-    from services.llm_service import get_anthropic_client
+    from services.llm_egress import dispatch_legacy_synthetic
 
-    client = get_anthropic_client()
     payload = build_payload(executive_case_v2, user_message, history)
 
-    logger.info(
-        "[CE] Appel %s — message: %.60s…",
-        CE_MODEL,
-        user_message,
-    )
+    logger.info("[CE] Appel %s", CE_MODEL)
 
-    response = client.messages.create(**payload)
+    response = dispatch_legacy_synthetic("ANALYSIS_CHAT", **payload)
     text = response.content[0].text.strip()
 
     logger.info("[CE] Réponse reçue (%d caractères)", len(text))

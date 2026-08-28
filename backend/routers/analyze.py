@@ -19,7 +19,7 @@ from jose import jwt, JWTError
 
 from models.schemas import AnalyzeResponse, TextQueryRequest, TextQueryResponse, DataQualityInfo
 from connectors import FileConnector
-from services.llm_service import run_full_pipeline, get_anthropic_client, call_chat_intelligent
+from services.llm_service import run_full_pipeline, call_chat_intelligent
 from services.excel_export import generate_excel_report
 # WP5C Commit 6 — compute_decision_fingerprint / FINGERPRINT_VERSION retirés de analyze.py.
 # Le fingerprint est désormais calculé dans l'extracteur (Phase 9, KERNEL-INV-013)
@@ -915,34 +915,11 @@ async def analyze_text(
     authorization: Optional[str] = Header(default=None),
     x_auth_type: Optional[str] = Header(default=None),
 ):
-    """Answer a financial question without file upload."""
+    """Disabled in V1 by Founder arbitration F3."""
     await _resolve_auth(authorization, x_auth_type)
-
-    client = get_anthropic_client()
-
-    system_prompt = """Tu es Pepperyn, un assistant financier IA expert de niveau consultant McKinsey.
-Tu réponds aux questions financières de manière précise, structurée et professionnelle.
-Tu peux expliquer des concepts financiers, analyser des situations décrites, donner des recommandations générales.
-Si une question nécessite des données chiffrées spécifiques (les chiffres réels de l'entreprise), invite l'utilisateur à uploader son fichier Excel pour une analyse complète.
-Sois concis mais complet. Utilise des listes structurées quand c'est pertinent.
-Réponds toujours en français."""
-
-    try:
-        message = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=800,
-            system=system_prompt,
-            messages=[{"role": "user", "content": request.query}]
-        )
-        response_text = message.content[0].text
-    except Exception as e:
-        logger.error("[ANALYZE] Erreur IA (texte): %s", e)
-        raise HTTPException(status_code=500, detail="Erreur lors de la génération de la réponse.")
-
-    return TextQueryResponse(
-        success=True,
-        message="Réponse générée",
-        response=response_text
+    raise HTTPException(
+        status_code=410,
+        detail="L'analyse textuelle est indisponible dans la version V1.",
     )
 
 

@@ -29,9 +29,8 @@ import os
 import re
 from typing import Any, Optional
 
-import anthropic
-
 from models.schemas import AnalysisResult
+from services.llm_egress import dispatch_legacy_synthetic
 
 logger = logging.getLogger(__name__)
 
@@ -379,7 +378,6 @@ async def _run_evidence_graph_agent(
       "sheets_verified": [...],
     }
     """
-    client = get_anthropic_client()
     data_summary = json.dumps(parsed_data, ensure_ascii=False, indent=1)[:10000]
 
     # Extraire le manifeste des feuilles si disponible
@@ -437,7 +435,8 @@ RÈGLES STRICTES :
 - Maximum 20 faits. Priorise les KPI les plus importants (CA, marges, trésorerie, bilan)."""
 
     try:
-        message = client.messages.create(
+        message = dispatch_legacy_synthetic(
+            "EVIDENCE_EXTRACTION",
             model=model,
             max_tokens=2000,
             temperature=0.0,
@@ -550,19 +549,12 @@ def _use_enhanced_pipeline() -> bool:
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
-def get_anthropic_client() -> anthropic.Anthropic:
-    api_key = os.getenv('ANTHROPIC_API_KEY')
-    if not api_key:
-        raise ValueError("ANTHROPIC_API_KEY non configurée")
-    return anthropic.Anthropic(api_key=api_key)
-
-
 async def classify_document(parsed_data: dict[str, Any]) -> tuple[str, int]:
     """Classify document type using claude-haiku-4-5."""
-    client = get_anthropic_client()
     data_summary = json.dumps(parsed_data, ensure_ascii=False, indent=1)[:5000]
 
-    message = client.messages.create(
+    message = dispatch_legacy_synthetic(
+        "DOCUMENT_CLASSIFICATION",
         model="claude-haiku-4-5-20251001",
         max_tokens=200,
         system=CLASSIFICATION_SYSTEM,
@@ -598,7 +590,6 @@ async def _run_financial_analyst_prep(
     Analyse les données financières et produit des constats structurés.
     Non-bloquant : retourne {} en cas d'échec.
     """
-    client = get_anthropic_client()
     data_summary = json.dumps(parsed_data, ensure_ascii=False, indent=1)[:8000]
 
     user_prompt = f"""Analyse ces données financières et produis un JSON structuré de tes constats.
@@ -627,7 +618,8 @@ Retourne UNIQUEMENT ce JSON (sans texte avant ni après) :
 }}"""
 
     try:
-        message = client.messages.create(
+        message = dispatch_legacy_synthetic(
+            "FINANCIAL_PREPASS",
             model=model,
             max_tokens=1200,
             temperature=0.1,
@@ -655,7 +647,6 @@ async def _run_strategic_cfo_prep(
     if not analyst_findings:
         return {}
 
-    client = get_anthropic_client()
     findings_json = json.dumps(analyst_findings, ensure_ascii=False, indent=1)[:3000]
 
     user_prompt = f"""Tu reçois l'analyse financière d'un analyste senior.
@@ -689,7 +680,8 @@ Retourne UNIQUEMENT ce JSON (sans texte avant ni après) :
 }}"""
 
     try:
-        message = client.messages.create(
+        message = dispatch_legacy_synthetic(
+            "STRATEGIC_PREPASS",
             model=model,
             max_tokens=1000,
             temperature=0.2,
@@ -2026,9 +2018,9 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
 
 async def _score_analysis(analysis_text: str) -> float:
     """Score the analysis using haiku (~100 tokens). Returns average score 0-10."""
-    client = get_anthropic_client()
     try:
-        message = client.messages.create(
+        message = dispatch_legacy_synthetic(
+            "ANALYSIS_QUALITY_SCORE",
             model="claude-haiku-4-5-20251001",
             max_tokens=100,
             system=SCORING_SYSTEM,
@@ -2065,14 +2057,14 @@ async def call_analysis_v3(
     system_prompt = surcharge optionnelle du system prompt (ENHANCED_ANALYSIS_SYSTEM si pipeline enrichi).
     Returns (analysis_text, input_tokens, output_tokens)
     """
-    client = get_anthropic_client()
     user_prompt = _build_user_prompt_call1(
         parsed_data, industry, business_model,
         memory_section, actions_section, quality_section, relation_section,
         pre_analysis_section=pre_analysis_section,
         evidence_graph_section=evidence_graph_section,
     )
-    message = client.messages.create(
+    message = dispatch_legacy_synthetic(
+        "FINANCIAL_ANALYSIS",
         model=model,
         system=system_prompt or ANALYSIS_SYSTEM_V3,
         messages=[{"role": "user", "content": user_prompt}],
@@ -2097,14 +2089,14 @@ async def call_verification_v3(
     system_prompt = surcharge optionnelle (ENHANCED_ANALYSIS_SYSTEM si pipeline enrichi).
     Returns verified/corrected analysis text.
     """
-    client = get_anthropic_client()
     user_prompt = _build_user_prompt_call2(
         analysis_call1,
         parsed_data,
         cfo_decisions=cfo_decisions,
         evidence_graph_audit=evidence_graph_audit,
     )
-    message = client.messages.create(
+    message = dispatch_legacy_synthetic(
+        "ANALYSIS_VERIFICATION",
         model=model,
         system=system_prompt or ANALYSIS_SYSTEM_V3,
         messages=[{"role": "user", "content": user_prompt}],
@@ -2329,8 +2321,6 @@ async def call_chat_intelligent(
 
     Returns (response_text, model_used)
     """
-    client = get_anthropic_client()
-
     system = CHAT_SYSTEM
     if analysis_context:
         system += f"\n\nCONTEXTE DE L'ANALYSE EN COURS :\n{analysis_context[:3000]}"
@@ -2338,7 +2328,8 @@ async def call_chat_intelligent(
     messages = list(history or [])
     messages.append({"role": "user", "content": message})
 
-    response = client.messages.create(
+    response = dispatch_legacy_synthetic(
+        "ANALYSIS_CHAT",
         model=CHAT_MODEL,
         max_tokens=CHAT_MAX_TOKENS,
         system=system,

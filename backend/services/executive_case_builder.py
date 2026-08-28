@@ -364,10 +364,8 @@ async def build_executive_case(
     """
     Agent 1 — construit l'ExecutiveCaseJSON.
 
-    Stratégie :
-      1. Pré-calcul Python (EDM) — déterministe, sans LLM.
-      2. Appel Claude Opus — structure et valide dans le JSON officiel.
-      3. Fallback Python pur — si Opus est indisponible.
+    Stratégie V1 : pré-calcul et rendu Python déterministes, sans nouvel
+    appel externe au moment de l'export (arbitrage Founder F1).
 
     Args:
         result_dict : dict issu de AnalysisResult.model_dump().
@@ -379,13 +377,7 @@ async def build_executive_case(
     result_dict = result_dict or {}
     edm = build_executive_decision_model(result_dict)
 
-    try:
-        case = await _call_opus(result_dict, edm, company_name)
-        logger.info("[ECB] ExecutiveCaseJSON produit par Claude Opus ✓")
-        return case
-    except Exception as exc:
-        logger.warning("[ECB] Opus indisponible (%s) — fallback Python activé.", exc)
-        return _python_mapper(result_dict, edm, company_name)
+    return _python_mapper(result_dict, edm, company_name)
 
 
 # ─── ADAPTERS : ExecutiveCaseJSON → (edm, result_dict) ───────────────────────
@@ -609,49 +601,6 @@ def case_to_result_dict(case: ExecutiveCaseJSON) -> dict:
 
 
 # ─── APPEL OPUS ───────────────────────────────────────────────────────────────
-
-async def _call_opus(result_dict: dict, edm, company_name: str) -> ExecutiveCaseJSON:
-    """Appelle Claude Opus et retourne un ExecutiveCaseJSON validé."""
-    import anthropic
-
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        raise RuntimeError("ANTHROPIC_API_KEY absent")
-
-    # Calcul déterministe du squelette AVANT l'appel LLM
-    skeleton = _compute_reasoning_skeleton(
-        decisions=edm.executive_decisions or [],
-        destroyers=edm.value_destroyers or [],
-        data_quality=edm.data_quality,
-        global_confidence=result_dict.get("score_confiance") or 0,
-    )
-
-    client = anthropic.Anthropic(api_key=api_key)
-    user_prompt = _build_user_prompt(result_dict, edm, company_name, skeleton)
-
-    resp = client.messages.create(
-        model=MODEL_OPUS,
-        max_tokens=8192,
-        temperature=0,
-        system=_SYSTEM,
-        messages=[{"role": "user", "content": user_prompt}],
-    )
-
-    raw = resp.content[0].text.strip()
-
-    # Extraire le JSON si Opus a ajouté du markdown malgré la consigne
-    if raw.startswith("```"):
-        parts = raw.split("```")
-        raw = parts[1] if len(parts) > 1 else raw
-        if raw.startswith("json"):
-            raw = raw[4:]
-        raw = raw.strip()
-    if raw.endswith("```"):
-        raw = raw[:-3].strip()
-
-    data = json.loads(raw)
-    return ExecutiveCaseJSON(**data)
-
 
 # ─── CONSTRUCTION DU PROMPT ───────────────────────────────────────────────────
 

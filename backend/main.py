@@ -43,12 +43,11 @@ def get_supabase_service() -> Client:
 async def lifespan(app: FastAPI):
     env = os.getenv("ENVIRONMENT", "development")
     supabase_url = os.getenv("SUPABASE_URL", "not set")
-    anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
 
     print(f"\n🚀 Pepperyn API v2.0 starting...")
     print(f"   Environment : {env}")
     print(f"   Supabase    : {supabase_url}")
-    print(f"   Anthropic   : {'✓ configured' if anthropic_key else '✗ MISSING'}")
+    print("   External AI : closed (synthetic-only trust-gate Slice 1)")
     print(f"   Max file    : {os.getenv('MAX_FILE_SIZE_MB', '5')}MB\n")
 
     yield
