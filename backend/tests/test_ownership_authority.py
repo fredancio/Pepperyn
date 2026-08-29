@@ -24,9 +24,9 @@ from services.ownership_authority import (
 )
 
 
-def _authority(records=None, ttl=30.0):
+def _authority(records=None, ttl=30.0, **kwargs):
     records = records or [OwnershipRecord("a-a", "co", "entity-a", "eng-a", "co", "entity-a")]
-    return OwnershipAuthority(InMemoryOwnershipRepository(records), ttl_seconds=ttl)
+    return OwnershipAuthority(InMemoryOwnershipRepository(records), ttl_seconds=ttl, **kwargs)
 
 
 def _grant(authority=None, *, analysis="a-a", company="co", request="req", entity=None, engagement=None, resources=None):
@@ -153,12 +153,16 @@ def test_legacy_unattributed_memory_is_quarantined():
 
 
 def _authorized_request():
-    authority, grant = _grant()
     payload = {"synthetic": True}
+    authority, grant = _grant(_authority(
+        projection_policy={ProtectedResource.ANALYSIS_RESULT: frozenset({("synthetic",)})},
+        allowed_payload_keys=frozenset({"synthetic"}),
+    ))
     records = [ScopedContextRecord(ProtectedResource.ANALYSIS_RESULT, "co", "entity-a", "eng-a", "a-a", payload)]
-    read_receipt = ProtectedContextReader(InMemoryScopedContextRepository(records)).read_receipted(
+    source_receipt = ProtectedContextReader(InMemoryScopedContextRepository(records)).read_receipted(
         grant, request_id="req", resource=ProtectedResource.ANALYSIS_RESULT
     )[0][1]
+    read_receipt = authority.project_read(source_receipt, ("synthetic",))
     receipt = authority.receipt_disclosure(
         grant=grant, request_id="req", protected_reads=[read_receipt], disclosure_payload=payload
     )
@@ -201,16 +205,54 @@ def test_concurrent_egress_consumption_allows_exactly_one_dispatch(monkeypatch):
 
 
 def test_disclosure_cannot_claim_foreign_arbitrary_payload():
-    authority, grant = _grant()
+    authority, grant = _grant(_authority(
+        projection_policy={ProtectedResource.ANALYSIS_RESULT: frozenset({("client",)})},
+        allowed_payload_keys=frozenset({"client"}),
+    ))
     source = {"client": "A"}
     record = ScopedContextRecord(ProtectedResource.ANALYSIS_RESULT, "co", "entity-a", "eng-a", "a-a", source)
-    read_receipt = ProtectedContextReader(InMemoryScopedContextRepository([record])).read_receipted(
+    source_receipt = ProtectedContextReader(InMemoryScopedContextRepository([record])).read_receipted(
         grant, request_id="req", resource=ProtectedResource.ANALYSIS_RESULT
     )[0][1]
+    read_receipt = authority.project_read(source_receipt, ("client",))
     with pytest.raises(OwnershipRefused):
         authority.receipt_disclosure(
             grant=grant, request_id="req", protected_reads=[read_receipt],
             disclosure_payload={"client": "B"},
+        )
+
+
+def test_legitimate_value_cannot_cover_additional_rogue_payload_leaf():
+    authority, grant = _grant(_authority(
+        projection_policy={ProtectedResource.ANALYSIS_RESULT: frozenset({("client",)})},
+        allowed_payload_keys=frozenset({"authorized", "client", "rogue"}),
+    ))
+    source = {"client": "B"}
+    record = ScopedContextRecord(ProtectedResource.ANALYSIS_RESULT, "co", "entity-a", "eng-a", "a-a", source)
+    source_receipt = ProtectedContextReader(InMemoryScopedContextRepository([record])).read_receipted(
+        grant, request_id="req", resource=ProtectedResource.ANALYSIS_RESULT
+    )[0][1]
+    projected = authority.project_read(source_receipt, ("client",))
+    with pytest.raises(OwnershipRefused):
+        authority.receipt_disclosure(
+            grant=grant, request_id="req", protected_reads=[projected],
+            disclosure_payload={"authorized": {"client": "B"}, "rogue": "CLIENT_A_SECRET"},
+        )
+
+
+def test_receipts_cannot_cross_authority_or_grant():
+    policy = {ProtectedResource.ANALYSIS_RESULT: frozenset({("value",)})}
+    authority_a, grant_a = _grant(_authority(projection_policy=policy, allowed_payload_keys=frozenset({"value"})), request="same")
+    authority_b, grant_b = _grant(_authority(projection_policy=policy, allowed_payload_keys=frozenset({"value"})), request="same")
+    record = ScopedContextRecord(ProtectedResource.ANALYSIS_RESULT, "co", "entity-a", "eng-a", "a-a", {"value": 1})
+    source_a = ProtectedContextReader(InMemoryScopedContextRepository([record])).read_receipted(
+        grant_a, request_id="same", resource=ProtectedResource.ANALYSIS_RESULT
+    )[0][1]
+    projected_a = authority_a.project_read(source_a, ("value",))
+    with pytest.raises(OwnershipRefused):
+        authority_b.receipt_disclosure(
+            grant=grant_b, request_id="same", protected_reads=[projected_a],
+            disclosure_payload={"value": 1},
         )
 
 

@@ -53,9 +53,31 @@ class CaptureBoundary:
 
 def _request(**changes):
     request_id = changes.pop("request_id", "slice1-synthetic-request")
-    authority = OwnershipAuthority(InMemoryOwnershipRepository([
-        OwnershipRecord("synthetic-analysis", "synthetic-company", "synthetic-entity", "synthetic-engagement", "synthetic-company", "synthetic-entity")
-    ]))
+    payload = changes.get("provider_payload", {
+        "model": "synthetic-model",
+        "system": "STATIC_INSTRUCTION",
+        "messages": [{"role": "user", "content": "CLIENT_001 revenue 123.45"}],
+        "max_tokens": 50,
+    })
+    def paths(value, prefix=()):
+        if isinstance(value, dict):
+            return [p for key, nested in value.items() for p in paths(nested, prefix + (key,))]
+        if isinstance(value, list):
+            return [p for index, nested in enumerate(value) for p in paths(nested, prefix + (index,))]
+        return [prefix]
+    def keys(value):
+        if isinstance(value, dict):
+            return set(value) | set().union(*(keys(v) for v in value.values()))
+        if isinstance(value, list):
+            return set().union(*(keys(v) for v in value)) if value else set()
+        return set()
+    authority = OwnershipAuthority(
+        InMemoryOwnershipRepository([
+            OwnershipRecord("synthetic-analysis", "synthetic-company", "synthetic-entity", "synthetic-engagement", "synthetic-company", "synthetic-entity")
+        ]),
+        projection_policy={ProtectedResource.ANALYSIS_RESULT: frozenset(paths(payload))},
+        allowed_payload_keys=frozenset(keys(payload)),
+    )
     principal = authority._accept_authenticated_principal("synthetic-principal", "synthetic-company")
     grant = authority.resolve_and_mint_read_grant(
         principal=principal,
@@ -63,25 +85,20 @@ def _request(**changes):
         request_id=request_id,
         resources=[ProtectedResource.ANALYSIS_RESULT],
     )
-    payload = changes.get("provider_payload", {
-        "model": "synthetic-model",
-        "system": "STATIC_INSTRUCTION",
-        "messages": [{"role": "user", "content": "CLIENT_001 revenue 123.45"}],
-        "max_tokens": 50,
-    })
     authorization = None
     try:
         receipt_source = ScopedContextRecord(
             ProtectedResource.ANALYSIS_RESULT, "synthetic-company", "synthetic-entity",
             "synthetic-engagement", "synthetic-analysis", payload,
         )
-        read_receipt = ProtectedContextReader(
+        source_receipt = ProtectedContextReader(
             InMemoryScopedContextRepository([receipt_source])
         ).read_receipted(
             grant, request_id=request_id, resource=ProtectedResource.ANALYSIS_RESULT
         )[0][1]
+        projected = [authority.project_read(source_receipt, path) for path in paths(payload)]
         receipt = authority.receipt_disclosure(
-            grant=grant, request_id=request_id, protected_reads=[read_receipt],
+            grant=grant, request_id=request_id, protected_reads=projected,
             disclosure_payload=payload,
         )
         authorization = authority.mint_egress_authorization(

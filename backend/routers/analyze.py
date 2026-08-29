@@ -9,7 +9,8 @@ import logging
 import os
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, is_dataclass
+import json
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -77,7 +78,18 @@ _analysis_owner: dict[str, str] = {}          # analyse_id → company_id (contr
 
 
 def _cache_content_hash(value) -> str:
-    return hashlib.sha256(repr(value).encode("utf-8")).hexdigest()
+    if hasattr(value, "model_dump"):
+        value = value.model_dump(mode="json")
+    elif is_dataclass(value):
+        value = asdict(value)
+    try:
+        canonical = json.dumps(
+            value, ensure_ascii=False, allow_nan=False, sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ValueError("unsupported non-canonical protected cache value") from exc
+    return hashlib.sha256(canonical).hexdigest()
 
 
 @dataclass(frozen=True)
