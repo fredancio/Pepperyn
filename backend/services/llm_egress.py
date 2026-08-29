@@ -73,6 +73,41 @@ class UntrustedProviderOutput:
     raw_response: Any
 
 
+class UntrustedProviderText(str):
+    """Text originating at a provider; inadmissible in another egress."""
+
+    def strip(self, chars: str | None = None) -> "UntrustedProviderText":
+        return UntrustedProviderText(super().strip(chars))
+
+    def lstrip(self, chars: str | None = None) -> "UntrustedProviderText":
+        return UntrustedProviderText(super().lstrip(chars))
+
+    def rstrip(self, chars: str | None = None) -> "UntrustedProviderText":
+        return UntrustedProviderText(super().rstrip(chars))
+
+
+class _UntrustedContentBlockProxy:
+    def __init__(self, block: Any) -> None:
+        self.__block = block
+
+    def __getattr__(self, name: str) -> Any:
+        value = getattr(self.__block, name)
+        if name == "text" and isinstance(value, str):
+            return UntrustedProviderText(value)
+        return value
+
+
+class _UntrustedLegacyResponseProxy:
+    def __init__(self, response: Any) -> None:
+        self.__response = response
+
+    def __getattr__(self, name: str) -> Any:
+        value = getattr(self.__response, name)
+        if name == "content":
+            return tuple(_UntrustedContentBlockProxy(block) for block in value)
+        return value
+
+
 @dataclass(frozen=True)
 class EgressResult:
     task: str
@@ -91,6 +126,7 @@ def _dispatch_final_request(request: FrozenProviderRequest) -> Any:
 
 
 def _canonical_json_bytes(value: Mapping[str, Any]) -> bytes:
+    _reject_provider_output(value)
     try:
         return json.dumps(
             dict(value),
@@ -101,6 +137,24 @@ def _canonical_json_bytes(value: Mapping[str, Any]) -> bytes:
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
         raise EgressRefused(EgressRefusalCode.ROUTE_NOT_ALLOWED) from exc
+
+
+def _reject_provider_output(value: Any) -> None:
+    if isinstance(value, (UntrustedProviderOutput, UntrustedProviderText)):
+        raise EgressRefused(EgressRefusalCode.IDENTITY_FORBIDDEN)
+    if isinstance(value, Mapping):
+        for key, nested in value.items():
+            _reject_provider_output(key)
+            _reject_provider_output(nested)
+    elif isinstance(value, (list, tuple)):
+        for nested in value:
+            _reject_provider_output(nested)
+
+
+def reject_untrusted_provider_input(value: Any) -> None:
+    """Fail before prompt construction can erase provider-output taint."""
+
+    _reject_provider_output(value)
 
 
 class LlmEgressAuthority:
@@ -182,4 +236,4 @@ def dispatch_legacy_synthetic(task: str, **provider_payload: Any) -> Any:
         provider_payload=MappingProxyType(dict(provider_payload)),
     )
     result = _CLOSED_AUTHORITY.dispatch(request)
-    return result.content.raw_response
+    return _UntrustedLegacyResponseProxy(result.content.raw_response)

@@ -30,7 +30,7 @@ import re
 from typing import Any, Optional
 
 from models.schemas import AnalysisResult
-from services.llm_egress import dispatch_legacy_synthetic
+from services.llm_egress import dispatch_legacy_synthetic, reject_untrusted_provider_input
 
 logger = logging.getLogger(__name__)
 
@@ -2018,6 +2018,7 @@ def _parse_v3_text(text: str, doc_type: str, score_confiance: int) -> dict[str, 
 
 async def _score_analysis(analysis_text: str) -> float:
     """Score the analysis using haiku (~100 tokens). Returns average score 0-10."""
+    reject_untrusted_provider_input(analysis_text)
     try:
         message = dispatch_legacy_synthetic(
             "ANALYSIS_QUALITY_SCORE",
@@ -2089,6 +2090,7 @@ async def call_verification_v3(
     system_prompt = surcharge optionnelle (ENHANCED_ANALYSIS_SYSTEM si pipeline enrichi).
     Returns verified/corrected analysis text.
     """
+    reject_untrusted_provider_input(analysis_call1)
     user_prompt = _build_user_prompt_call2(
         analysis_call1,
         parsed_data,
@@ -2321,6 +2323,7 @@ async def call_chat_intelligent(
 
     Returns (response_text, model_used)
     """
+    reject_untrusted_provider_input(analysis_context)
     system = CHAT_SYSTEM
     if analysis_context:
         system += f"\n\nCONTEXTE DE L'ANALYSE EN COURS :\n{analysis_context[:3000]}"
