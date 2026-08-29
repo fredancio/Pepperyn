@@ -29,6 +29,14 @@ from services.evidence_ledger_service import save_evidence_capture  # T1C-A
 from services.fte_minimal import resolve_newest_observed_period_end  # FTE v0
 from services.usage_service import UsageService
 from services.data_quality_gate import validate_excel_before_analysis
+from services.ownership_authority import (
+    OwnershipAuthority,
+    OwnershipRecord,
+    OwnershipRefused,
+    ProtectedContextReader,
+    ProtectedResource,
+    ScopedContextRecord,
+)
 from services.anonymization_service import (
     CorrespondenceTable,
     anonymize_parsed_data,
@@ -65,6 +73,7 @@ _export_format_chosen: dict[str, str] = {}    # analyse_id → "excel"|"pdf"|"pp
 _analysis_result_cache: dict[str, dict] = {}  # analyse_id → result dict (pour PDF/PPTX à la demande)
 _anonymization_cache: dict[str, CorrespondenceTable] = {}  # analyse_id → table de correspondance (jamais envoyée à l'IA)
 _analysis_owner: dict[str, str] = {}          # analyse_id → company_id (contrôle d'accès aux exports)
+_analysis_scope: dict[str, tuple[str, str, str]] = {}  # id → verified company/entity/engagement
 _analysis_params_cache: dict[str, dict] = {}  # analyse_id → {target_date, analysis_period_months}
 
 # ── V2 : Executive Case JSON cache ───────────────────────────────────────────
@@ -501,6 +510,7 @@ async def _run_analysis_pipeline(
                 _sb_rel.from_("entities")
                 .select("name, is_primary, relation_type")
                 .eq("id", entity_id)
+                .eq("company_id", company_id)
                 .limit(1)
                 .execute()
             )
@@ -518,19 +528,12 @@ async def _run_analysis_pipeline(
     memory_section = ""
     actions_section = ""
     memory_ctx: dict = {}
-    if _memory_service:
-        try:
-            memory_ctx = _memory_service.get_memory_context(company_id)
-            memory_section = _memory_service.build_memory_prompt_section(memory_ctx)
-        except Exception:
-            pass
+    # Slice 2 quarantine: the legacy tables are company-scoped and cannot
+    # prove entity/engagement attribution.  They must not feed external
+    # inference until a later migration provides authoritative scope.
 
     # Retrieve decision memory context (mémoire décisionnelle — feedback utilisateur)
-    if _decision_memory_service:
-        try:
-            actions_section = _decision_memory_service.build_decision_memory_prompt_section(company_id)
-        except Exception:
-            pass
+    # Same quarantine applies to legacy decision/action prompt material.
 
     # Inject data quality context into LLM prompt
     quality_section = quality_gate.to_prompt_section()
@@ -933,6 +936,90 @@ class ChatResponse(TextQueryResponse):
     model_used: Optional[str] = None
 
 
+class _AnalysisOwnershipRepository:
+    """Narrow authoritative adapter used before chat/context cache access."""
+
+    def resolve_analysis(self, analysis_id: str) -> OwnershipRecord | None:
+        try:
+            from main import get_supabase_service
+            supabase = get_supabase_service()
+            result = (
+                supabase.from_("analyses")
+                .select("id,company_id,entity_id")
+                .eq("id", analysis_id)
+                .limit(2)
+                .execute()
+            )
+            rows = result.data or []
+            if len(rows) != 1:
+                return OwnershipRecord(analysis_id, "", None, None, ambiguous=len(rows) > 1) if rows else None
+            row = rows[0]
+            entity_id = row.get("entity_id")
+            if not entity_id:
+                return OwnershipRecord(analysis_id, row.get("company_id") or "", None, None)
+            engagements = (
+                supabase.from_("engagements")
+                .select("id")
+                .eq("entity_id", entity_id)
+                .limit(2)
+                .execute()
+            ).data or []
+            if len(engagements) != 1:
+                return OwnershipRecord(
+                    analysis_id, row.get("company_id") or "", entity_id, None,
+                    ambiguous=len(engagements) > 1,
+                )
+            return OwnershipRecord(
+                analysis_id, row.get("company_id") or "", entity_id, engagements[0].get("id")
+            )
+        except Exception:
+            return None
+
+
+class _ProtectedCacheRepository:
+    def __init__(self, analysis_id: str, resource: ProtectedResource, cache: dict):
+        self._analysis_id = analysis_id
+        self._resource = resource
+        self._cache = cache
+
+    def read_scoped(self, resource: ProtectedResource):
+        scope = _analysis_scope.get(self._analysis_id)
+        if scope is None or resource is not self._resource:
+            return ()
+        value = self._cache.get(self._analysis_id)
+        if value is None:
+            return ()
+        company_id, entity_id, engagement_id = scope
+        return (ScopedContextRecord(
+            resource, company_id, entity_id, engagement_id, self._analysis_id, value
+        ),)
+
+
+def _mint_analysis_read_grant(company_id: str, analysis_id: str, request_id: str, resources):
+    authority = OwnershipAuthority(_AnalysisOwnershipRepository())
+    principal = authority.accept_authenticated_principal(company_id, company_id)
+    try:
+        grant = authority.resolve_and_mint_read_grant(
+            principal=principal,
+            analysis_id=analysis_id,
+            request_id=request_id,
+            resources=resources,
+        )
+    except OwnershipRefused as exc:
+        raise HTTPException(status_code=404, detail="Analyse introuvable") from exc
+    _analysis_scope[analysis_id] = (
+        grant.scope.company_id, grant.scope.entity_id, grant.scope.engagement_id
+    )
+    return grant
+
+
+def _read_protected_cache(grant, request_id: str, resource: ProtectedResource, cache: dict):
+    values = ProtectedContextReader(
+        _ProtectedCacheRepository(grant.scope.analysis_id, resource, cache)
+    ).read(grant, request_id=request_id, resource=resource)
+    return values[0] if values else None
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat_with_analysis(
     request: ChatRequest,
@@ -946,6 +1033,18 @@ async def chat_with_analysis(
     """
     company_id, plan, auth_type = await _resolve_auth(authorization, x_auth_type)
 
+    request_id = str(uuid.uuid4())
+    read_grant = None
+    if request.analysis_id:
+        # Ownership is resolved before every protected cache/context read.
+        read_grant = _mint_analysis_read_grant(
+            company_id,
+            request.analysis_id,
+            request_id,
+            [ProtectedResource.CORRESPONDENCE, ProtectedResource.EXECUTIVE_CASE,
+             ProtectedResource.ANALYSIS_RESULT],
+        )
+
     # Server-side chat limit check (non-bypassable)
     allowed, reason, model_tier = _usage_service.can_chat(
         company_id, request.analysis_id, plan
@@ -957,9 +1056,11 @@ async def chat_with_analysis(
     # Si une table de correspondance existe pour cette analyse, le contexte,
     # l'historique et le message de l'utilisateur sont anonymisés avant
     # l'appel IA, et la réponse est ré-identifiée avant d'être renvoyée.
-    correspondence_table = (
-        _anonymization_cache.get(request.analysis_id) if request.analysis_id else None
-    )
+    correspondence_table = None
+    if request.analysis_id and read_grant is not None:
+        correspondence_table = _read_protected_cache(
+            read_grant, request_id, ProtectedResource.CORRESPONDENCE, _anonymization_cache
+        )
 
     chat_message = request.query
     chat_context = request.analysis_context or ""
@@ -981,7 +1082,9 @@ async def chat_with_analysis(
         _case_v2 = None
         if request.analysis_id:
             try:
-                _case_v2 = await _get_or_build_executive_case_v2(request.analysis_id)
+                _case_v2 = await _get_or_build_executive_case_v2(
+                    request.analysis_id, read_grant, request_id
+                )
             except Exception as _v2_exc:
                 logger.warning("[V2-CE] Échec construction V2 — fallback legacy: %s", _v2_exc)
 
@@ -1217,6 +1320,8 @@ async def _get_or_build_executive_case(
 
 async def _get_or_build_executive_case_v2(
     analyse_id: str,
+    read_grant,
+    request_id: str,
 ) -> Optional["_ExecutiveCase"]:
     """
     Retourne l'ExecutiveCase V2 pour une analyse — Conversation Engine.
@@ -1230,12 +1335,17 @@ async def _get_or_build_executive_case_v2(
     Ne modifie PAS le pipeline d'analyse, les exports PDF/PPTX/XLSX, ni le chat.
     """
     # ── 1. Cache hit ──────────────────────────────────────────────────────────
-    if analyse_id in _executive_case_v2_cache:
+    cached_case = _read_protected_cache(
+        read_grant, request_id, ProtectedResource.EXECUTIVE_CASE, _executive_case_v2_cache
+    )
+    if cached_case is not None:
         logger.info("[V2-CE] ExecutiveCase V2 depuis cache mémoire (id=%s)", analyse_id[:8])
-        return _executive_case_v2_cache[analyse_id]
+        return cached_case
 
     # ── 2. Vérifier disponibilité du résultat d'analyse ──────────────────────
-    result_dict = _analysis_result_cache.get(analyse_id)
+    result_dict = _read_protected_cache(
+        read_grant, request_id, ProtectedResource.ANALYSIS_RESULT, _analysis_result_cache
+    )
     if not result_dict:
         logger.warning(
             "[V2-CE] Aucun résultat d'analyse disponible pour id=%s — "
@@ -1286,11 +1396,14 @@ async def get_conversation_context(
 
     company_id, plan, auth_type = await _resolve_auth(authorization, x_auth_type)
 
-    # Contrôle d'accès : l'analyse doit appartenir à la company authentifiée
-    _verify_export_access(analyse_id, company_id)
+    request_id = str(uuid.uuid4())
+    read_grant = _mint_analysis_read_grant(
+        company_id, analyse_id, request_id,
+        [ProtectedResource.EXECUTIVE_CASE, ProtectedResource.ANALYSIS_RESULT],
+    )
 
     # Construire / récupérer l'ExecutiveCase V2 (lazy, Python pur, sans LLM)
-    case_v2 = await _get_or_build_executive_case_v2(analyse_id)
+    case_v2 = await _get_or_build_executive_case_v2(analyse_id, read_grant, request_id)
 
     if case_v2 is None:
         raise HTTPException(

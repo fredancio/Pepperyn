@@ -23,6 +23,12 @@ from services.llm_egress import (
     taint_provider_derived,
     dispatch_legacy_synthetic,
 )
+from services.ownership_authority import (
+    InMemoryOwnershipRepository,
+    OwnershipAuthority,
+    OwnershipRecord,
+    ProtectedResource,
+)
 
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -42,14 +48,43 @@ class CaptureBoundary:
 
 
 def _request(**changes):
+    request_id = changes.pop("request_id", "slice1-synthetic-request")
+    authority = OwnershipAuthority(InMemoryOwnershipRepository([
+        OwnershipRecord("synthetic-analysis", "synthetic-company", "synthetic-entity", "synthetic-engagement")
+    ]))
+    principal = authority.accept_authenticated_principal("synthetic-principal", "synthetic-company")
+    grant = authority.resolve_and_mint_read_grant(
+        principal=principal,
+        analysis_id="synthetic-analysis",
+        request_id=request_id,
+        resources=[ProtectedResource.ANALYSIS_RESULT],
+    )
+    payload = changes.get("provider_payload", {
+        "model": "synthetic-model",
+        "system": "STATIC_INSTRUCTION",
+        "messages": [{"role": "user", "content": "CLIENT_001 revenue 123.45"}],
+        "max_tokens": 50,
+    })
+    try:
+        body = json.dumps(dict(payload), ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")).encode()
+    except (TypeError, ValueError):
+        # Invalid-payload tests must still reach the authority's own rejection.
+        body = b"{}"
+    receipt = authority.receipt_disclosure(
+        grant=grant, request_id=request_id,
+        disclosure_resources=[ProtectedResource.ANALYSIS_RESULT],
+        disclosure_hash=hashlib.sha256(body).hexdigest(),
+    )
+    authorization = authority.mint_egress_authorization(
+        grant=grant,
+        receipt=receipt,
+        task=changes.get("task", "FINANCIAL_ANALYSIS"),
+    )
     values = {
         "task": "FINANCIAL_ANALYSIS",
-        "provider_payload": {
-            "model": "synthetic-model",
-            "system": "STATIC_INSTRUCTION",
-            "messages": [{"role": "user", "content": "CLIENT_001 revenue 123.45"}],
-            "max_tokens": 50,
-        },
+        "provider_payload": payload,
+        "request_id": request_id,
+        "egress_authorization": authorization,
     }
     values.update(changes)
     return _mint_synthetic_test_request(**values)

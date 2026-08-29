@@ -17,6 +17,12 @@ import logging
 from types import MappingProxyType
 from typing import Any, Mapping
 
+from services.ownership_authority import (
+    EgressAuthorization,
+    OwnershipRefused,
+    consume_egress_authorization,
+)
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +32,7 @@ class EgressRefusalCode(str, Enum):
     IDENTITY_FORBIDDEN = "IDENTITY_FORBIDDEN"
     ROUTE_NOT_ALLOWED = "ROUTE_NOT_ALLOWED"
     TRANSPORT_CLOSED = "TRANSPORT_CLOSED"
+    OWNERSHIP_AUTHORIZATION_REQUIRED = "OWNERSHIP_AUTHORIZATION_REQUIRED"
 
 
 class EgressRefused(RuntimeError):
@@ -55,6 +62,8 @@ class SyntheticEgressRequest:
     identity_state: IdentityState = IdentityState.PSEUDONYMOUS
     max_attempts: int = 1
     _admission: object | None = None
+    request_id: str = ""
+    egress_authorization: EgressAuthorization | None = None
 
 
 @dataclass(frozen=True)
@@ -194,12 +203,21 @@ class LlmEgressAuthority:
             raise EgressRefused(EgressRefusalCode.REAL_DATA_ADMISSION_CLOSED)
         if not request.task or not isinstance(request.provider_payload, Mapping):
             raise EgressRefused(EgressRefusalCode.ROUTE_NOT_ALLOWED)
-
         body = _canonical_json_bytes(request.provider_payload)
+        payload_hash = hashlib.sha256(body).hexdigest()
+        try:
+            consume_egress_authorization(
+                request.egress_authorization,
+                task=request.task,
+                request_id=request.request_id,
+                disclosure_hash=payload_hash,
+            )
+        except OwnershipRefused as exc:
+            raise EgressRefused(EgressRefusalCode.OWNERSHIP_AUTHORIZATION_REQUIRED) from exc
         frozen = FrozenProviderRequest(
             task=request.task,
             body=body,
-            payload_hash=hashlib.sha256(body).hexdigest(),
+            payload_hash=payload_hash,
         )
         logger.info(
             "LLM egress request task=%s payload_hash=%s",
@@ -238,6 +256,8 @@ def _mint_synthetic_test_request(
     provider_payload: Mapping[str, Any],
     identity_state: IdentityState = IdentityState.PSEUDONYMOUS,
     max_attempts: int = 1,
+    request_id: str = "",
+    egress_authorization: EgressAuthorization | None = None,
 ) -> SyntheticEgressRequest:
     """Test-harness-only mint; production use is forbidden by static policy."""
 
@@ -247,6 +267,8 @@ def _mint_synthetic_test_request(
         identity_state=identity_state,
         max_attempts=max_attempts,
         _admission=_SYNTHETIC_TEST_ADMISSION,
+        request_id=request_id,
+        egress_authorization=egress_authorization,
     )
 
 
