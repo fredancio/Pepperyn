@@ -254,6 +254,7 @@ class OwnershipAuthority:
         self._egress_registry: dict[str, tuple[OwnershipScope, str, str, frozenset[ProtectedResource], str, float, bool]] = {}
         self._lock = threading.Lock()
         self._read_receipts: dict[str, tuple[str, OwnershipScope, str, ProtectedResource, Any, str, tuple | None]] = {}
+        self._used_projected_receipts: set[str] = set()
         self._disclosure_receipts: dict[str, tuple[str, frozenset[str], str, bool]] = {}
         self._projection_policy = dict(projection_policy or {})
         self._allowed_payload_keys = allowed_payload_keys
@@ -335,7 +336,7 @@ class OwnershipAuthority:
                 read._seal is not _MINT_SEAL or read._issuer is not self
                 or read.scope != grant.scope or read.request_id != request_id
                 or read.grant_id != grant.capability_id or read.projection_path is None
-                or registered is None
+                or registered is None or read.receipt_id in self._used_projected_receipts
             ):
                 raise OwnershipRefused("INVALID_READ_RECEIPT")
             projected_hashes.add(read.value_hash)
@@ -352,6 +353,7 @@ class OwnershipAuthority:
         self._disclosure_receipts[receipt_id] = (
             grant.capability_id, frozenset(receipt_ids), receipt.disclosure_hash, False
         )
+        self._used_projected_receipts.update(receipt_ids)
         return receipt
 
     def mint_egress_authorization(

@@ -256,6 +256,23 @@ def test_receipts_cannot_cross_authority_or_grant():
         )
 
 
+def test_projected_receipt_cannot_be_replayed_into_second_disclosure():
+    policy = {ProtectedResource.ANALYSIS_RESULT: frozenset({("value",)})}
+    authority, grant = _grant(_authority(projection_policy=policy, allowed_payload_keys=frozenset({"value"})))
+    record = ScopedContextRecord(ProtectedResource.ANALYSIS_RESULT, "co", "entity-a", "eng-a", "a-a", {"value": 1})
+    source = ProtectedContextReader(InMemoryScopedContextRepository([record])).read_receipted(
+        grant, request_id="req", resource=ProtectedResource.ANALYSIS_RESULT
+    )[0][1]
+    projected = authority.project_read(source, ("value",))
+    authority.receipt_disclosure(
+        grant=grant, request_id="req", protected_reads=[projected], disclosure_payload={"value": 1}
+    )
+    with pytest.raises(OwnershipRefused):
+        authority.receipt_disclosure(
+            grant=grant, request_id="req", protected_reads=[projected], disclosure_payload={"value": 1}
+        )
+
+
 def test_egress_rejects_missing_or_copied_authorization_before_dispatch(monkeypatch):
     import services.llm_egress as module
     calls = []
