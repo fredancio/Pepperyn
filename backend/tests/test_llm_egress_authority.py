@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import logging
 from pathlib import Path
@@ -19,6 +20,7 @@ from services.llm_egress import (
     UntrustedProviderOutput,
     UntrustedProviderText,
     _mint_synthetic_test_request,
+    taint_provider_derived,
     dispatch_legacy_synthetic,
 )
 
@@ -168,6 +170,35 @@ def test_p5_output_cannot_be_used_as_p6_or_p7_input():
         asyncio.run(_score_analysis(hostile))
 
 
+def test_structured_provider_output_cannot_be_laundered_into_p4_p5_or_p6():
+    import asyncio
+    from services.llm_service import (
+        _build_pre_analysis_section,
+        _format_evidence_graph_for_audit,
+        _format_evidence_graph_for_prompt,
+        _run_strategic_cfo_prep,
+    )
+
+    parsed = taint_provider_derived(json.loads('{"facts":[{"claim":"hostile"}]}'))
+    with pytest.raises(EgressRefused):
+        _format_evidence_graph_for_prompt(parsed)
+    with pytest.raises(EgressRefused):
+        _format_evidence_graph_for_audit(parsed)
+    with pytest.raises(EgressRefused):
+        _build_pre_analysis_section(parsed, {})
+    with pytest.raises(EgressRefused):
+        asyncio.run(_run_strategic_cfo_prep(parsed))
+
+
+def test_provider_derived_json_members_remain_tainted_after_extraction():
+    parsed = taint_provider_derived(
+        json.loads('{"kind":"financial","confidence":93,"nested":["x"]}')
+    )
+    for extracted in (parsed, parsed["kind"], parsed["confidence"], parsed["nested"]):
+        with pytest.raises(EgressRefused):
+            egress_module.reject_untrusted_provider_input(extracted)
+
+
 def test_logs_contain_metadata_but_not_payload_or_output(caplog, monkeypatch):
     sentinel = "PERSON_SENTINEL_NEVER_LOG"
     capture = CaptureBoundary(result="PROVIDER_OUTPUT_NEVER_LOG")
@@ -188,9 +219,13 @@ _NETWORK_ALLOWLIST = {
     "services/crm_service.py": {"httpx"},
     "services/file_parser.py": {"subprocess"},
 }
+_NETWORK_ALLOWLIST_HASHES = {
+    "services/crm_service.py": "1d66224dd716d1fe979cbb7299c59858e35857cafc81d1dd4d7b481473a75306",
+    "services/file_parser.py": "721054ba7b140b81f359ec56202c993dfa9b000790cf8fd6dc950f3a4b5923f7",
+}
 _NETWORK_ROOTS = {
-    "aiohttp", "anthropic", "http.client", "httpx", "openai", "requests",
-    "socket", "subprocess", "urllib",
+    "aiohttp", "anthropic", "http", "http.client", "httpx", "importlib",
+    "openai", "requests", "socket", "subprocess", "urllib",
 }
 _PROVIDER_INDICATORS = {
     "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "api.anthropic.com",
@@ -222,8 +257,16 @@ def _provider_bypass_violations(relative_path: str, source: str) -> list[str]:
         if isinstance(node, ast.Call):
             if isinstance(node.func, ast.Name) and node.func.id == "__import__":
                 violations.append(f"{relative_path}:{node.lineno}: dynamic import")
+            if isinstance(node.func, ast.Name) and node.func.id == "import_module":
+                violations.append(f"{relative_path}:{node.lineno}: dynamic import")
             if isinstance(node.func, ast.Attribute) and node.func.attr == "import_module":
                 violations.append(f"{relative_path}:{node.lineno}: dynamic import")
+            if isinstance(node.func, ast.Attribute):
+                owner = node.func.value.id if isinstance(node.func.value, ast.Name) else ""
+                if owner == "os" and node.func.attr in {"system", "popen"}:
+                    violations.append(f"{relative_path}:{node.lineno}: process launch")
+                if node.func.attr.startswith("create_subprocess"):
+                    violations.append(f"{relative_path}:{node.lineno}: async process launch")
             if isinstance(node.func, ast.Attribute) and node.func.attr == "create":
                 if isinstance(node.func.value, ast.Attribute) and node.func.value.attr == "messages":
                     violations.append(f"{relative_path}:{node.lineno}: direct messages.create")
@@ -242,6 +285,12 @@ def test_repository_wide_provider_bypass_policy():
     assert violations == []
 
 
+def test_unrelated_network_allowlist_is_content_pinned():
+    for relative, expected_hash in _NETWORK_ALLOWLIST_HASHES.items():
+        content = (BACKEND / relative).read_bytes()
+        assert hashlib.sha256(content).hexdigest() == expected_hash
+
+
 @pytest.mark.parametrize(
     "source",
     [
@@ -249,7 +298,11 @@ def test_repository_wide_provider_bypass_policy():
         "import requests\nrequests.post('https://provider.invalid')",
         "import subprocess\nsubprocess.run(['llm-cli', 'prompt'])",
         "import importlib\nimportlib.import_module('anthropic')",
+        "from importlib import import_module\nimport_module('anthropic')",
         "client = __import__('openai')",
+        "from http import client\nclient.HTTPSConnection('provider.invalid')",
+        "import os\nos.system('llm-cli prompt')",
+        "import asyncio\nasyncio.create_subprocess_exec('llm-cli')",
         "import os\nkey = os.getenv('OPENAI_API_KEY')",
     ],
 )

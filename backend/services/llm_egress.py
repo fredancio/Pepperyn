@@ -73,7 +73,11 @@ class UntrustedProviderOutput:
     raw_response: Any
 
 
-class UntrustedProviderText(str):
+class _UntrustedProviderDerived:
+    """Marker retained across provider-derived structural transformations."""
+
+
+class UntrustedProviderText(str, _UntrustedProviderDerived):
     """Text originating at a provider; inadmissible in another egress."""
 
     def strip(self, chars: str | None = None) -> "UntrustedProviderText":
@@ -84,6 +88,43 @@ class UntrustedProviderText(str):
 
     def rstrip(self, chars: str | None = None) -> "UntrustedProviderText":
         return UntrustedProviderText(super().rstrip(chars))
+
+
+class UntrustedProviderMapping(dict, _UntrustedProviderDerived):
+    pass
+
+
+class UntrustedProviderList(list, _UntrustedProviderDerived):
+    pass
+
+
+class UntrustedProviderInt(int, _UntrustedProviderDerived):
+    pass
+
+
+class UntrustedProviderFloat(float, _UntrustedProviderDerived):
+    pass
+
+
+def taint_provider_derived(value: Any) -> Any:
+    """Retain provider provenance after parsing a provider JSON response."""
+
+    if isinstance(value, str):
+        return UntrustedProviderText(value)
+    if isinstance(value, dict):
+        return UntrustedProviderMapping(
+            (taint_provider_derived(key), taint_provider_derived(nested))
+            for key, nested in value.items()
+        )
+    if isinstance(value, list):
+        return UntrustedProviderList(taint_provider_derived(item) for item in value)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return UntrustedProviderInt(value)
+    if isinstance(value, float):
+        return UntrustedProviderFloat(value)
+    return value
 
 
 class _UntrustedContentBlockProxy:
@@ -140,7 +181,7 @@ def _canonical_json_bytes(value: Mapping[str, Any]) -> bytes:
 
 
 def _reject_provider_output(value: Any) -> None:
-    if isinstance(value, (UntrustedProviderOutput, UntrustedProviderText)):
+    if isinstance(value, (UntrustedProviderOutput, _UntrustedProviderDerived)):
         raise EgressRefused(EgressRefusalCode.IDENTITY_FORBIDDEN)
     if isinstance(value, Mapping):
         for key, nested in value.items():

@@ -30,7 +30,11 @@ import re
 from typing import Any, Optional
 
 from models.schemas import AnalysisResult
-from services.llm_egress import dispatch_legacy_synthetic, reject_untrusted_provider_input
+from services.llm_egress import (
+    dispatch_legacy_synthetic,
+    reject_untrusted_provider_input,
+    taint_provider_derived,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -446,7 +450,7 @@ RÈGLES STRICTES :
         content = message.content[0].text.strip()
         json_match = re.search(r"\{.*\}", content, re.DOTALL)
         if json_match:
-            return json.loads(json_match.group(0))
+            return taint_provider_derived(json.loads(json_match.group(0)))
     except Exception as e:
         logger.warning("[EVIDENCE GRAPH] Agent failed: %s", e)
     return {}
@@ -458,6 +462,7 @@ def _format_evidence_graph_for_prompt(evidence_graph: dict[str, Any]) -> str:
     Fournit au LLM la liste des faits traçables qu'il peut utiliser.
     Tout chiffre dans le rapport DOIT provenir d'un fait de cet inventaire.
     """
+    reject_untrusted_provider_input(evidence_graph)
     if not evidence_graph:
         return ""
 
@@ -502,6 +507,7 @@ def _format_evidence_graph_for_audit(evidence_graph: dict[str, Any]) -> str:
     Formate l'Evidence Graph pour Call 2 (audit de cohérence).
     Fournit la liste des montants autorisés pour validation croisée.
     """
+    reject_untrusted_provider_input(evidence_graph)
     if not evidence_graph:
         return ""
 
@@ -573,7 +579,7 @@ async def classify_document(parsed_data: dict[str, Any]) -> tuple[str, int]:
         if not json_str.startswith("{"):
             json_match2 = re.search(r"\{.*\}", json_str, re.DOTALL)
             json_str = json_match2.group(0) if json_match2 else json_str
-        result = json.loads(json_str)
+        result = taint_provider_derived(json.loads(json_str))
         return result.get("type", "AUTRE"), result.get("confidence", 70)
     except (json.JSONDecodeError, AttributeError):
         return "AUTRE", 50
@@ -629,7 +635,7 @@ Retourne UNIQUEMENT ce JSON (sans texte avant ni après) :
         content = message.content[0].text.strip()
         json_match = re.search(r"\{.*\}", content, re.DOTALL)
         if json_match:
-            return json.loads(json_match.group(0))
+            return taint_provider_derived(json.loads(json_match.group(0)))
     except Exception as e:
         logger.warning("[ENHANCED PIPELINE] Financial analyst prep failed: %s", e)
     return {}
@@ -644,6 +650,7 @@ async def _run_strategic_cfo_prep(
     Transforme les constats financiers en décisions exécutives priorisées.
     Non-bloquant : retourne {} en cas d'échec.
     """
+    reject_untrusted_provider_input(analyst_findings)
     if not analyst_findings:
         return {}
 
@@ -691,7 +698,7 @@ Retourne UNIQUEMENT ce JSON (sans texte avant ni après) :
         content = message.content[0].text.strip()
         json_match = re.search(r"\{.*\}", content, re.DOTALL)
         if json_match:
-            return json.loads(json_match.group(0))
+            return taint_provider_derived(json.loads(json_match.group(0)))
     except Exception as e:
         logger.warning("[ENHANCED PIPELINE] Strategic CFO prep failed: %s", e)
     return {}
@@ -705,6 +712,8 @@ def _build_pre_analysis_section(
     Formate le bloc de pré-analyse à injecter dans le prompt Call 1.
     Retourne une chaîne vide si les deux inputs sont vides.
     """
+    reject_untrusted_provider_input(analyst_findings)
+    reject_untrusted_provider_input(cfo_findings)
     if not analyst_findings and not cfo_findings:
         return ""
 
@@ -2058,6 +2067,12 @@ async def call_analysis_v3(
     system_prompt = surcharge optionnelle du system prompt (ENHANCED_ANALYSIS_SYSTEM si pipeline enrichi).
     Returns (analysis_text, input_tokens, output_tokens)
     """
+    for provider_bound_value in (
+        parsed_data, industry, business_model, memory_section, actions_section,
+        quality_section, relation_section, pre_analysis_section,
+        evidence_graph_section,
+    ):
+        reject_untrusted_provider_input(provider_bound_value)
     user_prompt = _build_user_prompt_call1(
         parsed_data, industry, business_model,
         memory_section, actions_section, quality_section, relation_section,
@@ -2090,7 +2105,10 @@ async def call_verification_v3(
     system_prompt = surcharge optionnelle (ENHANCED_ANALYSIS_SYSTEM si pipeline enrichi).
     Returns verified/corrected analysis text.
     """
-    reject_untrusted_provider_input(analysis_call1)
+    for provider_bound_value in (
+        analysis_call1, parsed_data, cfo_decisions, evidence_graph_audit,
+    ):
+        reject_untrusted_provider_input(provider_bound_value)
     user_prompt = _build_user_prompt_call2(
         analysis_call1,
         parsed_data,
