@@ -74,57 +74,43 @@ class UntrustedProviderOutput:
 
 
 class _UntrustedProviderDerived:
-    """Marker retained across provider-derived structural transformations."""
+    """Opaque provider-derived value with no implicit native conversion."""
+
+    __slots__ = ("__value",)
+
+    def __init__(self, value: Any) -> None:
+        self.__value = value
+
+    def __repr__(self) -> str:
+        return "<UNTRUSTED_PROVIDER_DERIVED>"
+
+    def __str__(self) -> str:
+        raise TypeError("provider-derived value requires an authorized transformation")
+
+    def __format__(self, format_spec: str) -> str:
+        raise TypeError("provider-derived value requires an authorized transformation")
+
+    def __getitem__(self, key: Any) -> Any:
+        raise TypeError("provider-derived value is opaque")
+
+    def __bool__(self) -> bool:
+        raise TypeError("provider-derived value is opaque")
 
 
-class UntrustedProviderText(str, _UntrustedProviderDerived):
-    """Text originating at a provider; inadmissible in another egress."""
+class UntrustedProviderText(_UntrustedProviderDerived):
+    """Opaque text originating at a provider; never valid egress input."""
 
     def strip(self, chars: str | None = None) -> "UntrustedProviderText":
-        return UntrustedProviderText(super().strip(chars))
+        return self
 
-    def lstrip(self, chars: str | None = None) -> "UntrustedProviderText":
-        return UntrustedProviderText(super().lstrip(chars))
-
-    def rstrip(self, chars: str | None = None) -> "UntrustedProviderText":
-        return UntrustedProviderText(super().rstrip(chars))
-
-
-class UntrustedProviderMapping(dict, _UntrustedProviderDerived):
-    pass
-
-
-class UntrustedProviderList(list, _UntrustedProviderDerived):
-    pass
-
-
-class UntrustedProviderInt(int, _UntrustedProviderDerived):
-    pass
-
-
-class UntrustedProviderFloat(float, _UntrustedProviderDerived):
-    pass
+    lstrip = strip
+    rstrip = strip
 
 
 def taint_provider_derived(value: Any) -> Any:
-    """Retain provider provenance after parsing a provider JSON response."""
+    """Wrap a parsed provider value without exposing native operations."""
 
-    if isinstance(value, str):
-        return UntrustedProviderText(value)
-    if isinstance(value, dict):
-        return UntrustedProviderMapping(
-            (taint_provider_derived(key), taint_provider_derived(nested))
-            for key, nested in value.items()
-        )
-    if isinstance(value, list):
-        return UntrustedProviderList(taint_provider_derived(item) for item in value)
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, int):
-        return UntrustedProviderInt(value)
-    if isinstance(value, float):
-        return UntrustedProviderFloat(value)
-    return value
+    return _UntrustedProviderDerived(value)
 
 
 class _UntrustedContentBlockProxy:

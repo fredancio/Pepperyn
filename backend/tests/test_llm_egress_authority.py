@@ -194,9 +194,28 @@ def test_provider_derived_json_members_remain_tainted_after_extraction():
     parsed = taint_provider_derived(
         json.loads('{"kind":"financial","confidence":93,"nested":["x"]}')
     )
-    for extracted in (parsed, parsed["kind"], parsed["confidence"], parsed["nested"]):
-        with pytest.raises(EgressRefused):
-            egress_module.reject_untrusted_provider_input(extracted)
+    with pytest.raises(EgressRefused):
+        egress_module.reject_untrusted_provider_input(parsed)
+    with pytest.raises(TypeError):
+        parsed["kind"]
+    with pytest.raises(TypeError):
+        str(parsed)
+    with pytest.raises(TypeError):
+        f"{parsed}"
+
+
+def test_provider_text_cannot_be_laundered_by_common_transformations():
+    value = UntrustedProviderText("hostile")
+    assert value.strip() is value
+    for operation in (
+        lambda: value[:],
+        lambda: str(value),
+        lambda: f"{value}",
+        lambda: value + "suffix",
+        lambda: value.upper(),
+    ):
+        with pytest.raises((TypeError, AttributeError)):
+            operation()
 
 
 def test_logs_contain_metadata_but_not_payload_or_output(caplog, monkeypatch):
@@ -254,16 +273,28 @@ def _provider_bypass_violations(relative_path: str, source: str) -> list[str]:
             }
             if roots and not roots.issubset(allowed):
                 violations.append(f"{relative_path}:{node.lineno}: network import {name}")
+        if isinstance(node, ast.ImportFrom) and node.module == "asyncio":
+            if any(alias.name.startswith("create_subprocess") for alias in node.names):
+                violations.append(f"{relative_path}:{node.lineno}: async process import")
         if isinstance(node, ast.Call):
             if isinstance(node.func, ast.Name) and node.func.id == "__import__":
                 violations.append(f"{relative_path}:{node.lineno}: dynamic import")
             if isinstance(node.func, ast.Name) and node.func.id == "import_module":
                 violations.append(f"{relative_path}:{node.lineno}: dynamic import")
+            if isinstance(node.func, ast.Name) and node.func.id.startswith("create_subprocess"):
+                violations.append(f"{relative_path}:{node.lineno}: async process launch")
+            if isinstance(node.func, ast.Name) and node.func.id == "getattr":
+                if node.args and isinstance(node.args[0], ast.Name):
+                    if node.args[0].id in {"os", "asyncio"}:
+                        violations.append(f"{relative_path}:{node.lineno}: dynamic process access")
             if isinstance(node.func, ast.Attribute) and node.func.attr == "import_module":
                 violations.append(f"{relative_path}:{node.lineno}: dynamic import")
             if isinstance(node.func, ast.Attribute):
                 owner = node.func.value.id if isinstance(node.func.value, ast.Name) else ""
-                if owner == "os" and node.func.attr in {"system", "popen"}:
+                if owner == "os" and (
+                    node.func.attr in {"system", "popen"}
+                    or node.func.attr.startswith("spawn")
+                ):
                     violations.append(f"{relative_path}:{node.lineno}: process launch")
                 if node.func.attr.startswith("create_subprocess"):
                     violations.append(f"{relative_path}:{node.lineno}: async process launch")
@@ -303,6 +334,10 @@ def test_unrelated_network_allowlist_is_content_pinned():
         "from http import client\nclient.HTTPSConnection('provider.invalid')",
         "import os\nos.system('llm-cli prompt')",
         "import asyncio\nasyncio.create_subprocess_exec('llm-cli')",
+        "from asyncio import create_subprocess_exec\ncreate_subprocess_exec('llm-cli')",
+        "import asyncio\ngetattr(asyncio, 'create_' + 'subprocess_exec')('llm-cli')",
+        "import os\ngetattr(os, 'system')('llm-cli')",
+        "import os\nos.spawnlp(0, 'llm-cli', 'llm-cli')",
         "import os\nkey = os.getenv('OPENAI_API_KEY')",
     ],
 )
