@@ -2,6 +2,8 @@ from dataclasses import FrozenInstanceError, replace
 import ast
 import hashlib
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -23,7 +25,7 @@ from services.ownership_authority import (
 
 
 def _authority(records=None, ttl=30.0):
-    records = records or [OwnershipRecord("a-a", "co", "entity-a", "eng-a")]
+    records = records or [OwnershipRecord("a-a", "co", "entity-a", "eng-a", "co", "entity-a")]
     return OwnershipAuthority(InMemoryOwnershipRepository(records), ttl_seconds=ttl)
 
 
@@ -79,7 +81,7 @@ def test_caller_supplied_scope_mismatch_rejected(company, entity, engagement):
 
 def test_ambiguous_ownership_fails_closed():
     authority = _authority([
-        OwnershipRecord("a", "co", "e1", "g1"), OwnershipRecord("a", "co", "e2", "g2")
+        OwnershipRecord("a", "co", "e1", "g1", "co", "e1"), OwnershipRecord("a", "co", "e2", "g2", "co", "e2")
     ])
     with pytest.raises(OwnershipRefused):
         _grant(authority, analysis="a")
@@ -93,14 +95,23 @@ def test_missing_required_scope_fails_closed(record):
         _grant(_authority([record]), analysis="a")
 
 
+@pytest.mark.parametrize("record", [
+    OwnershipRecord("a", "co-a", "entity-b", "eng-b", "co-b", "entity-b"),
+    OwnershipRecord("a", "co", "entity-a", "eng-b", "co", "entity-b"),
+])
+def test_incoherent_entity_company_or_engagement_entity_rejected(record):
+    with pytest.raises(OwnershipRefused):
+        _grant(_authority([record]), analysis="a", company=record.company_id)
+
+
 def test_ordinary_caller_cannot_mint_capabilities():
     with pytest.raises(OwnershipRefused):
         AuthenticatedPrincipal("u", "co", object())
     principal = _authority()._accept_authenticated_principal("u", "co")
     with pytest.raises(OwnershipRefused):
-        ProtectedReadGrant(principal, None, "r", frozenset(), 0, "x", object())
+        ProtectedReadGrant(principal, None, "r", frozenset(), 0, "x", None, object())
     with pytest.raises(OwnershipRefused):
-        EgressAuthorization(None, "t", "r", frozenset(), "0" * 64, "x", 0, object())
+        EgressAuthorization(None, "t", "r", frozenset(), "0" * 64, "x", 0, None, object())
 
 
 def test_grant_is_immutable_and_cannot_be_widened():
@@ -122,9 +133,14 @@ def test_grant_cannot_cross_request_or_resource():
 
 
 def test_expired_grant_rejected():
-    authority, grant = _grant(_authority(ttl=-1))
     with pytest.raises(OwnershipRefused):
-        ProtectedContextReader(InMemoryScopedContextRepository([])).read(grant, request_id="req", resource=ProtectedResource.ANALYSIS_RESULT)
+        _authority(ttl=-1)
+
+
+@pytest.mark.parametrize("ttl", [0, float("nan"), float("inf"), 301])
+def test_invalid_or_unbounded_ttl_rejected(ttl):
+    with pytest.raises(OwnershipRefused):
+        _authority(ttl=ttl)
 
 
 def test_legacy_unattributed_memory_is_quarantined():
@@ -139,8 +155,13 @@ def test_legacy_unattributed_memory_is_quarantined():
 def _authorized_request():
     authority, grant = _grant()
     payload = {"synthetic": True}
-    digest = hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
-    receipt = authority.receipt_disclosure(grant=grant, request_id="req", disclosure_resources=[ProtectedResource.ANALYSIS_RESULT], disclosure_hash=digest)
+    records = [ScopedContextRecord(ProtectedResource.ANALYSIS_RESULT, "co", "entity-a", "eng-a", "a-a", payload)]
+    read_receipt = ProtectedContextReader(InMemoryScopedContextRepository(records)).read_receipted(
+        grant, request_id="req", resource=ProtectedResource.ANALYSIS_RESULT
+    )[0][1]
+    receipt = authority.receipt_disclosure(
+        grant=grant, request_id="req", protected_reads=[read_receipt], disclosure_payload=payload
+    )
     auth = authority.mint_egress_authorization(grant=grant, receipt=receipt, task="TASK")
     return _mint_synthetic_test_request(task="TASK", provider_payload=payload, request_id="req", egress_authorization=auth)
 
@@ -153,6 +174,44 @@ def test_egress_authorization_is_single_use(monkeypatch):
     with pytest.raises(EgressRefused) as exc:
         LlmEgressAuthority().dispatch(request)
     assert exc.value.code is EgressRefusalCode.OWNERSHIP_AUTHORIZATION_REQUIRED
+
+
+def test_concurrent_egress_consumption_allows_exactly_one_dispatch(monkeypatch):
+    import services.llm_egress as module
+    calls = []
+    lock = threading.Lock()
+    def transport(request):
+        with lock:
+            calls.append(request)
+        return "ok"
+    monkeypatch.setattr(module, "_dispatch_final_request", transport)
+    request = _authorized_request()
+    barrier = threading.Barrier(8)
+    def invoke():
+        barrier.wait()
+        try:
+            LlmEgressAuthority().dispatch(request)
+            return True
+        except EgressRefused:
+            return False
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda _: invoke(), range(8)))
+    assert results.count(True) == 1
+    assert len(calls) == 1
+
+
+def test_disclosure_cannot_claim_foreign_arbitrary_payload():
+    authority, grant = _grant()
+    source = {"client": "A"}
+    record = ScopedContextRecord(ProtectedResource.ANALYSIS_RESULT, "co", "entity-a", "eng-a", "a-a", source)
+    read_receipt = ProtectedContextReader(InMemoryScopedContextRepository([record])).read_receipted(
+        grant, request_id="req", resource=ProtectedResource.ANALYSIS_RESULT
+    )[0][1]
+    with pytest.raises(OwnershipRefused):
+        authority.receipt_disclosure(
+            grant=grant, request_id="req", protected_reads=[read_receipt],
+            disclosure_payload={"client": "B"},
+        )
 
 
 def test_egress_rejects_missing_or_copied_authorization_before_dispatch(monkeypatch):
@@ -227,5 +286,22 @@ def test_principal_acceptance_boundary_has_no_request_field_callers():
 def test_known_protected_chat_caches_only_use_protected_getter():
     source = (Path(__file__).parents[1] / "routers" / "analyze.py").read_text(encoding="utf-8")
     chat = source[source.index("async def chat_with_analysis"):source.index("def _resolve_entity_name")]
-    for cache_name in ("_anonymization_cache", "_analysis_result_cache", "_executive_case_v2_cache"):
+    for cache_name in (
+        "_anonymization_cache", "_analysis_result_cache", "_executive_case_v2_cache",
+        "_protected_correspondence_cache", "_protected_analysis_result_cache",
+        "_protected_executive_case_v2_cache",
+    ):
         assert f"{cache_name}.get(" not in chat
+
+
+def test_capability_internals_are_not_accessed_outside_authority_module():
+    backend = Path(__file__).parents[1]
+    forbidden = ("_MINT_SEAL", "._read_registry", "._egress_registry")
+    violations = []
+    for path in backend.rglob("*.py"):
+        if path.name in {"ownership_authority.py", "test_ownership_authority.py"}:
+            continue
+        text = path.read_text(encoding="utf-8")
+        if any(token in text for token in forbidden):
+            violations.append(path.relative_to(backend).as_posix())
+    assert violations == []

@@ -9,6 +9,7 @@ import logging
 import os
 import time
 import uuid
+from dataclasses import dataclass
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -73,7 +74,25 @@ _export_format_chosen: dict[str, str] = {}    # analyse_id → "excel"|"pdf"|"pp
 _analysis_result_cache: dict[str, dict] = {}  # analyse_id → result dict (pour PDF/PPTX à la demande)
 _anonymization_cache: dict[str, CorrespondenceTable] = {}  # analyse_id → table de correspondance (jamais envoyée à l'IA)
 _analysis_owner: dict[str, str] = {}          # analyse_id → company_id (contrôle d'accès aux exports)
-_analysis_scope: dict[str, tuple[str, str, str]] = {}  # id → verified company/entity/engagement
+
+
+def _cache_content_hash(value) -> str:
+    return hashlib.sha256(repr(value).encode("utf-8")).hexdigest()
+
+
+@dataclass(frozen=True)
+class _ScopedCacheEntry:
+    company_id: str
+    entity_id: str
+    engagement_id: str
+    analysis_id: str
+    content_hash: str
+    value: object
+
+
+_protected_analysis_result_cache: dict[str, _ScopedCacheEntry] = {}
+_protected_correspondence_cache: dict[str, _ScopedCacheEntry] = {}
+_protected_executive_case_v2_cache: dict[str, _ScopedCacheEntry] = {}
 _analysis_params_cache: dict[str, dict] = {}  # analyse_id → {target_date, analysis_period_months}
 
 # ── V2 : Executive Case JSON cache ───────────────────────────────────────────
@@ -502,6 +521,7 @@ async def _run_analysis_pipeline(
     # Lecture Supabase uniquement — aucun appel Claude. N'influence que le
     # prompt d'entrée (relation_section), jamais la structure du rapport.
     relation_section = ""
+    resolved_context_scope = None
     if entity_id:
         try:
             from main import get_supabase_service as _get_supabase_rel
@@ -516,11 +536,17 @@ async def _run_analysis_pipeline(
             )
             if _ent_res.data:
                 _ent = _ent_res.data[0]
-                relation_section = _build_relation_section(
-                    entity_name=_ent.get("name") or "",
-                    is_primary=bool(_ent.get("is_primary")),
-                    relation_type=_ent.get("relation_type"),
-                )
+                _engagements = (
+                    _sb_rel.from_("engagements").select("id")
+                    .eq("entity_id", entity_id).limit(2).execute()
+                ).data or []
+                if len(_engagements) == 1:
+                    resolved_context_scope = (company_id, entity_id, _engagements[0]["id"])
+                    relation_section = _build_relation_section(
+                        entity_name=_ent.get("name") or "",
+                        is_primary=bool(_ent.get("is_primary")),
+                        relation_type=_ent.get("relation_type"),
+                    )
         except Exception:
             pass
 
@@ -651,6 +677,10 @@ async def _run_analysis_pipeline(
     # chat de suivi sur cette analyse.
     if not correspondence_table.is_empty:
         _anonymization_cache[analyse_id] = correspondence_table
+        if resolved_context_scope:
+            _protected_correspondence_cache[analyse_id] = _ScopedCacheEntry(
+                *resolved_context_scope, analyse_id, _cache_content_hash(correspondence_table), correspondence_table
+            )
 
     # Extraire les recommandations pour le suivi décisionnel (mémoire
     # décisionnelle) — annexe séparée, n'altère pas analysis_result/le rapport.
@@ -663,6 +693,11 @@ async def _run_analysis_pipeline(
 
     # Cache analysis result dict for on-demand PDF/PPTX generation
     _analysis_result_cache[analyse_id] = analysis_result.model_dump()
+    if resolved_context_scope:
+        _protected_analysis_result_cache[analyse_id] = _ScopedCacheEntry(
+            *resolved_context_scope, analyse_id,
+            _cache_content_hash(analysis_result.model_dump()), analysis_result.model_dump(),
+        )
 
     # Generate Excel export — all plans
     # Note V2 : l'Excel est généré ici avec le result_dict (pipeline legacy).
@@ -957,9 +992,19 @@ class _AnalysisOwnershipRepository:
             entity_id = row.get("entity_id")
             if not entity_id:
                 return OwnershipRecord(analysis_id, row.get("company_id") or "", None, None)
+            entities = (
+                supabase.from_("entities").select("id,company_id")
+                .eq("id", entity_id).limit(2).execute()
+            ).data or []
+            if len(entities) != 1 or entities[0].get("company_id") != row.get("company_id"):
+                return OwnershipRecord(
+                    analysis_id, row.get("company_id") or "", entity_id, None,
+                    entity_company_id=entities[0].get("company_id") if len(entities) == 1 else None,
+                    ambiguous=len(entities) > 1,
+                )
             engagements = (
                 supabase.from_("engagements")
-                .select("id")
+                .select("id,entity_id")
                 .eq("entity_id", entity_id)
                 .limit(2)
                 .execute()
@@ -970,7 +1015,9 @@ class _AnalysisOwnershipRepository:
                     ambiguous=len(engagements) > 1,
                 )
             return OwnershipRecord(
-                analysis_id, row.get("company_id") or "", entity_id, engagements[0].get("id")
+                analysis_id, row.get("company_id") or "", entity_id, engagements[0].get("id"),
+                entity_company_id=entities[0].get("company_id"),
+                engagement_entity_id=engagements[0].get("entity_id"),
             )
         except Exception:
             return None
@@ -983,15 +1030,14 @@ class _ProtectedCacheRepository:
         self._cache = cache
 
     def read_scoped(self, resource: ProtectedResource):
-        scope = _analysis_scope.get(self._analysis_id)
-        if scope is None or resource is not self._resource:
+        if resource is not self._resource:
             return ()
-        value = self._cache.get(self._analysis_id)
-        if value is None:
+        entry = self._cache.get(self._analysis_id)
+        if entry is None or entry.content_hash != _cache_content_hash(entry.value):
             return ()
-        company_id, entity_id, engagement_id = scope
         return (ScopedContextRecord(
-            resource, company_id, entity_id, engagement_id, self._analysis_id, value
+            resource, entry.company_id, entry.entity_id, entry.engagement_id,
+            entry.analysis_id, entry.value
         ),)
 
 
@@ -1008,9 +1054,6 @@ def _mint_analysis_read_grant(company_id: str, analysis_id: str, request_id: str
         )
     except OwnershipRefused as exc:
         raise HTTPException(status_code=404, detail="Analyse introuvable") from exc
-    _analysis_scope[analysis_id] = (
-        grant.scope.company_id, grant.scope.entity_id, grant.scope.engagement_id
-    )
     return grant
 
 
@@ -1060,7 +1103,7 @@ async def chat_with_analysis(
     correspondence_table = None
     if request.analysis_id and read_grant is not None:
         correspondence_table = _read_protected_cache(
-            read_grant, request_id, ProtectedResource.CORRESPONDENCE, _anonymization_cache
+            read_grant, request_id, ProtectedResource.CORRESPONDENCE, _protected_correspondence_cache
         )
 
     chat_message = request.query
@@ -1337,7 +1380,7 @@ async def _get_or_build_executive_case_v2(
     """
     # ── 1. Cache hit ──────────────────────────────────────────────────────────
     cached_case = _read_protected_cache(
-        read_grant, request_id, ProtectedResource.EXECUTIVE_CASE, _executive_case_v2_cache
+        read_grant, request_id, ProtectedResource.EXECUTIVE_CASE, _protected_executive_case_v2_cache
     )
     if cached_case is not None:
         logger.info("[V2-CE] ExecutiveCase V2 depuis cache mémoire (id=%s)", analyse_id[:8])
@@ -1345,7 +1388,7 @@ async def _get_or_build_executive_case_v2(
 
     # ── 2. Vérifier disponibilité du résultat d'analyse ──────────────────────
     result_dict = _read_protected_cache(
-        read_grant, request_id, ProtectedResource.ANALYSIS_RESULT, _analysis_result_cache
+        read_grant, request_id, ProtectedResource.ANALYSIS_RESULT, _protected_analysis_result_cache
     )
     if not result_dict:
         logger.warning(
@@ -1366,6 +1409,11 @@ async def _get_or_build_executive_case_v2(
             analyse_id=analyse_id,
         )
         _executive_case_v2_cache[analyse_id] = case_v2
+        _protected_executive_case_v2_cache[analyse_id] = _ScopedCacheEntry(
+            read_grant.scope.company_id, read_grant.scope.entity_id,
+            read_grant.scope.engagement_id, analyse_id,
+            _cache_content_hash(case_v2), case_v2,
+        )
         logger.info("[V2-CE] ExecutiveCase V2 construit et mis en cache (id=%s)", analyse_id[:8])
         return case_v2
     except Exception as exc:

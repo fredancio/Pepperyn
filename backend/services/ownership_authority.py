@@ -9,7 +9,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import hashlib
+import json
+import math
 import secrets
+import threading
 import time
 from typing import Any, Iterable, Mapping, Protocol
 
@@ -59,6 +63,7 @@ class ProtectedReadGrant:
     allowed_resources: frozenset[ProtectedResource]
     expires_at: float
     capability_id: str
+    _issuer: Any
     _seal: object
 
     def __post_init__(self) -> None:
@@ -75,6 +80,7 @@ class EgressAuthorization:
     disclosure_hash: str
     capability_id: str
     expires_at: float
+    _issuer: Any
     _seal: object
 
     def __post_init__(self) -> None:
@@ -88,6 +94,8 @@ class OwnershipRecord:
     company_id: str
     entity_id: str | None
     engagement_id: str | None
+    entity_company_id: str | None = None
+    engagement_entity_id: str | None = None
     ambiguous: bool = False
 
 
@@ -102,6 +110,19 @@ class DisclosureReceipt:
     def __post_init__(self) -> None:
         if self._seal is not _MINT_SEAL:
             raise OwnershipRefused("FORGED_DISCLOSURE_RECEIPT")
+
+
+@dataclass(frozen=True)
+class ProtectedReadReceipt:
+    scope: OwnershipScope
+    request_id: str
+    resource: ProtectedResource
+    value_hash: str
+    _seal: object
+
+    def __post_init__(self) -> None:
+        if self._seal is not _MINT_SEAL:
+            raise OwnershipRefused("FORGED_READ_RECEIPT")
 
 
 @dataclass(frozen=True)
@@ -122,10 +143,6 @@ class ScopedContextRepository(Protocol):
     def read_scoped(self, resource: ProtectedResource) -> Iterable[ScopedContextRecord]: ...
 
 
-_read_registry: dict[str, tuple[OwnershipScope, str, frozenset[ProtectedResource], float]] = {}
-_egress_registry: dict[str, tuple[OwnershipScope, str, str, frozenset[ProtectedResource], str, float, bool]] = {}
-
-
 def _new_id() -> str:
     return secrets.token_urlsafe(24)
 
@@ -138,7 +155,9 @@ def _validate_read_grant(
 ) -> OwnershipScope:
     if not isinstance(grant, ProtectedReadGrant) or grant._seal is not _MINT_SEAL:
         raise OwnershipRefused("INVALID_READ_GRANT")
-    registered = _read_registry.get(grant.capability_id)
+    if not isinstance(grant._issuer, OwnershipAuthority):
+        raise OwnershipRefused("INVALID_READ_GRANT")
+    registered = grant._issuer._read_registry.get(grant.capability_id)
     expected = (grant.scope, grant.request_id, grant.allowed_resources, grant.expires_at)
     if registered != expected or request_id != grant.request_id:
         raise OwnershipRefused("READ_GRANT_SCOPE_MISMATCH")
@@ -160,28 +179,51 @@ def consume_egress_authorization(
 
     if not isinstance(authorization, EgressAuthorization) or authorization._seal is not _MINT_SEAL:
         raise OwnershipRefused("INVALID_EGRESS_AUTHORIZATION")
-    registered = _egress_registry.get(authorization.capability_id)
-    if registered is None:
+    if not isinstance(authorization._issuer, OwnershipAuthority):
         raise OwnershipRefused("INVALID_EGRESS_AUTHORIZATION")
-    scope, expected_task, expected_request, resources, expected_hash, expiry, consumed = registered
-    if consumed:
-        raise OwnershipRefused("EGRESS_AUTHORIZATION_REPLAYED")
-    if time.monotonic() >= expiry:
-        raise OwnershipRefused("EGRESS_AUTHORIZATION_EXPIRED")
-    if task != expected_task or request_id != expected_request or disclosure_hash != expected_hash:
-        raise OwnershipRefused("EGRESS_AUTHORIZATION_SCOPE_MISMATCH")
-    _egress_registry[authorization.capability_id] = (
-        scope, expected_task, expected_request, resources, expected_hash, expiry, True
+    return authorization._issuer._consume_egress(
+        authorization, task=task, request_id=request_id, disclosure_hash=disclosure_hash
     )
-    return scope
+
+
+def _canonical_hash(value: Any) -> str:
+    try:
+        body = json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")).encode()
+    except (TypeError, ValueError) as exc:
+        raise OwnershipRefused("NON_CANONICAL_DISCLOSURE") from exc
+    return hashlib.sha256(body).hexdigest()
+
+
+def _nested_hashes(value: Any) -> set[str]:
+    hashes = {_canonical_hash(value)}
+    if isinstance(value, Mapping):
+        for nested in value.values():
+            hashes.update(_nested_hashes(nested))
+    elif isinstance(value, (list, tuple)):
+        for nested in value:
+            hashes.update(_nested_hashes(nested))
+    return hashes
 
 
 class OwnershipAuthority:
     """Resolve authoritative scope and mint capabilities after verification."""
 
     def __init__(self, repository: OwnershipRepository, *, ttl_seconds: float = 30.0) -> None:
+        if not math.isfinite(ttl_seconds) or ttl_seconds <= 0 or ttl_seconds > 300:
+            raise OwnershipRefused("INVALID_CAPABILITY_TTL")
         self._repository = repository
         self._ttl_seconds = ttl_seconds
+        self._read_registry: dict[str, tuple[OwnershipScope, str, frozenset[ProtectedResource], float]] = {}
+        self._egress_registry: dict[str, tuple[OwnershipScope, str, str, frozenset[ProtectedResource], str, float, bool]] = {}
+        self._lock = threading.Lock()
+
+    def _prune(self) -> None:
+        now = time.monotonic()
+        self._read_registry = {key: value for key, value in self._read_registry.items() if value[3] > now}
+        self._egress_registry = {
+            key: value for key, value in self._egress_registry.items()
+            if value[5] > now and not value[6]
+        }
 
     def _accept_authenticated_principal(self, principal_id: str, company_id: str) -> AuthenticatedPrincipal:
         """Authentication-adapter boundary; never accepts HTTP caller fields."""
@@ -208,6 +250,10 @@ class OwnershipAuthority:
             raise OwnershipRefused("COMPANY_MISMATCH")
         if not record.entity_id or not record.engagement_id:
             raise OwnershipRefused("REQUIRED_SCOPE_MISSING")
+        if record.entity_company_id != record.company_id:
+            raise OwnershipRefused("ENTITY_COMPANY_MISMATCH")
+        if record.engagement_entity_id != record.entity_id:
+            raise OwnershipRefused("ENGAGEMENT_ENTITY_MISMATCH")
         if expected_entity_id is not None and expected_entity_id != record.entity_id:
             raise OwnershipRefused("ENTITY_MISMATCH")
         if expected_engagement_id is not None and expected_engagement_id != record.engagement_id:
@@ -218,8 +264,9 @@ class OwnershipAuthority:
         scope = OwnershipScope(record.company_id, record.entity_id, record.engagement_id, record.analysis_id)
         expiry = time.monotonic() + self._ttl_seconds
         capability_id = _new_id()
-        grant = ProtectedReadGrant(principal, scope, request_id, allowed, expiry, capability_id, _MINT_SEAL)
-        _read_registry[capability_id] = (scope, request_id, allowed, expiry)
+        self._prune()
+        grant = ProtectedReadGrant(principal, scope, request_id, allowed, expiry, capability_id, self, _MINT_SEAL)
+        self._read_registry[capability_id] = (scope, request_id, allowed, expiry)
         return grant
 
     def receipt_disclosure(
@@ -227,15 +274,23 @@ class OwnershipAuthority:
         *,
         grant: ProtectedReadGrant,
         request_id: str,
-        disclosure_resources: Iterable[ProtectedResource],
-        disclosure_hash: str,
+        protected_reads: Iterable[ProtectedReadReceipt],
+        disclosure_payload: Mapping[str, Any],
     ) -> DisclosureReceipt:
-        disclosed = frozenset(disclosure_resources)
-        if not disclosed or len(disclosure_hash) != 64:
+        reads = tuple(protected_reads)
+        disclosed = frozenset(read.resource for read in reads)
+        if not reads:
             raise OwnershipRefused("EMPTY_DISCLOSURE")
-        for resource in disclosed:
-            _validate_read_grant(grant, request_id=request_id, resource=resource)
-        return DisclosureReceipt(grant.scope, request_id, disclosed, disclosure_hash, _MINT_SEAL)
+        nested_hashes = _nested_hashes(disclosure_payload)
+        for read in reads:
+            _validate_read_grant(grant, request_id=request_id, resource=read.resource)
+            if read._seal is not _MINT_SEAL or read.scope != grant.scope or read.request_id != request_id:
+                raise OwnershipRefused("INVALID_READ_RECEIPT")
+            if read.value_hash not in nested_hashes:
+                raise OwnershipRefused("DISCLOSURE_NOT_DERIVED_FROM_READ")
+        return DisclosureReceipt(
+            grant.scope, request_id, disclosed, _canonical_hash(disclosure_payload), _MINT_SEAL
+        )
 
     def mint_egress_authorization(
         self,
@@ -254,13 +309,31 @@ class OwnershipAuthority:
         capability_id = _new_id()
         authorization = EgressAuthorization(
             grant.scope, task, receipt.request_id, receipt.resources, receipt.disclosure_hash,
-            capability_id, expiry, _MINT_SEAL
+            capability_id, expiry, self, _MINT_SEAL
         )
-        _egress_registry[capability_id] = (
+        self._prune()
+        self._egress_registry[capability_id] = (
             grant.scope, task, receipt.request_id, receipt.resources,
             receipt.disclosure_hash, expiry, False
         )
         return authorization
+
+    def _consume_egress(self, authorization, *, task: str, request_id: str, disclosure_hash: str) -> OwnershipScope:
+        with self._lock:
+            registered = self._egress_registry.get(authorization.capability_id)
+            if registered is None:
+                raise OwnershipRefused("INVALID_EGRESS_AUTHORIZATION")
+            scope, expected_task, expected_request, resources, expected_hash, expiry, consumed = registered
+            if consumed:
+                raise OwnershipRefused("EGRESS_AUTHORIZATION_REPLAYED")
+            if time.monotonic() >= expiry:
+                raise OwnershipRefused("EGRESS_AUTHORIZATION_EXPIRED")
+            if task != expected_task or request_id != expected_request or disclosure_hash != expected_hash:
+                raise OwnershipRefused("EGRESS_AUTHORIZATION_SCOPE_MISMATCH")
+            self._egress_registry[authorization.capability_id] = (
+                scope, expected_task, expected_request, resources, expected_hash, expiry, True
+            )
+            return scope
 
 
 class ProtectedContextReader:
@@ -290,6 +363,13 @@ class ProtectedContextReader:
             ):
                 values.append(record.value)
         return tuple(values)
+
+    def read_receipted(self, grant, *, request_id: str, resource: ProtectedResource):
+        values = self.read(grant, request_id=request_id, resource=resource)
+        return tuple(
+            (value, ProtectedReadReceipt(grant.scope, request_id, resource, _canonical_hash(value), _MINT_SEAL))
+            for value in values
+        )
 
 
 class InMemoryOwnershipRepository:

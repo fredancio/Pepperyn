@@ -25,9 +25,13 @@ from services.llm_egress import (
 )
 from services.ownership_authority import (
     InMemoryOwnershipRepository,
+    InMemoryScopedContextRepository,
     OwnershipAuthority,
+    OwnershipRefused,
     OwnershipRecord,
+    ProtectedContextReader,
     ProtectedResource,
+    ScopedContextRecord,
 )
 
 
@@ -50,7 +54,7 @@ class CaptureBoundary:
 def _request(**changes):
     request_id = changes.pop("request_id", "slice1-synthetic-request")
     authority = OwnershipAuthority(InMemoryOwnershipRepository([
-        OwnershipRecord("synthetic-analysis", "synthetic-company", "synthetic-entity", "synthetic-engagement")
+        OwnershipRecord("synthetic-analysis", "synthetic-company", "synthetic-entity", "synthetic-engagement", "synthetic-company", "synthetic-entity")
     ]))
     principal = authority._accept_authenticated_principal("synthetic-principal", "synthetic-company")
     grant = authority.resolve_and_mint_read_grant(
@@ -65,21 +69,27 @@ def _request(**changes):
         "messages": [{"role": "user", "content": "CLIENT_001 revenue 123.45"}],
         "max_tokens": 50,
     })
+    authorization = None
     try:
-        body = json.dumps(dict(payload), ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")).encode()
-    except (TypeError, ValueError):
-        # Invalid-payload tests must still reach the authority's own rejection.
-        body = b"{}"
-    receipt = authority.receipt_disclosure(
-        grant=grant, request_id=request_id,
-        disclosure_resources=[ProtectedResource.ANALYSIS_RESULT],
-        disclosure_hash=hashlib.sha256(body).hexdigest(),
-    )
-    authorization = authority.mint_egress_authorization(
-        grant=grant,
-        receipt=receipt,
-        task=changes.get("task", "FINANCIAL_ANALYSIS"),
-    )
+        receipt_source = ScopedContextRecord(
+            ProtectedResource.ANALYSIS_RESULT, "synthetic-company", "synthetic-entity",
+            "synthetic-engagement", "synthetic-analysis", payload,
+        )
+        read_receipt = ProtectedContextReader(
+            InMemoryScopedContextRepository([receipt_source])
+        ).read_receipted(
+            grant, request_id=request_id, resource=ProtectedResource.ANALYSIS_RESULT
+        )[0][1]
+        receipt = authority.receipt_disclosure(
+            grant=grant, request_id=request_id, protected_reads=[read_receipt],
+            disclosure_payload=payload,
+        )
+        authorization = authority.mint_egress_authorization(
+            grant=grant, receipt=receipt,
+            task=changes.get("task", "FINANCIAL_ANALYSIS"),
+        )
+    except OwnershipRefused:
+        pass
     values = {
         "task": "FINANCIAL_ANALYSIS",
         "provider_payload": payload,
