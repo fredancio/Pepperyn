@@ -52,7 +52,7 @@ def _request(**changes):
     authority = OwnershipAuthority(InMemoryOwnershipRepository([
         OwnershipRecord("synthetic-analysis", "synthetic-company", "synthetic-entity", "synthetic-engagement")
     ]))
-    principal = authority.accept_authenticated_principal("synthetic-principal", "synthetic-company")
+    principal = authority._accept_authenticated_principal("synthetic-principal", "synthetic-company")
     grant = authority.resolve_and_mint_read_grant(
         principal=principal,
         analysis_id="synthetic-analysis",

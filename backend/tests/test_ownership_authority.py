@@ -29,7 +29,7 @@ def _authority(records=None, ttl=30.0):
 
 def _grant(authority=None, *, analysis="a-a", company="co", request="req", entity=None, engagement=None, resources=None):
     authority = authority or _authority()
-    principal = authority.accept_authenticated_principal("user", company)
+    principal = authority._accept_authenticated_principal("user", company)
     return authority, authority.resolve_and_mint_read_grant(
         principal=principal, analysis_id=analysis, request_id=request,
         expected_entity_id=entity, expected_engagement_id=engagement,
@@ -44,7 +44,7 @@ def test_foreign_analysis_rejected_before_context_repository_read():
             self.reads += 1
             return ()
     authority = _authority()
-    principal = authority.accept_authenticated_principal("user", "foreign-company")
+    principal = authority._accept_authenticated_principal("user", "foreign-company")
     spy = Spy()
     with pytest.raises(OwnershipRefused):
         authority.resolve_and_mint_read_grant(principal=principal, analysis_id="a-a", request_id="r", resources=[ProtectedResource.ANALYSIS_RESULT])
@@ -96,7 +96,7 @@ def test_missing_required_scope_fails_closed(record):
 def test_ordinary_caller_cannot_mint_capabilities():
     with pytest.raises(OwnershipRefused):
         AuthenticatedPrincipal("u", "co", object())
-    principal = _authority().accept_authenticated_principal("u", "co")
+    principal = _authority()._accept_authenticated_principal("u", "co")
     with pytest.raises(OwnershipRefused):
         ProtectedReadGrant(principal, None, "r", frozenset(), 0, "x", object())
     with pytest.raises(OwnershipRefused):
@@ -211,6 +211,17 @@ def test_capability_minting_is_confined_to_ownership_authority():
         if any(token in text for token in forbidden):
             violations.append(path.relative_to(backend).as_posix())
     assert violations == []
+
+
+def test_principal_acceptance_boundary_has_no_request_field_callers():
+    backend = Path(__file__).parents[1]
+    callers = []
+    for path in backend.rglob("*.py"):
+        if path.name in {"ownership_authority.py", "test_ownership_authority.py", "test_llm_egress_authority.py"}:
+            continue
+        if "._accept_authenticated_principal(" in path.read_text(encoding="utf-8"):
+            callers.append(path.relative_to(backend).as_posix())
+    assert callers == ["routers/analyze.py"]
 
 
 def test_known_protected_chat_caches_only_use_protected_getter():

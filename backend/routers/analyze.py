@@ -997,7 +997,8 @@ class _ProtectedCacheRepository:
 
 def _mint_analysis_read_grant(company_id: str, analysis_id: str, request_id: str, resources):
     authority = OwnershipAuthority(_AnalysisOwnershipRepository())
-    principal = authority.accept_authenticated_principal(company_id, company_id)
+    # company_id is the output of _resolve_auth, never a request-body field.
+    principal = authority._accept_authenticated_principal(company_id, company_id)
     try:
         grant = authority.resolve_and_mint_read_grant(
             principal=principal,

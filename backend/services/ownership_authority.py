@@ -183,7 +183,8 @@ class OwnershipAuthority:
         self._repository = repository
         self._ttl_seconds = ttl_seconds
 
-    def accept_authenticated_principal(self, principal_id: str, company_id: str) -> AuthenticatedPrincipal:
+    def _accept_authenticated_principal(self, principal_id: str, company_id: str) -> AuthenticatedPrincipal:
+        """Authentication-adapter boundary; never accepts HTTP caller fields."""
         if not principal_id or not company_id:
             raise OwnershipRefused("MISSING_AUTHENTICATED_PRINCIPAL")
         return AuthenticatedPrincipal(principal_id, company_id, _MINT_SEAL)
