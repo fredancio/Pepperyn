@@ -278,3 +278,14 @@ These decisions do not justify delaying the selected mission's evidence and cont
 ---
 
 **Control decision:** The canonical product has re-entered normal product development. Recovery remains closed. The next authorized recommendation is the bounded **FIRST REAL-CLIENT LLM EGRESS TRUST GATE**; it must not begin automatically from this artifact.
+
+## 12. Trust Gate execution update — 2026-08-30
+
+- **Current security-lineage HEAD:** `be95c426bcb4f0d5552e36d97a18b0153b7dbb48` on `work/llm-egress-trust-gate-slice-2`.
+- **Slice 1:** independently reviewed PASS; implementation `dfdf6b98b3a8572760828a39e682ef7a78b2f624`, review artifact `6aeb01f41924c38c946b2642384047a6c20435dd`.
+- **Slice 2:** independently reviewed PASS; final implementation `1b7fe1fa4cfebe60c0d398e4f420704b07d1aa19`, concurrency evidence retained at `be95c426bcb4f0d5552e36d97a18b0153b7dbb48`.
+- **OpenAI provider:** conditionally approved candidate only. Real-data admission remains closed pending PG-1–PG-8 evidence/configuration.
+- **Milestone A — synthetic Founder rehearsal:** not ready. Ownership isolation is solved, but the actual product path still needs one bounded synthetic-only orchestration/admission implementation and a rehearsal fixture/scorecard.
+- **Milestone B — real-client admission:** not ready. Durable correspondence, real provenance, terminal re-identification, task-specific minimization, provider/account policy and explicit real-data admission remain.
+- **Exact next mission:** `SYNTHETIC FOUNDER REHEARSAL PATH — BOUNDED EGRESS ORCHESTRATION & RUNBOOK`.
+- **Frozen:** Portfolio Attention, broad cognitive/agent/memory redesign, new connectors, plan/UX work and historical recovery.
