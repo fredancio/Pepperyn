@@ -375,17 +375,23 @@ class OwnershipAuthority:
     ) -> EgressAuthorization:
         if not isinstance(receipt, DisclosureReceipt) or receipt._seal is not _MINT_SEAL:
             raise OwnershipRefused("INVALID_DISCLOSURE_RECEIPT")
-        registered_receipt = self._disclosure_receipts.get(receipt.receipt_id)
-        expected_disclosure = (
-            receipt.grant_id, receipt.input_receipt_ids, receipt.disclosure_hash,
-            False, receipt.scope, receipt.request_id, receipt.resources,
-        )
-        if (
-            receipt._issuer is not self or receipt.scope != grant.scope
-            or receipt.request_id != grant.request_id or receipt.grant_id != grant.capability_id
-            or registered_receipt != expected_disclosure
-        ):
-            raise OwnershipRefused("DISCLOSURE_SCOPE_MISMATCH")
+        with self._lock:
+            registered_receipt = self._disclosure_receipts.get(receipt.receipt_id)
+            expected_disclosure = (
+                receipt.grant_id, receipt.input_receipt_ids, receipt.disclosure_hash,
+                False, receipt.scope, receipt.request_id, receipt.resources,
+            )
+            if (
+                receipt._issuer is not self or receipt.scope != grant.scope
+                or receipt.request_id != grant.request_id or receipt.grant_id != grant.capability_id
+                or registered_receipt != expected_disclosure
+            ):
+                raise OwnershipRefused("DISCLOSURE_SCOPE_MISMATCH")
+            # Burn before leaving the critical section; later failure stays closed.
+            self._disclosure_receipts[receipt.receipt_id] = (
+                registered_receipt[0], registered_receipt[1], registered_receipt[2], True,
+                registered_receipt[4], registered_receipt[5], registered_receipt[6],
+            )
         for resource in receipt.resources:
             _validate_read_grant(grant, request_id=receipt.request_id, resource=resource)
         expiry = min(grant.expires_at, time.monotonic() + self._ttl_seconds)
@@ -398,10 +404,6 @@ class OwnershipAuthority:
         self._egress_registry[capability_id] = (
             grant.scope, task, receipt.request_id, receipt.resources,
             receipt.disclosure_hash, expiry, False
-        )
-        self._disclosure_receipts[receipt.receipt_id] = (
-            registered_receipt[0], registered_receipt[1], registered_receipt[2], True,
-            registered_receipt[4], registered_receipt[5], registered_receipt[6],
         )
         return authorization
 
