@@ -1,8 +1,11 @@
 # PEPPERYN — LLM EGRESS TRUST GATE — SLICE 2
 
-**Status:** PASS — independently reviewed; no S0/S1/S2 remains  
-**Starting reviewed lineage:** `6aeb01f41924c38c946b2642384047a6c20435dd`  
-**Final reviewed implementation:** `1b7fe1fa4cfebe60c0d398e4f420704b07d1aa19`  
+**Status:** PASS — independently reviewed; no S0/S1/S2 remains
+
+**Starting reviewed lineage:** `6aeb01f41924c38c946b2642384047a6c20435dd`
+
+**Final reviewed implementation:** `1b7fe1fa4cfebe60c0d398e4f420704b07d1aa19`
+
 **Final evidence HEAD:** `be95c426bcb4f0d5552e36d97a18b0153b7dbb48`
 
 ## Implemented boundary
