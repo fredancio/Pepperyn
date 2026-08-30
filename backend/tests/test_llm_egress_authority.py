@@ -65,11 +65,16 @@ def _request(**changes):
         if isinstance(value, list):
             return [p for index, nested in enumerate(value) for p in paths(nested, prefix + (index,))]
         return [prefix]
-    def keys(value):
+    def keys(value, prefix=()):
         if isinstance(value, dict):
-            return set(value) | set().union(*(keys(v) for v in value.values()))
+            result = set()
+            for key, nested in value.items():
+                path = prefix + (key,)
+                result.add(path)
+                result.update(keys(nested, path))
+            return result
         if isinstance(value, list):
-            return set().union(*(keys(v) for v in value)) if value else set()
+            return set().union(*(keys(v, prefix + (i,)) for i, v in enumerate(value))) if value else set()
         return set()
     authority = OwnershipAuthority(
         InMemoryOwnershipRepository([
@@ -96,7 +101,7 @@ def _request(**changes):
         ).read_receipted(
             grant, request_id=request_id, resource=ProtectedResource.ANALYSIS_RESULT
         )[0][1]
-        projected = [authority.project_read(source_receipt, path) for path in paths(payload)]
+        projected = {path: authority.project_read(source_receipt, path) for path in paths(payload)}
         receipt = authority.receipt_disclosure(
             grant=grant, request_id=request_id, protected_reads=projected,
             disclosure_payload=payload,

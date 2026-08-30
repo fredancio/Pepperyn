@@ -166,7 +166,7 @@ def _validate_read_grant(
     if not isinstance(grant._issuer, OwnershipAuthority):
         raise OwnershipRefused("INVALID_READ_GRANT")
     registered = grant._issuer._read_registry.get(grant.capability_id)
-    expected = (grant.scope, grant.request_id, grant.allowed_resources, grant.expires_at)
+    expected = (grant.principal, grant.scope, grant.request_id, grant.allowed_resources, grant.expires_at)
     if registered != expected or request_id != grant.request_id:
         raise OwnershipRefused("READ_GRANT_SCOPE_MISMATCH")
     if time.monotonic() >= grant.expires_at:
@@ -213,24 +213,25 @@ def _nested_hashes(value: Any) -> set[str]:
     return hashes
 
 
-def _payload_coverage(value: Any) -> tuple[set[str], set[str]]:
-    keys: set[str] = set()
-    leaves: set[str] = set()
+def _payload_coverage(value: Any, prefix: tuple[str | int, ...] = ()) -> tuple[set[tuple], dict[tuple, str]]:
+    keys: set[tuple] = set()
+    leaves: dict[tuple, str] = {}
     if isinstance(value, Mapping):
         for key, nested in value.items():
             if not isinstance(key, str):
                 raise OwnershipRefused("NON_STRING_DISCLOSURE_KEY")
-            keys.add(key)
-            nested_keys, nested_leaves = _payload_coverage(nested)
+            path = prefix + (key,)
+            keys.add(path)
+            nested_keys, nested_leaves = _payload_coverage(nested, path)
             keys.update(nested_keys)
             leaves.update(nested_leaves)
     elif isinstance(value, (list, tuple)):
-        for nested in value:
-            nested_keys, nested_leaves = _payload_coverage(nested)
+        for index, nested in enumerate(value):
+            nested_keys, nested_leaves = _payload_coverage(nested, prefix + (index,))
             keys.update(nested_keys)
             leaves.update(nested_leaves)
     else:
-        leaves.add(_canonical_hash(value))
+        leaves[prefix] = _canonical_hash(value)
     return keys, leaves
 
 
@@ -243,26 +244,26 @@ class OwnershipAuthority:
         *,
         ttl_seconds: float = 30.0,
         projection_policy: Mapping[ProtectedResource, frozenset[tuple[str | int, ...]]] | None = None,
-        allowed_payload_keys: frozenset[str] = frozenset(),
+        allowed_payload_keys: frozenset[tuple[str | int, ...]] = frozenset(),
         allowed_static_values: frozenset[Any] = frozenset(),
     ) -> None:
         if not math.isfinite(ttl_seconds) or ttl_seconds <= 0 or ttl_seconds > 300:
             raise OwnershipRefused("INVALID_CAPABILITY_TTL")
         self._repository = repository
         self._ttl_seconds = ttl_seconds
-        self._read_registry: dict[str, tuple[OwnershipScope, str, frozenset[ProtectedResource], float]] = {}
+        self._read_registry: dict[str, tuple[AuthenticatedPrincipal, OwnershipScope, str, frozenset[ProtectedResource], float]] = {}
         self._egress_registry: dict[str, tuple[OwnershipScope, str, str, frozenset[ProtectedResource], str, float, bool]] = {}
         self._lock = threading.Lock()
         self._read_receipts: dict[str, tuple[str, OwnershipScope, str, ProtectedResource, Any, str, tuple | None]] = {}
         self._used_projected_receipts: set[str] = set()
-        self._disclosure_receipts: dict[str, tuple[str, frozenset[str], str, bool]] = {}
+        self._disclosure_receipts: dict[str, tuple[str, frozenset[str], str, bool, OwnershipScope, str, frozenset[ProtectedResource]]] = {}
         self._projection_policy = dict(projection_policy or {})
         self._allowed_payload_keys = allowed_payload_keys
         self._allowed_static_hashes = frozenset(_canonical_hash(value) for value in allowed_static_values)
 
     def _prune(self) -> None:
         now = time.monotonic()
-        self._read_registry = {key: value for key, value in self._read_registry.items() if value[3] > now}
+        self._read_registry = {key: value for key, value in self._read_registry.items() if value[4] > now}
         self._egress_registry = {
             key: value for key, value in self._egress_registry.items()
             if value[5] > now and not value[6]
@@ -309,7 +310,7 @@ class OwnershipAuthority:
         capability_id = _new_id()
         self._prune()
         grant = ProtectedReadGrant(principal, scope, request_id, allowed, expiry, capability_id, self, _MINT_SEAL)
-        self._read_registry[capability_id] = (scope, request_id, allowed, expiry)
+        self._read_registry[capability_id] = (principal, scope, request_id, allowed, expiry)
         return grant
 
     def receipt_disclosure(
@@ -317,44 +318,53 @@ class OwnershipAuthority:
         *,
         grant: ProtectedReadGrant,
         request_id: str,
-        protected_reads: Iterable[ProtectedReadReceipt],
+        protected_reads: Mapping[tuple[str | int, ...], ProtectedReadReceipt],
         disclosure_payload: Mapping[str, Any],
     ) -> DisclosureReceipt:
-        reads = tuple(protected_reads)
+        reads_by_destination = dict(protected_reads)
+        reads = tuple(reads_by_destination.values())
         disclosed = frozenset(read.resource for read in reads)
         if not reads:
             raise OwnershipRefused("EMPTY_DISCLOSURE")
-        payload_keys, payload_leaf_hashes = _payload_coverage(disclosure_payload)
+        payload_keys, payload_leaves = _payload_coverage(disclosure_payload)
         if not payload_keys.issubset(self._allowed_payload_keys):
             raise OwnershipRefused("UNAPPROVED_DISCLOSURE_KEY")
         projected_hashes: set[str] = set()
         receipt_ids: set[str] = set()
-        for read in reads:
-            _validate_read_grant(grant, request_id=request_id, resource=read.resource)
-            registered = self._read_receipts.get(read.receipt_id)
-            if (
-                read._seal is not _MINT_SEAL or read._issuer is not self
-                or read.scope != grant.scope or read.request_id != request_id
-                or read.grant_id != grant.capability_id or read.projection_path is None
-                or registered is None or read.receipt_id in self._used_projected_receipts
-            ):
-                raise OwnershipRefused("INVALID_READ_RECEIPT")
-            projected_hashes.add(read.value_hash)
-            receipt_ids.add(read.receipt_id)
-        if not payload_leaf_hashes.issubset(projected_hashes | self._allowed_static_hashes):
-            raise OwnershipRefused("UNCOVERED_DISCLOSURE_VALUE")
-        if not projected_hashes.issubset(payload_leaf_hashes):
-            raise OwnershipRefused("UNUSED_READ_RECEIPT")
-        receipt_id = _new_id()
-        receipt = DisclosureReceipt(
-            grant.scope, request_id, disclosed, _canonical_hash(disclosure_payload),
-            grant.capability_id, frozenset(receipt_ids), receipt_id, self, _MINT_SEAL
-        )
-        self._disclosure_receipts[receipt_id] = (
-            grant.capability_id, frozenset(receipt_ids), receipt.disclosure_hash, False
-        )
-        self._used_projected_receipts.update(receipt_ids)
-        return receipt
+        with self._lock:
+            for destination, read in reads_by_destination.items():
+                _validate_read_grant(grant, request_id=request_id, resource=read.resource)
+                registered = self._read_receipts.get(read.receipt_id)
+                expected = (
+                    read.grant_id, read.scope, read.request_id, read.resource,
+                    registered[4] if registered else None, read.value_hash, read.projection_path,
+                )
+                if (
+                    read._seal is not _MINT_SEAL or read._issuer is not self
+                    or read.scope != grant.scope or read.request_id != request_id
+                    or read.grant_id != grant.capability_id or read.projection_path is None
+                    or registered != expected or read.receipt_id in self._used_projected_receipts
+                    or payload_leaves.get(destination) != read.value_hash
+                ):
+                    raise OwnershipRefused("INVALID_READ_RECEIPT")
+                projected_hashes.add(read.value_hash)
+                receipt_ids.add(read.receipt_id)
+            uncovered = set(payload_leaves) - set(reads_by_destination)
+            if any(payload_leaves[path] not in self._allowed_static_hashes for path in uncovered):
+                raise OwnershipRefused("UNCOVERED_DISCLOSURE_VALUE")
+            if set(reads_by_destination) - set(payload_leaves):
+                raise OwnershipRefused("UNUSED_READ_RECEIPT")
+            receipt_id = _new_id()
+            receipt = DisclosureReceipt(
+                grant.scope, request_id, disclosed, _canonical_hash(disclosure_payload),
+                grant.capability_id, frozenset(receipt_ids), receipt_id, self, _MINT_SEAL
+            )
+            self._disclosure_receipts[receipt_id] = (
+                grant.capability_id, frozenset(receipt_ids), receipt.disclosure_hash, False,
+                grant.scope, request_id, disclosed,
+            )
+            self._used_projected_receipts.update(receipt_ids)
+            return receipt
 
     def mint_egress_authorization(
         self,
@@ -366,10 +376,14 @@ class OwnershipAuthority:
         if not isinstance(receipt, DisclosureReceipt) or receipt._seal is not _MINT_SEAL:
             raise OwnershipRefused("INVALID_DISCLOSURE_RECEIPT")
         registered_receipt = self._disclosure_receipts.get(receipt.receipt_id)
+        expected_disclosure = (
+            receipt.grant_id, receipt.input_receipt_ids, receipt.disclosure_hash,
+            False, receipt.scope, receipt.request_id, receipt.resources,
+        )
         if (
             receipt._issuer is not self or receipt.scope != grant.scope
             or receipt.request_id != grant.request_id or receipt.grant_id != grant.capability_id
-            or registered_receipt is None or registered_receipt[3]
+            or registered_receipt != expected_disclosure
         ):
             raise OwnershipRefused("DISCLOSURE_SCOPE_MISMATCH")
         for resource in receipt.resources:
@@ -386,34 +400,40 @@ class OwnershipAuthority:
             receipt.disclosure_hash, expiry, False
         )
         self._disclosure_receipts[receipt.receipt_id] = (
-            registered_receipt[0], registered_receipt[1], registered_receipt[2], True
+            registered_receipt[0], registered_receipt[1], registered_receipt[2], True,
+            registered_receipt[4], registered_receipt[5], registered_receipt[6],
         )
         return authorization
 
     def project_read(self, receipt: ProtectedReadReceipt, path: tuple[str | int, ...]) -> ProtectedReadReceipt:
-        registered = self._read_receipts.get(receipt.receipt_id)
-        if (
-            receipt._issuer is not self or registered is None or receipt.projection_path is not None
-            or path not in self._projection_policy.get(receipt.resource, frozenset())
-        ):
-            raise OwnershipRefused("PROJECTION_NOT_AUTHORIZED")
-        value = registered[4]
-        try:
-            for component in path:
-                value = value[component]
-        except (KeyError, IndexError, TypeError) as exc:
-            raise OwnershipRefused("PROJECTION_PATH_MISSING") from exc
-        receipt_id = _new_id()
-        value_hash = _canonical_hash(value)
-        projected = ProtectedReadReceipt(
-            receipt.scope, receipt.request_id, receipt.resource, value_hash,
-            receipt.grant_id, receipt_id, path, self, _MINT_SEAL,
-        )
-        self._read_receipts[receipt_id] = (
-            receipt.grant_id, receipt.scope, receipt.request_id, receipt.resource,
-            value, value_hash, path,
-        )
-        return projected
+        with self._lock:
+            registered = self._read_receipts.get(receipt.receipt_id)
+            expected = (
+                receipt.grant_id, receipt.scope, receipt.request_id, receipt.resource,
+                registered[4] if registered else None, receipt.value_hash, receipt.projection_path,
+            )
+            if (
+                receipt._issuer is not self or registered != expected or receipt.projection_path is not None
+                or path not in self._projection_policy.get(receipt.resource, frozenset())
+            ):
+                raise OwnershipRefused("PROJECTION_NOT_AUTHORIZED")
+            value = registered[4]
+            try:
+                for component in path:
+                    value = value[component]
+            except (KeyError, IndexError, TypeError) as exc:
+                raise OwnershipRefused("PROJECTION_PATH_MISSING") from exc
+            receipt_id = _new_id()
+            value_hash = _canonical_hash(value)
+            projected = ProtectedReadReceipt(
+                receipt.scope, receipt.request_id, receipt.resource, value_hash,
+                receipt.grant_id, receipt_id, path, self, _MINT_SEAL,
+            )
+            self._read_receipts[receipt_id] = (
+                receipt.grant_id, receipt.scope, receipt.request_id, receipt.resource,
+                value, value_hash, path,
+            )
+            return projected
 
     def _consume_egress(self, authorization, *, task: str, request_id: str, disclosure_hash: str) -> OwnershipScope:
         with self._lock:
@@ -421,8 +441,13 @@ class OwnershipAuthority:
             if registered is None:
                 raise OwnershipRefused("INVALID_EGRESS_AUTHORIZATION")
             scope, expected_task, expected_request, resources, expected_hash, expiry, consumed = registered
-            if consumed:
-                raise OwnershipRefused("EGRESS_AUTHORIZATION_REPLAYED")
+            expected_authorization = (
+                authorization.scope, authorization.task, authorization.request_id,
+                authorization.disclosure_resources, authorization.disclosure_hash,
+                authorization.expires_at, False,
+            )
+            if registered != expected_authorization:
+                raise OwnershipRefused("INVALID_EGRESS_AUTHORIZATION")
             if time.monotonic() >= expiry:
                 raise OwnershipRefused("EGRESS_AUTHORIZATION_EXPIRED")
             if task != expected_task or request_id != expected_request or disclosure_hash != expected_hash:

@@ -156,7 +156,7 @@ def _authorized_request():
     payload = {"synthetic": True}
     authority, grant = _grant(_authority(
         projection_policy={ProtectedResource.ANALYSIS_RESULT: frozenset({("synthetic",)})},
-        allowed_payload_keys=frozenset({"synthetic"}),
+        allowed_payload_keys=frozenset({("synthetic",)}),
     ))
     records = [ScopedContextRecord(ProtectedResource.ANALYSIS_RESULT, "co", "entity-a", "eng-a", "a-a", payload)]
     source_receipt = ProtectedContextReader(InMemoryScopedContextRepository(records)).read_receipted(
@@ -164,7 +164,7 @@ def _authorized_request():
     )[0][1]
     read_receipt = authority.project_read(source_receipt, ("synthetic",))
     receipt = authority.receipt_disclosure(
-        grant=grant, request_id="req", protected_reads=[read_receipt], disclosure_payload=payload
+        grant=grant, request_id="req", protected_reads={("synthetic",): read_receipt}, disclosure_payload=payload
     )
     auth = authority.mint_egress_authorization(grant=grant, receipt=receipt, task="TASK")
     return _mint_synthetic_test_request(task="TASK", provider_payload=payload, request_id="req", egress_authorization=auth)
@@ -207,7 +207,7 @@ def test_concurrent_egress_consumption_allows_exactly_one_dispatch(monkeypatch):
 def test_disclosure_cannot_claim_foreign_arbitrary_payload():
     authority, grant = _grant(_authority(
         projection_policy={ProtectedResource.ANALYSIS_RESULT: frozenset({("client",)})},
-        allowed_payload_keys=frozenset({"client"}),
+        allowed_payload_keys=frozenset({("client",)}),
     ))
     source = {"client": "A"}
     record = ScopedContextRecord(ProtectedResource.ANALYSIS_RESULT, "co", "entity-a", "eng-a", "a-a", source)
@@ -217,7 +217,7 @@ def test_disclosure_cannot_claim_foreign_arbitrary_payload():
     read_receipt = authority.project_read(source_receipt, ("client",))
     with pytest.raises(OwnershipRefused):
         authority.receipt_disclosure(
-            grant=grant, request_id="req", protected_reads=[read_receipt],
+            grant=grant, request_id="req", protected_reads={("client",): read_receipt},
             disclosure_payload={"client": "B"},
         )
 
@@ -225,7 +225,7 @@ def test_disclosure_cannot_claim_foreign_arbitrary_payload():
 def test_legitimate_value_cannot_cover_additional_rogue_payload_leaf():
     authority, grant = _grant(_authority(
         projection_policy={ProtectedResource.ANALYSIS_RESULT: frozenset({("client",)})},
-        allowed_payload_keys=frozenset({"authorized", "client", "rogue"}),
+        allowed_payload_keys=frozenset({("authorized",), ("authorized", "client"), ("rogue",)}),
     ))
     source = {"client": "B"}
     record = ScopedContextRecord(ProtectedResource.ANALYSIS_RESULT, "co", "entity-a", "eng-a", "a-a", source)
@@ -235,15 +235,15 @@ def test_legitimate_value_cannot_cover_additional_rogue_payload_leaf():
     projected = authority.project_read(source_receipt, ("client",))
     with pytest.raises(OwnershipRefused):
         authority.receipt_disclosure(
-            grant=grant, request_id="req", protected_reads=[projected],
+            grant=grant, request_id="req", protected_reads={("authorized", "client"): projected},
             disclosure_payload={"authorized": {"client": "B"}, "rogue": "CLIENT_A_SECRET"},
         )
 
 
 def test_receipts_cannot_cross_authority_or_grant():
     policy = {ProtectedResource.ANALYSIS_RESULT: frozenset({("value",)})}
-    authority_a, grant_a = _grant(_authority(projection_policy=policy, allowed_payload_keys=frozenset({"value"})), request="same")
-    authority_b, grant_b = _grant(_authority(projection_policy=policy, allowed_payload_keys=frozenset({"value"})), request="same")
+    authority_a, grant_a = _grant(_authority(projection_policy=policy, allowed_payload_keys=frozenset({("value",)})), request="same")
+    authority_b, grant_b = _grant(_authority(projection_policy=policy, allowed_payload_keys=frozenset({("value",)})), request="same")
     record = ScopedContextRecord(ProtectedResource.ANALYSIS_RESULT, "co", "entity-a", "eng-a", "a-a", {"value": 1})
     source_a = ProtectedContextReader(InMemoryScopedContextRepository([record])).read_receipted(
         grant_a, request_id="same", resource=ProtectedResource.ANALYSIS_RESULT
@@ -251,26 +251,93 @@ def test_receipts_cannot_cross_authority_or_grant():
     projected_a = authority_a.project_read(source_a, ("value",))
     with pytest.raises(OwnershipRefused):
         authority_b.receipt_disclosure(
-            grant=grant_b, request_id="same", protected_reads=[projected_a],
+            grant=grant_b, request_id="same", protected_reads={("value",): projected_a},
             disclosure_payload={"value": 1},
         )
 
 
 def test_projected_receipt_cannot_be_replayed_into_second_disclosure():
     policy = {ProtectedResource.ANALYSIS_RESULT: frozenset({("value",)})}
-    authority, grant = _grant(_authority(projection_policy=policy, allowed_payload_keys=frozenset({"value"})))
+    authority, grant = _grant(_authority(projection_policy=policy, allowed_payload_keys=frozenset({("value",)})))
     record = ScopedContextRecord(ProtectedResource.ANALYSIS_RESULT, "co", "entity-a", "eng-a", "a-a", {"value": 1})
     source = ProtectedContextReader(InMemoryScopedContextRepository([record])).read_receipted(
         grant, request_id="req", resource=ProtectedResource.ANALYSIS_RESULT
     )[0][1]
     projected = authority.project_read(source, ("value",))
     authority.receipt_disclosure(
-        grant=grant, request_id="req", protected_reads=[projected], disclosure_payload={"value": 1}
+        grant=grant, request_id="req", protected_reads={("value",): projected}, disclosure_payload={"value": 1}
     )
     with pytest.raises(OwnershipRefused):
         authority.receipt_disclosure(
-            grant=grant, request_id="req", protected_reads=[projected], disclosure_payload={"value": 1}
+            grant=grant, request_id="req", protected_reads={("value",): projected}, disclosure_payload={"value": 1}
         )
+
+
+def _projected_fixture():
+    policy = {ProtectedResource.ANALYSIS_RESULT: frozenset({("value",)})}
+    authority, grant = _grant(_authority(projection_policy=policy, allowed_payload_keys=frozenset({("value",)})))
+    record = ScopedContextRecord(ProtectedResource.ANALYSIS_RESULT, "co", "entity-a", "eng-a", "a-a", {"value": 1})
+    source = ProtectedContextReader(InMemoryScopedContextRepository([record])).read_receipted(
+        grant, request_id="req", resource=ProtectedResource.ANALYSIS_RESULT
+    )[0][1]
+    return authority, grant, authority.project_read(source, ("value",))
+
+
+def test_all_security_fields_of_projected_receipt_are_registry_checked():
+    mutations = {
+        "value_hash": "f" * 64,
+        "request_id": "other",
+        "resource": ProtectedResource.MEMORY,
+        "grant_id": "other",
+        "projection_path": ("other",),
+        "_issuer": object(),
+    }
+    for field, value in mutations.items():
+        authority, grant, projected = _projected_fixture()
+        forged = replace(projected, **{field: value})
+        with pytest.raises(OwnershipRefused):
+            authority.receipt_disclosure(
+                grant=grant, request_id="req", protected_reads={("value",): forged},
+                disclosure_payload={"value": 1},
+            )
+
+
+def test_all_security_fields_of_disclosure_receipt_are_registry_checked():
+    mutations = {
+        "disclosure_hash": "f" * 64,
+        "request_id": "other",
+        "resources": frozenset({ProtectedResource.MEMORY}),
+        "grant_id": "other",
+        "input_receipt_ids": frozenset({"other"}),
+        "_issuer": object(),
+    }
+    for field, value in mutations.items():
+        authority, grant, projected = _projected_fixture()
+        receipt = authority.receipt_disclosure(
+            grant=grant, request_id="req", protected_reads={("value",): projected},
+            disclosure_payload={"value": 1},
+        )
+        forged = replace(receipt, **{field: value})
+        with pytest.raises(OwnershipRefused):
+            authority.mint_egress_authorization(grant=grant, receipt=forged, task="TASK")
+
+
+def test_concurrent_projected_receipt_consumption_allows_one_disclosure():
+    authority, grant, projected = _projected_fixture()
+    barrier = threading.Barrier(8)
+    def invoke():
+        barrier.wait()
+        try:
+            authority.receipt_disclosure(
+                grant=grant, request_id="req", protected_reads={("value",): projected},
+                disclosure_payload={"value": 1},
+            )
+            return True
+        except OwnershipRefused:
+            return False
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda _: invoke(), range(8)))
+    assert results.count(True) == 1
 
 
 def test_egress_rejects_missing_or_copied_authorization_before_dispatch(monkeypatch):
