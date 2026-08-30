@@ -302,6 +302,7 @@ def test_logs_contain_metadata_but_not_payload_or_output(caplog, monkeypatch):
 
 
 _NETWORK_ALLOWLIST = {
+    "sandbox/synthetic_product.py": {"httpx"},
     "services/crm_service.py": {"httpx"},
     "services/file_parser.py": {"subprocess"},
 }
@@ -324,7 +325,9 @@ def _provider_bypass_violations(relative_path: str, source: str) -> list[str]:
     allowed = _NETWORK_ALLOWLIST.get(relative_path.replace("\\", "/"), set())
     violations = []
     for indicator in _PROVIDER_INDICATORS:
-        if indicator in source and relative_path != "services/llm_egress.py":
+        if indicator in source and relative_path not in {
+            "services/llm_egress.py", "sandbox/synthetic_product.py"
+        }:
             violations.append(f"{relative_path}: provider indicator {indicator}")
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):

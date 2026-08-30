@@ -289,3 +289,11 @@ These decisions do not justify delaying the selected mission's evidence and cont
 - **Milestone B — real-client admission:** not ready. Durable correspondence, real provenance, terminal re-identification, task-specific minimization, provider/account policy and explicit real-data admission remain.
 - **Exact next mission:** `SYNTHETIC FOUNDER REHEARSAL PATH — BOUNDED EGRESS ORCHESTRATION & RUNBOOK`.
 - **Frozen:** Portfolio Attention, broad cognitive/agent/memory redesign, new connectors, plan/UX work and historical recovery.
+
+## 13. Isolated synthetic product sandbox — 2026-08-30
+
+- Milestone A strategy is now source isolation rather than production-security simulation.
+- The only admitted source is the byte-exact registered Optilux V3 fixture.
+- Production databases, uploads, correspondence, enterprise memory and arbitrary identifiers/content remain outside the sandbox.
+- Real-data admission remains closed. RD-1 through RD-5 are preserved in `docs/Security/PEPPERYN_ISOLATED_SYNTHETIC_PRODUCT_SANDBOX_V1.md` as Milestone B blockers.
+- Live rehearsal requires only a dedicated development `OPENAI_API_KEY`; absence of that secret does not authorize any alternative transport.
