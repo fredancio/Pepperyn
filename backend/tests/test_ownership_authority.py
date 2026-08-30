@@ -340,6 +340,25 @@ def test_concurrent_projected_receipt_consumption_allows_one_disclosure():
     assert results.count(True) == 1
 
 
+def test_concurrent_disclosure_receipt_consumption_allows_one_authorization():
+    authority, grant, projected = _projected_fixture()
+    receipt = authority.receipt_disclosure(
+        grant=grant, request_id="req", protected_reads={("value",): projected},
+        disclosure_payload={"value": 1},
+    )
+    barrier = threading.Barrier(8)
+    def invoke():
+        barrier.wait()
+        try:
+            authority.mint_egress_authorization(grant=grant, receipt=receipt, task="TASK")
+            return True
+        except OwnershipRefused:
+            return False
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda _: invoke(), range(8)))
+    assert results.count(True) == 1
+
+
 def test_egress_rejects_missing_or_copied_authorization_before_dispatch(monkeypatch):
     import services.llm_egress as module
     calls = []
