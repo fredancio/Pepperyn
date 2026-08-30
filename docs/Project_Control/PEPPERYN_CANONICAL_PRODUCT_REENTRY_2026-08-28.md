@@ -297,3 +297,15 @@ These decisions do not justify delaying the selected mission's evidence and cont
 - Production databases, uploads, correspondence, enterprise memory and arbitrary identifiers/content remain outside the sandbox.
 - Real-data admission remains closed. RD-1 through RD-5 are preserved in `docs/Security/PEPPERYN_ISOLATED_SYNTHETIC_PRODUCT_SANDBOX_V1.md` as Milestone B blockers.
 - Live rehearsal requires only a dedicated development `OPENAI_API_KEY`; absence of that secret does not authorize any alternative transport.
+
+## 14. Sandbox review evidence reconciliation — 2026-08-30
+
+- **Reviewed implementation:** `cefc131481f4beebf6cfd88995d47189db6f894c` on `work/synthetic-founder-rehearsal-v1`; the implementation is unchanged after that commit.
+- **Sandbox verdict:** PASS — no S0/S1/S2 or material S3 was reported. The reported review found that neither real nor arbitrary caller data could reach sandbox GPT and that the sandbox did not weaken production security.
+- **Evidence classification:** **FOUNDER-SUPPLIED HISTORICAL REVIEW VERDICT**. The previous Work mission reported the verdict, targeted suite (`79 passed`), backend suite (`1466 passed / 12 historical failures / 50 skipped / 3 warnings`), legacy standalone result (`89 OK / 4 historical FAIL`) and `git diff --check` PASS. The standalone original reviewer artifact was not preserved or found in the repository or durable Work outputs. This record preserves the handover without upgrading it to repository-native primary evidence.
+- **Re-review decision:** not required solely to recreate paperwork. The exact reviewed commit remains checked out unchanged, and its implementation, tests, sandbox boundary, runbook and scorecard preserve the reported review scope.
+- **Live GPT rehearsal:** pending; the scorecard has not been completed.
+- **Promotion/deployment:** the sandbox is not merged into `main`, has no upstream branch, and is not evidenced as pushed or deployed.
+- **Limitation:** Sandbox V1 begins from the registered byte-exact Optilux V3 `AnalysisResult` fixture after historical ingestion. It does not validate raw-workbook ingestion or a complete `RAW EXCEL → INGESTION → FULL PEPPERYN → GPT` path.
+- **Real-data admission:** CLOSED. RD-1 through RD-5 remain preserved and mandatory for Milestone B.
+- **Exact next action:** Founder securely configures a dedicated OpenAI development-project credential locally as `OPENAI_API_KEY`, with an appropriate spend limit, and explicitly authorizes the isolated synthetic rehearsal. No credential value may enter Work chat, Git, Dropbox, documentation, tests or logs.
