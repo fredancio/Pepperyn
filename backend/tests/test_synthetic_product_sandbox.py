@@ -10,6 +10,8 @@ import pytest
 import sandbox.synthetic_product as sandbox_module
 from sandbox.synthetic_product import (
     IsolatedSandboxLlmEgressAuthority,
+    OPENAI_SANDBOX_MAX_OUTPUT_TOKENS,
+    OPENAI_SANDBOX_MODEL,
     OPTILUX_V3_SHA256,
     SandboxRefused,
     load_registered_fixture,
@@ -65,13 +67,41 @@ def test_conformance_reuses_real_financial_models_and_never_calls_network():
     assert result.deterministic_summary["decision_kernel"]
     assert result.gpt_review["diagnostic"] == "Cas synthétique Optilux."
     assert seen[0]["store"] is False
+    assert seen[0]["model"] == OPENAI_SANDBOX_MODEL == "gpt-5"
+    assert seen[0]["reasoning"] == {"effort": "minimal"}
+    assert seen[0]["max_output_tokens"] == OPENAI_SANDBOX_MAX_OUTPUT_TOKENS == 8000
 
 
 def test_sandbox_response_refusal_and_wrong_shape_fail_closed():
-    with pytest.raises(SandboxRefused):
+    with pytest.raises(SandboxRefused, match="OPENAI_RESPONSE_INCOMPLETE_UNKNOWN"):
         run_conformance(lambda _: {"status": "incomplete"})
     with pytest.raises(SandboxRefused):
         run_conformance(lambda _: _response({"diagnostic": "missing fields"}))
+
+
+@pytest.mark.parametrize(
+    ("response", "code"),
+    [
+        (
+            {"status": "incomplete", "incomplete_details": {"reason": "max_output_tokens"}},
+            "OPENAI_RESPONSE_INCOMPLETE_MAX_OUTPUT_TOKENS",
+        ),
+        (
+            {"status": "incomplete", "incomplete_details": {"reason": "content_filter"}},
+            "OPENAI_RESPONSE_INCOMPLETE_CONTENT_FILTER",
+        ),
+        ({"status": "failed", "error": {"code": "server_error", "message": "private"}}, "OPENAI_RESPONSE_FAILED"),
+        ({"status": "in_progress"}, "OPENAI_RESPONSE_IN_PROGRESS"),
+        ({"status": "cancelled"}, "OPENAI_RESPONSE_CANCELLED"),
+        ({"status": "queued"}, "OPENAI_RESPONSE_QUEUED"),
+        ({"status": "completed", "error": {"code": "server_error", "message": "private"}}, "OPENAI_RESPONSE_ERROR"),
+        ({"status": "future_status"}, "OPENAI_RESPONSE_STATUS_UNKNOWN"),
+    ],
+)
+def test_openai_non_completed_statuses_fail_closed_with_safe_diagnostics(response, code):
+    with pytest.raises(SandboxRefused, match=code) as refused:
+        run_conformance(lambda _: response)
+    assert "private" not in str(refused.value)
 
 
 def test_sandbox_has_no_production_data_or_memory_imports():

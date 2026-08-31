@@ -16,6 +16,8 @@ from services.llm_egress import LlmEgressAuthority
 
 
 OPTILUX_V3_SHA256 = "6C66DE79F3AEBDACD41CE70AB38070C15A2516912105FB8E226A38CAAFCBFADB"
+OPENAI_SANDBOX_MODEL = "gpt-5"
+OPENAI_SANDBOX_MAX_OUTPUT_TOKENS = 8000
 _FIXTURE = Path(__file__).parents[1] / "tests" / "golden" / "fixtures" / "optilux_v3_analysis_result.json"
 _META = {"_comment", "_version", "_produced_at_test", "_analyse_id_test", "_source_data_hash_test"}
 
@@ -116,7 +118,7 @@ def _deterministic_summary(fixture: SandboxFixture) -> dict[str, Any]:
 
 def _payload(summary: Mapping[str, Any]) -> dict[str, Any]:
     return {
-        "model": "gpt-5",
+        "model": OPENAI_SANDBOX_MODEL,
         "store": False,
         "instructions": (
             "You are reviewing the synthetic Optilux financial case inside an isolated development sandbox. "
@@ -124,14 +126,34 @@ def _payload(summary: Mapping[str, Any]) -> dict[str, Any]:
             "Do not claim access to external or real-client data. Respond in French."
         ),
         "input": json.dumps(summary, ensure_ascii=False, sort_keys=True),
-        "max_output_tokens": 2500,
+        # GPT-5 defaults to medium reasoning. Keep this bounded product
+        # review on minimal reasoning and provide more room for the strict
+        # structured output, reducing the risk that reasoning consumes the
+        # response budget before visible output is emitted.
+        "reasoning": {"effort": "minimal"},
+        "max_output_tokens": OPENAI_SANDBOX_MAX_OUTPUT_TOKENS,
         "text": {"format": {"type": "json_schema", "name": "optilux_founder_review", "strict": True, "schema": _REVIEW_SCHEMA}},
     }
 
 
 def _extract_structured_response(response: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, int]]:
-    if response.get("status") != "completed" or response.get("error"):
-        raise SandboxRefused("OPENAI_RESPONSE_NOT_COMPLETED")
+    status = response.get("status")
+    if status == "incomplete":
+        details = response.get("incomplete_details")
+        reason = details.get("reason") if isinstance(details, Mapping) else None
+        if reason == "max_output_tokens":
+            raise SandboxRefused("OPENAI_RESPONSE_INCOMPLETE_MAX_OUTPUT_TOKENS")
+        if reason == "content_filter":
+            raise SandboxRefused("OPENAI_RESPONSE_INCOMPLETE_CONTENT_FILTER")
+        raise SandboxRefused("OPENAI_RESPONSE_INCOMPLETE_UNKNOWN")
+    if status != "completed":
+        if status in {"failed", "in_progress", "cancelled", "queued"}:
+            raise SandboxRefused(f"OPENAI_RESPONSE_{status.upper()}")
+        raise SandboxRefused("OPENAI_RESPONSE_STATUS_UNKNOWN")
+    if response.get("error"):
+        # Do not surface provider error messages: they are not needed for
+        # the fail-closed classification and may contain echoed content.
+        raise SandboxRefused("OPENAI_RESPONSE_ERROR")
     texts = []
     for item in response.get("output", []):
         if not isinstance(item, Mapping) or item.get("type") != "message":
