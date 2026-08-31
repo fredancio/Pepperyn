@@ -69,7 +69,19 @@ def test_conformance_reuses_real_financial_models_and_never_calls_network():
     assert seen[0]["store"] is False
     assert seen[0]["model"] == OPENAI_SANDBOX_MODEL == "gpt-5"
     assert seen[0]["reasoning"] == {"effort": "minimal"}
-    assert seen[0]["max_output_tokens"] == OPENAI_SANDBOX_MAX_OUTPUT_TOKENS == 8000
+    assert seen[0]["max_output_tokens"] == OPENAI_SANDBOX_MAX_OUTPUT_TOKENS == 32768
+
+
+def test_output_budget_covers_schema_envelope_and_reasoning_headroom():
+    schema = sandbox_module._REVIEW_SCHEMA
+    properties = schema["properties"]
+    visible_content_chars = properties["diagnostic"]["maxLength"] + sum(
+        properties[name]["maxItems"] * properties[name]["items"]["maxLength"]
+        for name in ("recommendations", "uncertainties", "founder_questions")
+    )
+
+    assert visible_content_chars == 19000
+    assert OPENAI_SANDBOX_MAX_OUTPUT_TOKENS >= visible_content_chars + 12000
 
 
 def test_review_contract_requires_decision_ready_evidence_grounded_output():

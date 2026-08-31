@@ -17,7 +17,11 @@ from services.llm_egress import LlmEgressAuthority
 
 OPTILUX_V3_SHA256 = "6C66DE79F3AEBDACD41CE70AB38070C15A2516912105FB8E226A38CAAFCBFADB"
 OPENAI_SANDBOX_MODEL = "gpt-5"
-OPENAI_SANDBOX_MAX_OUTPUT_TOKENS = 8000
+# The strict schema permits 19,000 characters of business content. Reserve
+# roughly 20k tokens for that JSON envelope and 12k+ for variable reasoning;
+# Responses counts both against max_output_tokens. This remains bounded well
+# below GPT-5's 128k output limit.
+OPENAI_SANDBOX_MAX_OUTPUT_TOKENS = 32768
 _FIXTURE = Path(__file__).parents[1] / "tests" / "golden" / "fixtures" / "optilux_v3_analysis_result.json"
 _META = {"_comment", "_version", "_produced_at_test", "_analyse_id_test", "_source_data_hash_test"}
 
@@ -159,9 +163,9 @@ def _payload(summary: Mapping[str, Any]) -> dict[str, Any]:
         ),
         "input": json.dumps(summary, ensure_ascii=False, sort_keys=True),
         # GPT-5 defaults to medium reasoning. Keep this bounded product
-        # review on minimal reasoning and provide more room for the strict
-        # structured output, reducing the risk that reasoning consumes the
-        # response budget before visible output is emitted.
+        # review on minimal reasoning. The bounded budget covers the maximum
+        # legitimate schema envelope plus variable reasoning without silently
+        # truncating professional output.
         "reasoning": {"effort": "minimal"},
         "max_output_tokens": OPENAI_SANDBOX_MAX_OUTPUT_TOKENS,
         "text": {"format": {"type": "json_schema", "name": "optilux_founder_review", "strict": True, "schema": _REVIEW_SCHEMA}},
