@@ -309,3 +309,14 @@ These decisions do not justify delaying the selected mission's evidence and cont
 - **Limitation:** Sandbox V1 begins from the registered byte-exact Optilux V3 `AnalysisResult` fixture after historical ingestion. It does not validate raw-workbook ingestion or a complete `RAW EXCEL → INGESTION → FULL PEPPERYN → GPT` path.
 - **Real-data admission:** CLOSED. RD-1 through RD-5 remain preserved and mandatory for Milestone B.
 - **Exact next action:** Founder securely configures a dedicated OpenAI development-project credential locally as `OPENAI_API_KEY`, with an appropriate spend limit, and explicitly authorizes the isolated synthetic rehearsal. No credential value may enter Work chat, Git, Dropbox, documentation, tests or logs.
+
+## 15. PC2 local execution environment — 2026-08-31
+
+- **PC2 repository:** `C:\Users\ADMIN-FRED\Documents\Codex\Pepperyn-development` on `work/synthetic-founder-rehearsal-v1` at setup baseline `b5b0e5cd35e8ef10c8df6cda78869a734828cda2`.
+- **Repository runtime specification:** deployment evidence uses Python 3.11; runtime dependencies are specified in `backend/requirements.txt`. The repository has no Python-version file, dependency lock, pytest configuration or pinned test dependency.
+- **PC2 environment:** external virtual environment `C:\Users\ADMIN-FRED\Documents\Codex\.venvs\Pepperyn-development-backend-py312`, created from the available bundled Python 3.12.13 runtime. It is outside the repository because the security tests intentionally scan every Python file below `backend`.
+- **Installed dependencies:** repository runtime requirements plus pytest 9.1.1. This proves PC2 compatibility; it does not change the Python 3.11 deployment baseline.
+- **Targeted non-live validation:** `79 passed` across `test_llm_egress_authority.py`, `test_ownership_authority.py` and `test_synthetic_product_sandbox.py`.
+- **Backend regression:** `1466 passed / 12 historical failures / 50 skipped / 3 warnings / 6 subtests passed`, matching the preserved sandbox review inventory. The standalone legacy executive-decision script remains `89 OK / 4 historical FAIL`.
+- **No-credential rehearsal preflight:** fails closed with `SANDBOX_CONFIGURATION_REQUIRED` and exit code 2; no provider call is made.
+- **Current gate:** **FOUNDER EXECUTION GATE**. The only remaining M1A execution prerequisite is a dedicated development-project `OPENAI_API_KEY` configured locally for the single rehearsal process. The credential value must not enter Work chat, Git, Dropbox, documentation, tests or logs.
