@@ -72,6 +72,24 @@ def test_conformance_reuses_real_financial_models_and_never_calls_network():
     assert seen[0]["max_output_tokens"] == OPENAI_SANDBOX_MAX_OUTPUT_TOKENS == 8000
 
 
+def test_review_contract_requires_decision_ready_evidence_grounded_output():
+    seen = []
+    run_conformance(lambda body: seen.append(json.loads(body)) or _response())
+
+    request = seen[0]
+    instructions = request["instructions"]
+    schema = request["text"]["format"]["schema"]
+
+    assert "decision-ready financial diagnosis" in instructions
+    assert "meta-description of the review is not a diagnosis" in instructions
+    assert "cite exact supplied facts or values" in instructions
+    assert "state the prerequisite validation" in instructions
+    assert "unconditional directive" in instructions
+    assert "material evidence gaps" in instructions
+    assert "meta-description" in schema["properties"]["diagnostic"]["description"]
+    assert "unconditional directive" in schema["properties"]["recommendations"]["description"]
+
+
 def test_sandbox_response_refusal_and_wrong_shape_fail_closed():
     with pytest.raises(SandboxRefused, match="OPENAI_RESPONSE_INCOMPLETE_UNKNOWN"):
         run_conformance(lambda _: {"status": "incomplete"})

@@ -93,10 +93,37 @@ _REVIEW_SCHEMA = {
     "additionalProperties": False,
     "required": ["diagnostic", "recommendations", "uncertainties", "founder_questions"],
     "properties": {
-        "diagnostic": {"type": "string", "maxLength": 4000},
-        "recommendations": {"type": "array", "maxItems": 5, "items": {"type": "string", "maxLength": 1000}},
-        "uncertainties": {"type": "array", "maxItems": 5, "items": {"type": "string", "maxLength": 1000}},
-        "founder_questions": {"type": "array", "maxItems": 5, "items": {"type": "string", "maxLength": 1000}},
+        "diagnostic": {
+            "type": "string",
+            "maxLength": 4000,
+            "description": (
+                "Decision-ready financial diagnosis that ranks the main tension, cites exact supplied "
+                "facts or values, and separates observed facts, deterministic calculations, and unknowns. "
+                "A meta-description of the review is not a diagnosis."
+            ),
+        },
+        "recommendations": {
+            "type": "array",
+            "maxItems": 5,
+            "description": (
+                "Prioritized, evidence-grounded actions. State prerequisites or validation needed before "
+                "conditional financing, employment, legal, or commercial action; never turn an unvalidated "
+                "source target into an unconditional directive."
+            ),
+            "items": {"type": "string", "maxLength": 1000},
+        },
+        "uncertainties": {
+            "type": "array",
+            "maxItems": 5,
+            "description": "Material limitations tied to the supplied evidence and calculations.",
+            "items": {"type": "string", "maxLength": 1000},
+        },
+        "founder_questions": {
+            "type": "array",
+            "maxItems": 5,
+            "description": "Questions that close the material evidence gaps identified in the diagnosis.",
+            "items": {"type": "string", "maxLength": 1000},
+        },
     },
 }
 
@@ -123,6 +150,11 @@ def _payload(summary: Mapping[str, Any]) -> dict[str, Any]:
         "instructions": (
             "You are reviewing the synthetic Optilux financial case inside an isolated development sandbox. "
             "Use only the supplied record. Distinguish observed facts, deterministic calculations, and uncertainty. "
+            "Give a decision-ready financial diagnosis: rank the main tension and cite exact supplied facts or "
+            "values; a meta-description of the review is not a diagnosis. Prioritize evidence-grounded actions. "
+            "For financing, employment, legal, or commercial actions, state the prerequisite validation and do "
+            "not turn an unvalidated source target into an unconditional directive. Ask questions that close the "
+            "material evidence gaps identified in the diagnosis. "
             "Do not claim access to external or real-client data. Respond in French."
         ),
         "input": json.dumps(summary, ensure_ascii=False, sort_keys=True),
