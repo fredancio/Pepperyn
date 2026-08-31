@@ -20,7 +20,7 @@ from typing import Any
 import pandas as pd
 import openpyxl
 
-from .temporal_normalizer import build_temporal_context
+from .temporal_normalizer import PeriodRole, build_temporal_context, classify_columns
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +128,29 @@ def _extract_sheets_openpyxl(
     return sheets_data, overall_null_ratio
 
 
+def _select_current_actual_value(
+    row: dict[str, Any], columns: list[str]
+) -> tuple[int | float, str] | None:
+    """Return the sole current-actual numeric cell with period provenance.
+
+    Prompt-prioritized summaries must never silently relabel the first
+    historical number as current. Ambiguous, missing, or non-annual current
+    periods are omitted; the full parsed table remains available downstream.
+    """
+
+    current_headers = [
+        column.header
+        for column in classify_columns([str(value) for value in columns])
+        if column.period_role is PeriodRole.CURRENT_ACTUAL
+    ]
+    candidates = [
+        (row.get(header), header)
+        for header in current_headers
+        if type(row.get(header)) in (int, float)
+    ]
+    return candidates[0] if len(candidates) == 1 else None
+
+
 def _extract_bfr_summary(sheets_data: list[dict[str, Any]]) -> dict[str, Any]:
     """
     Proactively extract BFR / liquidity indicators from all parsed sheets.
@@ -135,7 +158,8 @@ def _extract_bfr_summary(sheets_data: list[dict[str, Any]]) -> dict[str, Any]:
     Placed at the TOP of the LLM JSON payload so these critical values are
     never lost due to the 14 000-char truncation applied in llm_service.py.
     Scans every row of every sheet for cells whose string value contains
-    DSO / DPO / DIO / BFR / trésorerie keywords and picks adjacent numerics.
+    DSO / DPO / DIO / BFR / trésorerie keywords and selects the sole numeric
+    value classified CURRENT_ACTUAL for that sheet.
     """
     BFR_PATTERNS = {
         "dso_jours":     ["dso", "délai de recouvrement", "jours clients", "délai clients",
@@ -155,6 +179,7 @@ def _extract_bfr_summary(sheets_data: list[dict[str, Any]]) -> dict[str, Any]:
     for sheet in sheets_data:
         rows = sheet.get("full_table") or sheet.get("sample_rows") or []
         sheet_name = sheet.get("sheet_name", "")
+        columns = sheet.get("columns") or []
         for row in rows:
             for cell_val in row.values():
                 if not isinstance(cell_val, str):
@@ -164,15 +189,13 @@ def _extract_bfr_summary(sheets_data: list[dict[str, Any]]) -> dict[str, Any]:
                     if kpi in found:
                         continue
                     if any(pat in cell_lower for pat in patterns):
-                        # Pick the first non-zero numeric value in the same row
-                        nums = [
-                            v for v in row.values()
-                            if isinstance(v, (int, float)) and v not in (0, 0.0)
-                        ]
-                        if nums:
+                        selected = _select_current_actual_value(row, columns)
+                        if selected is not None:
+                            value, period = selected
                             found[kpi] = {
                                 "label": cell_val[:80],
-                                "value": nums[0],
+                                "value": value,
+                                "period": period,
                                 "sheet": sheet_name,
                             }
 
@@ -186,7 +209,9 @@ def _extract_bilan_summary(sheets_data: list[dict[str, Any]]) -> dict[str, Any]:
     Placed at the TOP of the LLM JSON payload (like bfr_summary) so bilan data
     is never lost due to the 14 000-char truncation in llm_service.py.
     Scans every row of every sheet for actif / passif / capitaux keywords and
-    picks the first adjacent non-zero numeric value.
+    selects the sole numeric value classified CURRENT_ACTUAL and records its
+    source period. If the period is unresolved or ambiguous, no summary value
+    is emitted rather than silently using a historical column.
     """
     BILAN_PATTERNS = {
         "total_actif":           ["total actif", "total de l'actif", "total assets"],
@@ -215,6 +240,7 @@ def _extract_bilan_summary(sheets_data: list[dict[str, Any]]) -> dict[str, Any]:
     for sheet in sheets_data:
         rows = sheet.get("full_table") or sheet.get("sample_rows") or []
         sheet_name = sheet.get("sheet_name", "")
+        columns = sheet.get("columns") or []
         for row in rows:
             for cell_val in row.values():
                 if not isinstance(cell_val, str):
@@ -224,14 +250,13 @@ def _extract_bilan_summary(sheets_data: list[dict[str, Any]]) -> dict[str, Any]:
                     if kpi in found:
                         continue
                     if any(pat in cell_lower for pat in patterns):
-                        nums = [
-                            v for v in row.values()
-                            if isinstance(v, (int, float)) and v not in (0, 0.0)
-                        ]
-                        if nums:
+                        selected = _select_current_actual_value(row, columns)
+                        if selected is not None:
+                            value, period = selected
                             found[kpi] = {
                                 "label": cell_val[:80],
-                                "value": nums[0],
+                                "value": value,
+                                "period": period,
                                 "sheet": sheet_name,
                             }
 

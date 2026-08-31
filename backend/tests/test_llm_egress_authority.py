@@ -308,7 +308,7 @@ _NETWORK_ALLOWLIST = {
 }
 _NETWORK_ALLOWLIST_HASHES = {
     "services/crm_service.py": "1d66224dd716d1fe979cbb7299c59858e35857cafc81d1dd4d7b481473a75306",
-    "services/file_parser.py": "721054ba7b140b81f359ec56202c993dfa9b000790cf8fd6dc950f3a4b5923f7",
+    "services/file_parser.py": "ef24f779e5dfc9ccab8325315889b1db953c01837c3d7a90af7ed769b53f08db",
 }
 _NETWORK_ROOTS = {
     "aiohttp", "anthropic", "http", "http.client", "httpx", "importlib",

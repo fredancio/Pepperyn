@@ -19,7 +19,9 @@ Statuts :
 """
 import logging
 import os
+import re
 import tempfile
+import unicodedata
 from dataclasses import dataclass, field
 from typing import List, Optional
 
@@ -278,6 +280,30 @@ def _is_structural_document(raw_sheets: dict) -> bool:
         except Exception:
             pass
     return False
+
+
+def _has_explicit_core_statement(raw_sheets: dict) -> bool:
+    """Identify an explicit P&L or balance-sheet name.
+
+    A partial ERP mapper hit (for example a multi-year "Trésorerie et BFR"
+    statement mistaken for transaction-level cash) must not override a named
+    P&L or balance sheet. This is intentionally stricter than the
+    content heuristic used as a fallback.
+    """
+
+    def normalize(value: str) -> str:
+        decomposed = unicodedata.normalize("NFKD", value)
+        ascii_text = "".join(c for c in decomposed if not unicodedata.combining(c))
+        return re.sub(r"[^a-z0-9&]+", " ", ascii_text.lower()).strip()
+
+    core_statement_names = (
+        "compte de resultat", "p&l", "income statement", "profit and loss",
+        "bilan", "balance sheet",
+    )
+    return any(
+        any(marker in normalize(str(sheet_name)) for marker in core_statement_names)
+        for sheet_name in raw_sheets
+    )
 
 
 def _validate_structural(raw_sheets: dict) -> QualityGateResult:
@@ -554,8 +580,18 @@ def validate_excel_before_analysis(file_bytes: bytes, filename: str) -> QualityG
             f"| score module: {result.quality.score} | status module: {result.quality.status}"
         )
 
+        # An explicit P&L/balance sheet is structural even if the ERP
+        # mapper produces a partial table from another statement sheet.
+        has_complete_erp_mapping = any(
+            not mapping.missing_required_fields for mapping in result.mapping.values()
+        )
+        if (
+            _has_explicit_core_statement(result.dataset.raw_sheets)
+            and not has_complete_erp_mapping
+        ):
+            gate = _validate_structural(result.dataset.raw_sheets)
         # ── Aucune table ERP détectée → tenter détection structurelle ─────────
-        if not non_empty_tables:
+        elif not non_empty_tables:
             if _is_structural_document(result.dataset.raw_sheets):
                 gate = _validate_structural(result.dataset.raw_sheets)
             else:

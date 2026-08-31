@@ -4,6 +4,8 @@ Outputs/
 Partenariats/
 Ressources/
 *.xlsx
+!backend/tests/golden/fixtures/optilux_m1c_raw_workbook.xlsx
+*.inspect.ndjson
 *.pdf
 *.docx
 
