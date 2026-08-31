@@ -331,3 +331,14 @@ These decisions do not justify delaying the selected mission's evidence and cont
 - **Validation:** targeted Slice 1 + Slice 2 + sandbox suite `87 passed`; backend regression `1474 passed / 12 historical failures / 50 skipped / 3 warnings / 6 subtests passed`; no-credential preflight remains `SANDBOX_CONFIGURATION_REQUIRED` with exit code 2.
 - **Independent adversarial review:** code and security impact PASS; reporting/readiness CONDITIONAL because the original reason is irrecoverable and 8,000 tokens is a bounded operational budget, not a mathematical completion guarantee. Any future incomplete response remains fail-closed with a reason-specific code.
 - **Current gate:** a new dedicated development credential and one synthetic Optilux-only rerun are required to confirm whether the correction completes M1A. No real-data admission or production path is changed.
+
+## 17. M1A corrected live synthetic execution — 2026-08-31
+
+- **Evidence classification:** **FOUNDER-SUPPLIED LIVE EXECUTION RESULT**. The Founder executed the reviewed synthetic sandbox locally on PC2 at synchronized branch HEAD `b31825ae40c32963e4c86f700716abe6422ea7c0`; no credential value was supplied to Work.
+- **Transport/result:** PASS. The Responses API call completed normally and returned all four strict structured fields: `diagnostic`, `founder_questions`, `recommendations`, and `uncertainties`. The previous generic non-completed failure did not recur.
+- **Usage:** `input_tokens: 3877`, `output_tokens: 886`, `total_tokens: 4763`.
+- **Credential handling:** the temporary development `OPENAI_API_KEY` was removed after execution and is unavailable. No further live call is authorized or currently required for transport diagnosis.
+- **Evidence discipline:** this successful run proves that the corrected sandbox configuration can complete a live synthetic OpenAI rehearsal. It does not retrospectively prove that the former 2,500-token ceiling caused the first failure.
+- **Product-evaluation gate:** the repository scorecard remains blank and the non-secret structured field values are not present in repository evidence or the current Work task. API completion is established, but financial usefulness, epistemic discipline, recommendation quality, cognitive relief and differentiation cannot be scored without the returned review text.
+- **Current M1A status:** **TRANSPORT PASS / PRODUCT SCORECARD PENDING**. Do not declare full M1A PASS or select M1B versus M1C until the non-secret structured review is evaluated against `PEPPERYN_FOUNDER_SYNTHETIC_REHEARSAL_SCORECARD_V1.md`.
+- **Security:** real-data admission remains CLOSED; Slice 1, Slice 2 and RD-1 through RD-5 are unchanged.
