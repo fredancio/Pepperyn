@@ -8,10 +8,12 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi.responses import Response
 
 from models.schemas import AnalyzeResponse
 import routers.analyze as analyze_routes
 from sandbox.v1_golden_case import run_v1_golden_case
+from sandbox.governed_exports import generate_governed_excel, generate_governed_pdf
 from services.governed_analysis_persistence import (
     GovernedPersistenceRefused, load_governed_envelope, save_governed_analysis,
 )
@@ -37,6 +39,25 @@ def _resolve_primary_scope(supabase, company_id: str) -> tuple[str, str, str]:
     return analyze_routes._resolve_analysis_entity_scope(
         supabase, company_id=company_id, entity_id=entities[0]["id"],
     )[0]
+
+
+def _load_for_company(supabase, *, analysis_id: str, company_id: str):
+    try:
+        rows = (
+            supabase.from_("analyses").select("id,entity_id")
+            .eq("id", analysis_id).eq("company_id", company_id).limit(2).execute()
+        ).data or []
+        if len(rows) != 1 or not rows[0].get("entity_id"):
+            raise GovernedPersistenceRefused("GOVERNED_ANALYSIS_NOT_FOUND")
+        _, entity_id, engagement_id = analyze_routes._resolve_analysis_entity_scope(
+            supabase, company_id=company_id, entity_id=rows[0]["entity_id"],
+        )[0]
+        return load_governed_envelope(
+            supabase, analysis_id=analysis_id, company_id=company_id,
+            entity_id=entity_id, engagement_id=engagement_id,
+        )
+    except (GovernedPersistenceRefused, HTTPException):
+        raise HTTPException(status_code=404, detail="Analyse introuvable")
 
 
 @router.post("/synthetic-demo", response_model=AnalyzeResponse)
@@ -84,25 +105,41 @@ async def get_v1_governed_analysis(
     _require_designated_company(company_id)
     from main import get_supabase_service
     supabase = get_supabase_service()
-    try:
-        rows = (
-            supabase.from_("analyses").select("id,entity_id")
-            .eq("id", analysis_id).eq("company_id", company_id).limit(2).execute()
-        ).data or []
-        if len(rows) != 1 or not rows[0].get("entity_id"):
-            raise GovernedPersistenceRefused("GOVERNED_ANALYSIS_NOT_FOUND")
-        _, entity_id, engagement_id = analyze_routes._resolve_analysis_entity_scope(
-            supabase, company_id=company_id, entity_id=rows[0]["entity_id"],
-        )[0]
-        envelope = load_governed_envelope(
-            supabase, analysis_id=analysis_id, company_id=company_id,
-            entity_id=entity_id, engagement_id=engagement_id,
-        )
-    except (GovernedPersistenceRefused, HTTPException):
-        raise HTTPException(status_code=404, detail="Analyse introuvable")
+    envelope = _load_for_company(supabase, analysis_id=analysis_id, company_id=company_id)
     result = envelope.analysis_result
     result.id = analysis_id
     return AnalyzeResponse(
         success=True, message="Analyse gouvernée rechargée", analyse_id=analysis_id,
         result=result, tokens_used=0, cout_estime=0,
     )
+
+
+@router.get("/governed-analyses/{analysis_id}/export.xlsx")
+async def export_v1_governed_excel(
+    analysis_id: str,
+    authorization: Optional[str] = Header(default=None),
+    x_auth_type: Optional[str] = Header(default=None),
+):
+    company_id, _, _ = await analyze_routes._resolve_auth(authorization, x_auth_type)
+    _require_designated_company(company_id)
+    from main import get_supabase_service
+    envelope = _load_for_company(get_supabase_service(), analysis_id=analysis_id, company_id=company_id)
+    content = generate_governed_excel(envelope)
+    return Response(content=content,
+                    media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    headers={"Content-Disposition": f'attachment; filename="pepperyn_v1_{analysis_id[:8]}.xlsx"'})
+
+
+@router.get("/governed-analyses/{analysis_id}/export.pdf")
+async def export_v1_governed_pdf(
+    analysis_id: str,
+    authorization: Optional[str] = Header(default=None),
+    x_auth_type: Optional[str] = Header(default=None),
+):
+    company_id, _, _ = await analyze_routes._resolve_auth(authorization, x_auth_type)
+    _require_designated_company(company_id)
+    from main import get_supabase_service
+    envelope = _load_for_company(get_supabase_service(), analysis_id=analysis_id, company_id=company_id)
+    content = generate_governed_pdf(envelope)
+    return Response(content=content, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="pepperyn_v1_{analysis_id[:8]}.pdf"'})

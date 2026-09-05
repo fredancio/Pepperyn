@@ -116,6 +116,7 @@ export interface AnalysisResult {
     delai?: string;
   }>;
   synthese?: string;
+  verification_tag?: string;
   excel_export_url?: string;
   excel_export_nom?: string;
 }

@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import type { AnalysisResult as AnalysisResultType } from '@/lib/types';
-import { downloadExcel, downloadPdf, downloadPptx } from '@/lib/api';
+import { downloadExcel, downloadPdf, downloadPptx, downloadV1GovernedExport } from '@/lib/api';
 import { UpgradeModal } from '@/components/ui/UpgradeModal';
 import { canAccess, type Feature } from '@/lib/featureGate';
 
@@ -178,12 +178,13 @@ export function AnalysisResult({ data, questionsRestantes, plan = 'free' }: Anal
       let blob: Blob;
       let filename: string;
       const base = result.excel_export_nom?.replace(/\.xlsx$/, '') || `pepperyn_analyse_${result.id.slice(0, 8)}`;
+      const governed = result.verification_tag === 'V1_GOVERNED_SINGLE_CALL';
 
       if (format === 'excel') {
-        blob = await downloadExcel(result.id);
+        blob = governed ? await downloadV1GovernedExport(result.id, 'xlsx') : await downloadExcel(result.id);
         filename = `${base}.xlsx`;
       } else if (format === 'pdf') {
-        blob = await downloadPdf(result.id);
+        blob = governed ? await downloadV1GovernedExport(result.id, 'pdf') : await downloadPdf(result.id);
         filename = `${base}.pdf`;
       } else {
         blob = await downloadPptx(result.id);

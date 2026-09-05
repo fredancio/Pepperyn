@@ -173,6 +173,19 @@ export async function downloadPdf(analyseId: string): Promise<Blob> {
   return res.blob();
 }
 
+export async function downloadV1GovernedExport(analyseId: string, format: 'xlsx' | 'pdf'): Promise<Blob> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(
+    `${API_URL}/api/v1/governed-analyses/${encodeURIComponent(analyseId)}/export.${format}`,
+    { headers },
+  );
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as { detail?: string }).detail || `Export ${format.toUpperCase()} indisponible`);
+  }
+  return res.blob();
+}
+
 export async function downloadPptx(analyseId: string): Promise<Blob> {
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/api/export-pptx/${analyseId}`, { headers });

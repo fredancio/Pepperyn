@@ -5,6 +5,9 @@ import copy
 
 from fastapi import FastAPI, HTTPException
 import pytest
+from io import BytesIO
+from openpyxl import load_workbook
+from pypdf import PdfReader
 
 import main
 import routers.analyze as analyze
@@ -101,7 +104,7 @@ def test_second_company_cannot_reload_first_company_analysis(monkeypatch):
 
 
 def test_main_application_does_not_mount_demo_without_startup_flag():
-    assert not any(route.path == "/api/v1/synthetic-demo" for route in main.app.routes)
+    assert not any(route.path.startswith("/api/v1/") for route in main.app.routes)
 
 
 def test_non_designated_company_cannot_create_synthetic_history(monkeypatch):
@@ -141,3 +144,58 @@ def test_http_contract_accepts_empty_body_rejects_payload_and_serializes(monkeyp
     assert created.status_code == loaded.status_code == 200
     assert created.json()["result"]["id"] == created.json()["analyse_id"]
     assert loaded.json()["result"] == created.json()["result"]
+
+
+def test_governed_exports_reload_after_restart_and_preserve_epistemic_labels(monkeypatch):
+    import httpx
+
+    db = _Db(); _enable(monkeypatch, db)
+    async def exercise():
+        app = FastAPI(); app.include_router(v1_routes.router)
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            created = await client.post("/api/v1/synthetic-demo", headers={"Authorization": "Bearer test"})
+            reconstructed = _Db(); reconstructed.tables = copy.deepcopy(db.tables)
+            monkeypatch.setattr(main, "get_supabase_service", lambda: reconstructed)
+            analysis_id = created.json()["analyse_id"]
+            excel = await client.get(f"/api/v1/governed-analyses/{analysis_id}/export.xlsx",
+                                     headers={"Authorization": "Bearer test"})
+            pdf = await client.get(f"/api/v1/governed-analyses/{analysis_id}/export.pdf",
+                                   headers={"Authorization": "Bearer test"})
+            return excel, pdf
+    excel, pdf = asyncio.run(exercise())
+    assert excel.status_code == pdf.status_code == 200
+    assert excel.content.startswith(b"PK")
+    assert pdf.content.startswith(b"%PDF")
+
+    workbook = load_workbook(BytesIO(excel.content), data_only=False)
+    assert workbook.sheetnames == ["Synthese", "Faits sources", "Inferences", "Recommandations", "UNKNOWN"]
+    cells = "\n".join(str(cell.value) for sheet in workbook for row in sheet.iter_rows() for cell in row if cell.value is not None)
+    assert "Diagnostic (inference)" in cells
+    assert "Observation source-matched - severite inferentielle HIGH" in cells
+    assert "EBITDA = -145000" in cells
+    assert "Validations requises" in cells
+    assert "Prerequis" in cells
+    assert "Les recommandations IA ne constituent pas des decisions confirmees." in cells
+    assert "Faits sources" in workbook.sheetnames
+
+    reader = PdfReader(BytesIO(pdf.content))
+    pdf_text = "\n".join(page.extract_text() or "" for page in reader.pages)
+    for token in ("Diagnostic - inference", "Faits sources", "Observations gouvernees",
+                  "Observation source-matched: EBITDA = -145000", "Severite inferentielle: HIGH",
+                  "Inferences et validations",
+                  "UNKNOWN et contradictions", "Recommandations proposees",
+                  "ne constituent pas des decisions confirmees"):
+        assert token in pdf_text
+
+
+def test_second_company_cannot_export_first_company_analysis(monkeypatch):
+    db = _Db(); _enable(monkeypatch, db)
+    created = asyncio.run(v1_routes.run_v1_synthetic_demo(
+        request=_empty_request(), authorization="Bearer a", x_auth_type=None,
+    ))
+    _enable(monkeypatch, db, company=COMPANY_B)
+    for handler in (v1_routes.export_v1_governed_excel, v1_routes.export_v1_governed_pdf):
+        with pytest.raises(HTTPException) as error:
+            asyncio.run(handler(created.analyse_id, authorization="Bearer b", x_auth_type=None))
+        assert error.value.status_code == 404
