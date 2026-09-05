@@ -108,6 +108,12 @@ app.include_router(contact_router)
 app.include_router(decision_memory_router)
 app.include_router(arcs_router)
 
+# The fixed synthetic V1 workflow is physically absent from production and
+# from ordinary development environments unless explicitly enabled.
+if not _is_prod and os.getenv("PEPPERYN_ENABLE_SYNTHETIC_V1_DEMO", "0") == "1":
+    from sandbox.v1_router import router as v1_synthetic_router
+    app.include_router(v1_synthetic_router)
+
 
 # ── Admin endpoints ───────────────────────────────────────────
 

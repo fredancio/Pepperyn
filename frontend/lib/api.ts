@@ -123,6 +123,22 @@ export async function analyzeText(
   return res.json();
 }
 
+export async function runV1SyntheticDemo() {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/v1/synthetic-demo`, { method: 'POST', headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { detail?: string }).detail || 'Démonstration V1 indisponible');
+  return data;
+}
+
+export async function fetchV1GovernedAnalysis(analyseId: string) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/v1/governed-analyses/${encodeURIComponent(analyseId)}`, { headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { detail?: string }).detail || 'Analyse gouvernée introuvable');
+  return data;
+}
+
 export async function updatePin(newPin: string) {
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/api/admin/update-pin`, {

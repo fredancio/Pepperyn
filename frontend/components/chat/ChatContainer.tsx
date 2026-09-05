@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { Message, Session } from '@/lib/types';
-import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, fetchPreviousRecommendations, fetchConversationContext, type BillingUsage, type Entity, type EntityRelationType } from '@/lib/api';
+import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, fetchPreviousRecommendations, fetchConversationContext, runV1SyntheticDemo, fetchV1GovernedAnalysis, type BillingUsage, type Entity, type EntityRelationType } from '@/lib/api';
 import { getCurrentAuthMode, signOutAdmin, clearGuestAuth, getGuestPlan } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { MessageBubble, TypingIndicator } from './MessageBubble';
@@ -19,6 +19,7 @@ import {
 } from '@/lib/featureGate';
 
 const MAX_CHAT_QUESTIONS_FREE = 3; // FREE = 3 interactions contextuelles par analyse
+const V1_SYNTHETIC_DEMO_ENABLED = process.env.NEXT_PUBLIC_ENABLE_SYNTHETIC_V1_DEMO === '1';
 
 function makeLocalMessage(role: 'user' | 'assistant', content: string, content_type: Message['content_type'] = 'text', metadata?: Record<string, unknown>): Message {
   return {
@@ -211,6 +212,20 @@ export function ChatContainer() {
     setAnalysisReceived(false);
     setQuestionsPostAnalysis(0);
     try {
+      if (V1_SYNTHETIC_DEMO_ENABLED) {
+        try {
+          const governed = await fetchV1GovernedAnalysis(session.id);
+          if (governed.result) {
+            setMessages([WELCOME_MESSAGE, makeLocalMessage('assistant', '', 'analysis', {
+              ...governed.result, id: governed.analyse_id, _filename: session.titre,
+            })]);
+            setAnalysisReceived(true);
+            return;
+          }
+        } catch {
+          // Not a governed V1 result; continue with the legacy session path.
+        }
+      }
       const { data } = await supabase
         .from('messages')
         .select('*')
@@ -226,6 +241,29 @@ export function ChatContainer() {
       // silently fail
     }
   };
+
+  const handleV1SyntheticDemo = useCallback(async () => {
+    setIsTyping(true);
+    try {
+      const response = await runV1SyntheticDemo();
+      if (!response.result || !response.analyse_id) throw new Error('Résultat synthétique incomplet');
+      setMessages([
+        makeLocalMessage('assistant', 'Démonstration V1 synthétique — données représentatives sans donnée client.', 'text'),
+        makeLocalMessage('assistant', '', 'analysis', {
+          ...response.result, id: response.analyse_id, _filename: 'Optilux — démonstration synthétique',
+        }),
+      ]);
+      setAnalysisReceived(true);
+      setQuestionsPostAnalysis(0);
+      await loadSessionHistory();
+    } catch (error) {
+      setMessages(prev => [...prev, makeLocalMessage(
+        'assistant', error instanceof Error ? error.message : 'Démonstration V1 indisponible', 'error',
+      )]);
+    } finally {
+      setIsTyping(false);
+    }
+  }, []);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -1011,6 +1049,17 @@ export function ChatContainer() {
                     plan={plan}
                   />
                 </div>
+
+                {V1_SYNTHETIC_DEMO_ENABLED && (
+                  <button
+                    type="button"
+                    onClick={handleV1SyntheticDemo}
+                    disabled={isTyping}
+                    className="w-full rounded-xl border border-[#1B73E8] px-4 py-3 text-sm font-semibold text-[#1B73E8] hover:bg-[#EFF6FF] disabled:opacity-50"
+                  >
+                    Lancer la démonstration V1 synthétique
+                  </button>
+                )}
 
                 {/* Value proof */}
                 <div className="flex flex-wrap justify-center gap-4 text-xs text-[#5F6368]">

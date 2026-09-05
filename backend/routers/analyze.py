@@ -168,6 +168,38 @@ suivies :
     return ""
 
 
+def _resolve_analysis_entity_scope(supabase, *, company_id: str, entity_id: str):
+    """Resolve the exact tenant/entity/engagement tuple or fail before analysis."""
+
+    try:
+        entities = (
+            supabase.from_("entities").select("name,is_primary,relation_type")
+            .eq("id", entity_id).eq("company_id", company_id).limit(2).execute()
+        ).data or []
+        if len(entities) != 1:
+            raise HTTPException(status_code=404, detail="Entité introuvable")
+        engagements = (
+            supabase.from_("engagements").select("id,entity_id")
+            .eq("entity_id", entity_id).limit(2).execute()
+        ).data or []
+        if len(engagements) != 1 or engagements[0].get("entity_id") != entity_id:
+            raise HTTPException(status_code=404, detail="Engagement introuvable")
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("[ANALYZE] Entity scope resolution unavailable: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="Validation de l'entité indisponible") from exc
+    entity = entities[0]
+    return (
+        (company_id, entity_id, engagements[0]["id"]),
+        _build_relation_section(
+            entity_name=entity.get("name") or "",
+            is_primary=bool(entity.get("is_primary")),
+            relation_type=entity.get("relation_type"),
+        ),
+    )
+
+
 async def _resolve_auth(
     authorization: Optional[str],
     x_auth_type: Optional[str],
@@ -535,32 +567,10 @@ async def _run_analysis_pipeline(
     relation_section = ""
     resolved_context_scope = None
     if entity_id:
-        try:
-            from main import get_supabase_service as _get_supabase_rel
-            _sb_rel = _get_supabase_rel()
-            _ent_res = (
-                _sb_rel.from_("entities")
-                .select("name, is_primary, relation_type")
-                .eq("id", entity_id)
-                .eq("company_id", company_id)
-                .limit(1)
-                .execute()
-            )
-            if _ent_res.data:
-                _ent = _ent_res.data[0]
-                _engagements = (
-                    _sb_rel.from_("engagements").select("id")
-                    .eq("entity_id", entity_id).limit(2).execute()
-                ).data or []
-                if len(_engagements) == 1:
-                    resolved_context_scope = (company_id, entity_id, _engagements[0]["id"])
-                    relation_section = _build_relation_section(
-                        entity_name=_ent.get("name") or "",
-                        is_primary=bool(_ent.get("is_primary")),
-                        relation_type=_ent.get("relation_type"),
-                    )
-        except Exception:
-            pass
+        from main import get_supabase_service as _get_supabase_rel
+        resolved_context_scope, relation_section = _resolve_analysis_entity_scope(
+            _get_supabase_rel(), company_id=company_id, entity_id=entity_id,
+        )
 
     # Retrieve memory context
     memory_section = ""
@@ -886,6 +896,8 @@ def _save_to_db(
     entity_id: Optional[str] = None,
     source_data_hash: Optional[str] = None,
     decision_kernel=None,  # Optional[DecisionKernel] — WP5C
+    governed_envelope=None,
+    engagement_id: Optional[str] = None,
 ):
     """Save analysis record to Supabase. Errors are logged but non-blocking."""
     try:
@@ -938,10 +950,21 @@ def _save_to_db(
                 insert_payload["decision_fingerprint_version"] = decision_kernel.decision_fingerprint_version
 
         logger.debug("[DB] Insert analyse %s", analyse_id)
-        result = supabase.from_("analyses").insert(insert_payload).execute()
+        if governed_envelope is not None:
+            from services.governed_analysis_persistence import save_governed_analysis
+            if engagement_id is None:
+                raise ValueError("governed persistence requires engagement scope")
+            save_governed_analysis(
+                supabase, analysis_row=insert_payload, engagement_id=engagement_id,
+                envelope=governed_envelope,
+            )
+        else:
+            result = supabase.from_("analyses").insert(insert_payload).execute()
 
     except Exception as e:
         logger.error(f"[DB ERROR] _save_to_db failed — analyse_id={analyse_id} | error={type(e).__name__}: {e}")
+        if governed_envelope is not None:
+            raise
 
     try:
         from main import get_supabase_service
