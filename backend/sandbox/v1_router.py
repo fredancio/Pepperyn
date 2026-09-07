@@ -13,7 +13,7 @@ from fastapi.responses import Response
 from models.schemas import AnalyzeResponse
 import routers.analyze as analyze_routes
 from sandbox.v1_golden_case import run_v1_golden_case
-from sandbox.governed_exports import generate_governed_excel, generate_governed_pdf
+from sandbox.governed_exports import generate_governed_excel, generate_governed_pdf, generate_governed_pptx
 from services.governed_analysis_persistence import (
     GovernedPersistenceRefused, load_governed_envelope, save_governed_analysis,
 )
@@ -151,3 +151,19 @@ async def export_v1_governed_pdf(
     content = generate_governed_pdf(envelope)
     return Response(content=content, media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="pepperyn_v1_{analysis_id[:8]}.pdf"'})
+
+
+@router.get("/governed-analyses/{analysis_id}/export.pptx")
+async def export_v1_governed_pptx(
+    analysis_id: str,
+    authorization: Optional[str] = Header(default=None),
+    x_auth_type: Optional[str] = Header(default=None),
+):
+    company_id, _, _ = await analyze_routes._resolve_auth(authorization, x_auth_type)
+    _require_designated_company(company_id)
+    from main import get_supabase_service
+    envelope = _load_for_company(get_supabase_service(), analysis_id=analysis_id, company_id=company_id)
+    content = generate_governed_pptx(envelope)
+    return Response(content=content,
+                    media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    headers={"Content-Disposition": f'attachment; filename="pepperyn_v1_{analysis_id[:8]}.pptx"'})

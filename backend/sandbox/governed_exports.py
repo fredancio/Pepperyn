@@ -18,6 +18,10 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from pptx import Presentation
+from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN
+from pptx.util import Inches, Pt
 
 from services.v1_analysis_contract import GovernedAnalysisEnvelope
 
@@ -25,6 +29,7 @@ _NAVY = "183B56"
 _BLUE = "2A6F97"
 _PALE = "EAF2F8"
 _TEXT = "243746"
+_ORANGE = "F28C28"
 
 
 def _neutralize_spreadsheet_formula(value: object) -> object:
@@ -223,4 +228,147 @@ def generate_governed_pdf(envelope: GovernedAnalysisEnvelope) -> bytes:
                             topMargin=14*mm, bottomMargin=14*mm,
                             title="Pepperyn - Analyse financiere gouvernee")
     doc.build(story)
+    return output.getvalue()
+
+
+def generate_governed_pptx(envelope: GovernedAnalysisEnvelope) -> bytes:
+    """Render a governed CODIR deck without reinterpreting provider output.
+
+    The deck consumes only the immutable envelope. Long sections create
+    continuation slides instead of losing content or silently shrinking it.
+    """
+
+    envelope = GovernedAnalysisEnvelope.model_validate(envelope)
+    analysis, source = envelope.governed_analysis, envelope.source_facts
+    fact_map = _fact_map(envelope)
+    prs = Presentation()
+    prs.slide_width = Inches(13.333)
+    prs.slide_height = Inches(7.5)
+
+    def color(hex_value: str) -> RGBColor:
+        return RGBColor.from_string(hex_value)
+
+    def add_text(slide, text: str, *, left: float, top: float, width: float,
+                 height: float, size: int, bold: bool = False,
+                 text_color: str = _TEXT, align=PP_ALIGN.LEFT):
+        box = slide.shapes.add_textbox(Inches(left), Inches(top), Inches(width), Inches(height))
+        frame = box.text_frame
+        frame.clear()
+        frame.word_wrap = True
+        paragraph = frame.paragraphs[0]
+        paragraph.text = text
+        paragraph.alignment = align
+        paragraph.font.name = "Aptos"
+        paragraph.font.size = Pt(size)
+        paragraph.font.bold = bold
+        paragraph.font.color.rgb = color(text_color)
+        return box
+
+    def add_header(slide, title: str, kicker: str = "PEPPERYN | CODIR") -> None:
+        add_text(slide, kicker, left=0.65, top=0.35, width=5.2, height=0.3,
+                 size=10, bold=True, text_color=_BLUE)
+        add_text(slide, title, left=0.65, top=0.75, width=12.0, height=0.7,
+                 size=28, bold=True, text_color=_NAVY)
+
+    def split_entry(entry: str, limit: int = 380) -> list[str]:
+        """Split long content and repeat its epistemic classification."""
+
+        first = entry.find(" | ")
+        second = entry.find(" | ", first + 3) if first >= 0 else -1
+        prefix_end = second if entry.startswith(("P1 | ", "P2 | ", "P3 | ")) else first
+        if prefix_end < 0:
+            label, remaining = "CONTENU", entry
+        else:
+            label, remaining = entry[:prefix_end], entry[prefix_end + 3:]
+        first_prefix = f"{label} | "
+        next_prefix = f"{label} (suite) | "
+        chunks: list[str] = []
+        prefix = first_prefix
+        while len(prefix) + len(remaining) > limit:
+            available = limit - len(prefix)
+            cut = remaining.rfind(" ", available // 2, available + 1)
+            cut = cut + 1 if cut >= 0 else available
+            chunks.append(prefix + remaining[:cut])
+            remaining = remaining[cut:]
+            prefix = next_prefix
+        if remaining or not chunks:
+            chunks.append(prefix + remaining)
+        return chunks
+
+    def paginate(title: str, entries: list[str], *, empty: str = "Aucun element declare.") -> None:
+        entries = entries or [empty]
+        chunks = [chunk for entry in entries for chunk in split_entry(entry)]
+        pages: list[list[tuple[str, float]]] = []
+        page: list[tuple[str, float]] = []
+        used_height = 0.0
+        for chunk in chunks:
+            visual_lines = max(1, (len(chunk) + 94) // 95)
+            height = 0.28 + visual_lines * 0.24
+            if page and used_height + height + 0.13 > 5.15:
+                pages.append(page)
+                page, used_height = [], 0.0
+            page.append((chunk, height))
+            used_height += height + 0.13
+        if page:
+            pages.append(page)
+        for page_index, page_entries in enumerate(pages):
+            slide = prs.slides.add_slide(prs.slide_layouts[6])
+            add_header(slide, title if page_index == 0 else f"{title} (suite)")
+            top = 1.62
+            for entry, height in page_entries:
+                add_text(slide, entry, left=0.9, top=top, width=11.6,
+                         height=height, size=15)
+                top += height + 0.13
+            add_text(slide, "Les analyses et recommandations restent soumises aux validations indiquees.",
+                     left=0.65, top=7.05, width=12, height=0.25, size=9, text_color=_BLUE)
+
+    cover = prs.slides.add_slide(prs.slide_layouts[6])
+    add_text(cover, "PEPPERYN", left=0.75, top=0.55, width=3.0, height=0.5,
+             size=17, bold=True, text_color=_BLUE)
+    add_text(cover, "Analyse financiere\npour decision CODIR", left=0.75, top=1.75,
+             width=8.5, height=1.8, size=34, bold=True, text_color=_NAVY)
+    add_text(cover, f"Periode {source.current_period or 'UNKNOWN'} | Donnees synthetiques uniquement",
+             left=0.78, top=4.15, width=8.5, height=0.45, size=16, text_color=_TEXT)
+    add_text(cover, "Recommandations proposees. Aucune decision n'est presentee comme confirmee.",
+             left=0.78, top=5.0, width=10.8, height=0.6, size=15, bold=True,
+             text_color=_ORANGE)
+    add_text(cover, f"Source SHA-256 {source.source_representation_sha256}",
+             left=0.78, top=6.7, width=11.8, height=0.25, size=8, text_color=_BLUE)
+
+    paginate("Situation executive", [
+        f"INFERENCE | {analysis.executive_diagnosis}",
+        "FAITS CITES | " + _refs(analysis.diagnosis_fact_ids, fact_map),
+    ])
+    paginate("Constats financiers", [
+        f"OBSERVATION SOURCE | {item.metric} = {item.observed_value} | "
+        f"Severite inferentielle {item.severity} | {_refs((item.fact_id,), fact_map)}"
+        for item in analysis.observations
+    ])
+    paginate("Evaluation et hypotheses", [
+        f"DIMENSION {item.scope} | Score inferentiel {item.score}/10 | Confiance {item.confidence}% | "
+        f"{item.rationale} | Faits: {_refs(item.fact_ids, fact_map)} | "
+        f"Validations: {'; '.join(item.validation_required)}"
+        for item in analysis.dimension_assessments
+    ] + [
+        f"INFERENCE | Confiance {item.confidence}% | {item.statement} | "
+        f"Faits: {_refs(item.fact_ids, fact_map)} | Validations: {'; '.join(item.validation_required)}"
+        for item in analysis.inferences
+    ])
+    paginate("Incertitudes et contradictions", [
+        f"UNKNOWN {item.materiality} | {item.question}" for item in analysis.unknowns
+    ] + [
+        f"UNDERSTANDING UNKNOWN | {item}" for item in source.unknowns
+    ] + [
+        f"CONTRADICTION | {item.statement} | Faits: {_refs(item.fact_ids, fact_map)}"
+        for item in analysis.contradictions
+    ])
+    paginate("Decisions requises", [
+        f"{item.priority} | ACTION PROPOSEE | {item.action} | Rationale: {item.rationale} | "
+        f"Faits: {_refs(item.fact_ids, fact_map) if item.fact_ids else 'Aucun'} | "
+        f"Prerequis: {'; '.join(item.prerequisite_validation) or 'Aucun'}"
+        for item in analysis.recommendations
+    ])
+
+    output = BytesIO()
+    prs.save(output)
     return output.getvalue()

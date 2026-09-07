@@ -187,7 +187,7 @@ export function AnalysisResult({ data, questionsRestantes, plan = 'free' }: Anal
         blob = governed ? await downloadV1GovernedExport(result.id, 'pdf') : await downloadPdf(result.id);
         filename = `${base}.pdf`;
       } else {
-        blob = await downloadPptx(result.id);
+        blob = governed ? await downloadV1GovernedExport(result.id, 'pptx') : await downloadPptx(result.id);
         filename = `${base}.pptx`;
       }
 

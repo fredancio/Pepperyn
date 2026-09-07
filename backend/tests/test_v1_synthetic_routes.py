@@ -170,11 +170,14 @@ def test_governed_exports_reload_after_restart_and_preserve_epistemic_labels(mon
                                      headers={"Authorization": "Bearer test"})
             pdf = await client.get(f"/api/v1/governed-analyses/{analysis_id}/export.pdf",
                                    headers={"Authorization": "Bearer test"})
-            return excel, pdf
-    excel, pdf = asyncio.run(exercise())
-    assert excel.status_code == pdf.status_code == 200
+            pptx = await client.get(f"/api/v1/governed-analyses/{analysis_id}/export.pptx",
+                                    headers={"Authorization": "Bearer test"})
+            return excel, pdf, pptx
+    excel, pdf, pptx = asyncio.run(exercise())
+    assert excel.status_code == pdf.status_code == pptx.status_code == 200
     assert excel.content.startswith(b"PK")
     assert pdf.content.startswith(b"%PDF")
+    assert pptx.content.startswith(b"PK")
 
     workbook = load_workbook(BytesIO(excel.content), data_only=False)
     assert workbook.sheetnames == ["Synthese", "Faits sources", "Inferences", "Recommandations", "UNKNOWN"]
@@ -203,7 +206,8 @@ def test_second_company_cannot_export_first_company_analysis(monkeypatch):
         request=_empty_request(), authorization="Bearer a", x_auth_type=None,
     ))
     _enable(monkeypatch, db, company=COMPANY_B)
-    for handler in (v1_routes.export_v1_governed_excel, v1_routes.export_v1_governed_pdf):
+    for handler in (v1_routes.export_v1_governed_excel, v1_routes.export_v1_governed_pdf,
+                    v1_routes.export_v1_governed_pptx):
         with pytest.raises(HTTPException) as error:
             asyncio.run(handler(created.analyse_id, authorization="Bearer b", x_auth_type=None))
         assert error.value.status_code == 404

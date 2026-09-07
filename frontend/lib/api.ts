@@ -172,7 +172,7 @@ export async function downloadPdf(analyseId: string): Promise<Blob> {
   return res.blob();
 }
 
-export async function downloadV1GovernedExport(analyseId: string, format: 'xlsx' | 'pdf'): Promise<Blob> {
+export async function downloadV1GovernedExport(analyseId: string, format: 'xlsx' | 'pdf' | 'pptx'): Promise<Blob> {
   const headers = await getAuthHeaders();
   const res = await fetch(
     `${API_URL}/api/v1/governed-analyses/${encodeURIComponent(analyseId)}/export.${format}`,

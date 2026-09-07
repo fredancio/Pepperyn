@@ -4,12 +4,15 @@ from io import BytesIO
 
 from openpyxl import load_workbook
 from pypdf import PdfReader
+from pptx import Presentation
+from pptx.util import Inches
 
-from sandbox.governed_exports import generate_governed_excel, generate_governed_pdf
+from sandbox.governed_exports import generate_governed_excel, generate_governed_pdf, generate_governed_pptx
 from services.v1_analysis_contract import GovernedAnalysisEnvelope
 
 
-def _envelope(*, action: str = "Valider le tableau des flux.") -> GovernedAnalysisEnvelope:
+def _envelope(*, action: str = "Valider le tableau des flux.",
+              diagnosis: str = "La rentabilite operationnelle est negative.") -> GovernedAnalysisEnvelope:
     fact_id = "FABCDEF123456"
     source_hash = "A" * 64
     return GovernedAnalysisEnvelope.model_validate({
@@ -22,7 +25,7 @@ def _envelope(*, action: str = "Valider le tableau des flux.") -> GovernedAnalys
         },
         "governed_analysis": {
             "source_representation_sha256": source_hash, "invocation_nonce": "B" * 32,
-            "executive_diagnosis": "La rentabilite operationnelle est negative.",
+            "executive_diagnosis": diagnosis,
             "diagnosis_fact_ids": [fact_id],
             "observations": [{"fact_id": fact_id, "metric": "EBITDA", "observed_value": -145000,
                               "severity": "HIGH"}],
@@ -72,3 +75,42 @@ def test_pdf_contains_governed_sections_and_no_confirmed_decision():
                      "UNKNOWN et contradictions", "Recommandations proposees",
                      "ne constituent pas des decisions confirmees"):
         assert required in text
+
+
+def test_pptx_is_governed_complete_and_contains_no_confirmed_decision():
+    deck = Presentation(BytesIO(generate_governed_pptx(_envelope())))
+    text = "\n".join(
+        shape.text for slide in deck.slides for shape in slide.shapes if hasattr(shape, "text_frame")
+    )
+    for required in ("Analyse financiere", "Situation executive", "INFERENCE",
+                     "Constats financiers", "OBSERVATION SOURCE", "EBITDA = -145000",
+                     "Severite inferentielle HIGH", "Evaluation et hypotheses",
+                     "UNKNOWN HIGH", "Decisions requises", "ACTION PROPOSEE",
+                     "Obtenir le tableau des flux", "Aucune decision n'est presentee comme confirmee"):
+        assert required in text
+
+
+def test_pptx_preserves_long_governed_content_on_continuation_slides():
+    diagnosis = "Diagnostic complet " + "contenu professionnel " * 175
+    deck = Presentation(BytesIO(generate_governed_pptx(_envelope(diagnosis=diagnosis))))
+    body_text = "".join(
+        shape.text for slide in deck.slides for shape in slide.shapes
+        if hasattr(shape, "text_frame") and shape.left == Inches(0.9)
+    )
+    diagnosis_chunks = [
+        shape.text for slide in deck.slides for shape in slide.shapes
+        if hasattr(shape, "text_frame") and shape.left == Inches(0.9)
+        and shape.text.startswith(("INFERENCE | ", "INFERENCE (suite) | "))
+    ]
+    reconstructed = "".join(
+        text.removeprefix("INFERENCE | ").removeprefix("INFERENCE (suite) | ")
+        for text in diagnosis_chunks
+    )
+    assert reconstructed.startswith(diagnosis)
+    assert all(text.startswith(("INFERENCE | ", "INFERENCE (suite) | ")) for text in diagnosis_chunks)
+    all_body_chunks = [
+        shape.text for slide in deck.slides for shape in slide.shapes
+        if hasattr(shape, "text_frame") and shape.left == Inches(0.9)
+    ]
+    assert all(" | " in text for text in all_body_chunks)
+    assert len(deck.slides) > 6
