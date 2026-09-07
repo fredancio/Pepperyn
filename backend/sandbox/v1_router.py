@@ -82,8 +82,16 @@ async def run_v1_synthetic_demo(
         analysis_row={
             "id": analysis_id, "company_id": company_id, "entity_id": entity_id,
             "fichier_nom": "optilux_m1c_raw_workbook.xlsx", "fichier_type": "xlsx",
-            "type_document": result.type_document, "contexte_utilisateur": "",
-            "mode": "V1_SYNTHETIC_GOLDEN", "analyse_json": result.model_dump(mode="json"),
+            # The governed contract identifies the source precisely as a
+            # FINANCIAL_WORKBOOK. The legacy analyses column has a closed,
+            # statement-oriented vocabulary and this workbook combines more
+            # than one statement, so AUTRE is its honest compatibility view.
+            "type_document": "AUTRE", "contexte_utilisateur": "",
+            # ``analyses.mode`` is the analysis-depth contract enforced by the
+            # canonical database (quick | complete). Synthetic provenance is
+            # carried by the immutable governed envelope and source hash, not
+            # overloaded into this legacy field.
+            "mode": "complete", "analyse_json": result.model_dump(mode="json"),
             "score_confiance": 0, "tokens_input": 0, "cout_estime_euros": 0,
             "duree_traitement_ms": 0, "status": "completed", "chat_count": 0,
             "source_data_hash": golden.source_workbook_sha256.lower(),

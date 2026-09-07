@@ -17,16 +17,18 @@ const PLAN_COLORS: Record<string, { bg: string; text: string; border: string }> 
 
 export function UpgradeModal({ feature, onClose }: UpgradeModalProps) {
   const meta: FeatureMeta | null = FEATURE_META[feature];
-  if (!meta) return null;
-
-  const colors = PLAN_COLORS[meta.requiredPlan] ?? PLAN_COLORS.PRO;
 
   // Close on Escape
   useEffect(() => {
+    if (!meta) return;
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  }, [meta, onClose]);
+
+  if (!meta) return null;
+
+  const colors = PLAN_COLORS[meta.requiredPlan] ?? PLAN_COLORS.PRO;
 
   return (
     <div

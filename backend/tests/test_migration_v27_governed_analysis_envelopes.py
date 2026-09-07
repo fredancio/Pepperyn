@@ -17,6 +17,16 @@ def test_v27_is_immutable_triple_scoped_and_service_role_only():
     assert "FOREIGN KEY (engagement_id, entity_id)" in SQL
     assert "persist_governed_analysis_v1" in SQL
     assert "REVOKE ALL" in SQL and "service_role" in SQL
+    assert (
+        "REVOKE ALL PRIVILEGES ON TABLE public.governed_analysis_envelopes"
+        in SQL
+    )
+    assert "FROM PUBLIC, anon, authenticated, service_role" in SQL
+    assert (
+        "GRANT SELECT ON TABLE public.governed_analysis_envelopes TO service_role"
+        in SQL
+    )
+    assert "ALTER DEFAULT PRIVILEGES" not in SQL
 
 
 def test_v27_has_live_schema_preflight_and_integrity_hash_constraints():

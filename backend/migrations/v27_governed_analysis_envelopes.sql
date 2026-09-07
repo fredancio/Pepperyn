@@ -107,6 +107,15 @@ END $$;
 
 ALTER TABLE public.governed_analysis_envelopes ENABLE ROW LEVEL SECURITY;
 
+-- Supabase projects may grant public-schema table privileges to API roles by
+-- default. This governed table is intentionally backend-only: RLS remains a
+-- defense in depth, not the sole client boundary. The service role reads the
+-- immutable envelope directly; creation remains exclusively through the
+-- SECURITY DEFINER RPC below.
+REVOKE ALL PRIVILEGES ON TABLE public.governed_analysis_envelopes
+  FROM PUBLIC, anon, authenticated, service_role;
+GRANT SELECT ON TABLE public.governed_analysis_envelopes TO service_role;
+
 CREATE OR REPLACE FUNCTION public.reject_governed_analysis_update()
 RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$
 BEGIN

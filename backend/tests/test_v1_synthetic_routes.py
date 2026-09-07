@@ -37,6 +37,11 @@ class _Rpc:
     def execute(self):
         analysis_row = self.params["p_analysis"]
         envelope_row = self.params["p_envelope"]
+        assert analysis_row["mode"] in {"quick", "complete"}
+        assert analysis_row["type_document"] in {
+            "AUTRE", "BILAN", "BUDGET", "COMMERCIAL", "COMPTE_RESULTAT",
+            "INCONNU", "PREVISIONNEL", "TRESORERIE",
+        }
         assert any(row["id"] == envelope_row["engagement_id"] and row["entity_id"] == analysis_row["entity_id"]
                    for row in self.db.tables["engagements"])
         self.db.tables.setdefault("analyses", []).append(analysis_row)
@@ -142,6 +147,9 @@ def test_http_contract_accepts_empty_body_rejects_payload_and_serializes(monkeyp
     assert missing_auth.status_code == 401
     assert with_body.status_code == 400
     assert created.status_code == loaded.status_code == 200
+    assert db.tables["analyses"][0]["mode"] == "complete"
+    assert db.tables["analyses"][0]["type_document"] == "AUTRE"
+    assert created.json()["result"]["type_document"] == "FINANCIAL_WORKBOOK"
     assert created.json()["result"]["id"] == created.json()["analyse_id"]
     assert loaded.json()["result"] == created.json()["result"]
 

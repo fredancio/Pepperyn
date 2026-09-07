@@ -83,7 +83,6 @@ export async function analyzeFile(
   const text = await res.text();
   const trimmed = text.trim();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let data: any = null;
   if (trimmed) {
     try {

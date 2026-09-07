@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  outputFileTracingRoot: __dirname,
   async headers() {
     return [
       // Ne jamais mettre en cache le HTML des pages
