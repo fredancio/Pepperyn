@@ -484,7 +484,16 @@ Potential enforcement dimensions:
 
 Caller code must not be trusted to declare provider compliance.
 
-**Status:** OPEN --- later LLM Trust Gate implementation.
+**Status:** CODE ENFORCEMENT IMPLEMENTED / OPERATIONAL ACTIVATION CLOSED.
+The local PG-8 contract requires a size-bounded, SHA-256-pinned, exact-scope
+evidence manifest; an approved policy version; a named project; effective DPA;
+disabled data sharing; European Responses endpoint; ZDR; an approved model;
+`store=false`; an approved task; and evidence no older than 90 days.  The
+issuer-bound authorization is tied to the exact canonical request hash and is
+verified immediately before the sole transport boundary. Missing, expired,
+tampered or mismatched state fails closed. This validates code enforcement
+only: it does not prove the truth of the external account evidence, and it does
+not activate transport or real-data admission.
 
 ------------------------------------------------------------------------
 
@@ -516,7 +525,8 @@ Caller code must not be trusted to declare provider compliance.
   PG-7              Effective account       Blocked pending   Yes
                     evidence                configuration     
 
-  PG-8              Code-level enforcement  Open              Yes
+  PG-8              Code-level enforcement  Implemented;      Yes until
+                                             activation closed PG-1--PG-7 pass
   -----------------------------------------------------------------------------
 
 ### Overall

@@ -179,6 +179,24 @@ def test_non_json_payload_is_refused_before_transport(monkeypatch):
     assert capture.requests == []
 
 
+def test_missing_or_mismatched_provider_policy_fails_before_transport(monkeypatch):
+    capture = CaptureBoundary()
+    monkeypatch.setattr(egress_module, "_dispatch_final_request", capture)
+    missing = _request(provider_policy_authorization=None)
+    missing = type(missing)(**{**missing.__dict__, "provider_policy_authorization": None})
+    with pytest.raises(EgressRefused) as exc:
+        LlmEgressAuthority().dispatch(missing)
+    assert exc.value.code is EgressRefusalCode.PROVIDER_POLICY_REQUIRED
+    assert capture.requests == []
+
+    valid = _request()
+    changed = type(valid)(**{**valid.__dict__, "task": "FOUNDER_REVIEW"})
+    with pytest.raises(EgressRefused) as exc:
+        LlmEgressAuthority().dispatch(changed)
+    assert exc.value.code is EgressRefusalCode.PROVIDER_POLICY_REQUIRED
+    assert capture.requests == []
+
+
 def test_default_production_transport_is_closed():
     with pytest.raises(EgressRefused) as exc:
         dispatch_legacy_synthetic(
@@ -326,7 +344,7 @@ def _provider_bypass_violations(relative_path: str, source: str) -> list[str]:
     violations = []
     for indicator in _PROVIDER_INDICATORS:
         if indicator in source and relative_path not in {
-            "services/llm_egress.py", "sandbox/synthetic_product.py"
+            "services/llm_egress.py", "services/provider_policy.py", "sandbox/synthetic_product.py"
         }:
             violations.append(f"{relative_path}: provider indicator {indicator}")
     for node in ast.walk(tree):
@@ -418,7 +436,7 @@ def test_representative_alternate_provider_bypasses_are_rejected(source):
 def test_test_admission_minter_is_not_used_by_production_code():
     violations = []
     for path in BACKEND.rglob("*.py"):
-        if "tests" in path.parts or path.name == "llm_egress.py":
+        if "tests" in path.parts or path.name in {"llm_egress.py", "provider_policy.py"}:
             continue
         source = path.read_text(encoding="utf-8")
         if any(
@@ -426,8 +444,21 @@ def test_test_admission_minter_is_not_used_by_production_code():
             for symbol in (
                 "_mint_synthetic_test_request",
                 "_SYNTHETIC_TEST_ADMISSION",
+                "_mint_synthetic_test_provider_authorization",
             )
         ):
+            violations.append(str(path))
+    assert violations == []
+
+
+def test_provider_policy_issuer_is_confined_to_its_defining_module():
+    forbidden = ("_ProviderPolicyIssuer", "_CONFIGURED_POLICY_ISSUER", "_SYNTHETIC_TEST_POLICY_ISSUER", "._issuer.mint")
+    violations = []
+    for path in BACKEND.rglob("*.py"):
+        if "tests" in path.parts or path.name == "provider_policy.py":
+            continue
+        source = path.read_text(encoding="utf-8")
+        if any(symbol in source for symbol in forbidden):
             violations.append(str(path))
     assert violations == []
 

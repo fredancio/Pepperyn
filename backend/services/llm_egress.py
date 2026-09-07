@@ -22,6 +22,12 @@ from services.ownership_authority import (
     OwnershipRefused,
     consume_egress_authorization,
 )
+from services.provider_policy import (
+    ProviderPolicyAuthorization,
+    ProviderPolicyRefused,
+    _mint_synthetic_test_provider_authorization,
+    verify_provider_policy_authorization,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -33,6 +39,7 @@ class EgressRefusalCode(str, Enum):
     ROUTE_NOT_ALLOWED = "ROUTE_NOT_ALLOWED"
     TRANSPORT_CLOSED = "TRANSPORT_CLOSED"
     OWNERSHIP_AUTHORIZATION_REQUIRED = "OWNERSHIP_AUTHORIZATION_REQUIRED"
+    PROVIDER_POLICY_REQUIRED = "PROVIDER_POLICY_REQUIRED"
 
 
 class EgressRefused(RuntimeError):
@@ -64,6 +71,7 @@ class SyntheticEgressRequest:
     _admission: object | None = None
     request_id: str = ""
     egress_authorization: EgressAuthorization | None = None
+    provider_policy_authorization: ProviderPolicyAuthorization | None = None
 
 
 @dataclass(frozen=True)
@@ -73,6 +81,7 @@ class FrozenProviderRequest:
     task: str
     body: bytes
     payload_hash: str
+    provider_policy: ProviderPolicyAuthorization
 
 
 @dataclass(frozen=True)
@@ -203,8 +212,18 @@ class LlmEgressAuthority:
             raise EgressRefused(EgressRefusalCode.REAL_DATA_ADMISSION_CLOSED)
         if not request.task or not isinstance(request.provider_payload, Mapping):
             raise EgressRefused(EgressRefusalCode.ROUTE_NOT_ALLOWED)
+        if request.max_attempts < 1 or request.max_attempts > 3:
+            raise EgressRefused(EgressRefusalCode.ROUTE_NOT_ALLOWED)
         body = _canonical_json_bytes(request.provider_payload)
         payload_hash = hashlib.sha256(body).hexdigest()
+        try:
+            provider_policy = verify_provider_policy_authorization(
+                request.provider_policy_authorization,
+                task=request.task,
+                request_hash=payload_hash,
+            )
+        except ProviderPolicyRefused as exc:
+            raise EgressRefused(EgressRefusalCode.PROVIDER_POLICY_REQUIRED) from exc
         try:
             consume_egress_authorization(
                 request.egress_authorization,
@@ -218,14 +237,13 @@ class LlmEgressAuthority:
             task=request.task,
             body=body,
             payload_hash=payload_hash,
+            provider_policy=provider_policy,
         )
         logger.info(
             "LLM egress request task=%s payload_hash=%s",
             request.task,
             frozen.payload_hash,
         )
-        if request.max_attempts < 1 or request.max_attempts > 3:
-            raise EgressRefused(EgressRefusalCode.ROUTE_NOT_ALLOWED)
         for attempt in range(1, request.max_attempts + 1):
             try:
                 raw_response = _dispatch_final_request(frozen)
@@ -258,9 +276,13 @@ def _mint_synthetic_test_request(
     max_attempts: int = 1,
     request_id: str = "",
     egress_authorization: EgressAuthorization | None = None,
+    provider_policy_authorization: ProviderPolicyAuthorization | None = None,
 ) -> SyntheticEgressRequest:
     """Test-harness-only mint; production use is forbidden by static policy."""
 
+    policy = provider_policy_authorization or _mint_synthetic_test_provider_authorization(
+        task=task, request_body=provider_payload,
+    )
     return SyntheticEgressRequest(
         task=task,
         provider_payload=provider_payload,
@@ -269,6 +291,7 @@ def _mint_synthetic_test_request(
         _admission=_SYNTHETIC_TEST_ADMISSION,
         request_id=request_id,
         egress_authorization=egress_authorization,
+        provider_policy_authorization=policy,
     )
 
 
