@@ -512,3 +512,33 @@ These decisions do not justify delaying the selected mission's evidence and cont
 - **Security:** the UI translation logs no payload, response or credential and
   does not convert any failure into success. Real-data admission remains
   CLOSED.
+
+## 31. V1 heterogeneous financial-input falsification — 2026-09-07
+
+- **Scope:** four byte-real, hash-pinned synthetic XLSX fixtures exercise the
+  actual Data Quality Gate, `FileConnector`, parser/temporal normalization,
+  anonymization and governed financial-understanding builder. They are not
+  reconstructed parsed objects and do not reuse the Optilux layout.
+- **Positive interpretation:** an English two-sheet management workbook with
+  reordered content produces ten exact current-period facts, including revenue,
+  EBITDA, cash and working capital, with source references and period 2025.
+- **Safe insufficiency:** ambiguous period headings, locale-ambiguous numeric
+  strings and conflicting current-period revenue each produce a specific
+  `AMBIGUOUS` result, promote zero facts and prevent provider-request
+  construction.
+- **Security boundary:** no provider call, credential, HTTP route, persistence
+  or real datum is used. The understood case produces only a no-network,
+  `store=false` request object; the three unsafe cases stop before that point.
+- **Remaining compatibility debt:** `FY25 Actual` is conservatively left
+  unclassified by raw temporal parsing. Because the behavior is explicit and
+  fail-closed, it is P2 rather than a V1 P0/P1; generalized FRU remains deferred.
+- **Evidence:** `docs/Product/PEPPERYN_V1_HETEROGENEOUS_INPUT_FALSIFICATION.md`
+  and `backend/tests/test_v1_heterogeneous_workbooks.py`.
+- **Validation:** heterogeneous fixtures plus adjacent M1C, data-quality,
+  parser-period, governed-contract, Slice 1/2 and provider-policy suite
+  `148 passed`. Every worksheet was
+  rendered and visually inspected; package scans found no formula, macro or
+  external link. Repository-wide collection remains unavailable in this local
+  environment because the historical standalone EDM script exits during
+  collection and the development venv lacks optional `pypdf`; neither affects
+  this bounded pipeline evidence.

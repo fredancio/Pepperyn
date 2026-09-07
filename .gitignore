@@ -5,6 +5,7 @@ Partenariats/
 Ressources/
 *.xlsx
 !backend/tests/golden/fixtures/optilux_m1c_raw_workbook.xlsx
+!backend/tests/golden/fixtures/pepperyn_v1_heterogeneous_*.xlsx
 *.inspect.ndjson
 *.pdf
 *.docx
