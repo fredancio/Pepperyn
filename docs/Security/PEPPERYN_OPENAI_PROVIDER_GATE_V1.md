@@ -741,3 +741,34 @@ continuing architecture-first development.
 
 **NEXT PROVIDER ACTION --- EFFECTIVE ACCOUNT / ZDR / REGION / ENDPOINT
 VERIFICATION BEFORE REAL-CLIENT ADMISSION**
+
+------------------------------------------------------------------------
+
+## 26. Effective-account checkpoint — 2026-09-07
+
+- **PG-1 effective configuration:** PASS. Founder-observed organization
+  settings show model-feedback sharing, evaluation/fine-tuning sharing and
+  input/output sharing all disabled. No voluntary training/data-sharing opt-in
+  is active.
+- **Current project inventory:** the organization exposes only its historical
+  default project, configured with Global geography and no project data
+  retention profile. No dedicated Pepperyn API project exists yet.
+- **PG-3 / PG-4:** OPEN. The new-project form exposes only a project name and
+  no region selector, so this organization is not currently evidenced as
+  eligible for project-level European data residency. ZDR is not shown as
+  enabled. OpenAI support has been asked for the supported individual-founder
+  eligibility path; no approval is assumed while that request is pending.
+- **Current API contract:** the official Responses reference confirms that
+  `store` defaults to true if omitted, that `store=false` is supported, and
+  that Structured Outputs are configured through `text.format`. Current data
+  controls documentation lists `/v1/responses` and Structured Outputs as
+  supported for European processing, subject to account eligibility,
+  retention controls and model support. PG-8 therefore remains correctly
+  strict on `store=false`, the EU base URL, ZDR and the approved model.
+- **PG-2 / PG-6:** provider capability evidence remains available, but the
+  Pepperyn-specific DPA applicability/effectiveness and dated operational
+  subprocessor review remain incomplete. Neither is inferred from dashboard
+  configuration.
+- **Decision:** no Global project will be created as a substitute for the
+  required regional/ZDR evidence. Real-data admission and provider transport
+  remain CLOSED while the external request is pending.

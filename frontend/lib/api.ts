@@ -124,7 +124,15 @@ export async function analyzeText(
 
 export async function runV1SyntheticDemo() {
   const headers = await getAuthHeaders();
-  const res = await fetch(`${API_URL}/api/v1/synthetic-demo`, { method: 'POST', headers });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/v1/synthetic-demo`, { method: 'POST', headers });
+  } catch {
+    // Browser/network failures must not leak implementation details such as
+    // "Failed to fetch". HTTP failures still use the bounded server detail
+    // below so a safe, deliberate backend refusal remains actionable.
+    throw new Error('Impossible de joindre le serveur Pepperyn. Vérifiez que le service est démarré puis réessayez.');
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((data as { detail?: string }).detail || 'Démonstration V1 indisponible');
   return data;

@@ -482,3 +482,33 @@ These decisions do not justify delaying the selected mission's evidence and cont
 - **Validation:** focused provider-policy, egress and ownership suite `98 passed`; final targeted V1/M1C/persistence/migration/DecisionKernel regression `311 passed`; `git diff --check` reports no defect beyond line-ending notices. Independent QA and Security re-review found no remaining P0/P1 and approved PG-8 code enforcement for the bounded closed-transport architecture.
 - **Gate interpretation:** **PG-8 code-enforcement implementation is locally complete, but operational activation remains CLOSED.** The manifest proves that deployed configuration matches an approved evidence artifact; it cannot independently prove the provider-account facts or the truth of that artifact. PG-1 through PG-7, effective account verification, transport activation and explicit real-data admission remain mandatory blockers.
 - **Security/admission:** `_dispatch_final_request` remains unconditionally closed; no API key is read, no network transport is added and no production caller can mint synthetic admission. Real-data admission remains CLOSED; Slice 1, Slice 2 and RD-1 through RD-5 remain unchanged.
+
+## 30. Provider-account checkpoint and bounded interface failure UX — 2026-09-07
+
+- **Effective organization evidence:** Founder inspection confirms that all
+  three OpenAI API data-sharing categories are disabled. PG-1 is therefore
+  PASS against the current organization rather than documentation alone.
+- **External account blocker:** only a Global default project exists, with no
+  retention profile; the create-project form offers no geography selector.
+  ZDR and a region-specific European project cannot be evidenced or configured
+  through the current account UI. A supported eligibility request is pending
+  with OpenAI. No substitute Global project was created.
+- **Contract verification:** current official OpenAI documentation continues
+  to support the PG-8 shape: Responses API, Structured Outputs, explicit
+  `store=false`, and European processing for supported models, conditional on
+  effective account and retention eligibility. PG-2, PG-3, PG-4, PG-6 and PG-7
+  remain incomplete; PG-8 operational activation remains closed.
+- **Bounded P2 correction:** the Fresh-Founder synthetic action no longer
+  exposes the browser-native `Failed to fetch` string when the backend is
+  unreachable. It emits a stable French recovery instruction instead, while
+  preserving deliberate bounded HTTP refusal details and all fail-closed
+  backend behavior.
+- **Validation:** dedicated network-refusal and bounded-HTTP-refusal tests pass;
+  the complete frontend suite is `35 passed`; TypeScript passes; repository
+  lint passes with pre-existing warnings only; and the production dependency
+  audit reports zero vulnerabilities. The first dependency reconstruction hit
+  npm's known internal exit-handler failure and was replaced by a clean,
+  lockfile-exact install; no tracked dependency file changed.
+- **Security:** the UI translation logs no payload, response or credential and
+  does not convert any failure into success. Real-data admission remains
+  CLOSED.
