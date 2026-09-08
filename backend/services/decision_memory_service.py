@@ -127,8 +127,8 @@ def classify_action(text: str) -> str:
 
 class DecisionMemoryService:
 
-    def __init__(self):
-        self._supabase = None
+    def __init__(self, supabase=None):
+        self._supabase = supabase
 
     def _get_supabase(self):
         if self._supabase is None:

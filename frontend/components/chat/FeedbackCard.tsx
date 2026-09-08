@@ -1,11 +1,12 @@
 'use client';
 import { useState } from 'react';
-import { submitDecisionFeedback } from '@/lib/api';
+import { submitDecisionFeedback, submitV1GovernedIntention } from '@/lib/api';
 import type { RecommendationTracking, DecisionFeedbackStatus } from '@/lib/types';
 
 interface FeedbackCardProps {
   reportId: string;
   recommendations: RecommendationTracking[];
+  governedV1?: boolean;
 }
 
 type IntentionChoice = 'planned' | 'rejected' | 'unsure' | 'no_longer_relevant';
@@ -26,15 +27,21 @@ function stripMarkdown(text: string): string {
   return text.replace(/\*\*/g, '');
 }
 
-export function FeedbackCard({ reportId, recommendations }: FeedbackCardProps) {
+export function FeedbackCard({ reportId, recommendations, governedV1 = false }: FeedbackCardProps) {
   const items = recommendations
     .filter(r => r.priority === 'haute')
     .concat(recommendations.filter(r => r.priority !== 'haute'))
     .slice(0, MAX_DISPLAYED);
 
-  const [choices, setChoices] = useState<Record<string, IntentionChoice>>({});
-  const [comments, setComments] = useState<Record<string, string>>({});
-  const [saved, setSaved] = useState<Record<string, boolean>>({});
+  const [choices, setChoices] = useState<Record<string, IntentionChoice>>(() =>
+    Object.fromEntries(items.filter(item => item.status).map(item => [item.id, item.status as IntentionChoice])),
+  );
+  const [comments, setComments] = useState<Record<string, string>>(() =>
+    Object.fromEntries(items.filter(item => item.comment).map(item => [item.id, item.comment as string])),
+  );
+  const [saved, setSaved] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(items.filter(item => item.status).map(item => [item.id, true])),
+  );
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   // Arc Décisionnel MVP v16 — trace si un arc a été créé pour cette recommandation
   const [arcTracked, setArcTracked] = useState<Record<string, boolean>>({});
@@ -54,14 +61,21 @@ export function FeedbackCard({ reportId, recommendations }: FeedbackCardProps) {
     if (!option) return;
     setSaving(prev => ({ ...prev, [rec.id]: true }));
     try {
-      const response = await submitDecisionFeedback({
-        report_id: reportId,
-        recommendation_id: rec.id,
-        recommendation_text: rec.text,
-        recommendation_source: rec.source,
-        status: option.status,
-        comment: comment || undefined,
-      });
+      const response = governedV1
+        ? await submitV1GovernedIntention({
+            analysis_id: reportId,
+            recommendation_id: rec.id,
+            status: option.status as 'planned' | 'unsure' | 'rejected' | 'no_longer_relevant',
+            comment: comment || undefined,
+          })
+        : await submitDecisionFeedback({
+            report_id: reportId,
+            recommendation_id: rec.id,
+            recommendation_text: rec.text,
+            recommendation_source: rec.source,
+            status: option.status,
+            comment: comment || undefined,
+          });
       setSaved(prev => ({ ...prev, [rec.id]: true }));
       // Arc Décisionnel MVP v16 : si le backend a créé un arc, afficher "Décision tracée ✓"
       if (response.arc_created) {
@@ -83,9 +97,13 @@ export function FeedbackCard({ reportId, recommendations }: FeedbackCardProps) {
           <span className="text-white text-sm">🎯</span>
         </div>
         <div>
-          <p className="font-bold text-sm text-[#1A1A2E]">Que comptez-vous faire ?</p>
+          <p className="font-bold text-sm text-[#1A1A2E]">
+            {governedV1 ? 'Quelle est votre intention ?' : 'Que comptez-vous faire ?'}
+          </p>
           <p className="text-xs mt-0.5 text-[#5F6368]">
-            Une réponse rapide m&apos;aide à adapter mes prochaines recommandations.
+            {governedV1
+              ? 'Votre réponse est enregistrée comme une intention, jamais comme une décision confirmée.'
+              : 'Une réponse rapide m\'aide à adapter mes prochaines recommandations.'}
           </p>
         </div>
       </div>
@@ -144,7 +162,7 @@ export function FeedbackCard({ reportId, recommendations }: FeedbackCardProps) {
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
-                    Merci, c&apos;est noté.
+                    {governedV1 ? 'Intention enregistrée — aucune décision confirmée.' : 'Merci, c\'est noté.'}
                   </div>
                   {/* Arc Décisionnel MVP v16 : confirmation non-intrusive de la traçabilité */}
                   {arcTracked[rec.id] && (

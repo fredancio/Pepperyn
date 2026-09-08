@@ -10,6 +10,7 @@ import httpx
 import routers.analyze as analyze
 import sandbox.v1_router as v1_routes
 import main
+from services.decision_memory_service import make_recommendation_id
 
 
 COMPANY = "20000000-0000-0000-0000-000000000001"
@@ -125,6 +126,11 @@ def test_mock_analysis_route_validates_persists_and_returns_governed_result(monk
     assert response.success is True and response.analyse_id
     assert response.tokens_used == 0 and response.cout_estime == 0
     assert response.result.verification_tag == "V1_GOVERNED_SINGLE_CALL"
+    assert response.recommendations_tracking
+    first = response.recommendations_tracking[0]
+    assert first["priority"] == "haute"
+    assert first["source"] == "plan_action"
+    assert first["id"] == make_recommendation_id(response.analyse_id, "plan_action", 0)
     assert persisted["supabase"] is database
     assert persisted["engagement_id"] == "engagement-id"
     assert persisted["analysis_row"]["fichier_nom"] == filename

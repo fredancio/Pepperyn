@@ -698,3 +698,48 @@ These decisions do not justify delaying the selected mission's evidence and cont
   persisted V1 mock analysis is closed with final PASS. No provider request was
   dispatched and no real datum was admitted. External Provider remains CLOSED
   and Real-data admission remains CLOSED.
+
+## 35. Governed Founder-intention capture — 2026-09-08
+
+- **Critical-path purpose:** extend the persisted synthetic Founder rehearsal
+  from recommendation delivery to one explicit human response, without
+  manufacturing a DecisionKernel, a confirmed professional decision or a
+  provider-dependent result.
+- **Governed boundary:** recommendations are projected from the integrity-
+  checked `GovernedAnalysisEnvelope` with deterministic identifiers. The V1
+  endpoint reloads the tenant/entity/engagement-bound envelope and resolves the
+  submitted identifier against the server-side recommendation snapshot; the
+  browser cannot supply or replace the authoritative recommendation text.
+- **Semantic boundary:** the interface asks `Quelle est votre intention ?` and
+  states that the response is an intention, never a confirmed decision. The V1
+  write path records feedback only and returns `decision_confirmed=false` and
+  `arc_created=false`; it does not invoke the legacy DecisionKernel/DecisionArc
+  promotion path.
+- **Registry repair:** the first reload correctly failed closed at the new
+  secondary feedback lookup with PostgREST `PGRST205`, proving that
+  `public.decision_feedback` was absent from the deployed schema cache. V28
+  restores only that idempotent registry, its exact status constraint including
+  `unsure`, unique recommendation/report key, indexes, update trigger and RLS
+  policy. It inserts or backfills no status and changes neither analyses nor
+  governed envelopes. The migration was applied before the write rehearsal.
+- **Availability correction:** a secondary feedback-registry read failure no
+  longer hides an otherwise valid governed analysis. The verified analysis and
+  recommendations remain readable with feedback state represented as unknown;
+  writes continue to fail closed independently. This correction was exercised
+  with an explicit registry-outage test.
+- **Founder-observed rehearsal — PASS:** on persisted analysis
+  `75132a71-c80c-4469-aba8-5171d947a9d0`, the Founder selected exactly
+  `Je ne sais pas encore`. The dedicated intention endpoint returned HTTP 200.
+  Reopening the same analysis without a new analysis or write displayed
+  `Intention enregistrée — aucune décision confirmée.` No further
+  `[V1 INTENTION]` warning appeared after V28.
+- **Automated validation:** the final targeted backend selection passes
+  `32 passed`; frontend Jest passes `41 passed`; TypeScript passes. Tests cover
+  deterministic recommendation projection, server-side snapshot enforcement,
+  forged recommendation refusal, no-arc semantics, persistence/reload,
+  registry-outage isolation and the narrow/idempotent V28 contract.
+- **Closeout verdict:** the governed recommendation-to-Founder-intention link is
+  closed with PASS for the synthetic V1 rehearsal. Decision/action confirmation
+  and later consequence learning remain separate future links. No provider
+  request was dispatched and no real datum was admitted. External Provider
+  remains CLOSED and Real-data admission remains CLOSED.

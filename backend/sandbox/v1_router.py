@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import uuid
 from typing import Optional
 
 from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 
 from models.schemas import AnalyzeResponse
 import routers.analyze as analyze_routes
@@ -17,10 +19,61 @@ from sandbox.governed_exports import generate_governed_excel, generate_governed_
 from services.governed_analysis_persistence import (
     GovernedPersistenceRefused, load_governed_envelope, save_governed_analysis,
 )
+from services.decision_memory_service import DecisionMemoryService, make_recommendation_id
 from sandbox.heterogeneous_workbooks import inspect_registered_workbook, run_registered_mock_analysis
 from sandbox.synthetic_product import SandboxRefused
 
 router = APIRouter(prefix="/api/v1", tags=["v1-synthetic"])
+logger = logging.getLogger(__name__)
+
+
+def _recommendations_tracking(envelope, analysis_id: str, supabase=None) -> list[dict]:
+    """Project governed recommendations into the existing intention UI contract.
+
+    This is deliberately an intention/feedback projection only. It neither
+    creates a DecisionKernel nor represents a recommendation as a confirmed
+    professional decision.
+    """
+    priority = {"P1": "haute", "P2": "moyenne", "P3": "basse"}
+    items = [
+        {
+            "id": make_recommendation_id(analysis_id, "plan_action", index),
+            "text": item.action,
+            "source": "plan_action",
+            "priority": priority[item.priority],
+            "index": index,
+        }
+        for index, item in enumerate(envelope.governed_analysis.recommendations)
+    ]
+    if supabase is None:
+        return items
+    try:
+        rows = (
+            supabase.from_("decision_feedback").select("recommendation_id,status,comment")
+            .eq("report_id", analysis_id).execute()
+        ).data or []
+    except Exception as exc:
+        # The governed analysis is authoritative and already integrity-checked.
+        # A secondary feedback-registry outage must not make that analysis
+        # disappear. Absence is represented as UNKNOWN; writes remain
+        # independently fail-closed in record_v1_governed_intention().
+        logger.warning(
+            "[V1 INTENTION] feedback state unavailable for analysis=%s: %s",
+            analysis_id, exc,
+        )
+        rows = []
+    feedback = {row["recommendation_id"]: row for row in rows}
+    for item in items:
+        saved = feedback.get(item["id"])
+        item["status"] = saved.get("status") if saved else None
+        item["comment"] = saved.get("comment") if saved else None
+    return items
+
+
+class GovernedIntentionRequest(BaseModel):
+    recommendation_id: str = Field(min_length=12, max_length=12)
+    status: str
+    comment: Optional[str] = Field(default=None, max_length=1000)
 
 
 @router.post("/synthetic-workbook-inspection")
@@ -89,6 +142,7 @@ async def analyze_v1_synthetic_workbook(
         result=result,
         tokens_used=0,
         cout_estime=0,
+        recommendations_tracking=_recommendations_tracking(mock.envelope, analysis_id),
     )
 
 
@@ -171,6 +225,7 @@ async def run_v1_synthetic_demo(
     return AnalyzeResponse(
         success=True, message="Démonstration V1 synthétique terminée",
         analyse_id=analysis_id, result=result, tokens_used=0, cout_estime=0,
+        recommendations_tracking=_recommendations_tracking(golden.envelope, analysis_id, supabase),
     )
 
 
@@ -190,7 +245,47 @@ async def get_v1_governed_analysis(
     return AnalyzeResponse(
         success=True, message="Analyse gouvernée rechargée", analyse_id=analysis_id,
         result=result, tokens_used=0, cout_estime=0,
+        recommendations_tracking=_recommendations_tracking(envelope, analysis_id, supabase),
     )
+
+
+@router.post("/governed-analyses/{analysis_id}/intention")
+async def record_v1_governed_intention(
+    analysis_id: str,
+    request: GovernedIntentionRequest,
+    authorization: Optional[str] = Header(default=None),
+    x_auth_type: Optional[str] = Header(default=None),
+):
+    """Record explicit Founder intent without promoting it to a decision."""
+    if request.status not in {"planned", "unsure", "rejected", "no_longer_relevant"}:
+        raise HTTPException(status_code=400, detail="Intention invalide")
+    company_id, _, _ = await analyze_routes._resolve_auth(authorization, x_auth_type)
+    _require_designated_company(company_id)
+    from main import get_supabase_service
+    supabase = get_supabase_service()
+    envelope = _load_for_company(supabase, analysis_id=analysis_id, company_id=company_id)
+    recommendations = _recommendations_tracking(envelope, analysis_id)
+    recommendation = next(
+        (item for item in recommendations if item["id"] == request.recommendation_id), None,
+    )
+    if recommendation is None:
+        raise HTTPException(status_code=404, detail="Recommandation gouvernée introuvable")
+    if not DecisionMemoryService(supabase).upsert_feedback(
+        company_id=company_id,
+        report_id=analysis_id,
+        recommendation_id=recommendation["id"],
+        recommendation_text=recommendation["text"],
+        recommendation_source=recommendation["source"],
+        status=request.status,
+        comment=request.comment,
+    ):
+        raise HTTPException(status_code=503, detail="Enregistrement de l’intention indisponible")
+    return {
+        "success": True,
+        "intention_recorded": True,
+        "decision_confirmed": False,
+        "arc_created": False,
+    }
 
 
 @router.get("/governed-analyses/{analysis_id}/export.xlsx")

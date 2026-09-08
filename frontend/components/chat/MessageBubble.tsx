@@ -128,14 +128,22 @@ export function MessageBubble({ message, questionsRestantes, plan = 'free', onCh
 
   // Cartes de feedback post-rapport — "Que comptez-vous faire ?"
   if (message.content_type === 'feedback_request' && message.metadata) {
-    const meta = message.metadata as { report_id: string; recommendations: RecommendationTracking[] };
+    const meta = message.metadata as {
+      report_id: string;
+      recommendations: RecommendationTracking[];
+      governed_v1?: boolean;
+    };
     return (
       <div className="flex items-start gap-3 max-w-[92%] animate-slide-up">
         <div className="w-8 h-8 bg-[#1B73E8] rounded-full flex-shrink-0 flex items-center justify-center mt-1 shadow-sm">
           <span className="text-white text-xs font-bold">P</span>
         </div>
         <div className="flex-1">
-          <FeedbackCard reportId={meta.report_id} recommendations={meta.recommendations} />
+          <FeedbackCard
+            reportId={meta.report_id}
+            recommendations={meta.recommendations}
+            governedV1={meta.governed_v1}
+          />
           <p className="text-xs text-[#5F6368] mt-1 ml-1">{formatTime(message.created_at)}</p>
         </div>
       </div>

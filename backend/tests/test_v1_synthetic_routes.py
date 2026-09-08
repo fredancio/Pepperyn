@@ -29,6 +29,17 @@ class _Query:
     def select(self, _fields): return self
     def eq(self, field, value): self.rows = [row for row in self.rows if row.get(field) == value]; return self
     def limit(self, count): self.rows = self.rows[:count]; return self
+    def upsert(self, row, on_conflict=None):
+        assert on_conflict == "report_id,recommendation_id"
+        rows = self.db.tables.setdefault(self.table, [])
+        existing = next((item for item in rows if item["report_id"] == row["report_id"]
+                         and item["recommendation_id"] == row["recommendation_id"]), None)
+        if existing is None:
+            rows.append(copy.deepcopy(row))
+        else:
+            existing.update(copy.deepcopy(row))
+        self.rows = [row]
+        return self
     def execute(self): return _Response(copy.deepcopy(self.rows))
 
 
@@ -58,6 +69,13 @@ class _Db:
         }
     def from_(self, table): return _Query(self, table)
     def rpc(self, name, params): assert name == "persist_governed_analysis_v1"; return _Rpc(self, params)
+
+
+class _FeedbackReadUnavailableDb(_Db):
+    def from_(self, table):
+        if table == "decision_feedback":
+            raise RuntimeError("feedback registry unavailable")
+        return super().from_(table)
 
 
 def _enable(monkeypatch, db, company=COMPANY_A):
@@ -93,6 +111,71 @@ def test_authenticated_no_body_demo_persists_and_reloads_after_cache_free_recons
         created.analyse_id, authorization="Bearer test", x_auth_type=None,
     ))
     assert loaded.result == created.result
+    assert loaded.recommendations_tracking == created.recommendations_tracking
+
+
+def test_governed_intention_uses_server_snapshot_and_never_confirms_a_decision(monkeypatch):
+    import httpx
+
+    db = _Db(); _enable(monkeypatch, db)
+    async def exercise():
+        app = FastAPI(); app.include_router(v1_routes.router)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test",
+        ) as client:
+            created = await client.post("/api/v1/synthetic-demo", headers={"Authorization": "Bearer test"})
+            analysis_id = created.json()["analyse_id"]
+            recommendation = created.json()["recommendations_tracking"][0]
+            recorded = await client.post(
+                f"/api/v1/governed-analyses/{analysis_id}/intention",
+                headers={"Authorization": "Bearer test"},
+                json={"recommendation_id": recommendation["id"], "status": "planned"},
+            )
+            forged = await client.post(
+                f"/api/v1/governed-analyses/{analysis_id}/intention",
+                headers={"Authorization": "Bearer test"},
+                json={"recommendation_id": "000000000000", "status": "planned"},
+            )
+            return recorded, forged, recommendation
+
+    recorded, forged, recommendation = asyncio.run(exercise())
+    assert recorded.status_code == 200
+    assert recorded.json() == {
+        "success": True, "intention_recorded": True,
+        "decision_confirmed": False, "arc_created": False,
+    }
+    assert forged.status_code == 404
+    assert len(db.tables["decision_feedback"]) == 1
+    row = db.tables["decision_feedback"][0]
+    assert row["recommendation_id"] == recommendation["id"]
+    assert row["recommendation_text"] == recommendation["text"]
+    assert not db.tables.get("decision_arcs")
+
+    reloaded = asyncio.run(v1_routes.get_v1_governed_analysis(
+        row["report_id"], authorization="Bearer test", x_auth_type=None,
+    ))
+    saved = next(item for item in reloaded.recommendations_tracking
+                 if item["id"] == recommendation["id"])
+    assert saved["status"] == "planned"
+    assert saved["comment"] is None
+
+
+def test_feedback_read_outage_does_not_hide_verified_governed_analysis(monkeypatch):
+    db = _Db(); _enable(monkeypatch, db)
+    created = asyncio.run(v1_routes.run_v1_synthetic_demo(
+        request=_empty_request(), authorization="Bearer test", x_auth_type=None,
+    ))
+    unavailable = _FeedbackReadUnavailableDb()
+    unavailable.tables = copy.deepcopy(db.tables)
+    monkeypatch.setattr(main, "get_supabase_service", lambda: unavailable)
+
+    loaded = asyncio.run(v1_routes.get_v1_governed_analysis(
+        created.analyse_id, authorization="Bearer test", x_auth_type=None,
+    ))
+
+    assert loaded.result == created.result
+    assert loaded.recommendations_tracking
+    assert all(item["status"] is None for item in loaded.recommendations_tracking)
 
 
 def test_second_company_cannot_reload_first_company_analysis(monkeypatch):

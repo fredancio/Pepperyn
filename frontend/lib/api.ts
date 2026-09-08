@@ -190,6 +190,30 @@ export async function fetchV1GovernedAnalysis(analyseId: string) {
   return data;
 }
 
+export async function submitV1GovernedIntention(params: {
+  analysis_id: string;
+  recommendation_id: string;
+  status: 'planned' | 'unsure' | 'rejected' | 'no_longer_relevant';
+  comment?: string;
+}) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(
+    `${API_URL}/api/v1/governed-analyses/${encodeURIComponent(params.analysis_id)}/intention`,
+    {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recommendation_id: params.recommendation_id,
+        status: params.status,
+        comment: params.comment,
+      }),
+    },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { detail?: string }).detail || 'Enregistrement de l’intention indisponible');
+  return data as { success: boolean; intention_recorded: true; decision_confirmed: false; arc_created: false };
+}
+
 export async function updatePin(newPin: string) {
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/api/admin/update-pin`, {

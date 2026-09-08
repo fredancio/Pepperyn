@@ -216,9 +216,17 @@ export function ChatContainer() {
         try {
           const governed = await fetchV1GovernedAnalysis(session.id);
           if (governed.result) {
-            setMessages([WELCOME_MESSAGE, makeLocalMessage('assistant', '', 'analysis', {
+            const governedMessages = [WELCOME_MESSAGE, makeLocalMessage('assistant', '', 'analysis', {
               ...governed.result, id: governed.analyse_id, _filename: session.titre,
-            })]);
+            })];
+            if (governed.recommendations_tracking?.length) {
+              governedMessages.push(makeLocalMessage('assistant', '', 'feedback_request', {
+                report_id: governed.analyse_id,
+                recommendations: governed.recommendations_tracking,
+                governed_v1: true,
+              }));
+            }
+            setMessages(governedMessages);
             setAnalysisReceived(true);
             return;
           }
@@ -299,6 +307,13 @@ export function ChatContainer() {
         makeLocalMessage('assistant', '', 'analysis', {
           ...response.result, id: response.analyse_id, _filename: file.name,
         }),
+        ...(response.recommendations_tracking?.length ? [makeLocalMessage(
+          'assistant', '', 'feedback_request', {
+            report_id: response.analyse_id,
+            recommendations: response.recommendations_tracking,
+            governed_v1: true,
+          },
+        )] : []),
       ]);
       setAnalysisReceived(true);
       setQuestionsPostAnalysis(0);
