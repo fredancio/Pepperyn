@@ -569,3 +569,47 @@ These decisions do not justify delaying the selected mission's evidence and cont
 - **Security/admission:** the route remains absent from production and from any
   environment without the explicit synthetic flag. Provider transport and
   real-data admission remain CLOSED.
+
+### Founder-observed five-file interface closeout
+
+- **Execution surface:** the Founder used the actual authenticated `/app/chat`
+  file selector against the development backend mounted from checkpoint
+  `20aba47fc68c4c64724e3e0a0ea4fb9982782126`. Health, route discovery and the
+  multipart CORS preflight were independently confirmed `200` before the final
+  run.
+- **Registered English workbook — PASS:**
+  `pepperyn_v1_heterogeneous_english.xlsx` displayed UNDERSTOOD for period 2025
+  with ten governed facts and the explicit statement that no provider call was
+  performed.
+- **Ambiguous period workbook — PASS:**
+  `pepperyn_v1_heterogeneous_ambiguous_period.xlsx` displayed AMBIGUOUS with
+  `Exactly one CURRENT_ACTUAL column could not be established.` No fact was
+  promoted and the interface stated that no provider call was performed.
+- **Ambiguous number workbook — PASS:**
+  `pepperyn_v1_heterogeneous_ambiguous_number.xlsx` displayed AMBIGUOUS for the
+  registered locale-ambiguous numeric representation, promoted no fact and
+  performed no provider call.
+- **Conflicting metric workbook — PASS:**
+  `pepperyn_v1_heterogeneous_conflict.xlsx` displayed AMBIGUOUS with
+  `Conflicting values exist for a governed metric in the current period.` No
+  fact was promoted and no provider call was performed.
+- **Unregistered renamed copy — PASS:**
+  `pepperyn_v1_heterogeneous_english_UNREGISTERED.xlsx` displayed the bounded
+  refusal `Fichier refusé : sélectionnez uniquement un classeur synthétique V1
+  enregistré.` This exact branch returns HTTP 400 before the quality gate,
+  parser, anonymizer or understanding builder. The endpoint has no persistence
+  or provider-request operation, so the rejected file produced neither an
+  analysis record nor provider egress.
+- **Operational diagnostics:** the rehearsal first exposed three local startup
+  configuration failures rather than product-contract failures: the public
+  Supabase key was absent from the compiled frontend, `JWT_GUEST_SECRET` was
+  absent from the backend, and the designated synthetic company identifier did
+  not match the authenticated company. Each condition failed closed. After
+  correcting only local environment variables and restarting, frontend health,
+  backend health, authenticated adjacent endpoints and CORS were healthy; no
+  code or admission rule was weakened.
+- **Closeout verdict:** all five real interface selections PASS. The positive
+  case promotes only deterministic source-referenced facts; all unsafe inputs
+  fail closed with zero promoted facts; the unregistered copy is rejected
+  before parsing. Provider transport, production mounting and real-data
+  admission remain CLOSED.
