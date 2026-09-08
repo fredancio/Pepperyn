@@ -59,7 +59,8 @@ export type DecisionFeedbackStatus =
   | 'partially_done'
   | 'not_done'
   | 'rejected'
-  | 'no_longer_relevant';
+  | 'no_longer_relevant'
+  | 'decided';
 
 /** Une recommandation extraite d'un rapport, avec son feedback éventuel. */
 export interface RecommendationTracking {
@@ -73,6 +74,11 @@ export interface RecommendationTracking {
   index: number;
   status?: DecisionFeedbackStatus | null;
   comment?: string | null;
+  decision_kind?: 'accepted_conditional' | 'modified' | 'rejected' | null;
+  decision_text?: string | null;
+  decision_confirmed_at?: string | null;
+  decision_confirmation_source?: 'explicit' | null;
+  prerequisites_acknowledged?: boolean | null;
 }
 
 /** Réponse de GET /api/decision-feedback/previous */

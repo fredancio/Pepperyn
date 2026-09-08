@@ -773,3 +773,50 @@ These decisions do not justify delaying the selected mission's evidence and cont
 - **Closeout verdict:** the full governed recommendation context is now visible
   before any future professional-decision interaction. External Provider
   remains CLOSED and Real-data admission remains CLOSED.
+
+## 37. Explicit governed professional decision — 2026-09-08
+
+- **Critical-path purpose:** extend the persisted synthetic Founder rehearsal
+  from an explicit intention to one separate, explicit professional decision,
+  without treating an intention as consent, validating a prerequisite, creating
+  a DecisionArc or invoking an external provider.
+- **Durable transition:** V29 adds nullable decision fields to the existing
+  recommendation-bound feedback registry. A coherent confirmed decision
+  requires status `decided`, an allowed decision kind, non-empty professional
+  motivation, a confirmation timestamp, source `explicit` and an explicit
+  prerequisite acknowledgement value. Pre-existing intentions remain
+  intentions and are not backfilled or promoted.
+- **Fail-closed and immutable boundary:** the dedicated endpoint reloads and
+  integrity-checks the tenant-bound governed envelope, resolves the submitted
+  deterministic recommendation identifier against the server snapshot, and
+  requires an existing intention. Conditional acceptance or modification is
+  refused unless the Founder acknowledges that every listed validation remains
+  attached. Once confirmed, decision fields cannot be updated or deleted. The
+  transition returns `arc_created=false` and does not access `decision_arcs`.
+- **Interface semantics:** the Founder must choose `Retenir sous conditions`,
+  `Adapter` or `Ne pas retenir`, provide a professional motivation and, when
+  applicable, acknowledge the still-required validations. A persisted decision
+  is labelled `Décision professionnelle confirmée explicitement`; the form is
+  removed after confirmation and the interface states that no DecisionArc was
+  created.
+- **Migration deployment:** V29 was applied to Pepperyn Integration Test with
+  `Success. No rows returned`. Before the write, the existing `unsure`
+  intention and complete governed context reloaded successfully from analysis
+  `75132a71-c80c-4469-aba8-5171d947a9d0` via HTTP 200, and the decision form appeared
+  without automatic selection or confirmation.
+- **Founder-observed write and persistence rehearsal — PASS:** on persisted
+  analysis `75132a71-c80c-4469-aba8-5171d947a9d0`, the Founder explicitly retained the
+  recommendation about validating EBITDA-to-cash conversion under the stated
+  conditions, supplied a professional motivation and acknowledged that the
+  monthly cash-flow table and customer receivables schedules remain required.
+  After hard refresh and reopening the same analysis without a new analysis or
+  write, `Retenue sous conditions`, the motivation and `Aucun arc décisionnel
+  n’a été créé` reappeared; the form and confirmation button did not.
+- **Automated validation:** the final focused backend selection passes
+  `18 passed`; the governed decision interface passes `4 passed`; TypeScript
+  passes. Tests cover migration coherence and immutability, prior-intention
+  enforcement, prerequisite acknowledgement, authoritative server-side
+  recommendation resolution, persistence/reload and no-arc semantics.
+- **Admission status:** this rehearsal uses only the existing synthetic mock
+  analysis. External Provider remains CLOSED and Real-data admission remains
+  CLOSED.

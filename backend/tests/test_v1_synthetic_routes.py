@@ -25,9 +25,18 @@ class _Response:
 
 
 class _Query:
-    def __init__(self, db, table): self.db, self.table = db, table; self.rows = list(db.tables.get(table, ()))
+    def __init__(self, db, table):
+        self.db, self.table = db, table
+        self.rows = list(db.tables.get(table, ()))
+        self.filters = []
     def select(self, _fields): return self
-    def eq(self, field, value): self.rows = [row for row in self.rows if row.get(field) == value]; return self
+    def eq(self, field, value):
+        self.filters.append((field, value))
+        self.rows = [row for row in self.rows if row.get(field) == value]
+        return self
+    def is_(self, field, value):
+        assert value == "null"
+        return self.eq(field, None)
     def limit(self, count): self.rows = self.rows[:count]; return self
     def upsert(self, row, on_conflict=None):
         assert on_conflict == "report_id,recommendation_id"
@@ -35,12 +44,26 @@ class _Query:
         existing = next((item for item in rows if item["report_id"] == row["report_id"]
                          and item["recommendation_id"] == row["recommendation_id"]), None)
         if existing is None:
-            rows.append(copy.deepcopy(row))
+            inserted = copy.deepcopy(row)
+            inserted.setdefault("id", f"feedback-{len(rows) + 1}")
+            rows.append(inserted)
         else:
             existing.update(copy.deepcopy(row))
         self.rows = [row]
         return self
-    def execute(self): return _Response(copy.deepcopy(self.rows))
+    def update(self, values):
+        self._update_values = copy.deepcopy(values)
+        self._is_update = True
+        return self
+    def execute(self):
+        if getattr(self, "_is_update", False):
+            matched = []
+            for row in self.db.tables.get(self.table, []):
+                if all(row.get(field) == value for field, value in self.filters):
+                    row.update(copy.deepcopy(self._update_values))
+                    matched.append(row)
+            self.rows = matched
+        return _Response(copy.deepcopy(self.rows))
 
 
 class _Rpc:
@@ -160,6 +183,81 @@ def test_governed_intention_uses_server_snapshot_and_never_confirms_a_decision(m
                  if item["id"] == recommendation["id"])
     assert saved["status"] == "planned"
     assert saved["comment"] is None
+
+
+def test_explicit_decision_requires_intention_and_retains_prerequisites(monkeypatch):
+    import httpx
+
+    db = _Db(); _enable(monkeypatch, db)
+    async def exercise():
+        app = FastAPI(); app.include_router(v1_routes.router)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            created = await client.post("/api/v1/synthetic-demo", headers={"Authorization": "Bearer test"})
+            analysis_id = created.json()["analyse_id"]
+            recommendation = next(
+                item for item in created.json()["recommendations_tracking"]
+                if item["prerequisite_validation"]
+            )
+            payload = {
+                "recommendation_id": recommendation["id"],
+                "decision_kind": "accepted_conditional",
+                "decision_text": "Retenir sous réserve des validations listées.",
+                "prerequisites_acknowledged": False,
+            }
+            no_ack = await client.post(
+                f"/api/v1/governed-analyses/{analysis_id}/decision",
+                headers={"Authorization": "Bearer test"}, json=payload,
+            )
+            intention = await client.post(
+                f"/api/v1/governed-analyses/{analysis_id}/intention",
+                headers={"Authorization": "Bearer test"},
+                json={"recommendation_id": recommendation["id"], "status": "unsure"},
+            )
+            payload["prerequisites_acknowledged"] = True
+            decision = await client.post(
+                f"/api/v1/governed-analyses/{analysis_id}/decision",
+                headers={"Authorization": "Bearer test"}, json=payload,
+            )
+            reload = await client.get(
+                f"/api/v1/governed-analyses/{analysis_id}",
+                headers={"Authorization": "Bearer test"},
+            )
+            return no_ack, intention, decision, reload, recommendation
+
+    no_ack, intention, decision, reload, recommendation = asyncio.run(exercise())
+    assert no_ack.status_code == 422
+    assert intention.status_code == 200
+    assert decision.status_code == 200
+    assert decision.json() == {
+        "success": True, "decision_confirmed": True,
+        "decision_confirmation_source": "explicit", "arc_created": False,
+    }
+    saved = next(item for item in reload.json()["recommendations_tracking"]
+                 if item["id"] == recommendation["id"])
+    assert saved["status"] == "decided"
+    assert saved["decision_kind"] == "accepted_conditional"
+    assert saved["decision_confirmation_source"] == "explicit"
+    assert saved["prerequisites_acknowledged"] is True
+    assert not db.tables.get("decision_arcs")
+
+
+def test_explicit_decision_without_prior_intention_is_refused(monkeypatch):
+    import httpx
+
+    db = _Db(); _enable(monkeypatch, db)
+    async def exercise():
+        app = FastAPI(); app.include_router(v1_routes.router)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            created = await client.post("/api/v1/synthetic-demo", headers={"Authorization": "Bearer test"})
+            rec = created.json()["recommendations_tracking"][0]
+            return await client.post(
+                f"/api/v1/governed-analyses/{created.json()['analyse_id']}/decision",
+                headers={"Authorization": "Bearer test"},
+                json={"recommendation_id": rec["id"], "decision_kind": "rejected",
+                      "decision_text": "Non retenue.", "prerequisites_acknowledged": False},
+            )
+    response = asyncio.run(exercise())
+    assert response.status_code == 409
 
 
 def test_feedback_read_outage_does_not_hide_verified_governed_analysis(monkeypatch):

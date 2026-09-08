@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
@@ -52,7 +53,10 @@ def _recommendations_tracking(envelope, analysis_id: str, supabase=None) -> list
         return items
     try:
         rows = (
-            supabase.from_("decision_feedback").select("recommendation_id,status,comment")
+            supabase.from_("decision_feedback").select(
+                "recommendation_id,status,comment,decision_kind,decision_text,"
+                "decision_confirmed_at,decision_confirmation_source,prerequisites_acknowledged"
+            )
             .eq("report_id", analysis_id).execute()
         ).data or []
     except Exception as exc:
@@ -70,6 +74,15 @@ def _recommendations_tracking(envelope, analysis_id: str, supabase=None) -> list
         saved = feedback.get(item["id"])
         item["status"] = saved.get("status") if saved else None
         item["comment"] = saved.get("comment") if saved else None
+        item["decision_kind"] = saved.get("decision_kind") if saved else None
+        item["decision_text"] = saved.get("decision_text") if saved else None
+        item["decision_confirmed_at"] = saved.get("decision_confirmed_at") if saved else None
+        item["decision_confirmation_source"] = (
+            saved.get("decision_confirmation_source") if saved else None
+        )
+        item["prerequisites_acknowledged"] = (
+            saved.get("prerequisites_acknowledged") if saved else None
+        )
     return items
 
 
@@ -77,6 +90,13 @@ class GovernedIntentionRequest(BaseModel):
     recommendation_id: str = Field(min_length=12, max_length=12)
     status: str
     comment: Optional[str] = Field(default=None, max_length=1000)
+
+
+class GovernedDecisionRequest(BaseModel):
+    recommendation_id: str = Field(min_length=12, max_length=12)
+    decision_kind: str
+    decision_text: str = Field(min_length=1, max_length=2000)
+    prerequisites_acknowledged: bool
 
 
 @router.post("/synthetic-workbook-inspection")
@@ -287,6 +307,79 @@ async def record_v1_governed_intention(
         "success": True,
         "intention_recorded": True,
         "decision_confirmed": False,
+        "arc_created": False,
+    }
+
+
+@router.post("/governed-analyses/{analysis_id}/decision")
+async def record_v1_governed_decision(
+    analysis_id: str,
+    request: GovernedDecisionRequest,
+    authorization: Optional[str] = Header(default=None),
+    x_auth_type: Optional[str] = Header(default=None),
+):
+    """Confirm one explicit professional decision without creating an arc."""
+    if request.decision_kind not in {"accepted_conditional", "modified", "rejected"}:
+        raise HTTPException(status_code=400, detail="Type de décision invalide")
+    decision_text = request.decision_text.strip()
+    if not decision_text:
+        raise HTTPException(status_code=400, detail="Texte de décision requis")
+    company_id, _, _ = await analyze_routes._resolve_auth(authorization, x_auth_type)
+    _require_designated_company(company_id)
+    from main import get_supabase_service
+    supabase = get_supabase_service()
+    envelope = _load_for_company(supabase, analysis_id=analysis_id, company_id=company_id)
+    recommendation = next(
+        (item for item in _recommendations_tracking(envelope, analysis_id)
+         if item["id"] == request.recommendation_id), None,
+    )
+    if recommendation is None:
+        raise HTTPException(status_code=404, detail="Recommandation gouvernée introuvable")
+    if (request.decision_kind in {"accepted_conditional", "modified"}
+            and recommendation["prerequisite_validation"]
+            and not request.prerequisites_acknowledged):
+        raise HTTPException(
+            status_code=422,
+            detail="Les validations requises doivent rester explicitement attachées à cette décision.",
+        )
+    try:
+        existing = (
+            supabase.from_("decision_feedback")
+            .select("id,status,decision_confirmed_at")
+            .eq("company_id", company_id).eq("report_id", analysis_id)
+            .eq("recommendation_id", recommendation["id"]).limit(2).execute()
+        ).data or []
+        if len(existing) != 1:
+            raise HTTPException(status_code=409, detail="Enregistrez d’abord une intention explicite.")
+        if existing[0].get("decision_confirmed_at"):
+            raise HTTPException(status_code=409, detail="Cette décision est déjà confirmée et immuable.")
+        if existing[0].get("status") not in {"planned", "unsure", "rejected", "no_longer_relevant"}:
+            raise HTTPException(status_code=409, detail="L’état existant n’est pas une intention confirmable.")
+        prerequisites_acknowledged = (
+            request.prerequisites_acknowledged if request.decision_kind != "rejected" else False
+        )
+        updated = (
+            supabase.from_("decision_feedback").update({
+                "status": "decided",
+                "decision_kind": request.decision_kind,
+                "decision_text": decision_text,
+                "decision_confirmed_at": datetime.now(timezone.utc).isoformat(),
+                "decision_confirmation_source": "explicit",
+                "prerequisites_acknowledged": prerequisites_acknowledged,
+            }).eq("id", existing[0]["id"]).eq("company_id", company_id)
+            .is_("decision_confirmed_at", "null").execute()
+        ).data or []
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("[V1 DECISION] explicit confirmation failed analysis=%s: %s", analysis_id, exc)
+        raise HTTPException(status_code=503, detail="Confirmation de la décision indisponible") from exc
+    if len(updated) != 1:
+        raise HTTPException(status_code=409, detail="La décision n’a pas pu être confirmée atomiquement.")
+    return {
+        "success": True,
+        "decision_confirmed": True,
+        "decision_confirmation_source": "explicit",
         "arc_created": False,
     }
 

@@ -214,6 +214,37 @@ export async function submitV1GovernedIntention(params: {
   return data as { success: boolean; intention_recorded: true; decision_confirmed: false; arc_created: false };
 }
 
+export async function submitV1GovernedDecision(params: {
+  analysis_id: string;
+  recommendation_id: string;
+  decision_kind: 'accepted_conditional' | 'modified' | 'rejected';
+  decision_text: string;
+  prerequisites_acknowledged: boolean;
+}) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(
+    `${API_URL}/api/v1/governed-analyses/${encodeURIComponent(params.analysis_id)}/decision`,
+    {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recommendation_id: params.recommendation_id,
+        decision_kind: params.decision_kind,
+        decision_text: params.decision_text,
+        prerequisites_acknowledged: params.prerequisites_acknowledged,
+      }),
+    },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { detail?: string }).detail || 'Confirmation de la décision indisponible');
+  return data as {
+    success: boolean;
+    decision_confirmed: true;
+    decision_confirmation_source: 'explicit';
+    arc_created: false;
+  };
+}
+
 export async function updatePin(newPin: string) {
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/api/admin/update-pin`, {

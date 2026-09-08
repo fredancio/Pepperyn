@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { submitDecisionFeedback, submitV1GovernedIntention } from '@/lib/api';
+import { submitDecisionFeedback, submitV1GovernedDecision, submitV1GovernedIntention } from '@/lib/api';
 import type { RecommendationTracking, DecisionFeedbackStatus } from '@/lib/types';
 
 interface FeedbackCardProps {
@@ -10,6 +10,7 @@ interface FeedbackCardProps {
 }
 
 type IntentionChoice = 'planned' | 'rejected' | 'unsure' | 'no_longer_relevant';
+type DecisionKind = 'accepted_conditional' | 'modified' | 'rejected';
 
 const INTENTION_OPTIONS: { choice: IntentionChoice; label: string; status: DecisionFeedbackStatus }[] = [
   { choice: 'planned', label: 'Je vais appliquer', status: 'planned' },
@@ -45,6 +46,13 @@ export function FeedbackCard({ reportId, recommendations, governedV1 = false }: 
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   // Arc Décisionnel MVP v16 — trace si un arc a été créé pour cette recommandation
   const [arcTracked, setArcTracked] = useState<Record<string, boolean>>({});
+  const [decisionKinds, setDecisionKinds] = useState<Record<string, DecisionKind>>({});
+  const [decisionTexts, setDecisionTexts] = useState<Record<string, string>>({});
+  const [acknowledged, setAcknowledged] = useState<Record<string, boolean>>({});
+  const [decided, setDecided] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(items.filter(item => item.decision_confirmed_at).map(item => [item.id, true])),
+  );
+  const [decisionErrors, setDecisionErrors] = useState<Record<string, string>>({});
 
   if (items.length === 0) return null;
 
@@ -90,6 +98,38 @@ export function FeedbackCard({ reportId, recommendations, governedV1 = false }: 
 
   const allSaved = items.every(r => saved[r.id]);
 
+  const confirmDecision = async (rec: RecommendationTracking) => {
+    const kind = decisionKinds[rec.id];
+    const decisionText = (decisionTexts[rec.id] || '').trim();
+    if (!kind || !decisionText) {
+      setDecisionErrors(prev => ({ ...prev, [rec.id]: 'Choisissez une décision et expliquez-la.' }));
+      return;
+    }
+    if (kind !== 'rejected' && (rec.prerequisite_validation?.length ?? 0) > 0 && !acknowledged[rec.id]) {
+      setDecisionErrors(prev => ({ ...prev, [rec.id]: 'Confirmez que les validations restent requises.' }));
+      return;
+    }
+    setSaving(prev => ({ ...prev, [rec.id]: true }));
+    setDecisionErrors(prev => ({ ...prev, [rec.id]: '' }));
+    try {
+      await submitV1GovernedDecision({
+        analysis_id: reportId,
+        recommendation_id: rec.id,
+        decision_kind: kind,
+        decision_text: decisionText,
+        prerequisites_acknowledged: kind === 'rejected' ? false : Boolean(acknowledged[rec.id]),
+      });
+      setDecided(prev => ({ ...prev, [rec.id]: true }));
+    } catch (error) {
+      setDecisionErrors(prev => ({
+        ...prev,
+        [rec.id]: error instanceof Error ? error.message : 'Confirmation indisponible.',
+      }));
+    } finally {
+      setSaving(prev => ({ ...prev, [rec.id]: false }));
+    }
+  };
+
   return (
     <div className="rounded-2xl border border-blue-200 bg-blue-50 overflow-hidden max-w-2xl">
       <div className="flex items-center gap-3 px-5 py-3.5 bg-blue-100 border-b border-blue-200">
@@ -113,6 +153,10 @@ export function FeedbackCard({ reportId, recommendations, governedV1 = false }: 
           const choice = choices[rec.id];
           const isSaved = saved[rec.id];
           const needsComment = choice === 'rejected' || choice === 'unsure' || choice === 'no_longer_relevant';
+          const isDecided = decided[rec.id];
+          const decisionKind = decisionKinds[rec.id];
+          const shownDecisionKind = rec.decision_kind || decisionKind;
+          const shownDecisionText = rec.decision_text || decisionTexts[rec.id];
 
           return (
             <div key={rec.id} className="bg-white rounded-xl border border-blue-100 p-4">
@@ -195,6 +239,52 @@ export function FeedbackCard({ reportId, recommendations, governedV1 = false }: 
                       <span>Décision tracée</span>
                     </div>
                   )}
+                </div>
+              )}
+
+              {governedV1 && isSaved && !isDecided && (
+                <div className="mt-4 border-t border-blue-100 pt-4">
+                  <p className="text-sm font-semibold text-[#1A1A2E]">Formaliser une décision professionnelle</p>
+                  <p className="mt-1 text-xs text-[#5F6368]">
+                    Cette confirmation est explicite, distincte de votre intention et ne crée aucun arc décisionnel.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {([
+                      ['accepted_conditional', 'Retenir sous conditions'],
+                      ['modified', 'Adapter'],
+                      ['rejected', 'Ne pas retenir'],
+                    ] as const).map(([kind, label]) => (
+                      <button key={kind} type="button" onClick={() => setDecisionKinds(prev => ({ ...prev, [rec.id]: kind }))}
+                        className={`rounded-lg border px-3 py-1.5 text-xs font-medium ${decisionKind === kind ? 'border-[#1B73E8] bg-[#1B73E8] text-white' : 'border-gray-200 bg-white'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <textarea aria-label="Motivation de la décision" value={decisionTexts[rec.id] || ''}
+                    onChange={(event) => setDecisionTexts(prev => ({ ...prev, [rec.id]: event.target.value }))}
+                    placeholder="Motivation professionnelle obligatoire"
+                    className="mt-3 min-h-20 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+                  {decisionKind !== 'rejected' && (rec.prerequisite_validation?.length ?? 0) > 0 && (
+                    <label className="mt-2 flex items-start gap-2 text-xs text-amber-900">
+                      <input type="checkbox" checked={Boolean(acknowledged[rec.id])}
+                        onChange={(event) => setAcknowledged(prev => ({ ...prev, [rec.id]: event.target.checked }))} />
+                      Je confirme que cette décision reste conditionnée aux validations ci-dessus.
+                    </label>
+                  )}
+                  {decisionErrors[rec.id] && <p className="mt-2 text-xs text-red-700">{decisionErrors[rec.id]}</p>}
+                  <button type="button" onClick={() => void confirmDecision(rec)} disabled={saving[rec.id]}
+                    className="mt-3 rounded-lg bg-[#1A1A2E] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                    Confirmer explicitement la décision
+                  </button>
+                </div>
+              )}
+
+              {governedV1 && isDecided && (
+                <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-3 py-3 text-xs text-green-900">
+                  <p className="font-semibold">Décision professionnelle confirmée explicitement</p>
+                  <p className="mt-1">{shownDecisionKind === 'accepted_conditional' ? 'Retenue sous conditions' : shownDecisionKind === 'modified' ? 'Adaptée' : 'Non retenue'}</p>
+                  {shownDecisionText && <p className="mt-1">{shownDecisionText}</p>}
+                  <p className="mt-2 text-green-800">Aucun arc décisionnel n’a été créé.</p>
                 </div>
               )}
             </div>
