@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+from io import BytesIO
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile
 import httpx
 
 import routers.analyze as analyze
 import sandbox.v1_router as v1_routes
+import main
 
 
 COMPANY = "20000000-0000-0000-0000-000000000001"
@@ -93,3 +95,42 @@ def test_route_hides_from_non_designated_company(monkeypatch):
             return await _post(client, filename, (FIXTURES / filename).read_bytes())
 
     assert asyncio.run(exercise()).status_code == 404
+
+
+def test_mock_analysis_route_validates_persists_and_returns_governed_result(monkeypatch):
+    _enable(monkeypatch)
+    filename = "pepperyn_v1_heterogeneous_english.xlsx"
+    raw = (FIXTURES / filename).read_bytes()
+    persisted = {}
+    database = object()
+
+    monkeypatch.setattr(main, "get_supabase_service", lambda: database)
+    monkeypatch.setattr(
+        v1_routes, "_resolve_primary_scope",
+        lambda supabase, company_id: ("Synthetic", "entity-id", "engagement-id"),
+    )
+
+    def capture(supabase, *, analysis_row, engagement_id, envelope):
+        persisted.update(
+            supabase=supabase, analysis_row=analysis_row,
+            engagement_id=engagement_id, envelope=envelope,
+        )
+
+    monkeypatch.setattr(v1_routes, "save_governed_analysis", capture)
+    response = asyncio.run(v1_routes.analyze_v1_synthetic_workbook(
+        file=UploadFile(file=BytesIO(raw), filename=filename),
+        authorization="Bearer synthetic", x_auth_type="admin",
+    ))
+
+    assert response.success is True and response.analyse_id
+    assert response.tokens_used == 0 and response.cout_estime == 0
+    assert response.result.verification_tag == "V1_GOVERNED_SINGLE_CALL"
+    assert persisted["supabase"] is database
+    assert persisted["engagement_id"] == "engagement-id"
+    assert persisted["analysis_row"]["fichier_nom"] == filename
+    assert persisted["analysis_row"]["source_data_hash"] == (
+        "fe7fe4cc8fc6ce649f1ff61d18fdd3d45e2097031fd05aa8c9e2b7a47fad3b93"
+    )
+    assert persisted["analysis_row"]["tokens_input"] == 0
+    assert persisted["analysis_row"]["cout_estime_euros"] == 0
+    persisted["envelope"].validate_lineage()

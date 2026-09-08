@@ -1,4 +1,4 @@
-import { inspectV1SyntheticWorkbook, runV1SyntheticDemo } from './api';
+import { analyzeV1SyntheticWorkbook, inspectV1SyntheticWorkbook, runV1SyntheticDemo } from './api';
 
 jest.mock('./supabase', () => ({
   supabase: {
@@ -69,6 +69,36 @@ describe('inspectV1SyntheticWorkbook', () => {
     });
     await expect(inspectV1SyntheticWorkbook(new File(['real'], 'client.xlsx'))).rejects.toThrow(
       'Fichier refusé',
+    );
+  });
+});
+
+describe('analyzeV1SyntheticWorkbook', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    global.fetch = jest.fn();
+  });
+
+  it('uses only the dedicated simulated-provider endpoint', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValue({ analyse_id: 'synthetic-id', result: {} }),
+    });
+    const file = new File(['synthetic'], 'pepperyn_v1_heterogeneous_english.xlsx');
+    await expect(analyzeV1SyntheticWorkbook(file)).resolves.toMatchObject({ analyse_id: 'synthetic-id' });
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/v1/synthetic-workbook-analysis'),
+      expect.objectContaining({ method: 'POST', body: expect.any(FormData) }),
+    );
+  });
+
+  it('preserves the bounded refusal from the closed backend', async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      json: jest.fn().mockResolvedValue({ detail: 'Analyse simulée refusée' }),
+    });
+    await expect(analyzeV1SyntheticWorkbook(new File(['unsafe'], 'unknown.xlsx'))).rejects.toThrow(
+      'Analyse simulée refusée',
     );
   });
 });

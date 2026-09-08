@@ -165,6 +165,23 @@ export async function inspectV1SyntheticWorkbook(file: File): Promise<V1Syntheti
   return data as V1SyntheticWorkbookInspection;
 }
 
+export async function analyzeV1SyntheticWorkbook(file: File) {
+  const headers = await getAuthHeaders();
+  const formData = new FormData();
+  formData.append('file', file);
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/v1/synthetic-workbook-analysis`, {
+      method: 'POST', headers, body: formData,
+    });
+  } catch {
+    throw new Error('Impossible de joindre le serveur Pepperyn. Vérifiez que le service est démarré puis réessayez.');
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { detail?: string }).detail || 'Analyse synthétique simulée indisponible');
+  return data;
+}
+
 export async function fetchV1GovernedAnalysis(analyseId: string) {
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/api/v1/governed-analyses/${encodeURIComponent(analyseId)}`, { headers });

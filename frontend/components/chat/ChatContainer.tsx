@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { Message, Session } from '@/lib/types';
-import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, fetchPreviousRecommendations, fetchConversationContext, runV1SyntheticDemo, inspectV1SyntheticWorkbook, fetchV1GovernedAnalysis, type BillingUsage, type Entity, type EntityRelationType } from '@/lib/api';
+import { analyzeFile, analyzeText, analyzeV1SyntheticWorkbook, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, fetchPreviousRecommendations, fetchConversationContext, runV1SyntheticDemo, inspectV1SyntheticWorkbook, fetchV1GovernedAnalysis, type BillingUsage, type Entity, type EntityRelationType } from '@/lib/api';
 import { getCurrentAuthMode, signOutAdmin, clearGuestAuth, getGuestPlan } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { MessageBubble, TypingIndicator } from './MessageBubble';
@@ -266,6 +266,7 @@ export function ChatContainer() {
   }, []);
 
   const syntheticWorkbookInputRef = useRef<HTMLInputElement>(null);
+  const syntheticMockAnalysisInputRef = useRef<HTMLInputElement>(null);
   const handleV1SyntheticWorkbook = useCallback(async (file: File) => {
     setIsTyping(true);
     try {
@@ -283,6 +284,31 @@ export function ChatContainer() {
       )]);
     } finally {
       if (syntheticWorkbookInputRef.current) syntheticWorkbookInputRef.current.value = '';
+      setIsTyping(false);
+    }
+  }, []);
+
+  const handleV1SyntheticMockAnalysis = useCallback(async (file: File) => {
+    setIsTyping(true);
+    try {
+      const response = await analyzeV1SyntheticWorkbook(file);
+      if (!response.result || !response.analyse_id) throw new Error('Résultat simulé incomplet');
+      setMessages([
+        makeLocalMessage('user', file.name, 'file'),
+        makeLocalMessage('assistant', 'Analyse V1 complète — fournisseur simulé local, aucun réseau externe.', 'text'),
+        makeLocalMessage('assistant', '', 'analysis', {
+          ...response.result, id: response.analyse_id, _filename: file.name,
+        }),
+      ]);
+      setAnalysisReceived(true);
+      setQuestionsPostAnalysis(0);
+      await loadSessionHistory();
+    } catch (error) {
+      setMessages(prev => [...prev, makeLocalMessage(
+        'assistant', error instanceof Error ? error.message : 'Analyse synthétique simulée indisponible', 'error',
+      )]);
+    } finally {
+      if (syntheticMockAnalysisInputRef.current) syntheticMockAnalysisInputRef.current.value = '';
       setIsTyping(false);
     }
   }, []);
@@ -1099,6 +1125,24 @@ export function ChatContainer() {
                       className="w-full rounded-xl border border-amber-500 px-4 py-3 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50"
                     >
                       Tester un classeur synthétique V1 enregistré
+                    </button>
+                    <input
+                      ref={syntheticMockAnalysisInputRef}
+                      type="file"
+                      accept=".xlsx"
+                      className="hidden"
+                      onChange={event => {
+                        const file = event.target.files?.[0];
+                        if (file) void handleV1SyntheticMockAnalysis(file);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => syntheticMockAnalysisInputRef.current?.click()}
+                      disabled={isTyping}
+                      className="w-full rounded-xl border border-emerald-600 px-4 py-3 text-sm font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50"
+                    >
+                      Analyser le classeur English via le fournisseur simulé
                     </button>
                     <p className="text-center text-xs text-[#5F6368]">Tout autre fichier est refusé · appel fournisseur fermé</p>
                   </div>

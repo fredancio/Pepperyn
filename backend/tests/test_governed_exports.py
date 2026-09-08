@@ -11,6 +11,9 @@ from sandbox.governed_exports import generate_governed_excel, generate_governed_
 from services.v1_analysis_contract import GovernedAnalysisEnvelope
 
 
+ANALYSIS_ID = "75132a71-1111-4222-8333-123456789abc"
+
+
 def _envelope(*, action: str = "Valider le tableau des flux.",
               diagnosis: str = "La rentabilite operationnelle est negative.") -> GovernedAnalysisEnvelope:
     fact_id = "FABCDEF123456"
@@ -45,13 +48,14 @@ def _envelope(*, action: str = "Valider le tableau des flux.",
 
 
 def test_excel_is_structured_auditable_and_contains_no_formulas():
-    workbook = load_workbook(BytesIO(generate_governed_excel(_envelope())), data_only=False)
+    workbook = load_workbook(BytesIO(generate_governed_excel(_envelope(), ANALYSIS_ID)), data_only=False)
     assert workbook.sheetnames == ["Synthese", "Faits sources", "Inferences", "Recommandations", "UNKNOWN"]
     values = [cell.value for sheet in workbook for row in sheet.iter_rows() for cell in row if cell.value is not None]
     text = "\n".join(map(str, values))
     for required in ("Diagnostic (inference)", "Faits sources",
                      "Observation source-matched - severite inferentielle HIGH", "EBITDA = -145000",
-                     "Validations requises", "Prerequis",
+                     "Validations requises", "Prerequis", ANALYSIS_ID,
+                     "Fournisseur simulé local", "Aucun réseau externe n'a été utilisé",
                      "Les recommandations IA ne constituent pas des decisions confirmees."):
         assert required in text or required in workbook.sheetnames
     assert not [cell for sheet in workbook for row in sheet.iter_rows() for cell in row if cell.data_type == "f"]
@@ -59,7 +63,7 @@ def test_excel_is_structured_auditable_and_contains_no_formulas():
 
 def test_provider_text_cannot_become_an_excel_formula():
     workbook = load_workbook(BytesIO(generate_governed_excel(
-        _envelope(action='=HYPERLINK("https://invalid.example","click")')
+        _envelope(action='=HYPERLINK("https://invalid.example","click")'), ANALYSIS_ID
     )), data_only=False)
     action = workbook["Recommandations"]["B2"]
     assert action.data_type == "s"
@@ -67,32 +71,35 @@ def test_provider_text_cannot_become_an_excel_formula():
 
 
 def test_pdf_contains_governed_sections_and_no_confirmed_decision():
-    reader = PdfReader(BytesIO(generate_governed_pdf(_envelope())))
+    reader = PdfReader(BytesIO(generate_governed_pdf(_envelope(), ANALYSIS_ID)))
     text = "\n".join(page.extract_text() or "" for page in reader.pages)
     for required in ("Diagnostic - inference", "Faits sources", "Observations gouvernees",
                      "Observation source-matched: EBITDA = -145000", "Severite inferentielle: HIGH",
                      "Inferences et validations",
-                     "UNKNOWN et contradictions", "Recommandations proposees",
+                     "UNKNOWN et contradictions", "Recommandations proposees", ANALYSIS_ID,
+                     "Fournisseur simulé local", "Aucun réseau externe n'a été utilisé",
                      "ne constituent pas des decisions confirmees"):
         assert required in text
 
 
 def test_pptx_is_governed_complete_and_contains_no_confirmed_decision():
-    deck = Presentation(BytesIO(generate_governed_pptx(_envelope())))
+    deck = Presentation(BytesIO(generate_governed_pptx(_envelope(), ANALYSIS_ID)))
     text = "\n".join(
         shape.text for slide in deck.slides for shape in slide.shapes if hasattr(shape, "text_frame")
     )
     for required in ("Analyse financiere", "Situation executive", "INFERENCE",
                      "Constats financiers", "OBSERVATION SOURCE", "EBITDA = -145000",
                      "Severite inferentielle HIGH", "Evaluation et hypotheses",
-                     "UNKNOWN HIGH", "Decisions requises", "ACTION PROPOSEE",
+                     "UNKNOWN HIGH", "Recommandations proposées", "ACTION PROPOSEE", ANALYSIS_ID,
+                     "Fournisseur simulé local", "Aucun réseau externe n'a été utilisé",
                      "Obtenir le tableau des flux", "Aucune decision n'est presentee comme confirmee"):
         assert required in text
+    assert "Decisions requises" not in text
 
 
 def test_pptx_preserves_long_governed_content_on_continuation_slides():
     diagnosis = "Diagnostic complet " + "contenu professionnel " * 175
-    deck = Presentation(BytesIO(generate_governed_pptx(_envelope(diagnosis=diagnosis))))
+    deck = Presentation(BytesIO(generate_governed_pptx(_envelope(diagnosis=diagnosis), ANALYSIS_ID)))
     body_text = "".join(
         shape.text for slide in deck.slides for shape in slide.shapes
         if hasattr(shape, "text_frame") and shape.left == Inches(0.9)

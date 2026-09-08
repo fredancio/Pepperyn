@@ -17,7 +17,7 @@ from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
@@ -30,6 +30,15 @@ _BLUE = "2A6F97"
 _PALE = "EAF2F8"
 _TEXT = "243746"
 _ORANGE = "F28C28"
+_SYNTHETIC_PROVIDER = "Fournisseur simulé local"
+_NETWORK_DISCLOSURE = "Aucun réseau externe n'a été utilisé"
+
+
+def _durable_analysis_id(analysis_id: str) -> str:
+    value = str(analysis_id).strip()
+    if not value:
+        raise ValueError("analysis_id is required for governed exports")
+    return value
 
 
 def _neutralize_spreadsheet_formula(value: object) -> object:
@@ -51,10 +60,11 @@ def _refs(ids: tuple[str, ...], fact_map: dict[str, str]) -> str:
     return "; ".join(f"{fact_id}: {fact_map[fact_id]}" for fact_id in ids)
 
 
-def generate_governed_excel(envelope: GovernedAnalysisEnvelope) -> bytes:
+def generate_governed_excel(envelope: GovernedAnalysisEnvelope, analysis_id: str) -> bytes:
     """Render an auditable workbook from the validated envelope only."""
 
     envelope = GovernedAnalysisEnvelope.model_validate(envelope)
+    analysis_id = _durable_analysis_id(analysis_id)
     analysis, source = envelope.governed_analysis, envelope.source_facts
     fact_map = _fact_map(envelope)
     wb = Workbook()
@@ -63,6 +73,9 @@ def generate_governed_excel(envelope: GovernedAnalysisEnvelope) -> bytes:
     summary.sheet_view.showGridLines = False
     summary.append(["Pepperyn - Analyse financiere gouvernee"])
     summary.append(["Perimetre", "Donnees synthetiques uniquement"])
+    summary.append(["Identifiant durable de l'analyse", analysis_id])
+    summary.append(["Fournisseur", _SYNTHETIC_PROVIDER])
+    summary.append(["Reseau externe", _NETWORK_DISCLOSURE])
     summary.append(["Periode", source.current_period or "UNKNOWN"])
     summary.append(["Statut de comprehension", source.status])
     summary.append(["Empreinte source SHA-256", source.source_representation_sha256])
@@ -126,18 +139,19 @@ def generate_governed_excel(envelope: GovernedAnalysisEnvelope) -> bytes:
     summary.auto_filter.ref = None
     summary.merge_cells("A1:B1")
     summary["A1"].font = Font(name="Arial", size=14, bold=True, color="FFFFFF")
-    summary["A7"].fill = PatternFill("solid", fgColor=_PALE)
-    summary["A7"].font = Font(name="Arial", bold=True, color=_NAVY)
+    summary["A10"].fill = PatternFill("solid", fgColor=_PALE)
+    summary["A10"].font = Font(name="Arial", bold=True, color=_NAVY)
 
     output = BytesIO()
     wb.save(output)
     return output.getvalue()
 
 
-def generate_governed_pdf(envelope: GovernedAnalysisEnvelope) -> bytes:
+def generate_governed_pdf(envelope: GovernedAnalysisEnvelope, analysis_id: str) -> bytes:
     """Render a professional, bounded PDF from the validated envelope only."""
 
     envelope = GovernedAnalysisEnvelope.model_validate(envelope)
+    analysis_id = _durable_analysis_id(analysis_id)
     analysis, source = envelope.governed_analysis, envelope.source_facts
     fact_map = _fact_map(envelope)
     output = BytesIO()
@@ -162,6 +176,9 @@ def generate_governed_pdf(envelope: GovernedAnalysisEnvelope) -> bytes:
     story: list[object] = [Paragraph("Pepperyn - Analyse financiere gouvernee", title), Spacer(1, 3 * mm)]
     metadata = [
         [p("Perimetre", small), p("Donnees synthetiques uniquement", small)],
+        [p("Identifiant durable de l'analyse", small), p(analysis_id, small)],
+        [p("Fournisseur", small), p(_SYNTHETIC_PROVIDER, small)],
+        [p("Reseau externe", small), p(_NETWORK_DISCLOSURE, small)],
         [p("Periode", small), p(source.current_period or "UNKNOWN", small)],
         [p("Statut de comprehension", small), p(source.status, small)],
         [p("Empreinte source SHA-256", small), p(source.source_representation_sha256, small)],
@@ -199,13 +216,17 @@ def generate_governed_pdf(envelope: GovernedAnalysisEnvelope) -> bytes:
                       p("Fait cite: " + _refs((item.fact_id,), fact_map), small), Spacer(1, 2*mm)])
     story.extend(section("Inferences et validations"))
     for item in analysis.dimension_assessments:
-        story.extend([p(f"Dimension {item.scope} - score inferentiel {item.score}/10 (confiance {item.confidence}%)"),
-                      p(item.rationale), p("Faits cites: " + _refs(item.fact_ids, fact_map), small),
-                      p("Validations requises: " + "; ".join(item.validation_required), small), Spacer(1, 2*mm)])
+        story.append(KeepTogether([
+            p(f"Dimension {item.scope} - score inferentiel {item.score}/10 (confiance {item.confidence}%)"),
+            p(item.rationale), p("Faits cites: " + _refs(item.fact_ids, fact_map), small),
+            p("Validations requises: " + "; ".join(item.validation_required), small), Spacer(1, 2*mm),
+        ]))
     for item in analysis.inferences:
-        story.extend([p(f"Inference (confiance {item.confidence}%): {item.statement}"),
-                      p("Faits cites: " + _refs(item.fact_ids, fact_map), small),
-                      p("Validations requises: " + "; ".join(item.validation_required), small), Spacer(1, 2*mm)])
+        story.append(KeepTogether([
+            p(f"Inference (confiance {item.confidence}%): {item.statement}"),
+            p("Faits cites: " + _refs(item.fact_ids, fact_map), small),
+            p("Validations requises: " + "; ".join(item.validation_required), small), Spacer(1, 2*mm),
+        ]))
 
     story.extend(section("UNKNOWN et contradictions"))
     if not analysis.unknowns and not source.unknowns and not analysis.contradictions:
@@ -231,7 +252,7 @@ def generate_governed_pdf(envelope: GovernedAnalysisEnvelope) -> bytes:
     return output.getvalue()
 
 
-def generate_governed_pptx(envelope: GovernedAnalysisEnvelope) -> bytes:
+def generate_governed_pptx(envelope: GovernedAnalysisEnvelope, analysis_id: str) -> bytes:
     """Render a governed CODIR deck without reinterpreting provider output.
 
     The deck consumes only the immutable envelope. Long sections create
@@ -239,6 +260,7 @@ def generate_governed_pptx(envelope: GovernedAnalysisEnvelope) -> bytes:
     """
 
     envelope = GovernedAnalysisEnvelope.model_validate(envelope)
+    analysis_id = _durable_analysis_id(analysis_id)
     analysis, source = envelope.governed_analysis, envelope.source_facts
     fact_map = _fact_map(envelope)
     prs = Presentation()
@@ -328,7 +350,9 @@ def generate_governed_pptx(envelope: GovernedAnalysisEnvelope) -> bytes:
     add_text(cover, "Analyse financiere\npour decision CODIR", left=0.75, top=1.75,
              width=8.5, height=1.8, size=34, bold=True, text_color=_NAVY)
     add_text(cover, f"Periode {source.current_period or 'UNKNOWN'} | Donnees synthetiques uniquement",
-             left=0.78, top=4.15, width=8.5, height=0.45, size=16, text_color=_TEXT)
+             left=0.78, top=3.9, width=8.5, height=0.45, size=16, text_color=_TEXT)
+    add_text(cover, f"Analyse {analysis_id} | {_SYNTHETIC_PROVIDER} | {_NETWORK_DISCLOSURE}",
+             left=0.78, top=4.35, width=11.8, height=0.45, size=11, text_color=_BLUE)
     add_text(cover, "Recommandations proposees. Aucune decision n'est presentee comme confirmee.",
              left=0.78, top=5.0, width=10.8, height=0.6, size=15, bold=True,
              text_color=_ORANGE)
@@ -362,7 +386,7 @@ def generate_governed_pptx(envelope: GovernedAnalysisEnvelope) -> bytes:
         f"CONTRADICTION | {item.statement} | Faits: {_refs(item.fact_ids, fact_map)}"
         for item in analysis.contradictions
     ])
-    paginate("Decisions requises", [
+    paginate("Recommandations proposées", [
         f"{item.priority} | ACTION PROPOSEE | {item.action} | Rationale: {item.rationale} | "
         f"Faits: {_refs(item.fact_ids, fact_map) if item.fact_ids else 'Aucun'} | "
         f"Prerequis: {'; '.join(item.prerequisite_validation) or 'Aucun'}"

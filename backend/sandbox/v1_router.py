@@ -17,7 +17,7 @@ from sandbox.governed_exports import generate_governed_excel, generate_governed_
 from services.governed_analysis_persistence import (
     GovernedPersistenceRefused, load_governed_envelope, save_governed_analysis,
 )
-from sandbox.heterogeneous_workbooks import inspect_registered_workbook
+from sandbox.heterogeneous_workbooks import inspect_registered_workbook, run_registered_mock_analysis
 from sandbox.synthetic_product import SandboxRefused
 
 router = APIRouter(prefix="/api/v1", tags=["v1-synthetic"])
@@ -41,6 +41,55 @@ async def inspect_v1_synthetic_workbook(
             status_code=400,
             detail="Fichier refusé : sélectionnez uniquement un classeur synthétique V1 enregistré.",
         ) from exc
+
+
+@router.post("/synthetic-workbook-analysis", response_model=AnalyzeResponse)
+async def analyze_v1_synthetic_workbook(
+    file: UploadFile = File(...),
+    authorization: Optional[str] = Header(default=None),
+    x_auth_type: Optional[str] = Header(default=None),
+):
+    company_id, _, _ = await analyze_routes._resolve_auth(authorization, x_auth_type)
+    _require_designated_company(company_id)
+    raw = await file.read(1_000_001)
+    if len(raw) > 1_000_000:
+        raise HTTPException(status_code=413, detail="Classeur synthétique trop volumineux")
+    try:
+        mock = await asyncio.to_thread(run_registered_mock_analysis, raw, file.filename or "")
+    except SandboxRefused as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Analyse simulée refusée : utilisez le classeur synthétique English enregistré.",
+        ) from exc
+
+    from main import get_supabase_service
+    supabase = get_supabase_service()
+    _, entity_id, engagement_id = _resolve_primary_scope(supabase, company_id)
+    analysis_id = str(uuid.uuid4())
+    result = mock.envelope.analysis_result
+    result.id = analysis_id
+    save_governed_analysis(
+        supabase,
+        analysis_row={
+            "id": analysis_id, "company_id": company_id, "entity_id": entity_id,
+            "fichier_nom": mock.filename, "fichier_type": "xlsx",
+            "type_document": "AUTRE", "contexte_utilisateur": "",
+            "mode": "complete", "analyse_json": result.model_dump(mode="json"),
+            "score_confiance": 0, "tokens_input": 0, "cout_estime_euros": 0,
+            "duree_traitement_ms": 0, "status": "completed", "chat_count": 0,
+            "source_data_hash": mock.source_sha256.lower(),
+        },
+        engagement_id=engagement_id,
+        envelope=mock.envelope,
+    )
+    return AnalyzeResponse(
+        success=True,
+        message="Analyse V1 synthétique via fournisseur simulé local terminée",
+        analyse_id=analysis_id,
+        result=result,
+        tokens_used=0,
+        cout_estime=0,
+    )
 
 
 def _require_designated_company(company_id: str) -> None:
@@ -154,7 +203,7 @@ async def export_v1_governed_excel(
     _require_designated_company(company_id)
     from main import get_supabase_service
     envelope = _load_for_company(get_supabase_service(), analysis_id=analysis_id, company_id=company_id)
-    content = generate_governed_excel(envelope)
+    content = generate_governed_excel(envelope, analysis_id)
     return Response(content=content,
                     media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f'attachment; filename="pepperyn_v1_{analysis_id[:8]}.xlsx"'})
@@ -170,7 +219,7 @@ async def export_v1_governed_pdf(
     _require_designated_company(company_id)
     from main import get_supabase_service
     envelope = _load_for_company(get_supabase_service(), analysis_id=analysis_id, company_id=company_id)
-    content = generate_governed_pdf(envelope)
+    content = generate_governed_pdf(envelope, analysis_id)
     return Response(content=content, media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="pepperyn_v1_{analysis_id[:8]}.pdf"'})
 
@@ -185,7 +234,7 @@ async def export_v1_governed_pptx(
     _require_designated_company(company_id)
     from main import get_supabase_service
     envelope = _load_for_company(get_supabase_service(), analysis_id=analysis_id, company_id=company_id)
-    content = generate_governed_pptx(envelope)
+    content = generate_governed_pptx(envelope, analysis_id)
     return Response(content=content,
                     media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     headers={"Content-Disposition": f'attachment; filename="pepperyn_v1_{analysis_id[:8]}.pptx"'})

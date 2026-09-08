@@ -613,3 +613,88 @@ These decisions do not justify delaying the selected mission's evidence and cont
   fail closed with zero promoted facts; the unregistered copy is rejected
   before parsing. Provider transport, production mounting and real-data
   admission remain CLOSED.
+
+## 33. Uploaded-workbook governed analysis with local mock provider — 2026-09-08
+
+- **Critical-path purpose:** close the gap between the proven uploaded-file
+  understanding path and the already proven governed persistence/render path
+  without waiting for OpenAI account eligibility. The non-production interface
+  now exposes a separate action for the registered English workbook.
+- **End-to-end boundary:** exact filename plus SHA-256 admission → real quality
+  gate/parser/anonymizer → ten governed 2025 facts → bounded `store=false`
+  request construction → deterministic local mock response → invocation/source
+  lineage validation → governed envelope → tenant/entity/engagement-bound
+  persistence → ordinary governed result rendering and reload.
+- **Mock semantics:** the English mock is distinct from Optilux and does not
+  reuse its negative-EBITDA narrative. It cites the positive English-workbook
+  facts, separates literal observations from inference, carries confidence and
+  validation requirements, preserves a material UNKNOWN, and proposes no
+  confirmed decision.
+- **Fail-closed admission:** only
+  `pepperyn_v1_heterogeneous_english.xlsx` may enter this path. Renamed,
+  altered, unknown and all three AMBIGUOUS registered workbooks are refused
+  before mock analysis. The route remains designated-company-only, size
+  bounded, development-only and absent unless the synthetic flag is enabled.
+- **No external provider:** the mock is an in-process mapping with no transport
+  dependency. The built request uses model marker `mock-v1-local` and
+  `store=false`; it is validated but never dispatched. Persisted token and cost
+  fields are zero.
+- **Validation:** the focused upload/inspection/mock route and heterogeneous
+  workbook suite passes `20 passed`; the adjacent governed-contract selection
+  passes `45 passed`; frontend Jest passes `39 passed`; TypeScript passes.
+  Tests cover exact-file admission, all three ambiguity refusals, tenant
+  isolation, request invariants, governed lineage and persistence arguments.
+- **Admission status:** this closes an internal V1 convergence dependency only.
+  It does not satisfy or bypass the Provider Gate. External Provider remains
+  CLOSED and Real-data admission remains CLOSED.
+
+## 34. Persisted mock analysis and governed export closeout — 2026-09-08
+
+- **Founder persistence rehearsal — PASS:** the Founder ran the registered
+  `pepperyn_v1_heterogeneous_english.xlsx` once through the actual interface,
+  then restarted the backend and reloaded the same analysis from history
+  without creating another analysis. The governed facts, material `UNKNOWN`,
+  conditional action plan, validation requirements and distinction between an
+  AI recommendation and a professional decision all survived the restart.
+- **Durable analysis identity:** the persisted analysis and every final export
+  carry the complete UUID
+  `75132a71-c80c-4469-aba8-5171d947a9d0`. The source representation SHA-256
+  remains `9E23C4CE2B3C8F3F9C67E5DDAF609EF2EC44EB56492563BDADF7E296906785B7`
+  in all three formats.
+- **Initial export rehearsal and remediation:** the first three downloads were
+  structurally valid and mutually consistent but lacked the durable analysis
+  identifier and explicit mock/no-network provenance inside the artifacts.
+  The PowerPoint also used the unsafe heading `Decisions requises`, and the PDF
+  began its second page with an orphaned validation line. The three bounded
+  renderers now require the analysis identifier, disclose `Fournisseur simulé
+  local` and `Aucun réseau externe n'a été utilisé`, preserve the synthetic-data
+  label, use `Recommandations proposées`, and keep each PDF inference with its
+  validation block.
+- **Founder-observed final export files — PASS:** without creating a new
+  analysis, the Founder downloaded and the final QA inspected exactly:
+  `pepperyn_analyse_75132a71(1).xlsx`,
+  `pepperyn_analyse_75132a71-1.pdf`, and
+  `pepperyn_analyse_75132a71(1).pptx`. The older unsuffixed files were excluded
+  from the final verification.
+- **Artifact validity and content:** the XLSX and PPTX OpenXML packages pass
+  archive integrity checks and contain no external links or embedded external
+  content. The workbook contains the five expected sheets and no formulas. The
+  PDF is a valid, unencrypted two-page A4 document with no JavaScript. Across
+  all formats, the same ten source facts, fact references, inferences,
+  confidence levels, validation requirements, recommendation and material
+  `UNKNOWN` are present; no recommendation is represented as a confirmed
+  decision.
+- **Visual verification:** all five workbook sheets, both PDF pages and all six
+  PowerPoint slides were rendered and inspected. Accented French text is
+  correct, the PDF page break no longer separates a validation from its
+  inference, and the deck has no detected overflow or truncated content.
+- **Automated validation:** focused governed export and persisted-route tests
+  pass `12 passed`. The final persistence, export, Provider Gate, migration,
+  governed-contract, Golden Case, heterogeneous-workbook and synthetic-route
+  selection passes `135 passed`. The first broader attempt encountered only a
+  local pytest temporary-directory permission error; rerunning the identical
+  selection with an explicit isolated base directory passed completely.
+- **Closeout verdict:** governed XLSX/PDF/PPTX export from the existing
+  persisted V1 mock analysis is closed with final PASS. No provider request was
+  dispatched and no real datum was admitted. External Provider remains CLOSED
+  and Real-data admission remains CLOSED.

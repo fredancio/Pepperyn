@@ -10,6 +10,8 @@ from connectors import FileConnector
 from services.anonymization_service import anonymize_parsed_data
 from services.data_quality_gate import validate_excel_before_analysis
 from services.v1_analysis_contract import build_financial_understanding, build_openai_request
+from sandbox.heterogeneous_workbooks import run_registered_mock_analysis
+from sandbox.synthetic_product import SandboxRefused
 
 
 FIXTURES = Path(__file__).parent / "golden" / "fixtures"
@@ -127,3 +129,27 @@ def test_unsafe_workbooks_preserve_specific_unknown_and_forbid_provider_request(
     assert understanding.facts == ()
     with pytest.raises(ValueError, match="provider dispatch forbidden"):
         build_openai_request(anonymized, model="gpt-test")
+
+
+def test_registered_english_workbook_runs_full_governed_mock_contract_without_network():
+    filename = "pepperyn_v1_heterogeneous_english.xlsx"
+    result = run_registered_mock_analysis((FIXTURES / filename).read_bytes(), filename)
+
+    assert result.provider_mode == "DETERMINISTIC_MOCK_NO_NETWORK"
+    assert result.provider_request["model"] == "mock-v1-local"
+    assert result.provider_request["store"] is False
+    assert result.envelope.source_facts.status == "UNDERSTOOD"
+    assert result.envelope.source_facts.current_period == "2025"
+    assert len(result.envelope.source_facts.facts) == 10
+    assert result.envelope.analysis_result.verification_tag == "V1_GOVERNED_SINGLE_CALL"
+    result.envelope.governed_analysis.validate_against(result.envelope.source_facts)
+
+
+@pytest.mark.parametrize("filename", [
+    "pepperyn_v1_heterogeneous_ambiguous_period.xlsx",
+    "pepperyn_v1_heterogeneous_ambiguous_number.xlsx",
+    "pepperyn_v1_heterogeneous_conflict.xlsx",
+])
+def test_ambiguous_registered_workbooks_cannot_enter_mock_analysis(filename):
+    with pytest.raises(SandboxRefused, match="MOCK_ANALYSIS_REQUIRES"):
+        run_registered_mock_analysis((FIXTURES / filename).read_bytes(), filename)
