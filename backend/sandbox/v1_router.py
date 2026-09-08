@@ -7,7 +7,7 @@ import os
 import uuid
 from typing import Optional
 
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
 from models.schemas import AnalyzeResponse
@@ -17,8 +17,30 @@ from sandbox.governed_exports import generate_governed_excel, generate_governed_
 from services.governed_analysis_persistence import (
     GovernedPersistenceRefused, load_governed_envelope, save_governed_analysis,
 )
+from sandbox.heterogeneous_workbooks import inspect_registered_workbook
+from sandbox.synthetic_product import SandboxRefused
 
 router = APIRouter(prefix="/api/v1", tags=["v1-synthetic"])
+
+
+@router.post("/synthetic-workbook-inspection")
+async def inspect_v1_synthetic_workbook(
+    file: UploadFile = File(...),
+    authorization: Optional[str] = Header(default=None),
+    x_auth_type: Optional[str] = Header(default=None),
+):
+    company_id, _, _ = await analyze_routes._resolve_auth(authorization, x_auth_type)
+    _require_designated_company(company_id)
+    raw = await file.read(1_000_001)
+    if len(raw) > 1_000_000:
+        raise HTTPException(status_code=413, detail="Classeur synthétique trop volumineux")
+    try:
+        return inspect_registered_workbook(raw, file.filename or "")
+    except SandboxRefused as exc:
+        raise HTTPException(
+            status_code=400,
+            detail="Fichier refusé : sélectionnez uniquement un classeur synthétique V1 enregistré.",
+        ) from exc
 
 
 def _require_designated_company(company_id: str) -> None:

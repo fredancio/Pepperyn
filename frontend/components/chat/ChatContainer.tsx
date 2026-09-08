@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { Message, Session } from '@/lib/types';
-import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, fetchPreviousRecommendations, fetchConversationContext, runV1SyntheticDemo, fetchV1GovernedAnalysis, type BillingUsage, type Entity, type EntityRelationType } from '@/lib/api';
+import { analyzeFile, analyzeText, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, fetchPreviousRecommendations, fetchConversationContext, runV1SyntheticDemo, inspectV1SyntheticWorkbook, fetchV1GovernedAnalysis, type BillingUsage, type Entity, type EntityRelationType } from '@/lib/api';
 import { getCurrentAuthMode, signOutAdmin, clearGuestAuth, getGuestPlan } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { MessageBubble, TypingIndicator } from './MessageBubble';
@@ -261,6 +261,28 @@ export function ChatContainer() {
         'assistant', error instanceof Error ? error.message : 'Démonstration V1 indisponible', 'error',
       )]);
     } finally {
+      setIsTyping(false);
+    }
+  }, []);
+
+  const syntheticWorkbookInputRef = useRef<HTMLInputElement>(null);
+  const handleV1SyntheticWorkbook = useCallback(async (file: File) => {
+    setIsTyping(true);
+    try {
+      const result = await inspectV1SyntheticWorkbook(file);
+      const detail = result.status === 'UNDERSTOOD'
+        ? `Compréhension établie pour ${result.current_period} : ${result.facts.length} faits gouvernés.`
+        : `Compréhension ${result.status.toLowerCase()} : ${result.unknowns.join(' ')}`;
+      setMessages(prev => [...prev,
+        makeLocalMessage('user', file.name, 'file'),
+        makeLocalMessage('assistant', `Inspection synthétique V1 — ${detail} Aucun appel fournisseur n’a été effectué.`, 'text'),
+      ]);
+    } catch (error) {
+      setMessages(prev => [...prev, makeLocalMessage(
+        'assistant', error instanceof Error ? error.message : 'Inspection synthétique indisponible', 'error',
+      )]);
+    } finally {
+      if (syntheticWorkbookInputRef.current) syntheticWorkbookInputRef.current.value = '';
       setIsTyping(false);
     }
   }, []);
@@ -1051,14 +1073,35 @@ export function ChatContainer() {
                 </div>
 
                 {V1_SYNTHETIC_DEMO_ENABLED && (
-                  <button
-                    type="button"
-                    onClick={handleV1SyntheticDemo}
-                    disabled={isTyping}
-                    className="w-full rounded-xl border border-[#1B73E8] px-4 py-3 text-sm font-semibold text-[#1B73E8] hover:bg-[#EFF6FF] disabled:opacity-50"
-                  >
-                    Lancer la démonstration V1 synthétique
-                  </button>
+                  <div className="w-full flex flex-col gap-2">
+                    <button
+                      type="button"
+                      onClick={handleV1SyntheticDemo}
+                      disabled={isTyping}
+                      className="w-full rounded-xl border border-[#1B73E8] px-4 py-3 text-sm font-semibold text-[#1B73E8] hover:bg-[#EFF6FF] disabled:opacity-50"
+                    >
+                      Lancer la démonstration V1 synthétique
+                    </button>
+                    <input
+                      ref={syntheticWorkbookInputRef}
+                      type="file"
+                      accept=".xlsx"
+                      className="hidden"
+                      onChange={event => {
+                        const file = event.target.files?.[0];
+                        if (file) void handleV1SyntheticWorkbook(file);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => syntheticWorkbookInputRef.current?.click()}
+                      disabled={isTyping}
+                      className="w-full rounded-xl border border-amber-500 px-4 py-3 text-sm font-semibold text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                    >
+                      Tester un classeur synthétique V1 enregistré
+                    </button>
+                    <p className="text-center text-xs text-[#5F6368]">Tout autre fichier est refusé · appel fournisseur fermé</p>
+                  </div>
                 )}
 
                 {/* Value proof */}

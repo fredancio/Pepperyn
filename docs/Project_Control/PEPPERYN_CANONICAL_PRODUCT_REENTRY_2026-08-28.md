@@ -542,3 +542,30 @@ These decisions do not justify delaying the selected mission's evidence and cont
   environment because the historical standalone EDM script exits during
   collection and the development venv lacks optional `pypdf`; neither affects
   this bounded pipeline evidence.
+
+## 32. Closed interface rehearsal for heterogeneous workbooks — 2026-09-08
+
+- **Interface path:** when the non-production V1 synthetic flag is enabled,
+  `/app/chat` exposes a distinct XLSX selector for the four registered
+  heterogeneous fixtures. It does not reuse or silently redirect into the
+  ordinary `/api/analyze` real-file path.
+- **Byte-exact admission:** the backend accepts only an exact registered
+  filename and SHA-256 pair, reads at most 1 MB and requires the authenticated
+  designated synthetic company. A renamed registered file, altered bytes,
+  unknown input or another company is rejected before parsing.
+- **Bounded result:** the route executes the real local quality gate, parser,
+  connector, anonymizer and governed-understanding builder. It returns only
+  UNDERSTOOD/AMBIGUOUS/INSUFFICIENT, current-period facts or explicit UNKNOWNs,
+  and the literal marker `provider_dispatch: CLOSED`. It neither builds a
+  provider request nor persists an analysis.
+- **Interface semantics:** the positive workbook reports period 2025 and ten
+  governed facts. Each unsafe workbook reports AMBIGUOUS with its explicit
+  reason and zero promoted facts. The interface states that no provider call
+  occurred; ordinary real-file upload remains separate and unchanged.
+- **Validation:** dedicated HTTP scenarios cover the registered positive case,
+  all three ambiguous cases, rename/unknown rejection and company isolation;
+  together with the fixture pipeline they pass `15 passed`. Frontend Jest
+  passes, TypeScript passes and lint reports only pre-existing warnings.
+- **Security/admission:** the route remains absent from production and from any
+  environment without the explicit synthetic flag. Provider transport and
+  real-data admission remain CLOSED.

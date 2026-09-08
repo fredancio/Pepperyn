@@ -138,6 +138,33 @@ export async function runV1SyntheticDemo() {
   return data;
 }
 
+export type V1SyntheticWorkbookInspection = {
+  filename: string;
+  source_sha256: string;
+  status: 'UNDERSTOOD' | 'AMBIGUOUS' | 'INSUFFICIENT';
+  current_period: string | null;
+  facts: Array<{ metric: string; value: number; unit: string }>;
+  unknowns: string[];
+  provider_dispatch: 'CLOSED';
+};
+
+export async function inspectV1SyntheticWorkbook(file: File): Promise<V1SyntheticWorkbookInspection> {
+  const headers = await getAuthHeaders();
+  const formData = new FormData();
+  formData.append('file', file);
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}/api/v1/synthetic-workbook-inspection`, {
+      method: 'POST', headers, body: formData,
+    });
+  } catch {
+    throw new Error('Impossible de joindre le serveur Pepperyn. Vérifiez que le service est démarré puis réessayez.');
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { detail?: string }).detail || 'Inspection synthétique indisponible');
+  return data as V1SyntheticWorkbookInspection;
+}
+
 export async function fetchV1GovernedAnalysis(analyseId: string) {
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/api/v1/governed-analyses/${encodeURIComponent(analyseId)}`, { headers });
