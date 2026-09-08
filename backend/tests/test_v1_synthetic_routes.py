@@ -278,6 +278,23 @@ def test_feedback_read_outage_does_not_hide_verified_governed_analysis(monkeypat
     assert all(item["status"] is None for item in loaded.recommendations_tracking)
 
 
+def test_feedback_read_outage_refuses_export_instead_of_hiding_a_decision(monkeypatch):
+    db = _Db(); _enable(monkeypatch, db)
+    created = asyncio.run(v1_routes.run_v1_synthetic_demo(
+        request=_empty_request(), authorization="Bearer test", x_auth_type=None,
+    ))
+    unavailable = _FeedbackReadUnavailableDb()
+    unavailable.tables = copy.deepcopy(db.tables)
+    monkeypatch.setattr(main, "get_supabase_service", lambda: unavailable)
+
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(v1_routes.export_v1_governed_excel(
+            created.analyse_id, authorization="Bearer test", x_auth_type=None,
+        ))
+    assert error.value.status_code == 503
+    assert "export gouverné refusé" in error.value.detail
+
+
 def test_second_company_cannot_reload_first_company_analysis(monkeypatch):
     db = _Db(); _enable(monkeypatch, db)
     created = asyncio.run(v1_routes.run_v1_synthetic_demo(

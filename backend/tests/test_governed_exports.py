@@ -14,6 +14,19 @@ from services.v1_analysis_contract import GovernedAnalysisEnvelope
 ANALYSIS_ID = "75132a71-1111-4222-8333-123456789abc"
 
 
+def _decision() -> dict:
+    return {
+        "status": "decided",
+        "text": "Valider le tableau des flux.",
+        "prerequisite_validation": ["Obtenir le tableau des flux."],
+        "decision_kind": "accepted_conditional",
+        "decision_text": "Retenir uniquement apres verification des flux.",
+        "decision_confirmed_at": "2026-09-08T15:20:00+00:00",
+        "decision_confirmation_source": "explicit",
+        "prerequisites_acknowledged": True,
+    }
+
+
 def _envelope(*, action: str = "Valider le tableau des flux.",
               diagnosis: str = "La rentabilite operationnelle est negative.") -> GovernedAnalysisEnvelope:
     fact_id = "FABCDEF123456"
@@ -82,6 +95,14 @@ def test_pdf_contains_governed_sections_and_no_confirmed_decision():
         assert required in text
 
 
+def test_pdf_keeps_inference_heading_with_its_first_content_block():
+    reader = PdfReader(BytesIO(generate_governed_pdf(_envelope(), ANALYSIS_ID, [_decision()])))
+    pages = [page.extract_text() or "" for page in reader.pages]
+    heading_page = next(page for page in pages if "Inferences et validations" in page)
+    assert "Dimension PROFITABILITY" in heading_page
+    assert not heading_page.rstrip().endswith("Inferences et validations")
+
+
 def test_pptx_is_governed_complete_and_contains_no_confirmed_decision():
     deck = Presentation(BytesIO(generate_governed_pptx(_envelope(), ANALYSIS_ID)))
     text = "\n".join(
@@ -121,3 +142,41 @@ def test_pptx_preserves_long_governed_content_on_continuation_slides():
     ]
     assert all(" | " in text for text in all_body_chunks)
     assert len(deck.slides) > 6
+
+
+def test_all_exports_include_the_same_explicit_conditional_decision():
+    decision = _decision()
+    workbook = load_workbook(BytesIO(generate_governed_excel(
+        _envelope(), ANALYSIS_ID, [decision],
+    )), data_only=False)
+    excel_text = "\n".join(
+        str(cell.value) for sheet in workbook for row in sheet.iter_rows()
+        for cell in row if cell.value is not None
+    )
+    pdf = PdfReader(BytesIO(generate_governed_pdf(_envelope(), ANALYSIS_ID, [decision])))
+    pdf_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+    deck = Presentation(BytesIO(generate_governed_pptx(_envelope(), ANALYSIS_ID, [decision])))
+    pptx_text = "\n".join(
+        shape.text for slide in deck.slides for shape in slide.shapes if hasattr(shape, "text_frame")
+    )
+
+    assert "Decisions confirmees" in workbook.sheetnames
+    for text in (excel_text, pdf_text, pptx_text):
+        assert "Retenue sous conditions" in text
+        assert decision["decision_text"] in text
+        assert decision["decision_confirmed_at"] in text
+        assert "Validations toujours requises" in text
+        assert decision["prerequisite_validation"][0] in text
+        assert "Aucun arc decisionnel n'a ete cree" in text
+
+
+def test_export_refuses_incomplete_or_non_explicit_decision():
+    decision = _decision()
+    decision["decision_confirmation_source"] = "inferred_from_execution"
+    for renderer in (generate_governed_excel, generate_governed_pdf, generate_governed_pptx):
+        try:
+            renderer(_envelope(), ANALYSIS_ID, [decision])
+        except ValueError as exc:
+            assert "non-explicit" in str(exc)
+        else:
+            raise AssertionError("A non-explicit decision must never enter a governed export")

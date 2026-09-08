@@ -60,13 +60,41 @@ def _refs(ids: tuple[str, ...], fact_map: dict[str, str]) -> str:
     return "; ".join(f"{fact_id}: {fact_map[fact_id]}" for fact_id in ids)
 
 
-def generate_governed_excel(envelope: GovernedAnalysisEnvelope, analysis_id: str) -> bytes:
+def _confirmed_decisions(decisions: list[dict] | None) -> list[dict]:
+    """Accept only complete decisions known to have been explicitly confirmed."""
+
+    result = []
+    for item in decisions or []:
+        if (
+            item.get("status") != "decided"
+            or item.get("decision_confirmation_source") != "explicit"
+            or item.get("decision_kind") not in {"accepted_conditional", "modified", "rejected"}
+            or not str(item.get("decision_text") or "").strip()
+            or not item.get("decision_confirmed_at")
+        ):
+            raise ValueError("incomplete or non-explicit governed decision")
+        result.append(item)
+    return result
+
+
+def _decision_kind_label(kind: str) -> str:
+    return {
+        "accepted_conditional": "Retenue sous conditions",
+        "modified": "Adaptee",
+        "rejected": "Non retenue",
+    }[kind]
+
+
+def generate_governed_excel(
+    envelope: GovernedAnalysisEnvelope, analysis_id: str, decisions: list[dict] | None = None,
+) -> bytes:
     """Render an auditable workbook from the validated envelope only."""
 
     envelope = GovernedAnalysisEnvelope.model_validate(envelope)
     analysis_id = _durable_analysis_id(analysis_id)
     analysis, source = envelope.governed_analysis, envelope.source_facts
     fact_map = _fact_map(envelope)
+    decisions = _confirmed_decisions(decisions)
     wb = Workbook()
     summary = wb.active
     summary.title = "Synthese"
@@ -83,7 +111,11 @@ def generate_governed_excel(envelope: GovernedAnalysisEnvelope, analysis_id: str
     summary.append(["Diagnostic (inference)", analysis.executive_diagnosis])
     summary.append(["Faits cites", _refs(analysis.diagnosis_fact_ids, fact_map)])
     summary.append([])
-    summary.append(["Limite", "Les recommandations IA ne constituent pas des decisions confirmees."])
+    summary.append([
+        "Limite",
+        ("Une recommandation IA n'est pas une decision professionnelle."
+         if decisions else "Les recommandations IA ne constituent pas des decisions confirmees."),
+    ])
 
     facts = wb.create_sheet("Faits sources")
     facts.append(["Fact ID", "Metrique", "Valeur", "Unite", "Periode", "Feuille source", "Champ source"])
@@ -111,6 +143,20 @@ def generate_governed_excel(envelope: GovernedAnalysisEnvelope, analysis_id: str
     for item in analysis.recommendations:
         recommendations.append([item.priority, item.action, item.rationale,
                                 _refs(item.fact_ids, fact_map), "; ".join(item.prerequisite_validation)])
+
+    if decisions:
+        confirmed = wb.create_sheet("Decisions confirmees")
+        confirmed.append([
+            "Recommandation", "Decision professionnelle", "Motivation", "Confirmee le",
+            "Source de confirmation", "Validations toujours requises", "Arc decisionnel",
+        ])
+        for item in decisions:
+            confirmed.append([
+                item["text"], _decision_kind_label(item["decision_kind"]), item["decision_text"],
+                item["decision_confirmed_at"], "Explicite",
+                "; ".join(item.get("prerequisite_validation") or []) or "Aucune",
+                "Aucun arc decisionnel n'a ete cree.",
+            ])
 
     unknowns = wb.create_sheet("UNKNOWN")
     unknowns.append(["Materialite", "Question non resolue"])
@@ -147,13 +193,16 @@ def generate_governed_excel(envelope: GovernedAnalysisEnvelope, analysis_id: str
     return output.getvalue()
 
 
-def generate_governed_pdf(envelope: GovernedAnalysisEnvelope, analysis_id: str) -> bytes:
+def generate_governed_pdf(
+    envelope: GovernedAnalysisEnvelope, analysis_id: str, decisions: list[dict] | None = None,
+) -> bytes:
     """Render a professional, bounded PDF from the validated envelope only."""
 
     envelope = GovernedAnalysisEnvelope.model_validate(envelope)
     analysis_id = _durable_analysis_id(analysis_id)
     analysis, source = envelope.governed_analysis, envelope.source_facts
     fact_map = _fact_map(envelope)
+    decisions = _confirmed_decisions(decisions)
     output = BytesIO()
     styles = getSampleStyleSheet()
     title = ParagraphStyle("PepperynTitle", parent=styles["Title"], fontName="Helvetica-Bold",
@@ -214,19 +263,26 @@ def generate_governed_pdf(envelope: GovernedAnalysisEnvelope, analysis_id: str) 
         story.extend([p(f"Observation source-matched: {item.metric} = {item.observed_value}"),
                       p(f"Severite inferentielle: {item.severity}"),
                       p("Fait cite: " + _refs((item.fact_id,), fact_map), small), Spacer(1, 2*mm)])
-    story.extend(section("Inferences et validations"))
+    reasoning_blocks: list[list[object]] = []
     for item in analysis.dimension_assessments:
-        story.append(KeepTogether([
+        reasoning_blocks.append([
             p(f"Dimension {item.scope} - score inferentiel {item.score}/10 (confiance {item.confidence}%)"),
             p(item.rationale), p("Faits cites: " + _refs(item.fact_ids, fact_map), small),
             p("Validations requises: " + "; ".join(item.validation_required), small), Spacer(1, 2*mm),
-        ]))
+        ])
     for item in analysis.inferences:
-        story.append(KeepTogether([
+        reasoning_blocks.append([
             p(f"Inference (confiance {item.confidence}%): {item.statement}"),
             p("Faits cites: " + _refs(item.fact_ids, fact_map), small),
             p("Validations requises: " + "; ".join(item.validation_required), small), Spacer(1, 2*mm),
-        ]))
+        ])
+    if reasoning_blocks:
+        # Keep the heading with the first governed reasoning block. This avoids
+        # an orphan heading without forcing the complete section onto one page.
+        story.append(KeepTogether([Paragraph("Inferences et validations", heading), *reasoning_blocks[0]]))
+        story.extend(KeepTogether(block) for block in reasoning_blocks[1:])
+    else:
+        story.append(KeepTogether([Paragraph("Inferences et validations", heading), p("Aucun element declare.")]))
 
     story.extend(section("UNKNOWN et contradictions"))
     if not analysis.unknowns and not source.unknowns and not analysis.contradictions:
@@ -243,7 +299,23 @@ def generate_governed_pdf(envelope: GovernedAnalysisEnvelope, analysis_id: str) 
         story.extend([p(f"{item.priority} - {item.action}"), p(item.rationale),
                       p("Faits cites: " + (_refs(item.fact_ids, fact_map) if item.fact_ids else "Aucun"), small),
                       p("Prerequis: " + ("; ".join(item.prerequisite_validation) or "Aucun"), small), Spacer(1, 2*mm)])
-    story.extend([Spacer(1, 3*mm), p("Les recommandations IA ne constituent pas des decisions confirmees.", small)])
+    disclaimer = (
+        "Une recommandation IA n'est pas une decision professionnelle."
+        if decisions else "Les recommandations IA ne constituent pas des decisions confirmees."
+    )
+    story.extend([Spacer(1, 3*mm), p(disclaimer, small)])
+    if decisions:
+        story.extend(section("Decisions professionnelles confirmees explicitement"))
+        for item in decisions:
+            story.append(KeepTogether([
+                p(f"Decision: {_decision_kind_label(item['decision_kind'])}"),
+                p("Recommandation source: " + item["text"], small),
+                p("Motivation professionnelle: " + item["decision_text"]),
+                p("Confirmee explicitement le: " + item["decision_confirmed_at"], small),
+                p("Validations toujours requises: " +
+                  ("; ".join(item.get("prerequisite_validation") or []) or "Aucune"), small),
+                p("Aucun arc decisionnel n'a ete cree.", small), Spacer(1, 2*mm),
+            ]))
 
     doc = SimpleDocTemplate(output, pagesize=A4, rightMargin=15*mm, leftMargin=15*mm,
                             topMargin=14*mm, bottomMargin=14*mm,
@@ -252,7 +324,9 @@ def generate_governed_pdf(envelope: GovernedAnalysisEnvelope, analysis_id: str) 
     return output.getvalue()
 
 
-def generate_governed_pptx(envelope: GovernedAnalysisEnvelope, analysis_id: str) -> bytes:
+def generate_governed_pptx(
+    envelope: GovernedAnalysisEnvelope, analysis_id: str, decisions: list[dict] | None = None,
+) -> bytes:
     """Render a governed CODIR deck without reinterpreting provider output.
 
     The deck consumes only the immutable envelope. Long sections create
@@ -263,6 +337,7 @@ def generate_governed_pptx(envelope: GovernedAnalysisEnvelope, analysis_id: str)
     analysis_id = _durable_analysis_id(analysis_id)
     analysis, source = envelope.governed_analysis, envelope.source_facts
     fact_map = _fact_map(envelope)
+    decisions = _confirmed_decisions(decisions)
     prs = Presentation()
     prs.slide_width = Inches(13.333)
     prs.slide_height = Inches(7.5)
@@ -353,7 +428,11 @@ def generate_governed_pptx(envelope: GovernedAnalysisEnvelope, analysis_id: str)
              left=0.78, top=3.9, width=8.5, height=0.45, size=16, text_color=_TEXT)
     add_text(cover, f"Analyse {analysis_id} | {_SYNTHETIC_PROVIDER} | {_NETWORK_DISCLOSURE}",
              left=0.78, top=4.35, width=11.8, height=0.45, size=11, text_color=_BLUE)
-    add_text(cover, "Recommandations proposees. Aucune decision n'est presentee comme confirmee.",
+    cover_status = (
+        "Decision professionnelle explicite incluse; recommandations distinctes."
+        if decisions else "Recommandations proposees. Aucune decision n'est presentee comme confirmee."
+    )
+    add_text(cover, cover_status,
              left=0.78, top=5.0, width=10.8, height=0.6, size=15, bold=True,
              text_color=_ORANGE)
     add_text(cover, f"Source SHA-256 {source.source_representation_sha256}",
@@ -392,6 +471,15 @@ def generate_governed_pptx(envelope: GovernedAnalysisEnvelope, analysis_id: str)
         f"Prerequis: {'; '.join(item.prerequisite_validation) or 'Aucun'}"
         for item in analysis.recommendations
     ])
+    if decisions:
+        paginate("Decisions professionnelles confirmees", [
+            f"DECISION EXPLICITE | {_decision_kind_label(item['decision_kind'])} | "
+            f"Recommandation source: {item['text']} | Motivation: {item['decision_text']} | "
+            f"Confirmee le: {item['decision_confirmed_at']} | "
+            f"Validations toujours requises: {'; '.join(item.get('prerequisite_validation') or []) or 'Aucune'} | "
+            "Aucun arc decisionnel n'a ete cree."
+            for item in decisions
+        ])
 
     output = BytesIO()
     prs.save(output)

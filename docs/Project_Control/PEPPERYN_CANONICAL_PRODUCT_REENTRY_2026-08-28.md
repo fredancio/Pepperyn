@@ -820,3 +820,47 @@ These decisions do not justify delaying the selected mission's evidence and cont
 - **Admission status:** this rehearsal uses only the existing synthetic mock
   analysis. External Provider remains CLOSED and Real-data admission remains
   CLOSED.
+
+## 38. Governed exports after explicit decision — 2026-09-08
+
+- **Critical-path correction:** the governed export routes previously rendered
+  only the immutable analysis envelope. After a professional decision had been
+  confirmed, a fresh export could therefore omit that persisted decision and
+  contradict the interface. The routes now combine the integrity-checked
+  envelope with the recommendation-bound decision registry at export time.
+- **Fail-closed boundary:** only complete decisions with status `decided`,
+  confirmation source `explicit`, an allowed decision kind, professional
+  motivation and confirmation timestamp can enter an export. If the decision
+  registry is unavailable, the export returns HTTP 503 instead of silently
+  producing a stale document. The analysis envelope remains unchanged and no
+  DecisionArc is created.
+- **Cross-format semantics:** XLSX, PDF and PPTX preserve the recommendation as
+  a proposal and add the confirmed professional decision separately. Each
+  carries `Retenue sous conditions`, the exact Founder motivation, confirmation
+  timestamp, validations still required and the explicit statement that no
+  DecisionArc was created. The durable analysis UUID, source SHA-256, synthetic
+  scope, local mock-provider disclosure and no-external-network disclosure
+  remain present.
+- **Founder-observed export rehearsal:** from persisted analysis
+  `75132a71-c80c-4469-aba8-5171d947a9d0`, without a new analysis or decision
+  write, the Founder downloaded and QA inspected exactly
+  `pepperyn_analyse_75132a71(2).xlsx`,
+  `pepperyn_analyse_75132a71-2.pdf` and
+  `pepperyn_analyse_75132a71(2).pptx`. The XLSX and PPTX passed structural,
+  content and visual review. The first PDF carried the complete correct content
+  but left `Inferences et validations` isolated at the foot of page 1.
+- **PDF pagination correction and final PASS:** the heading is now kept with
+  the first governed reasoning block, without forcing the whole section onto
+  one page. The Founder downloaded only the corrected
+  `pepperyn_analyse_75132a71-3.pdf`. Final inspection confirmed a valid,
+  unencrypted two-page A4 PDF with no JavaScript or attachment, no clipping or
+  overlap, and the heading plus first evaluation together at the top of page 2.
+  Its SHA-256 is
+  `CD7A585B52C919E2D9921D582B6D28B9CD6565CC160B761C8081B957D2C510BE`.
+- **Automated validation:** the final focused export, persistence-route and V29
+  contract selection passes `22 passed`. Tests cover decision inclusion across
+  all formats, rejection of incomplete or non-explicit decision state,
+  fail-closed registry availability and PDF heading/content pagination.
+- **Closeout verdict:** governed exports from the existing persisted decision
+  are closed with final PASS. External Provider remains CLOSED and Real-data
+  admission remains CLOSED.

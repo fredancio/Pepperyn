@@ -28,7 +28,9 @@ router = APIRouter(prefix="/api/v1", tags=["v1-synthetic"])
 logger = logging.getLogger(__name__)
 
 
-def _recommendations_tracking(envelope, analysis_id: str, supabase=None) -> list[dict]:
+def _recommendations_tracking(
+    envelope, analysis_id: str, supabase=None, *, feedback_required: bool = False,
+) -> list[dict]:
     """Project governed recommendations into the existing intention UI contract.
 
     This is deliberately an intention/feedback projection only. It neither
@@ -60,6 +62,11 @@ def _recommendations_tracking(envelope, analysis_id: str, supabase=None) -> list
             .eq("report_id", analysis_id).execute()
         ).data or []
     except Exception as exc:
+        if feedback_required:
+            raise HTTPException(
+                status_code=503,
+                detail="État décisionnel indisponible : export gouverné refusé.",
+            ) from exc
         # The governed analysis is authoritative and already integrity-checked.
         # A secondary feedback-registry outage must not make that analysis
         # disappear. Absence is represented as UNKNOWN; writes remain
@@ -393,8 +400,13 @@ async def export_v1_governed_excel(
     company_id, _, _ = await analyze_routes._resolve_auth(authorization, x_auth_type)
     _require_designated_company(company_id)
     from main import get_supabase_service
-    envelope = _load_for_company(get_supabase_service(), analysis_id=analysis_id, company_id=company_id)
-    content = generate_governed_excel(envelope, analysis_id)
+    supabase = get_supabase_service()
+    envelope = _load_for_company(supabase, analysis_id=analysis_id, company_id=company_id)
+    decisions = [item for item in _recommendations_tracking(
+        envelope, analysis_id, supabase, feedback_required=True,
+    )
+                 if item.get("decision_confirmed_at")]
+    content = generate_governed_excel(envelope, analysis_id, decisions)
     return Response(content=content,
                     media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f'attachment; filename="pepperyn_v1_{analysis_id[:8]}.xlsx"'})
@@ -409,8 +421,13 @@ async def export_v1_governed_pdf(
     company_id, _, _ = await analyze_routes._resolve_auth(authorization, x_auth_type)
     _require_designated_company(company_id)
     from main import get_supabase_service
-    envelope = _load_for_company(get_supabase_service(), analysis_id=analysis_id, company_id=company_id)
-    content = generate_governed_pdf(envelope, analysis_id)
+    supabase = get_supabase_service()
+    envelope = _load_for_company(supabase, analysis_id=analysis_id, company_id=company_id)
+    decisions = [item for item in _recommendations_tracking(
+        envelope, analysis_id, supabase, feedback_required=True,
+    )
+                 if item.get("decision_confirmed_at")]
+    content = generate_governed_pdf(envelope, analysis_id, decisions)
     return Response(content=content, media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="pepperyn_v1_{analysis_id[:8]}.pdf"'})
 
@@ -424,8 +441,13 @@ async def export_v1_governed_pptx(
     company_id, _, _ = await analyze_routes._resolve_auth(authorization, x_auth_type)
     _require_designated_company(company_id)
     from main import get_supabase_service
-    envelope = _load_for_company(get_supabase_service(), analysis_id=analysis_id, company_id=company_id)
-    content = generate_governed_pptx(envelope, analysis_id)
+    supabase = get_supabase_service()
+    envelope = _load_for_company(supabase, analysis_id=analysis_id, company_id=company_id)
+    decisions = [item for item in _recommendations_tracking(
+        envelope, analysis_id, supabase, feedback_required=True,
+    )
+                 if item.get("decision_confirmed_at")]
+    content = generate_governed_pptx(envelope, analysis_id, decisions)
     return Response(content=content,
                     media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     headers={"Content-Disposition": f'attachment; filename="pepperyn_v1_{analysis_id[:8]}.pptx"'})
