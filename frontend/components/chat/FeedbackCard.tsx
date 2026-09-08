@@ -118,6 +118,30 @@ export function FeedbackCard({ reportId, recommendations, governedV1 = false }: 
             <div key={rec.id} className="bg-white rounded-xl border border-blue-100 p-4">
               <p className="text-sm text-[#1A1A2E] leading-relaxed mb-3">{stripMarkdown(rec.text)}</p>
 
+              {governedV1 && rec.rationale && (
+                <div className="mb-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                  <span className="font-semibold">Pourquoi cette recommandation : </span>
+                  {stripMarkdown(rec.rationale)}
+                </div>
+              )}
+
+              {governedV1 && (rec.prerequisite_validation?.length ?? 0) > 0 && (
+                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                  <p className="text-xs font-semibold text-amber-900">Validations requises avant toute décision</p>
+                  <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-amber-900">
+                    {rec.prerequisite_validation!.map((item) => (
+                      <li key={item}>{stripMarkdown(item)}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {governedV1 && (rec.fact_ids?.length ?? 0) > 0 && (
+                <p className="mb-3 text-[11px] text-[#5F6368]">
+                  Références factuelles : {rec.fact_ids!.join(', ')}
+                </p>
+              )}
+
               {!isSaved && (
                 <div className="flex flex-wrap gap-2">
                   {INTENTION_OPTIONS.map(opt => (

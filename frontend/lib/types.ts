@@ -65,6 +65,9 @@ export type DecisionFeedbackStatus =
 export interface RecommendationTracking {
   id: string;
   text: string;
+  rationale?: string;
+  fact_ids?: string[];
+  prerequisite_validation?: string[];
   source: string;
   priority: 'haute' | 'moyenne' | 'basse';
   index: number;

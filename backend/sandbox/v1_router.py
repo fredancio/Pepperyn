@@ -39,6 +39,9 @@ def _recommendations_tracking(envelope, analysis_id: str, supabase=None) -> list
         {
             "id": make_recommendation_id(analysis_id, "plan_action", index),
             "text": item.action,
+            "rationale": item.rationale,
+            "fact_ids": list(item.fact_ids),
+            "prerequisite_validation": list(item.prerequisite_validation),
             "source": "plan_action",
             "priority": priority[item.priority],
             "index": index,

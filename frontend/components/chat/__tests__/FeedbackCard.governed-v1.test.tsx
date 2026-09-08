@@ -12,6 +12,9 @@ const mockedSubmit = submitV1GovernedIntention as jest.Mock;
 const recommendation = {
   id: 'governed-rec-1',
   text: 'Valider la marge avant toute action commerciale.',
+  rationale: 'La marge observée doit être rapprochée des écritures sources.',
+  fact_ids: ['FACT-REVENUE-2025'],
+  prerequisite_validation: ['Confirmer le périmètre de marge avec le Fondateur.'],
   source: 'plan_action',
   priority: 'haute' as const,
   index: 0,
@@ -27,6 +30,10 @@ test('présente le feedback V1 comme une intention et jamais comme une décision
 
   expect(screen.getByText('Quelle est votre intention ?')).toBeInTheDocument();
   expect(screen.getByText(/jamais comme une décision confirmée/i)).toBeInTheDocument();
+  expect(screen.getByText(/La marge observée doit être rapprochée/)).toBeInTheDocument();
+  expect(screen.getByText('Validations requises avant toute décision')).toBeInTheDocument();
+  expect(screen.getByText('Confirmer le périmètre de marge avec le Fondateur.')).toBeInTheDocument();
+  expect(screen.getByText(/FACT-REVENUE-2025/)).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Je vais appliquer' }));
 

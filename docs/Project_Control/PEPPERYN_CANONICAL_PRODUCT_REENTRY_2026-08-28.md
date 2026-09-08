@@ -743,3 +743,33 @@ These decisions do not justify delaying the selected mission's evidence and cont
   and later consequence learning remain separate future links. No provider
   request was dispatched and no real datum was admitted. External Provider
   remains CLOSED and Real-data admission remains CLOSED.
+
+## 36. Governed recommendation context before decision — 2026-09-08
+
+- **Corrective purpose:** the intention card initially projected only the
+  recommendation action. Although it never claimed a confirmed decision,
+  proceeding toward decision capture without the governed rationale,
+  prerequisite validations and evidence references would have discarded a
+  material part of the V1 recommendation contract.
+- **Bounded correction:** the existing deterministic recommendation projection
+  now carries the verbatim governed rationale, prerequisite-validation list and
+  fact identifiers alongside the action. The interface renders all three before
+  any response controls under the explicit labels `Pourquoi cette
+  recommandation`, `Validations requises avant toute décision` and `Références
+  factuelles`.
+- **Semantic invariants:** the correction does not alter the persisted
+  intention, create a decision or DecisionArc, change the governed envelope, or
+  invoke a provider. A recommendation remains a proposal; prerequisites remain
+  required; fact identifiers remain references rather than new assertions.
+- **Founder-observed visual rehearsal — PASS:** after backend restart, hard
+  refresh and reopening persisted analysis
+  `75132a71-c80c-4469-aba8-5171d947a9d0`, the existing `unsure` intention
+  displayed the rationale, required validations, factual references and
+  `Intention enregistrée — aucune décision confirmée.` No new intention or
+  analysis was created.
+- **Automated validation:** the targeted backend selection passes `39 passed`;
+  frontend Jest passes `41 passed`; TypeScript passes. Tests bind the projected
+  fields to the authoritative envelope and verify their governed rendering.
+- **Closeout verdict:** the full governed recommendation context is now visible
+  before any future professional-decision interaction. External Provider
+  remains CLOSED and Real-data admission remains CLOSED.

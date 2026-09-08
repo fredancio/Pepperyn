@@ -131,6 +131,10 @@ def test_mock_analysis_route_validates_persists_and_returns_governed_result(monk
     assert first["priority"] == "haute"
     assert first["source"] == "plan_action"
     assert first["id"] == make_recommendation_id(response.analyse_id, "plan_action", 0)
+    governed = persisted["envelope"].governed_analysis.recommendations[0]
+    assert first["rationale"] == governed.rationale
+    assert first["fact_ids"] == list(governed.fact_ids)
+    assert first["prerequisite_validation"] == list(governed.prerequisite_validation)
     assert persisted["supabase"] is database
     assert persisted["engagement_id"] == "engagement-id"
     assert persisted["analysis_row"]["fichier_nom"] == filename

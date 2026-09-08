@@ -149,6 +149,8 @@ def test_governed_intention_uses_server_snapshot_and_never_confirms_a_decision(m
     row = db.tables["decision_feedback"][0]
     assert row["recommendation_id"] == recommendation["id"]
     assert row["recommendation_text"] == recommendation["text"]
+    assert recommendation["rationale"]
+    assert recommendation["fact_ids"] or recommendation["prerequisite_validation"]
     assert not db.tables.get("decision_arcs")
 
     reloaded = asyncio.run(v1_routes.get_v1_governed_analysis(
