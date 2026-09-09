@@ -772,3 +772,96 @@ VERIFICATION BEFORE REAL-CLIENT ADMISSION**
 - **Decision:** no Global project will be created as a substitute for the
   required regional/ZDR evidence. Real-data admission and provider transport
   remain CLOSED while the external request is pending.
+
+------------------------------------------------------------------------
+
+## 27. Official-response and effective-project proof update — 2026-09-09
+
+### New provider evidence received
+
+The Founder received a response from the OpenAI Privacy Team directing
+Pepperyn to the official OpenAI Data Processing Addendum. This is dated
+evidence that the provider identifies the DPA as the contractual source for the
+enquiry. It strengthens PG-2 at provider-document level, but does not by itself
+prove that the Pepperyn contracting party has accepted every required
+amendment or that a particular API project has European geography and Zero
+Data Retention.
+
+Official OpenAI documentation rechecked on 2026-09-09 confirms that API data
+is not used for model training by default unless the customer opts in; ZDR is
+available to approved customers at organization or project level; data
+residency is configured per project; and European regional requests use
+`https://eu.api.openai.com/v1`. Non-US residency also requires approval for
+abuse-monitoring controls and an applicable retention amendment. Endpoint,
+feature and model compatibility remains material: ZDR does not make an
+otherwise ineligible stateful feature non-retaining.
+
+### Remaining proof for the effective Pepperyn project
+
+The following evidence is cumulative. Generic documentation, a DPA link, or a
+successful request alone cannot substitute for it.
+
+1. **Contracting and eligibility:** identify the actual Pepperyn API
+   contracting party and applicable OpenAI entity without placing personal
+   data in this repository; preserve the DPA version/date and evidence of
+   applicability or acceptance; preserve OpenAI approval for the required
+   abuse-monitoring control and applicable non-US retention amendment; record
+   any account-specific exception communicated by OpenAI.
+2. **Dedicated project:** create or identify a dedicated Pepperyn API project
+   whose geography is visibly `Europe (EEA + Switzerland)`; preserve its
+   non-secret project/organization identifiers, purpose, creation date and
+   environment separation. The historical Global default project is not
+   sufficient.
+3. **Effective ZDR:** capture the project Data Retention screen and retrieve
+   `GET /organization/projects/{project_id}/data_retention` with an Admin API
+   key. Require `zero_data_retention` (or `enhanced_zero_data_retention` if
+   specifically approved). If it returns `organization_default`, separately
+   retrieve the organization setting and resolve the effective value. `none`
+   is a failure. Preserve no secret or unredacted key.
+4. **Project-bound credential:** create a project service account or API key
+   scoped only to that European project; preserve only its identifier/redacted
+   value and project association; prove Pepperyn cannot silently fall back to
+   an organization/default-project key.
+5. **Transport policy:** bind `LlmEgressAuthority` to
+   `https://eu.api.openai.com/v1`, an approved endpoint and an eligible pinned
+   model/snapshot; keep `store=false`; prohibit incompatible persistent
+   surfaces/options including provider conversations/threads,
+   `background=true`, and any feature not proven ZDR-eligible; verify every
+   production-capable OpenAI call site uses this boundary without caller
+   overrides.
+6. **Synthetic activation proof:** only after items 1–5 pass, run one
+   payload-free or synthetic sentinel through the real governed transport;
+   preserve a redacted request manifest proving policy version, project, EU
+   base URL, endpoint, model, `store=false`, task and absence of stateful tools;
+   prove fail-closed behavior for Global endpoint, wrong project credential,
+   non-ZDR state, unsupported feature/model, stale evidence and missing
+   evidence; obtain independent security review before any gate-opening
+   recommendation.
+
+### Updated disposition
+
+- **PG-1:** PASS on the already observed disabled sharing settings and current
+  no-training-by-default policy; recheck at promotion.
+- **PG-2:** CONDITIONAL PASS, strengthened by the Privacy Team response and DPA
+  reference; Pepperyn-specific applicability/acceptance and the required
+  retention amendment remain unevidenced.
+- **PG-3:** OPEN — no effective Pepperyn-project ZDR result captured.
+- **PG-4:** OPEN — no dedicated European Pepperyn project captured.
+- **PG-5:** OPEN — exact endpoint/model/feature policy not activated against an
+  eligible project.
+- **PG-6:** CONDITIONAL PASS — dated operational subprocessor review required.
+- **PG-7:** BLOCKED — effective project and project-bound credential evidence
+  remain absent.
+- **PG-8:** IMPLEMENTED / ACTIVATION CLOSED — generic provider evidence cannot
+  activate it.
+
+**Decision:** the new official evidence narrows the remaining work but opens no
+gate. External Provider remains **CLOSED**. Real-data admission remains
+**CLOSED**. V30 synthetic follow-up work may continue independently.
+
+### Official sources rechecked
+
+- [OpenAI API data controls](https://developers.openai.com/api/docs/guides/your-data)
+- [Retrieve project data retention](https://developers.openai.com/api/reference/python/resources/admin/subresources/organization/subresources/projects/subresources/data_retention/methods/retrieve)
+- [Retrieve organization data retention](https://developers.openai.com/api/reference/python/resources/admin/subresources/organization/subresources/data_retention/methods/retrieve)
+- [OpenAI Projects Admin API](https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/projects)
