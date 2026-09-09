@@ -245,6 +245,32 @@ export async function submitV1GovernedDecision(params: {
   };
 }
 
+export async function submitV1GovernedFollowup(params: {
+  analysis_id: string;
+  recommendation_id: string;
+  followup_status: 'pending_validation' | 'in_progress' | 'blocked' | 'completed' | 'not_pursued';
+  professional_note: string;
+  prerequisites_confirmed_complete: boolean;
+}) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(
+    `${API_URL}/api/v1/governed-analyses/${encodeURIComponent(params.analysis_id)}/followup`,
+    {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        recommendation_id: params.recommendation_id,
+        followup_status: params.followup_status,
+        professional_note: params.professional_note,
+        prerequisites_confirmed_complete: params.prerequisites_confirmed_complete,
+      }),
+    },
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { detail?: string }).detail || 'Enregistrement du suivi indisponible');
+  return data as { success: boolean; followup_recorded: true; arc_created: false };
+}
+
 export async function updatePin(newPin: string) {
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/api/admin/update-pin`, {

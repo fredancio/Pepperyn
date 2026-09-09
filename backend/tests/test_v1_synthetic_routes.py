@@ -55,6 +55,13 @@ class _Query:
         self._update_values = copy.deepcopy(values)
         self._is_update = True
         return self
+    def insert(self, values):
+        rows = self.db.tables.setdefault(self.table, [])
+        inserted = copy.deepcopy(values)
+        inserted.setdefault("id", f"{self.table}-{len(rows) + 1}")
+        rows.append(inserted)
+        self.rows = [inserted]
+        return self
     def execute(self):
         if getattr(self, "_is_update", False):
             matched = []
@@ -258,6 +265,47 @@ def test_explicit_decision_without_prior_intention_is_refused(monkeypatch):
             )
     response = asyncio.run(exercise())
     assert response.status_code == 409
+
+
+def test_explicit_followup_requires_decision_and_persists_without_arc(monkeypatch):
+    import httpx
+
+    db = _Db(); _enable(monkeypatch, db)
+    async def exercise():
+        app = FastAPI(); app.include_router(v1_routes.router)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            created = await client.post("/api/v1/synthetic-demo", headers={"Authorization": "Bearer test"})
+            analysis_id = created.json()["analyse_id"]
+            rec = next(item for item in created.json()["recommendations_tracking"] if item["prerequisite_validation"])
+            payload = {"recommendation_id": rec["id"], "followup_status": "pending_validation",
+                       "professional_note": "En attente du tableau des flux mensuels.",
+                       "prerequisites_confirmed_complete": False}
+            before = await client.post(f"/api/v1/governed-analyses/{analysis_id}/followup",
+                                       headers={"Authorization": "Bearer test"}, json=payload)
+            await client.post(f"/api/v1/governed-analyses/{analysis_id}/intention",
+                              headers={"Authorization": "Bearer test"},
+                              json={"recommendation_id": rec["id"], "status": "unsure"})
+            await client.post(f"/api/v1/governed-analyses/{analysis_id}/decision",
+                              headers={"Authorization": "Bearer test"},
+                              json={"recommendation_id": rec["id"], "decision_kind": "accepted_conditional",
+                                    "decision_text": "Retenir sous conditions.", "prerequisites_acknowledged": True})
+            recorded = await client.post(f"/api/v1/governed-analyses/{analysis_id}/followup",
+                                         headers={"Authorization": "Bearer test"}, json=payload)
+            duplicate = await client.post(f"/api/v1/governed-analyses/{analysis_id}/followup",
+                                          headers={"Authorization": "Bearer test"}, json=payload)
+            reloaded = await client.get(f"/api/v1/governed-analyses/{analysis_id}",
+                                        headers={"Authorization": "Bearer test"})
+            return before, recorded, duplicate, reloaded, rec
+
+    before, recorded, duplicate, reloaded, rec = asyncio.run(exercise())
+    assert before.status_code == 409
+    assert recorded.status_code == 200
+    assert recorded.json() == {"success": True, "followup_recorded": True, "arc_created": False}
+    assert duplicate.status_code == 409
+    saved = next(item for item in reloaded.json()["recommendations_tracking"] if item["id"] == rec["id"])
+    assert saved["followup"]["followup_status"] == "pending_validation"
+    assert saved["followup"]["confirmation_source"] == "explicit"
+    assert not db.tables.get("decision_arcs")
 
 
 def test_feedback_read_outage_does_not_hide_verified_governed_analysis(monkeypatch):

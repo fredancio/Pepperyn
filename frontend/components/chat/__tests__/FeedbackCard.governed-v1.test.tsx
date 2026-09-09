@@ -1,15 +1,17 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { FeedbackCard } from '../FeedbackCard';
-import { submitV1GovernedDecision, submitV1GovernedIntention } from '@/lib/api';
+import { submitV1GovernedDecision, submitV1GovernedFollowup, submitV1GovernedIntention } from '@/lib/api';
 
 jest.mock('@/lib/api', () => ({
   submitDecisionFeedback: jest.fn(),
   submitV1GovernedIntention: jest.fn(),
   submitV1GovernedDecision: jest.fn(),
+  submitV1GovernedFollowup: jest.fn(),
 }));
 
 const mockedSubmit = submitV1GovernedIntention as jest.Mock;
 const mockedDecision = submitV1GovernedDecision as jest.Mock;
+const mockedFollowup = submitV1GovernedFollowup as jest.Mock;
 
 const recommendation = {
   id: 'governed-rec-1',
@@ -26,6 +28,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockedSubmit.mockResolvedValue({ success: true, arc_created: false });
   mockedDecision.mockResolvedValue({ success: true, decision_confirmed: true, arc_created: false });
+  mockedFollowup.mockResolvedValue({ success: true, followup_recorded: true, arc_created: false });
 });
 
 test('présente le feedback V1 comme une intention et jamais comme une décision confirmée', async () => {
@@ -99,4 +102,40 @@ test('réaffiche une décision persistée sans contrôle de mutation', () => {
   expect(screen.getByText('Décision professionnelle confirmée explicitement')).toBeInTheDocument();
   expect(screen.getByText('Adapter le calendrier après validation.')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Confirmer explicitement la décision' })).not.toBeInTheDocument();
+  expect(screen.getByText('Enregistrer le premier point de suivi')).toBeInTheDocument();
+});
+
+test('enregistre explicitement un suivi sans modifier la décision ni créer un arc', async () => {
+  render(<FeedbackCard reportId="analysis-1" recommendations={[{
+    ...recommendation, status: 'decided', decision_kind: 'accepted_conditional',
+    decision_text: 'Retenir sous conditions.', decision_confirmed_at: '2026-09-08T10:00:00Z',
+    decision_confirmation_source: 'explicit', prerequisites_acknowledged: true,
+  }]} governedV1 />);
+  fireEvent.change(screen.getByLabelText('État du suivi'), { target: { value: 'pending_validation' } });
+  fireEvent.change(screen.getByLabelText('Note professionnelle de suivi'), {
+    target: { value: 'En attente du tableau des flux mensuels.' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Enregistrer explicitement le suivi' }));
+  await waitFor(() => expect(mockedFollowup).toHaveBeenCalledWith({
+    analysis_id: 'analysis-1', recommendation_id: 'governed-rec-1',
+    followup_status: 'pending_validation',
+    professional_note: 'En attente du tableau des flux mensuels.',
+    prerequisites_confirmed_complete: false,
+  }));
+  expect(await screen.findByText('Premier point de suivi enregistré explicitement')).toBeInTheDocument();
+  expect(screen.getByText('Décision inchangée — aucun arc décisionnel créé.')).toBeInTheDocument();
+});
+
+test('réaffiche un suivi persistant en lecture seule', () => {
+  render(<FeedbackCard reportId="analysis-1" recommendations={[{
+    ...recommendation, status: 'decided', decision_kind: 'accepted_conditional',
+    decision_text: 'Retenir sous conditions.', decision_confirmed_at: '2026-09-08T10:00:00Z',
+    decision_confirmation_source: 'explicit', prerequisites_acknowledged: true,
+    followup: { followup_status: 'blocked', professional_note: 'Pièce attendue.',
+      prerequisites_confirmed_complete: false, confirmation_source: 'explicit',
+      recorded_at: '2026-09-08T12:00:00Z' },
+  }]} governedV1 />);
+  expect(screen.getByText('Bloqué')).toBeInTheDocument();
+  expect(screen.getByText('Pièce attendue.')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Enregistrer explicitement le suivi' })).not.toBeInTheDocument();
 });

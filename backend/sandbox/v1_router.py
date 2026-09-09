@@ -56,7 +56,7 @@ def _recommendations_tracking(
     try:
         rows = (
             supabase.from_("decision_feedback").select(
-                "recommendation_id,status,comment,decision_kind,decision_text,"
+                "id,recommendation_id,status,comment,decision_kind,decision_text,"
                 "decision_confirmed_at,decision_confirmation_source,prerequisites_acknowledged"
             )
             .eq("report_id", analysis_id).execute()
@@ -77,6 +77,19 @@ def _recommendations_tracking(
         )
         rows = []
     feedback = {row["recommendation_id"]: row for row in rows}
+    feedback_ids = [row.get("id") for row in rows if row.get("id")]
+    followups = {}
+    if feedback_ids:
+        try:
+            followup_rows = (
+                supabase.from_("governed_decision_followups").select(
+                    "decision_feedback_id,followup_status,professional_note,"
+                    "prerequisites_confirmed_complete,confirmation_source,recorded_at"
+                ).eq("report_id", analysis_id).execute()
+            ).data or []
+            followups = {row["decision_feedback_id"]: row for row in followup_rows}
+        except Exception as exc:
+            logger.warning("[V1 FOLLOW-UP] state unavailable for analysis=%s: %s", analysis_id, exc)
     for item in items:
         saved = feedback.get(item["id"])
         item["status"] = saved.get("status") if saved else None
@@ -90,6 +103,7 @@ def _recommendations_tracking(
         item["prerequisites_acknowledged"] = (
             saved.get("prerequisites_acknowledged") if saved else None
         )
+        item["followup"] = followups.get(saved.get("id")) if saved else None
     return items
 
 
@@ -104,6 +118,13 @@ class GovernedDecisionRequest(BaseModel):
     decision_kind: str
     decision_text: str = Field(min_length=1, max_length=2000)
     prerequisites_acknowledged: bool
+
+
+class GovernedFollowupRequest(BaseModel):
+    recommendation_id: str = Field(min_length=12, max_length=12)
+    followup_status: str
+    professional_note: str = Field(min_length=1, max_length=2000)
+    prerequisites_confirmed_complete: bool = False
 
 
 @router.post("/synthetic-workbook-inspection")
@@ -389,6 +410,74 @@ async def record_v1_governed_decision(
         "decision_confirmation_source": "explicit",
         "arc_created": False,
     }
+
+
+@router.post("/governed-analyses/{analysis_id}/followup")
+async def record_v1_governed_followup(
+    analysis_id: str,
+    request: GovernedFollowupRequest,
+    authorization: Optional[str] = Header(default=None),
+    x_auth_type: Optional[str] = Header(default=None),
+):
+    """Record one explicit checkpoint without mutating the confirmed decision."""
+    allowed = {"pending_validation", "in_progress", "blocked", "completed", "not_pursued"}
+    if request.followup_status not in allowed:
+        raise HTTPException(status_code=400, detail="État de suivi invalide")
+    note = request.professional_note.strip()
+    if not note:
+        raise HTTPException(status_code=400, detail="Note professionnelle requise")
+    company_id, _, _ = await analyze_routes._resolve_auth(authorization, x_auth_type)
+    _require_designated_company(company_id)
+    from main import get_supabase_service
+    supabase = get_supabase_service()
+    envelope = _load_for_company(supabase, analysis_id=analysis_id, company_id=company_id)
+    recommendation = next(
+        (item for item in _recommendations_tracking(envelope, analysis_id)
+         if item["id"] == request.recommendation_id), None,
+    )
+    if recommendation is None:
+        raise HTTPException(status_code=404, detail="Recommandation gouvernée introuvable")
+    if (request.followup_status == "completed" and recommendation["prerequisite_validation"]
+            and not request.prerequisites_confirmed_complete):
+        raise HTTPException(
+            status_code=422,
+            detail="Un suivi terminé exige la confirmation explicite des validations préalables.",
+        )
+    try:
+        decisions = (
+            supabase.from_("decision_feedback").select("id,decision_confirmed_at")
+            .eq("company_id", company_id).eq("report_id", analysis_id)
+            .eq("recommendation_id", recommendation["id"]).limit(2).execute()
+        ).data or []
+        if len(decisions) != 1 or not decisions[0].get("decision_confirmed_at"):
+            raise HTTPException(status_code=409, detail="Une décision explicite est requise avant son suivi.")
+        existing = (
+            supabase.from_("governed_decision_followups").select("id")
+            .eq("decision_feedback_id", decisions[0]["id"]).limit(2).execute()
+        ).data or []
+        if existing:
+            raise HTTPException(status_code=409, detail="Le point de suivi initial est déjà enregistré.")
+        inserted = (
+            supabase.from_("governed_decision_followups").insert({
+                "company_id": company_id,
+                "report_id": analysis_id,
+                "decision_feedback_id": decisions[0]["id"],
+                "recommendation_id": recommendation["id"],
+                "followup_status": request.followup_status,
+                "professional_note": note,
+                "prerequisites_confirmed_complete": request.prerequisites_confirmed_complete,
+                "confirmation_source": "explicit",
+                "recorded_at": datetime.now(timezone.utc).isoformat(),
+            }).execute()
+        ).data or []
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("[V1 FOLLOW-UP] checkpoint failed analysis=%s: %s", analysis_id, exc)
+        raise HTTPException(status_code=503, detail="Enregistrement du suivi indisponible") from exc
+    if len(inserted) != 1:
+        raise HTTPException(status_code=503, detail="Le suivi n’a pas été enregistré.")
+    return {"success": True, "followup_recorded": True, "arc_created": False}
 
 
 @router.get("/governed-analyses/{analysis_id}/export.xlsx")

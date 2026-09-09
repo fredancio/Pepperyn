@@ -864,3 +864,44 @@ These decisions do not justify delaying the selected mission's evidence and cont
 - **Closeout verdict:** governed exports from the existing persisted decision
   are closed with final PASS. External Provider remains CLOSED and Real-data
   admission remains CLOSED.
+
+## 39. Explicit governed decision follow-up checkpoint — 2026-09-09
+
+- **Critical-path purpose:** complete the synthetic Founder rehearsal through
+  one explicit post-decision follow-up observation without mutating the
+  confirmed decision, inferring execution, validating an unmet prerequisite or
+  creating a DecisionArc.
+- **Bounded persistence:** V30 creates one recommendation/decision-bound,
+  tenant/report-scoped follow-up checkpoint. It requires an allowed state, a
+  non-empty professional note, source `explicit` and an explicit value for
+  prerequisite completion. The row is immutable after insertion and a unique
+  decision-feedback constraint prevents a second initial checkpoint.
+- **Fail-closed semantics:** the dedicated endpoint reloads the governed
+  envelope, resolves the submitted recommendation identifier against the
+  server snapshot, requires an existing explicitly confirmed decision and
+  refuses `completed` when governed prerequisite validations exist unless
+  their completion is explicitly confirmed. It returns `arc_created=false`.
+- **Interface semantics:** the form appears only after a confirmed decision and
+  offers `En attente des validations`, `En cours`, `Bloqué`, `Terminé` or `Non
+  poursuivi` with a mandatory professional note. Once persisted, the form is
+  removed and the read-only checkpoint states `Décision inchangée — aucun arc
+  décisionnel créé.`
+- **Migration deployment:** V30 was applied to Pepperyn Integration Test with
+  `Success. No rows returned`. No interface action occurred before migration
+  confirmation.
+- **Founder-observed write — PASS:** on existing persisted synthetic analysis
+  `75132a71-c80c-4469-aba8-5171d947a9d0`, the Founder performed exactly one
+  follow-up write with state `En attente des validations` and note `En attente
+  du tableau des flux mensuels et des échéanciers clients requis avant
+  exécution.` The interface displayed `Premier point de suivi enregistré
+  explicitement`; the prior `Retenue sous conditions` decision remained
+  unchanged and no DecisionArc was created.
+- **Persistence rehearsal — PASS:** after hard refresh and reopening the same
+  analysis, the governed-analysis GET returned HTTP 200; the exact state and
+  note reappeared; the follow-up form/button remained absent; the confirmed
+  decision and motivation were unchanged. No POST, second follow-up, new
+  analysis or provider call occurred during verification.
+- **Closeout verdict:** the first explicit governed decision-follow-up link is
+  closed with PASS for V1 synthetic rehearsal. This does not open the broader
+  recurring Decision Follow-up capability. External Provider remains CLOSED
+  and Real-data admission remains CLOSED.

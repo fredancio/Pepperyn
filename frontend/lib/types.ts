@@ -79,6 +79,13 @@ export interface RecommendationTracking {
   decision_confirmed_at?: string | null;
   decision_confirmation_source?: 'explicit' | null;
   prerequisites_acknowledged?: boolean | null;
+  followup?: {
+    followup_status: 'pending_validation' | 'in_progress' | 'blocked' | 'completed' | 'not_pursued';
+    professional_note: string;
+    prerequisites_confirmed_complete: boolean;
+    confirmation_source: 'explicit';
+    recorded_at: string;
+  } | null;
 }
 
 /** Réponse de GET /api/decision-feedback/previous */
