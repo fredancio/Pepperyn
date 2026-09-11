@@ -357,6 +357,44 @@
 - **Déclencheur de réouverture :** non fixé — à nommer explicitement si ce chantier doit un jour redevenir actif, plutôt que de rester une intuition non datée.
 - **Ordre relatif :** dernier de tous les chantiers listés.
 
+### 4.5 Pepperyn Control Center — Self-Selling Capability / Economic Agency
+- **Nature :** capacité stratégique interne, admin-only ; extension future du
+  Pepperyn Control Center, pas extension du Profession Model CFO.
+- **Source :** décision explicite du Founder du 2026-09-11 ; définition de
+  portée dans `docs/Product/PEPPERYN_SELF_SELLING_CONTROL_CENTER_VISION.md`.
+- **État réel :** vision enregistrée, non commencée, aucune implémentation ni
+  autonomie autorisée. La roadmap V1 reste inchangée.
+- **Finalité :** construire à terme une machine gouvernée qui apprend comment
+  Pepperyn doit être vendu à partir d'Evidence / Decision / Outcome / Learning,
+  plutôt qu'un CRM générique ou un bot de prospection.
+- **Dépendances :** stabilisation du chemin critique V1 ; preuve commerciale
+  Founder réelle et licite ; autorisation admin backend ; contrats de
+  confidentialité/rétention ; future définition de Commercial Memory et de la
+  séparation avec les Engagements financiers clients.
+- **Ce qu'il bloque :** rien dans la V1 actuelle.
+- **Déclencheur de réouverture :** toutes les conditions du document source §8,
+  puis GO explicite du Founder pour un seul incrément G0 borné.
+- **Échelle d'autonomie :** G0 observer/enregistrer ; G1 analyser ; G2
+  recommander ; G3 préparer ; G4 exécuter sous règles ; G5 autonomie
+  substantielle seulement après preuve empirique et nouvel arbitrage explicite.
+- **Gouvernance :** aucun spam, aucune affirmation inventée, aucun sales motion
+  non validé automatisé, opt-out/fréquence obligatoires, actions significatives
+  tracées, priorité à la marge/revenu rentable/temps Founder économisé.
+- **Accès :** admin-only, autorité backend issue d'un rôle ou d'une
+  configuration sécurisée ; aucune identité codée en dur dans le frontend.
+- **Classification :** A = documentation et invariants seulement ; B = préserver
+  les frontières lors de changements déjà autorisés ; C = tous modèles,
+  moteurs, cockpit, connecteurs et niveaux G1–G5 ; D = CRM générique, spam,
+  claims inventés, scores opaques, automatisation prématurée, identité admin
+  frontend et double source de vérité.
+- **Risque trop tôt :** détourner l'attention de la V1, figer une architecture
+  sans preuve de sales motion et automatiser une activité non validée.
+- **Risque trop tard :** perdre les apprentissages commerciaux Founder dans des
+  notes dispersées ; ce risque justifie G0 après déclenchement, pas un build
+  aujourd'hui.
+- **Ordre relatif :** après stabilisation des maillons critiques V1 ; progression
+  ultérieure strictement preuve-gatée.
+
 ---
 
 ## Catégorie 5 — Dette et migration (catégorie ajoutée, hors les 4 prévues par le mandat, justifiée ci-dessous)

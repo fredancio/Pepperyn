@@ -63,7 +63,11 @@
 
 ## 5. VISION / PARKING
 
-*(Renvoi vers `STRATEGIC_DEFERRED_WORK_REGISTER.md` §4 — Decision Simulation Engine, BYOM/local, extension à d'autres professions.)*
+*(Renvoi vers `STRATEGIC_DEFERRED_WORK_REGISTER.md` §4 — Decision Simulation
+Engine, BYOM/local, extension à d'autres professions, et future capacité
+admin-only **Pepperyn Control Center — Self-Selling Capability / Economic
+Agency** (§4.5). Cette dernière préserve la vision Growth Brain sans modifier la
+roadmap V1 ni autoriser de build.)*
 
 ---
 
