@@ -905,3 +905,69 @@ These decisions do not justify delaying the selected mission's evidence and cont
   closed with PASS for V1 synthetic rehearsal. This does not open the broader
   recurring Decision Follow-up capability. External Provider remains CLOSED
   and Real-data admission remains CLOSED.
+
+## 40. Explicit execution and synthetic prerequisite evidence — 2026-09-12
+
+- **Critical-path purpose:** distinguish a confirmed professional decision
+  from its effective execution while preserving LaterEvidence, ActualOutcome
+  and Learning as separate, still-absent concepts.
+- **V31 execution checkpoint:** one immutable, append-only execution row is
+  bound to the exact company, report, decision-feedback row and governed
+  recommendation. It requires an executable confirmed decision, one prior
+  governed follow-up, explicitly completed prerequisite validations, a
+  non-future date not preceding the decision, and a professional note.
+  Database triggers independently revalidate scope and chronology. No
+  DecisionArc is created.
+- **V32 prerequisite package:** registered fixture
+  `PEPPERYN_V1_EXECUTION_PREREQUISITES` contains twelve monthly projected cash
+  flows and twelve corresponding synthetic customer schedules for 2026-09-01
+  through 2027-08-31. Cash roll-forward, net flow and customer receipts
+  reconcile deterministically. Canonical SHA-256:
+  `9cbefc35330e9503379e9c13524c6c868b276cd5bdf91aa48889d30f7de716b9`.
+- **Semantic boundary:** the package and its receipt are
+  `DECISION_PREREQUISITE_ONLY`, synthetic, local and no-network. Structural
+  checks keep LaterEvidence, ActualOutcome, Learning and ExpectedImpact false.
+  V31 refuses execution without the matching V32 receipt.
+- **Deployment:** V31 and V32 were applied in Pepperyn Integration Test; each
+  returned `Success. No rows returned` before its controlled write.
+- **Negative guard — PASS:** date and note with prerequisite confirmation
+  absent produced `Confirmez explicitement les validations préalables.` and no
+  execution POST.
+- **Founder-observed writes — PASS:** on persisted analysis
+  `75132a71-c80c-4469-aba8-5171d947a9d0`, exactly one V32 receipt and then one
+  V31 execution dated `2026-09-12` were recorded. Decision and initial
+  follow-up remained unchanged; no arc or downstream epistemic concept was
+  created.
+- **Persistence rehearsal — PASS:** after hard refresh and reopening, the GET
+  returned HTTP 200; intention, decision, follow-up, prerequisite receipt and
+  execution reappeared unchanged; the execution form remained absent. Only
+  GET/OPTIONS occurred during reload.
+- **Validation:** governed UI `9/9`, TypeScript, Python compilation, package
+  reconciliation and `git diff --check` pass. The available Python runtimes do
+  not contain pytest, so new backend route tests are present but were not
+  executed here.
+- **Closeout verdict:** V31/V32 are functionally closed with persistence PASS.
+  This proves explicit execution capture only. External Provider and Real-data
+  admission remain CLOSED.
+
+## 41. Measured closeout re-evaluation — 2026-09-12
+
+- **Current verdict:** NOT ADMISSIBLE for the existing decision. Its governed
+  recommendation had no prospective measurable ExpectedImpact before
+  execution. V32 is prerequisite forecast evidence and cannot be promoted
+  retroactively; creating ExpectedImpact now would falsify chronology.
+- **Prospective requirement:** a future synthetic recommendation must define
+  ExpectedImpact before decision and execution: metric, unit, baseline,
+  expected delta or target, horizon, provenance, uncertainty and prerequisites.
+- **Later-evidence requirement:** after that future execution, a distinct
+  synthetic period must produce immutable post-execution Evidence Ledger
+  references on the same metric and comparable basis. V32 predates and enables
+  execution, so it cannot satisfy this condition.
+- **Outcome and learning:** only the evidenced comparison with the prior
+  ExpectedImpact may populate ActualOutcome. Missing or incomparable evidence
+  remains UNKNOWN, with no causal claim. Learning is a separate explicit
+  interpretation recorded only after ActualOutcome, never cosmetic completion.
+- **Next smallest honest slice:** define and falsify one new fully synthetic,
+  prospective ExpectedImpact contract before creating any new analysis or
+  persistence schema. The present decision remains closed at Execution and is
+  not reused as a measured-closeout candidate.

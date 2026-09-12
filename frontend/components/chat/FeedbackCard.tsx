@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { submitDecisionFeedback, submitV1GovernedDecision, submitV1GovernedFollowup, submitV1GovernedIntention } from '@/lib/api';
+import { submitDecisionFeedback, submitV1GovernedDecision, submitV1GovernedExecution, submitV1GovernedFollowup, submitV1GovernedIntention, submitV1PrerequisiteEvidence } from '@/lib/api';
 import type { RecommendationTracking, DecisionFeedbackStatus } from '@/lib/types';
 
 interface FeedbackCardProps {
@@ -61,6 +61,17 @@ export function FeedbackCard({ reportId, recommendations, governedV1 = false }: 
     Object.fromEntries(items.filter(item => item.followup).map(item => [item.id, item.followup!])),
   );
   const [followupErrors, setFollowupErrors] = useState<Record<string, string>>({});
+  const [executionDates, setExecutionDates] = useState<Record<string, string>>({});
+  const [executionNotes, setExecutionNotes] = useState<Record<string, string>>({});
+  const [executionPrerequisites, setExecutionPrerequisites] = useState<Record<string, boolean>>({});
+  const [executions, setExecutions] = useState(() =>
+    Object.fromEntries(items.filter(item => item.execution).map(item => [item.id, item.execution!])),
+  );
+  const [executionErrors, setExecutionErrors] = useState<Record<string, string>>({});
+  const [prerequisiteEvidence, setPrerequisiteEvidence] = useState(() =>
+    Object.fromEntries(items.filter(item => item.prerequisite_evidence).map(item => [item.id, item.prerequisite_evidence!])),
+  );
+  const [prerequisiteErrors, setPrerequisiteErrors] = useState<Record<string, string>>({});
 
   if (items.length === 0) return null;
 
@@ -173,6 +184,50 @@ export function FeedbackCard({ reportId, recommendations, governedV1 = false }: 
     }
   };
 
+  const recordExecution = async (rec: RecommendationTracking) => {
+    const executedOn = executionDates[rec.id];
+    const note = (executionNotes[rec.id] || '').trim();
+    if (!executedOn || !note) {
+      setExecutionErrors(prev => ({ ...prev, [rec.id]: 'Indiquez la date et la note professionnelle d’exécution.' }));
+      return;
+    }
+    if (!executionPrerequisites[rec.id]) {
+      setExecutionErrors(prev => ({ ...prev, [rec.id]: 'Confirmez explicitement les validations préalables.' }));
+      return;
+    }
+    setSaving(prev => ({ ...prev, [rec.id]: true }));
+    setExecutionErrors(prev => ({ ...prev, [rec.id]: '' }));
+    try {
+      await submitV1GovernedExecution({ analysis_id: reportId, recommendation_id: rec.id,
+        executed_on: executedOn, professional_note: note, prerequisites_confirmed_complete: true });
+      setExecutions(prev => ({ ...prev, [rec.id]: { executed_on: executedOn,
+        professional_note: note, prerequisites_confirmed_complete: true,
+        confirmation_source: 'explicit', recorded_at: new Date().toISOString() } }));
+    } catch (error) {
+      setExecutionErrors(prev => ({ ...prev, [rec.id]: error instanceof Error ? error.message : 'Exécution indisponible.' }));
+    } finally {
+      setSaving(prev => ({ ...prev, [rec.id]: false }));
+    }
+  };
+
+  const validatePrerequisiteEvidence = async (rec: RecommendationTracking) => {
+    setSaving(prev => ({ ...prev, [rec.id]: true }));
+    setPrerequisiteErrors(prev => ({ ...prev, [rec.id]: '' }));
+    try {
+      await submitV1PrerequisiteEvidence({ analysis_id: reportId, recommendation_id: rec.id });
+      setPrerequisiteEvidence(prev => ({ ...prev, [rec.id]: {
+        id: 'recorded', fixture_id: 'PEPPERYN_V1_EXECUTION_PREREQUISITES', payload_sha256: 'verified',
+        period_start: '2026-09-01', period_end: '2027-08-31',
+        provenance: 'Pepperyn deterministic V1 rehearsal fixture',
+        evidence_role: 'DECISION_PREREQUISITE_ONLY', recorded_at: new Date().toISOString(),
+      } }));
+    } catch (error) {
+      setPrerequisiteErrors(prev => ({ ...prev, [rec.id]: error instanceof Error ? error.message : 'Validation indisponible.' }));
+    } finally {
+      setSaving(prev => ({ ...prev, [rec.id]: false }));
+    }
+  };
+
   return (
     <div className="rounded-2xl border border-blue-200 bg-blue-50 overflow-hidden max-w-2xl">
       <div className="flex items-center gap-3 px-5 py-3.5 bg-blue-100 border-b border-blue-200">
@@ -201,6 +256,8 @@ export function FeedbackCard({ reportId, recommendations, governedV1 = false }: 
           const shownDecisionKind = rec.decision_kind || decisionKind;
           const shownDecisionText = rec.decision_text || decisionTexts[rec.id];
           const followup = followups[rec.id];
+          const execution = executions[rec.id];
+          const prerequisites = prerequisiteEvidence[rec.id];
 
           return (
             <div key={rec.id} className="bg-white rounded-xl border border-blue-100 p-4">
@@ -375,6 +432,68 @@ export function FeedbackCard({ reportId, recommendations, governedV1 = false }: 
                   <p className="mt-1">{{ pending_validation: 'En attente des validations', in_progress: 'En cours', blocked: 'Bloqué', completed: 'Terminé', not_pursued: 'Non poursuivi' }[followup.followup_status]}</p>
                   <p className="mt-1">{followup.professional_note}</p>
                   <p className="mt-2 text-indigo-800">Décision inchangée — aucun arc décisionnel créé.</p>
+                </div>
+              )}
+
+              {governedV1 && followup && isDecided && shownDecisionKind !== 'rejected' && !prerequisites && (
+                <div className="mt-4 border-t border-blue-100 pt-4">
+                  <p className="text-sm font-semibold text-[#1A1A2E]">Valider les preuves synthétiques préalables</p>
+                  <p className="mt-1 text-xs text-[#5F6368]">
+                    Paquet local enregistré : flux mensuels et échéanciers clients, du 01/09/2026 au 31/08/2027.
+                    Il justifie uniquement les prérequis et ne constitue ni preuve ultérieure, ni résultat, ni apprentissage.
+                  </p>
+                  {prerequisiteErrors[rec.id] && <p className="mt-2 text-xs text-red-700">{prerequisiteErrors[rec.id]}</p>}
+                  <button type="button" onClick={() => void validatePrerequisiteEvidence(rec)} disabled={saving[rec.id]}
+                    className="mt-3 rounded-lg bg-[#1A1A2E] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                    Enregistrer le paquet préalable vérifié
+                  </button>
+                </div>
+              )}
+
+              {governedV1 && prerequisites && (
+                <div className="mt-4 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-3 text-xs text-cyan-900">
+                  <p className="font-semibold">Preuves synthétiques préalables validées</p>
+                  <p className="mt-1">Période : {prerequisites.period_start} au {prerequisites.period_end}</p>
+                  <p className="mt-1">Provenance : {prerequisites.provenance}</p>
+                  <p className="mt-2 text-cyan-800">Usage limité aux prérequis — aucune preuve ultérieure, aucun résultat ni apprentissage.</p>
+                </div>
+              )}
+
+              {governedV1 && followup && prerequisites && isDecided && shownDecisionKind !== 'rejected' && !execution && (
+                <div className="mt-4 border-t border-blue-100 pt-4">
+                  <p className="text-sm font-semibold text-[#1A1A2E]">Confirmer l’exécution effective</p>
+                  <p className="mt-1 text-xs text-[#5F6368]">
+                    Cette confirmation est distincte de la décision. Elle ne crée ni résultat, ni apprentissage, ni arc décisionnel.
+                  </p>
+                  <label className="mt-3 block text-xs font-medium text-[#1A1A2E]" htmlFor={`execution-date-${rec.id}`}>Date d’exécution</label>
+                  <input id={`execution-date-${rec.id}`} aria-label="Date d’exécution" type="date"
+                    max={new Date().toISOString().slice(0, 10)} value={executionDates[rec.id] || ''}
+                    onChange={(event) => setExecutionDates(prev => ({ ...prev, [rec.id]: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+                  <textarea aria-label="Note professionnelle d’exécution" value={executionNotes[rec.id] || ''}
+                    onChange={(event) => setExecutionNotes(prev => ({ ...prev, [rec.id]: event.target.value }))}
+                    placeholder="Ce qui a été effectivement exécuté"
+                    className="mt-3 min-h-20 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm" />
+                  <label className="mt-2 flex items-start gap-2 text-xs text-amber-900">
+                    <input type="checkbox" aria-label="Validations préalables accomplies pour l’exécution"
+                      checked={Boolean(executionPrerequisites[rec.id])}
+                      onChange={(event) => setExecutionPrerequisites(prev => ({ ...prev, [rec.id]: event.target.checked }))} />
+                    Je confirme explicitement que les validations préalables sont accomplies.
+                  </label>
+                  {executionErrors[rec.id] && <p className="mt-2 text-xs text-red-700">{executionErrors[rec.id]}</p>}
+                  <button type="button" onClick={() => void recordExecution(rec)} disabled={saving[rec.id]}
+                    className="mt-3 rounded-lg bg-[#1A1A2E] px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+                    Enregistrer explicitement l’exécution
+                  </button>
+                </div>
+              )}
+
+              {governedV1 && execution && (
+                <div className="mt-4 rounded-lg border border-teal-200 bg-teal-50 px-3 py-3 text-xs text-teal-900">
+                  <p className="font-semibold">Exécution confirmée explicitement</p>
+                  <p className="mt-1">Date déclarée : {execution.executed_on}</p>
+                  <p className="mt-1">{execution.professional_note}</p>
+                  <p className="mt-2 text-teal-800">Aucun résultat ni apprentissage n’est encore établi. Aucun arc décisionnel créé.</p>
                 </div>
               )}
             </div>

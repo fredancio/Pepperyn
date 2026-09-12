@@ -271,6 +271,37 @@ export async function submitV1GovernedFollowup(params: {
   return data as { success: boolean; followup_recorded: true; arc_created: false };
 }
 
+export async function submitV1GovernedExecution(params: {
+  analysis_id: string; recommendation_id: string; executed_on: string;
+  professional_note: string; prerequisites_confirmed_complete: true;
+}) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/v1/governed-analyses/${encodeURIComponent(params.analysis_id)}/execution`, {
+    method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recommendation_id: params.recommendation_id,
+      executed_on: params.executed_on, professional_note: params.professional_note,
+      prerequisites_confirmed_complete: params.prerequisites_confirmed_complete }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { detail?: string }).detail || 'Enregistrement de l’exécution indisponible');
+  return data as { success: boolean; execution_recorded: true; outcome_created: false;
+    learning_created: false; arc_created: false };
+}
+
+export async function submitV1PrerequisiteEvidence(params: {
+  analysis_id: string; recommendation_id: string;
+}) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_URL}/api/v1/governed-analyses/${encodeURIComponent(params.analysis_id)}/prerequisite-evidence`, {
+    method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recommendation_id: params.recommendation_id }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((data as { detail?: string }).detail || 'Validation des preuves préalables indisponible');
+  return data as { success: boolean; prerequisite_evidence_recorded: true;
+    later_evidence_created: false; outcome_created: false; learning_created: false; arc_created: false };
+}
+
 export async function updatePin(newPin: string) {
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_URL}/api/admin/update-pin`, {

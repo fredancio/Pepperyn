@@ -6,7 +6,7 @@ import asyncio
 import logging
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
@@ -22,10 +22,14 @@ from services.governed_analysis_persistence import (
 )
 from services.decision_memory_service import DecisionMemoryService, make_recommendation_id
 from sandbox.heterogeneous_workbooks import inspect_registered_workbook, run_registered_mock_analysis
+from sandbox.v1_prerequisite_evidence import (
+    PrerequisiteEvidenceRefused, load_validated_prerequisite_evidence,
+)
 from sandbox.synthetic_product import SandboxRefused
 
 router = APIRouter(prefix="/api/v1", tags=["v1-synthetic"])
 logger = logging.getLogger(__name__)
+_EXECUTION_PREREQUISITES = ["Obtenir le tableau des flux mensuel et les échéanciers clients."]
 
 
 def _recommendations_tracking(
@@ -79,6 +83,8 @@ def _recommendations_tracking(
     feedback = {row["recommendation_id"]: row for row in rows}
     feedback_ids = [row.get("id") for row in rows if row.get("id")]
     followups = {}
+    executions = {}
+    prerequisite_evidence = {}
     if feedback_ids:
         try:
             followup_rows = (
@@ -90,6 +96,26 @@ def _recommendations_tracking(
             followups = {row["decision_feedback_id"]: row for row in followup_rows}
         except Exception as exc:
             logger.warning("[V1 FOLLOW-UP] state unavailable for analysis=%s: %s", analysis_id, exc)
+        try:
+            execution_rows = (
+                supabase.from_("governed_decision_executions").select(
+                    "decision_feedback_id,executed_on,professional_note,"
+                    "prerequisites_confirmed_complete,confirmation_source,recorded_at"
+                ).eq("report_id", analysis_id).execute()
+            ).data or []
+            executions = {row["decision_feedback_id"]: row for row in execution_rows}
+        except Exception as exc:
+            logger.warning("[V1 EXECUTION] state unavailable for analysis=%s: %s", analysis_id, exc)
+        try:
+            evidence_rows = (
+                supabase.from_("governed_decision_prerequisite_evidence").select(
+                    "id,decision_feedback_id,fixture_id,payload_sha256,period_start,period_end,"
+                    "provenance,evidence_role,recorded_at"
+                ).eq("report_id", analysis_id).execute()
+            ).data or []
+            prerequisite_evidence = {row["decision_feedback_id"]: row for row in evidence_rows}
+        except Exception as exc:
+            logger.warning("[V1 PREREQUISITES] state unavailable for analysis=%s: %s", analysis_id, exc)
     for item in items:
         saved = feedback.get(item["id"])
         item["status"] = saved.get("status") if saved else None
@@ -104,6 +130,8 @@ def _recommendations_tracking(
             saved.get("prerequisites_acknowledged") if saved else None
         )
         item["followup"] = followups.get(saved.get("id")) if saved else None
+        item["execution"] = executions.get(saved.get("id")) if saved else None
+        item["prerequisite_evidence"] = prerequisite_evidence.get(saved.get("id")) if saved else None
     return items
 
 
@@ -125,6 +153,17 @@ class GovernedFollowupRequest(BaseModel):
     followup_status: str
     professional_note: str = Field(min_length=1, max_length=2000)
     prerequisites_confirmed_complete: bool = False
+
+
+class GovernedExecutionRequest(BaseModel):
+    recommendation_id: str = Field(min_length=12, max_length=12)
+    executed_on: date
+    professional_note: str = Field(min_length=1, max_length=2000)
+    prerequisites_confirmed_complete: bool
+
+
+class GovernedPrerequisiteEvidenceRequest(BaseModel):
+    recommendation_id: str = Field(min_length=12, max_length=12)
 
 
 @router.post("/synthetic-workbook-inspection")
@@ -478,6 +517,166 @@ async def record_v1_governed_followup(
     if len(inserted) != 1:
         raise HTTPException(status_code=503, detail="Le suivi n’a pas été enregistré.")
     return {"success": True, "followup_recorded": True, "arc_created": False}
+
+
+@router.post("/governed-analyses/{analysis_id}/prerequisite-evidence")
+async def record_v1_prerequisite_evidence(
+    analysis_id: str,
+    request: GovernedPrerequisiteEvidenceRequest,
+    authorization: Optional[str] = Header(default=None),
+    x_auth_type: Optional[str] = Header(default=None),
+):
+    """Validate and bind the registered local prerequisite package only."""
+    company_id, _, _ = await analyze_routes._resolve_auth(authorization, x_auth_type)
+    _require_designated_company(company_id)
+    from main import get_supabase_service
+    supabase = get_supabase_service()
+    envelope = _load_for_company(supabase, analysis_id=analysis_id, company_id=company_id)
+    recommendation = next(
+        (item for item in _recommendations_tracking(envelope, analysis_id)
+         if item["id"] == request.recommendation_id), None,
+    )
+    if (recommendation is None
+            or recommendation["prerequisite_validation"] != _EXECUTION_PREREQUISITES):
+        raise HTTPException(status_code=404, detail="Prérequis gouvernés introuvables")
+    try:
+        package = load_validated_prerequisite_evidence()
+        decisions = (
+            supabase.from_("decision_feedback").select("id,decision_kind,decision_confirmed_at")
+            .eq("company_id", company_id).eq("report_id", analysis_id)
+            .eq("recommendation_id", recommendation["id"]).limit(2).execute()
+        ).data or []
+        if (len(decisions) != 1 or not decisions[0].get("decision_confirmed_at")
+                or decisions[0].get("decision_kind") not in {"accepted_conditional", "modified"}):
+            raise HTTPException(status_code=409, detail="Une décision exécutable explicite est requise.")
+        followups = (
+            supabase.from_("governed_decision_followups").select("id")
+            .eq("company_id", company_id).eq("report_id", analysis_id)
+            .eq("decision_feedback_id", decisions[0]["id"]).limit(2).execute()
+        ).data or []
+        if len(followups) != 1:
+            raise HTTPException(status_code=409, detail="Un suivi gouverné est requis.")
+        existing = (
+            supabase.from_("governed_decision_prerequisite_evidence").select("id")
+            .eq("company_id", company_id).eq("report_id", analysis_id)
+            .eq("decision_feedback_id", decisions[0]["id"]).limit(2).execute()
+        ).data or []
+        if existing:
+            raise HTTPException(status_code=409, detail="Les preuves préalables sont déjà enregistrées.")
+        inserted = (
+            supabase.from_("governed_decision_prerequisite_evidence").insert({
+                "company_id": company_id, "report_id": analysis_id,
+                "decision_feedback_id": decisions[0]["id"], "recommendation_id": recommendation["id"],
+                "fixture_id": package.fixture_id, "payload_sha256": package.payload_sha256,
+                "period_start": package.period_start.isoformat(), "period_end": package.period_end.isoformat(),
+                "provenance": package.provenance, "payload": package.payload,
+                "evidence_role": "DECISION_PREREQUISITE_ONLY", "synthetic": True,
+                "external_network_used": False, "real_client_data_used": False,
+                "later_evidence": False, "actual_outcome_created": False,
+                "learning_created": False, "expected_impact_created": False,
+                "validation_source": "registered_local_fixture",
+                "recorded_at": datetime.now(timezone.utc).isoformat(),
+            }).execute()
+        ).data or []
+    except HTTPException:
+        raise
+    except PrerequisiteEvidenceRefused as exc:
+        raise HTTPException(status_code=409, detail="Paquet synthétique préalable refusé.") from exc
+    except Exception as exc:
+        logger.warning("[V1 PREREQUISITES] registration failed analysis=%s: %s", analysis_id, exc)
+        raise HTTPException(status_code=503, detail="Validation des preuves préalables indisponible") from exc
+    if len(inserted) != 1:
+        raise HTTPException(status_code=503, detail="Les preuves préalables n’ont pas été enregistrées.")
+    return {"success": True, "prerequisite_evidence_recorded": True,
+            "later_evidence_created": False, "outcome_created": False,
+            "learning_created": False, "arc_created": False}
+
+
+@router.post("/governed-analyses/{analysis_id}/execution")
+async def record_v1_governed_execution(
+    analysis_id: str,
+    request: GovernedExecutionRequest,
+    authorization: Optional[str] = Header(default=None),
+    x_auth_type: Optional[str] = Header(default=None),
+):
+    """Record execution explicitly; never infer outcome or learning."""
+    note = request.professional_note.strip()
+    if not note:
+        raise HTTPException(status_code=400, detail="Note professionnelle d’exécution requise")
+    if not request.prerequisites_confirmed_complete:
+        raise HTTPException(status_code=422, detail="Confirmez explicitement les validations préalables.")
+    if request.executed_on > datetime.now(timezone.utc).date():
+        raise HTTPException(status_code=422, detail="La date d’exécution ne peut pas être future.")
+    company_id, _, _ = await analyze_routes._resolve_auth(authorization, x_auth_type)
+    _require_designated_company(company_id)
+    from main import get_supabase_service
+    supabase = get_supabase_service()
+    envelope = _load_for_company(supabase, analysis_id=analysis_id, company_id=company_id)
+    recommendation = next(
+        (item for item in _recommendations_tracking(envelope, analysis_id)
+         if item["id"] == request.recommendation_id), None,
+    )
+    if recommendation is None:
+        raise HTTPException(status_code=404, detail="Recommandation gouvernée introuvable")
+    try:
+        decisions = (
+            supabase.from_("decision_feedback").select("id,decision_kind,decision_confirmed_at")
+            .eq("company_id", company_id).eq("report_id", analysis_id)
+            .eq("recommendation_id", recommendation["id"]).limit(2).execute()
+        ).data or []
+        if len(decisions) != 1 or not decisions[0].get("decision_confirmed_at"):
+            raise HTTPException(status_code=409, detail="Une décision explicite est requise avant son exécution.")
+        if decisions[0].get("decision_kind") not in {"accepted_conditional", "modified"}:
+            raise HTTPException(status_code=409, detail="Cette décision ne peut pas être déclarée exécutée.")
+        confirmed_on = datetime.fromisoformat(
+            decisions[0]["decision_confirmed_at"].replace("Z", "+00:00")
+        ).date()
+        if request.executed_on < confirmed_on:
+            raise HTTPException(status_code=422, detail="L’exécution ne peut pas précéder la décision confirmée.")
+        followups = (
+            supabase.from_("governed_decision_followups").select("id")
+            .eq("company_id", company_id).eq("report_id", analysis_id)
+            .eq("decision_feedback_id", decisions[0]["id"]).limit(2).execute()
+        ).data or []
+        if len(followups) != 1:
+            raise HTTPException(status_code=409, detail="Un suivi gouverné est requis avant l’exécution.")
+        evidence = (
+            supabase.from_("governed_decision_prerequisite_evidence").select("id")
+            .eq("company_id", company_id).eq("report_id", analysis_id)
+            .eq("decision_feedback_id", decisions[0]["id"])
+            .eq("recommendation_id", recommendation["id"]).limit(2).execute()
+        ).data or []
+        if len(evidence) != 1:
+            raise HTTPException(status_code=409, detail="Les preuves synthétiques préalables sont requises.")
+        existing = (
+            supabase.from_("governed_decision_executions").select("id")
+            .eq("company_id", company_id).eq("report_id", analysis_id)
+            .eq("decision_feedback_id", decisions[0]["id"]).limit(2).execute()
+        ).data or []
+        if existing:
+            raise HTTPException(status_code=409, detail="L’exécution est déjà enregistrée.")
+        inserted = (
+            supabase.from_("governed_decision_executions").insert({
+                "company_id": company_id, "report_id": analysis_id,
+                "decision_feedback_id": decisions[0]["id"],
+                "recommendation_id": recommendation["id"],
+                "executed_on": request.executed_on.isoformat(),
+                "professional_note": note,
+                "prerequisites_confirmed_complete": True,
+                "confirmation_source": "explicit",
+                "prerequisite_evidence_id": evidence[0]["id"],
+                "recorded_at": datetime.now(timezone.utc).isoformat(),
+            }).execute()
+        ).data or []
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.warning("[V1 EXECUTION] checkpoint failed analysis=%s: %s", analysis_id, exc)
+        raise HTTPException(status_code=503, detail="Enregistrement de l’exécution indisponible") from exc
+    if len(inserted) != 1:
+        raise HTTPException(status_code=503, detail="L’exécution n’a pas été enregistrée.")
+    return {"success": True, "execution_recorded": True, "outcome_created": False,
+            "learning_created": False, "arc_created": False}
 
 
 @router.get("/governed-analyses/{analysis_id}/export.xlsx")

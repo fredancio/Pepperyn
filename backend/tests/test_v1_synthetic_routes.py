@@ -308,6 +308,68 @@ def test_explicit_followup_requires_decision_and_persists_without_arc(monkeypatc
     assert not db.tables.get("decision_arcs")
 
 
+def test_explicit_execution_requires_followup_validations_and_persists_without_outcome(monkeypatch):
+    import httpx
+    from datetime import datetime, timezone
+
+    db = _Db(); _enable(monkeypatch, db)
+    async def exercise():
+        app = FastAPI(); app.include_router(v1_routes.router)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            created = await client.post("/api/v1/synthetic-demo", headers={"Authorization": "Bearer test"})
+            analysis_id = created.json()["analyse_id"]
+            rec = next(item for item in created.json()["recommendations_tracking"] if item["prerequisite_validation"])
+            await client.post(f"/api/v1/governed-analyses/{analysis_id}/intention",
+                              headers={"Authorization": "Bearer test"},
+                              json={"recommendation_id": rec["id"], "status": "unsure"})
+            await client.post(f"/api/v1/governed-analyses/{analysis_id}/decision",
+                              headers={"Authorization": "Bearer test"},
+                              json={"recommendation_id": rec["id"], "decision_kind": "accepted_conditional",
+                                    "decision_text": "Retenir sous conditions.", "prerequisites_acknowledged": True})
+            payload = {"recommendation_id": rec["id"],
+                       "executed_on": datetime.now(timezone.utc).date().isoformat(),
+                       "professional_note": "Action effectivement mise en œuvre.",
+                       "prerequisites_confirmed_complete": True}
+            before_followup = await client.post(f"/api/v1/governed-analyses/{analysis_id}/execution",
+                                                 headers={"Authorization": "Bearer test"}, json=payload)
+            await client.post(f"/api/v1/governed-analyses/{analysis_id}/followup",
+                              headers={"Authorization": "Bearer test"},
+                              json={"recommendation_id": rec["id"], "followup_status": "pending_validation",
+                                    "professional_note": "En attente.", "prerequisites_confirmed_complete": False})
+            evidence = await client.post(f"/api/v1/governed-analyses/{analysis_id}/prerequisite-evidence",
+                                         headers={"Authorization": "Bearer test"},
+                                         json={"recommendation_id": rec["id"]})
+            no_validation = await client.post(f"/api/v1/governed-analyses/{analysis_id}/execution",
+                                               headers={"Authorization": "Bearer test"},
+                                               json={**payload, "prerequisites_confirmed_complete": False})
+            recorded = await client.post(f"/api/v1/governed-analyses/{analysis_id}/execution",
+                                         headers={"Authorization": "Bearer test"}, json=payload)
+            duplicate = await client.post(f"/api/v1/governed-analyses/{analysis_id}/execution",
+                                          headers={"Authorization": "Bearer test"}, json=payload)
+            reloaded = await client.get(f"/api/v1/governed-analyses/{analysis_id}",
+                                        headers={"Authorization": "Bearer test"})
+            return before_followup, evidence, no_validation, recorded, duplicate, reloaded, rec
+
+    before_followup, evidence, no_validation, recorded, duplicate, reloaded, rec = asyncio.run(exercise())
+    assert before_followup.status_code == 409
+    assert evidence.status_code == 200
+    assert evidence.json()["later_evidence_created"] is False
+    assert evidence.json()["outcome_created"] is False
+    assert evidence.json()["learning_created"] is False
+    assert no_validation.status_code == 422
+    assert recorded.status_code == 200
+    assert recorded.json() == {"success": True, "execution_recorded": True,
+                               "outcome_created": False, "learning_created": False, "arc_created": False}
+    assert duplicate.status_code == 409
+    saved = next(item for item in reloaded.json()["recommendations_tracking"] if item["id"] == rec["id"])
+    assert saved["execution"]["confirmation_source"] == "explicit"
+    assert saved["execution"]["prerequisites_confirmed_complete"] is True
+    assert saved["prerequisite_evidence"]["evidence_role"] == "DECISION_PREREQUISITE_ONLY"
+    assert not db.tables.get("decision_arcs")
+    assert not db.tables.get("actual_outcomes")
+    assert not db.tables.get("learnings")
+
+
 def test_feedback_read_outage_does_not_hide_verified_governed_analysis(monkeypatch):
     db = _Db(); _enable(monkeypatch, db)
     created = asyncio.run(v1_routes.run_v1_synthetic_demo(

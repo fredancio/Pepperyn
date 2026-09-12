@@ -86,6 +86,23 @@ export interface RecommendationTracking {
     confirmation_source: 'explicit';
     recorded_at: string;
   } | null;
+  execution?: {
+    executed_on: string;
+    professional_note: string;
+    prerequisites_confirmed_complete: true;
+    confirmation_source: 'explicit';
+    recorded_at: string;
+  } | null;
+  prerequisite_evidence?: {
+    id: string;
+    fixture_id: 'PEPPERYN_V1_EXECUTION_PREREQUISITES';
+    payload_sha256: string;
+    period_start: string;
+    period_end: string;
+    provenance: string;
+    evidence_role: 'DECISION_PREREQUISITE_ONLY';
+    recorded_at: string;
+  } | null;
 }
 
 /** Réponse de GET /api/decision-feedback/previous */

@@ -1,0 +1,52 @@
+{
+  "fixture_id": "PEPPERYN_V1_EXECUTION_PREREQUISITES",
+  "evidence_role": "DECISION_PREREQUISITE_ONLY",
+  "synthetic": true,
+  "provenance": {
+    "source": "Pepperyn deterministic V1 rehearsal fixture",
+    "prepared_by": "Pepperyn local synthetic harness",
+    "as_of_date": "2026-09-12",
+    "external_network_used": false,
+    "real_client_data_used": false
+  },
+  "period": {
+    "start": "2026-09-01",
+    "end": "2027-08-31",
+    "frequency": "MONTHLY",
+    "currency": "EUR"
+  },
+  "semantic_boundaries": {
+    "later_evidence": false,
+    "actual_outcome": false,
+    "learning": false,
+    "expected_impact": false
+  },
+  "monthly_cash_flows": [
+    {"month": "2026-09", "opening_cash": 410000, "customer_receipts": 120000, "other_operating_inflows": 10000, "payroll": 52000, "supplier_payments": 43000, "taxes": 12000, "other_operating_outflows": 8000, "net_cash_flow": 15000, "closing_cash": 425000},
+    {"month": "2026-10", "opening_cash": 425000, "customer_receipts": 125000, "other_operating_inflows": 10000, "payroll": 52000, "supplier_payments": 45000, "taxes": 12000, "other_operating_outflows": 8000, "net_cash_flow": 18000, "closing_cash": 443000},
+    {"month": "2026-11", "opening_cash": 443000, "customer_receipts": 130000, "other_operating_inflows": 10000, "payroll": 53000, "supplier_payments": 46000, "taxes": 12000, "other_operating_outflows": 8000, "net_cash_flow": 21000, "closing_cash": 464000},
+    {"month": "2026-12", "opening_cash": 464000, "customer_receipts": 135000, "other_operating_inflows": 10000, "payroll": 53000, "supplier_payments": 48000, "taxes": 13000, "other_operating_outflows": 8000, "net_cash_flow": 23000, "closing_cash": 487000},
+    {"month": "2027-01", "opening_cash": 487000, "customer_receipts": 128000, "other_operating_inflows": 10000, "payroll": 54000, "supplier_payments": 45000, "taxes": 12000, "other_operating_outflows": 8000, "net_cash_flow": 19000, "closing_cash": 506000},
+    {"month": "2027-02", "opening_cash": 506000, "customer_receipts": 132000, "other_operating_inflows": 10000, "payroll": 54000, "supplier_payments": 46000, "taxes": 12000, "other_operating_outflows": 8000, "net_cash_flow": 22000, "closing_cash": 528000},
+    {"month": "2027-03", "opening_cash": 528000, "customer_receipts": 138000, "other_operating_inflows": 10000, "payroll": 55000, "supplier_payments": 48000, "taxes": 13000, "other_operating_outflows": 8000, "net_cash_flow": 24000, "closing_cash": 552000},
+    {"month": "2027-04", "opening_cash": 552000, "customer_receipts": 140000, "other_operating_inflows": 10000, "payroll": 55000, "supplier_payments": 49000, "taxes": 13000, "other_operating_outflows": 8000, "net_cash_flow": 25000, "closing_cash": 577000},
+    {"month": "2027-05", "opening_cash": 577000, "customer_receipts": 145000, "other_operating_inflows": 10000, "payroll": 56000, "supplier_payments": 50000, "taxes": 14000, "other_operating_outflows": 8000, "net_cash_flow": 27000, "closing_cash": 604000},
+    {"month": "2027-06", "opening_cash": 604000, "customer_receipts": 148000, "other_operating_inflows": 10000, "payroll": 56000, "supplier_payments": 51000, "taxes": 14000, "other_operating_outflows": 8000, "net_cash_flow": 29000, "closing_cash": 633000},
+    {"month": "2027-07", "opening_cash": 633000, "customer_receipts": 150000, "other_operating_inflows": 10000, "payroll": 57000, "supplier_payments": 52000, "taxes": 14000, "other_operating_outflows": 8000, "net_cash_flow": 29000, "closing_cash": 662000},
+    {"month": "2027-08", "opening_cash": 662000, "customer_receipts": 155000, "other_operating_inflows": 10000, "payroll": 57000, "supplier_payments": 53000, "taxes": 15000, "other_operating_outflows": 8000, "net_cash_flow": 32000, "closing_cash": 694000}
+  ],
+  "customer_schedules": [
+    {"synthetic_customer_id": "SYN-C001", "invoice_ref": "SYN-INV-001", "due_date": "2026-09-20", "projected_collection_date": "2026-09-20", "amount": 120000, "currency": "EUR"},
+    {"synthetic_customer_id": "SYN-C002", "invoice_ref": "SYN-INV-002", "due_date": "2026-10-20", "projected_collection_date": "2026-10-20", "amount": 125000, "currency": "EUR"},
+    {"synthetic_customer_id": "SYN-C003", "invoice_ref": "SYN-INV-003", "due_date": "2026-11-20", "projected_collection_date": "2026-11-20", "amount": 130000, "currency": "EUR"},
+    {"synthetic_customer_id": "SYN-C004", "invoice_ref": "SYN-INV-004", "due_date": "2026-12-20", "projected_collection_date": "2026-12-20", "amount": 135000, "currency": "EUR"},
+    {"synthetic_customer_id": "SYN-C005", "invoice_ref": "SYN-INV-005", "due_date": "2027-01-20", "projected_collection_date": "2027-01-20", "amount": 128000, "currency": "EUR"},
+    {"synthetic_customer_id": "SYN-C006", "invoice_ref": "SYN-INV-006", "due_date": "2027-02-20", "projected_collection_date": "2027-02-20", "amount": 132000, "currency": "EUR"},
+    {"synthetic_customer_id": "SYN-C007", "invoice_ref": "SYN-INV-007", "due_date": "2027-03-20", "projected_collection_date": "2027-03-20", "amount": 138000, "currency": "EUR"},
+    {"synthetic_customer_id": "SYN-C008", "invoice_ref": "SYN-INV-008", "due_date": "2027-04-20", "projected_collection_date": "2027-04-20", "amount": 140000, "currency": "EUR"},
+    {"synthetic_customer_id": "SYN-C009", "invoice_ref": "SYN-INV-009", "due_date": "2027-05-20", "projected_collection_date": "2027-05-20", "amount": 145000, "currency": "EUR"},
+    {"synthetic_customer_id": "SYN-C010", "invoice_ref": "SYN-INV-010", "due_date": "2027-06-20", "projected_collection_date": "2027-06-20", "amount": 148000, "currency": "EUR"},
+    {"synthetic_customer_id": "SYN-C011", "invoice_ref": "SYN-INV-011", "due_date": "2027-07-20", "projected_collection_date": "2027-07-20", "amount": 150000, "currency": "EUR"},
+    {"synthetic_customer_id": "SYN-C012", "invoice_ref": "SYN-INV-012", "due_date": "2027-08-20", "projected_collection_date": "2027-08-20", "amount": 155000, "currency": "EUR"}
+  ]
+}
