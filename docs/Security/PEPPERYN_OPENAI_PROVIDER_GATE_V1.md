@@ -381,8 +381,9 @@ entity/processing relationship.
 acceptance/execution status where required; - appropriate Pepperyn
 legal/privacy review.
 
-**Status:** CONDITIONAL PASS --- DPA available; Pepperyn-specific state
-to verify.
+**Status:** PASS --- executed Pepperyn-specific DPA verified on 2026-09-12.
+This passes the DPA contracting/applicability gate only; it does not evidence
+ZDR, MAM, regional residency or any retention-control amendment.
 
 ------------------------------------------------------------------------
 
@@ -865,3 +866,65 @@ gate. External Provider remains **CLOSED**. Real-data admission remains
 - [Retrieve project data retention](https://developers.openai.com/api/reference/python/resources/admin/subresources/organization/subresources/projects/subresources/data_retention/methods/retrieve)
 - [Retrieve organization data retention](https://developers.openai.com/api/reference/python/resources/admin/subresources/organization/subresources/data_retention/methods/retrieve)
 - [OpenAI Projects Admin API](https://developers.openai.com/api/reference/resources/admin/subresources/organization/subresources/projects)
+
+------------------------------------------------------------------------
+
+## 28. Executed Pepperyn DPA evidence — 2026-09-12
+
+### Artifact verification
+
+The Founder supplied the final signed DocuSign PDF directly for read-only
+verification. The signed document itself, not a generic DPA URL, establishes:
+
+- Customer: Frédéric Anciaux, identified as `Individual Customer`;
+- the Pepperyn API Organization ID is present in the signature block;
+- the stated Customer address is in Belgium, within the EEA;
+- DPA version `v.010126`;
+- effective signature date `2026-09-12` for both OpenAI's authorized signer
+  and the Customer;
+- the EEA/Switzerland contracting clause designates OpenAI Ireland Ltd. when
+  the Customer is based in the EEA or Switzerland;
+- OpenAI acts as Data Processor for Customer Data under section 1.1;
+- section 4.1 contains the EEA/Swiss transfer provisions and requires SCCs or
+  an adequacy decision for applicable transfers outside the EEA/Switzerland;
+- Schedule 1 contains the SCC processing and transfer details.
+
+The reviewed file is five pages, produced by DocuSign, and contains an
+embedded detached PDF signature object. Its SHA-256 at verification time is:
+`15721fba73b75e875c0066fcdd4da00b7336c8f4678099d64ae4463b052c4060`.
+The signed PDF is Founder-held contractual evidence and is not copied into
+Git because it contains personal data. This review verifies the document
+contents and embedded signature structure; it is not an independent legal
+opinion or a third-party certificate-status attestation.
+
+### PG-2 disposition
+
+**PG-2: PASS, bounded to the executed DPA requirement.** The artifact now
+proves the actual Customer, effective API organization association, applicable
+OpenAI contracting entity, DPA version, execution date and EEA/SCC terms.
+
+The earlier phrase `required non-US retention amendment` is not an additional
+DPA-completeness condition established by this signed artifact. Current OpenAI
+API documentation separately states that use of non-US data residency requires
+approval for the applicable retention controls and execution of a `Modified
+Retention amendment`. It is therefore retained as provider-documented
+eligibility evidence for PG-3/PG-4 activation, not as an inferred annex of the
+DPA and not as a reason to keep PG-2 conditional.
+
+No claim is made that ZDR, Modified Abuse Monitoring, European project
+geography or a Modified Retention amendment is active. Those states remain
+unproved and the pending OpenAI support escalation remains necessary.
+
+### Gate state after this evidence
+
+- **PG-2:** PASS for the executed Pepperyn-specific DPA.
+- **PG-3:** OPEN — no effective Pepperyn-project ZDR evidence.
+- **PG-4:** OPEN — no effective European Pepperyn-project evidence and no
+  provider confirmation of the required retention-control eligibility and
+  amendment.
+- **PG-5:** OPEN.
+- **PG-6:** CONDITIONAL PASS.
+- **PG-7:** BLOCKED.
+- **PG-8:** IMPLEMENTED / ACTIVATION CLOSED.
+
+External Provider remains **CLOSED**. Real-data admission remains **CLOSED**.
