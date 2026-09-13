@@ -971,3 +971,225 @@ These decisions do not justify delaying the selected mission's evidence and cont
   prospective ExpectedImpact contract before creating any new analysis or
   persistence schema. The present decision remains closed at Execution and is
   not reused as a measured-closeout candidate.
+
+## 42. Governed decision continuity into Portfolio — 2026-09-12
+
+- **Gap closed:** Portfolio previously read only the legacy `decision_arcs`
+  state machine. The validated governed V1 workflow intentionally returns
+  `arc_created=false`, so an explicit intention, decision or follow-up could
+  remain durable in its analysis while being invisible from the cross-client
+  cockpit.
+- **Bounded correction:** `GET /api/portfolio` now merges the existing legacy
+  cards with a separate read-only projection of `decision_feedback`,
+  `governed_decision_followups` and `governed_decision_executions`. No row is
+  inserted or updated and no governed checkpoint is copied into or promoted
+  to a `DecisionArc`.
+- **Attention contract:** an old unresolved intention and an explicitly
+  blocked follow-up are urgent; confirmed decisions awaiting follow-up,
+  validations or execution remain `to_check`. Rejected/not-pursued decisions
+  are not active. An explicit execution without a prospective ExpectedImpact
+  creates no invented outcome-review task and remains available only in its
+  governed analysis.
+- **Isolation and provenance:** every registry read is bound to the resolved
+  company. Only reports with an immutable `governed_analysis_envelopes` row
+  are projected, which prevents legacy `decision_feedback` rows from being
+  duplicated or reclassified heuristically. Envelope-to-entity ownership and
+  entity ownership are rechecked in memory; missing, mismatched or unavailable
+  required registries fail closed. The item declares
+  `source_type=governed_decision` and never masquerades as an arc.
+- **Three-client falsification:** deterministic records for three entities
+  prove one card per client, ordering by explicit state then age, and exclusion
+  of a fourth adversarial tenant. Additional falsifications prove zero writes,
+  fail-closed missing scope, exclusion of legacy feedback without a governed
+  envelope, exclusion of an already executed decision from active attention,
+  and stable merging with legacy cards.
+- **Validation:** six direct Python falsifications pass; backend modules
+  compile; the available backend runtime still lacks pytest. Portfolio UI
+  regression passes `13/13`, and TypeScript `tsc --noEmit` passes.
+- **Stop condition:** complete. Pepperyn can surface open governed V1 work
+  across three synthetic clients without creating an arc, outcome, learning,
+  provider call or new analysis. This proves deterministic cockpit continuity,
+  not real-world attention reduction or temporal change detection.
+- **Security/admission:** PG-2 is separately evidenced; PG-3/PG-4 remain open.
+  External Provider and Real-data admission remain CLOSED. Self-Selling remains
+  PARKED / DEFERRED.
+
+## 43. Governed temporal continuity kernel — 2026-09-12
+
+- **Critical gap addressed:** the persisted V1 path could reload one analysis,
+  but had no governed read model for answering what changed when the same
+  client returns with a later period. The new kernel compares only immutable
+  source facts from `governed_analysis_envelopes`; it never compares generated
+  prose or provider-selected severity.
+- **Exact scope:** `GET /api/v1/governed-analyses/{analysis_id}/temporal-comparison`
+  resolves the authenticated synthetic tenant, target entity and engagement,
+  then selects the unique nearest strictly earlier governed period. The
+  endpoint remains on the existing non-production, designated-company V1
+  router.
+- **Epistemic output:** a comparable metric exposes only previous value,
+  current value, arithmetic absolute change, unit and both fact IDs. Missing
+  metrics and unit mismatches remain `UNKNOWN`; a non-earlier or duplicate
+  nearest period is a named `CONTRADICTION`; partial comparisons are labelled
+  `PARTIALLY_COMPARABLE`. `causal_interpretation` is always null.
+- **Isolation and integrity:** all discovery reads are tenant-, entity- and
+  engagement-bound. Both selected envelopes are then reloaded through the
+  existing cryptographic binding verification. Any persistence or integrity
+  failure refuses the comparison; the module contains no mutation or provider
+  primitive.
+- **Falsification:** deterministic tests prove source-referenced arithmetic,
+  signed changes, UNKNOWN preservation, partial status, chronology refusal,
+  nearest-prior selection, duplicate-period contradiction, exclusion of
+  another entity and adversarial tenant, and read-only operation. Six direct
+  falsifications pass and the changed backend modules compile.
+- **Stop condition:** the deterministic temporal comparison contract and HTTP
+  boundary are closed. No second analysis was created and no founder action is
+  required for this kernel. End-to-end visual proof with two persisted periods
+  remains unproven and must not be claimed until a justified registered later
+  synthetic fixture exists or Real-data admission opens.
+- **Security/admission:** PG-3/PG-4 remain OPEN. External Provider and Real-data
+  admission remain CLOSED. No ActualOutcome, Learning, ExpectedImpact or
+  DecisionArc is created. Self-Selling remains PARKED / DEFERRED.
+
+## 44. Durable governed pseudonymous correspondence kernel — 2026-09-13
+
+- **Founder invariant:** a real identity is pseudonymously stable across time
+  only inside the client boundary that legitimately needs continuity; the same
+  identity is non-correlatable across different Pepperyn client entities by
+  default.
+- **Recovered architecture preserved:** this implements the previously
+  specified `CorrespondenceRepository` / `CorrespondenceTransformer` boundary
+  rather than replacing the deterministic anonymizer or the independently
+  reviewed egress and ownership slices.
+- **Kernel:** scope-bound HMAC pseudonyms, AES-256-GCM encrypted values,
+  independent domain-separated key material, ciphertext checksum, immutable
+  mapping/version, exact analysis bindings and encrypted short-lived opaque
+  handles. Rehydration is local and mapping values never leave the component.
+- **Persistence:** migration V33 adds backend-only, RLS-protected mapping and
+  binding tables plus a scoped purge RPC. Mapping rows have no UPDATE/DELETE
+  grant; purge is impossible while an analysis binding remains.
+- **Lifecycle:** no legal duration is invented. Purge requires an explicit
+  injected policy and zero active bindings; absent policy fails closed.
+- **Falsification:** nine deterministic tests pass for restart/multi-worker
+  continuity through shared durable repository state, cross-tenant and
+  cross-entity non-correlation, encryption-at-rest representation, corruption,
+  wrong key, wrong scope, handle tampering, version mismatch, purge guards,
+  migration permissions and absence of provider/network dependencies.
+  The second-process verification path is asserted to perform zero writes.
+- **Deployment:** V33 was applied to Supabase Pepperyn Integration Test on
+  2026-09-13 (`Success. No rows returned`) with no mapping or interface action.
+  The real analysis/provider path remains intentionally unconnected.
+- **Bounded verdict:** Supabase restart/multi-worker persistence, key operations, task minimization,
+  D10 and terminal provider-response rehydration remain unproven.
+- **Security/admission:** PG-3/PG-4 remain OPEN. External Provider and Real-data
+  admission remain CLOSED. Proven analysis, decision, export, portfolio and
+  temporal behaviors are unchanged. Self-Selling remains PARKED / DEFERRED.
+
+## 45. D10 governed minimal projection before egress — 2026-09-13
+
+- **Bounded task:** `FINANCIAL_CHANGE_INTERPRETATION_V1` now has a closed,
+  versioned deterministic projector. It emits only a V33-shaped pseudonym,
+  fixed `PREVIOUS`/`CURRENT` roles, allow-listed metric codes, direction and
+  coarse change bands. Exact amounts, exact dates, names, free text, geography,
+  sector, filenames and correspondence handles cannot enter its output schema.
+- **D10 disposition:** combination-identification risk is reduced for this
+  exact task, not declared absent. The receipt explicitly records
+  `D10_REDUCED_NOT_ANONYMOUS`; no claim of GDPR anonymization is made.
+- **Enforcement:** every request admitted by `LlmEgressAuthority` must now carry
+  a sealed projection receipt bound to the exact task, canonical payload hash
+  and identity state. Missing, forged, unknown-policy or mismatched evidence
+  is refused before the sole transport boundary. Existing compatibility tests
+  are explicitly marked `SYNTHETIC_TEST_ONLY` and confer no real-data status.
+- **Falsification:** eleven deterministic tests pass for schema minimization,
+  coarsening, canonical order, malformed values, direct-identity refusal,
+  allow-list enforcement, receipt integrity/scope and pre-transport refusal.
+  Changed modules compile; no provider call or persistence write occurred.
+- **Authorized composition:** the project now requires a V33 handle resolved
+  against durable exact scope plus one ownership-issued projected read receipt
+  for every metric code and value. Input hashes are checked and consumed once;
+  V33 and ownership scopes must match. The sealed projection retains scope,
+  analysis/request provenance, correspondence record/version and source
+  receipt IDs/hashes without retaining clear financial values. Plausible but
+  unbound pseudonyms, values and metrics are refused.
+- **Still open:** ownership-authorized initiation of V33 registration, task
+  policies needing exact values or contextual fields, complete
+  provider-response/rehydration flow, production key custody, PG-3, PG-4 and
+  Real-data Admission. External Provider and Real-data Admission remain CLOSED.
+
+## 46. Ownership-authorized initial V33 registration — 2026-09-13
+
+- **Origin authority:** creating or binding a correspondence now requires a
+  short-lived single-use capability minted from an exact projected
+  `ENTITY_CONTEXT` read receipt. It binds tenant/company, entity, engagement,
+  analysis, registration request, identity category and canonical identity
+  hash, and is burned before persistence.
+- **Durable evidence:** V34 adds registration version plus hashed request,
+  authority and source-receipt evidence. A database `BEFORE INSERT` guard
+  rejects new rows missing that evidence. Clear identity and unkeyed identity
+  hashes are not added. Existing V33 rows remain readable but are marked by
+  absence of origin evidence and cannot enter governed projection.
+- **Falsification:** seventeen registry/registration and thirteen composition
+  tests pass. Direct, replayed, stale, wrong-request, substituted,
+  cross-analysis, cross-company and cross-entity registration attempts fail
+  closed; source receipts and registration capabilities are single-use.
+- **Live proof:** V34 was applied once to Supabase Pepperyn Integration Test.
+  One authorized synthetic registration created
+  `ENTITY-098A6ADB73E999F0`; a separate process resolved the same mapping,
+  verified its durable origin and mapping version, performed no write, used no
+  real data and called no provider. Registration was not repeated.
+- **Bounded status:** the governed code chain is authoritative from an
+  ownership-controlled identity read through V33/V34 mapping and D10
+  projection receipt in deterministic tests. Live D10 composition from the new
+  mapping remains unproven. The historical V33 rehearsal mapping is not
+  retroactively certified.
+- **Still closed:** provider transport/response handling, richer D10 policies,
+  production key custody, PG-3/PG-4 and Real-data Admission.
+
+## 47. Quarantined provider return and terminal rehydration — 2026-09-13
+
+- **Return boundary:** one JSON-shaped mock response is frozen and hashed at
+  the transport boundary, then consumed once under exact request, task,
+  projection-payload and projection-binding evidence. It remains explicitly
+  `PROVIDER_INFERENCE_NOT_CANONICAL`.
+- **Closed validation:** the response must repeat the exact V33 subject and
+  every projected metric/direction exactly once, with only an allow-listed
+  assessment code. Unknown pseudonyms, missing or added metrics, free text,
+  mutation, substitution, forged receipts and replay fail closed.
+- **Local authority:** rehydration requires an ownership-issued, expiring,
+  single-use `CORRESPONDENCE` capability bound to exact tenant/company,
+  entity, engagement, analysis, request, task, projection binding and V33
+  correspondence record. The reference is resolved again before restoration.
+- **One-way information state:** restored content is an opaque terminal-only
+  type. Egress serialization and governed projection canonicalization reject
+  it recursively, so `REIDENTIFIED` content cannot re-enter either route.
+- **Falsification:** 101 focused D10/V33/V34/egress/provider-policy/return-path
+  tests pass, including mutation, omission, replay, foreign scope,
+  unauthorized rehydration and nested re-egress. Changed modules compile. No
+  external provider, real data, database write or interface action occurred.
+- **Still open:** the live D10 composition rehearsal using the V34-attested
+  mapping remains explicit proof debt. Richer task policies, production key
+  custody, provider transport, PG-3/PG-4 and Real-data Admission remain open.
+  No governed fact, decision, outcome or learning is created by this slice.
+
+## 48. Live V34-attested D10 composition rehearsal — 2026-09-13
+
+- **Founder-run result:** `INSPECTED` then `PASS` for governed analysis
+  `75132a71-c80c-4469-aba8-5171d947a9d0`.
+- **Durable origin:** exactly one mapping was resolved; it carried an
+  ownership-authorized V34 origin and mapping version 1. The immutable
+  governed analysis envelope was reloaded and cryptographically verified.
+- **Composition:** the hash-pinned, synthetic-only D10 rehearsal fixture
+  supplied two receipted metrics and produced policy
+  `FINANCIAL_CHANGE_MINIMAL_V1`. Six protected-source receipts, exact
+  ownership scope and correspondence version survived into the sealed
+  projection receipt.
+- **Terminal verification:** the receipt was checked and consumed without
+  transport. The proof explicitly records no exact-value disclosure, no
+  external provider, no real data and no write.
+- **Bounded verdict:** the outstanding live V34-to-D10 composition debt is
+  closed. No legacy V33 mapping is retro-certified; no new analysis,
+  LaterEvidence, ActualOutcome, Learning, ExpectedImpact or DecisionArc is
+  created.
+- **Still open:** task-specific policies beyond
+  `FINANCIAL_CHANGE_MINIMAL_V1`, production key custody, real provider
+  transport, PG-3/PG-4 and Real-data Admission. External Provider and
+  Real-data Admission remain CLOSED.
