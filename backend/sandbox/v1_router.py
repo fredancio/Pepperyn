@@ -20,6 +20,9 @@ from sandbox.governed_exports import generate_governed_excel, generate_governed_
 from services.governed_analysis_persistence import (
     GovernedPersistenceRefused, load_governed_envelope, save_governed_analysis,
 )
+from services.governed_temporal_continuity import (
+    GovernedTemporalContinuityRefused, load_governed_temporal_comparison,
+)
 from services.decision_memory_service import DecisionMemoryService, make_recommendation_id
 from sandbox.heterogeneous_workbooks import inspect_registered_workbook, run_registered_mock_analysis
 from sandbox.v1_prerequisite_evidence import (
@@ -337,6 +340,25 @@ async def get_v1_governed_analysis(
         result=result, tokens_used=0, cout_estime=0,
         recommendations_tracking=_recommendations_tracking(envelope, analysis_id, supabase),
     )
+
+
+@router.get("/governed-analyses/{analysis_id}/temporal-comparison")
+async def get_v1_governed_temporal_comparison(
+    analysis_id: str,
+    authorization: Optional[str] = Header(default=None),
+    x_auth_type: Optional[str] = Header(default=None),
+):
+    """Describe source-fact changes without inferring causes or outcomes."""
+    company_id, _, _ = await analyze_routes._resolve_auth(authorization, x_auth_type)
+    _require_designated_company(company_id)
+    from main import get_supabase_service
+    try:
+        return load_governed_temporal_comparison(
+            get_supabase_service(), analysis_id=analysis_id, company_id=company_id,
+        )
+    except GovernedTemporalContinuityRefused as exc:
+        logger.warning("[V1 TEMPORAL] comparison refused analysis=%s: %s", analysis_id, exc)
+        raise HTTPException(status_code=503, detail="Continuité temporelle indisponible") from exc
 
 
 @router.post("/governed-analyses/{analysis_id}/intention")
