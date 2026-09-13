@@ -219,7 +219,7 @@ export interface EvidenceSupport {
 
 export interface BriefingItem {
   arc_id: string;
-  source_type: 'decision_arc';
+  source_type: 'decision_arc' | 'governed_decision';
   /** Client propriétaire de l'arc — utilisé pour le regroupement Portfolio. */
   entity_id?: string | null;
   priority: BriefingPriority;

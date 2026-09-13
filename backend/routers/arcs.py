@@ -23,6 +23,7 @@ from fastapi import APIRouter, Header, HTTPException
 from models.decision_arc import ArcConsequenceRequest, ArcLearningRequest, ArcAbandonRequest
 from routers.analyze import _resolve_auth
 from services.arc_service import arc_service
+from services.governed_portfolio_service import build_governed_portfolio_cards, merge_portfolio_cards
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +82,12 @@ async def get_portfolio(
     top_item) mais volontairement non affichés côté frontend avant.
     """
     company_id, _plan, _auth_type = await _resolve_auth(authorization, x_auth_type)
-    cards = arc_service.build_portfolio_briefing(company_id=company_id)
+    legacy_cards = arc_service.build_portfolio_briefing(company_id=company_id)
+    # Explicit V1 decisions intentionally create no DecisionArc. They enter
+    # this cockpit through a read-only projection, never an inferred arc.
+    from main import get_supabase_service
+    governed_cards = build_governed_portfolio_cards(get_supabase_service(), company_id)
+    cards = merge_portfolio_cards(legacy_cards, governed_cards)
     return {"cards": cards}
 
 
