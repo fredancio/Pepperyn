@@ -118,3 +118,33 @@ Before provider activation, the complete chain must separately prove:
 `real identity → governed registry → minimized pseudonymous projection → egress authority → untrusted provider response → authorized local rehydration`.
 
 PG-3/PG-4 and Real-data admission remain CLOSED.
+
+## 6. Authorized registration origin — V34
+
+New mappings can no longer be created from caller-supplied identity arguments
+alone. Registration requires a single-use
+`CorrespondenceRegistrationAuthorization` minted by `OwnershipAuthority` from
+an exact projected `ENTITY_CONTEXT` read receipt. The capability binds company,
+entity, engagement, analysis, request, category and the canonical identity
+hash, expires with the protected-read grant and is burned before persistence.
+
+V34 adds immutable origin metadata to new rows and a database `BEFORE INSERT`
+guard requiring the authority, request and source-receipt digests. No clear
+identity or unkeyed identity hash is persisted as origin evidence. Existing
+V33 rows remain readable to preserve continuity, but a row without V34 origin
+attestation is refused by the governed projection composer. There is no
+retroactive attestation or silent backfill.
+
+Seventeen registry/registration falsifications and twelve composition
+falsifications pass. They cover absent, replayed, stale, wrong-request,
+wrong-analysis, wrong-category, substituted-identity, cross-company and
+cross-entity registration authority; source-receipt replay; and immutable
+durable origin metadata.
+
+V34 was applied once to Supabase Pepperyn Integration Test on 2026-09-13
+(`Success. No rows returned`). A bounded authorized rehearsal then created one
+synthetic mapping, `ENTITY-098A6ADB73E999F0`, from the exact designated entity
+and governed analysis scope. A separate-process verification resolved the same
+mapping and durable origin attestation with `mapping_version=1`, performed no
+write, used no real data and made no external-provider call. Registration was
+not repeated.

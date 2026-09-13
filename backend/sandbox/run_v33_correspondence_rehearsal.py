@@ -26,7 +26,7 @@ SYNTHETIC_IDENTITY = "V33 SYNTHETIC COUNTERPARTY — NO REAL IDENTITY"
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--phase", choices=("register", "verify", "inspect"), required=True)
+    parser.add_argument("--phase", choices=("verify", "inspect"), required=True)
     args = parser.parse_args()
     url = os.getenv("SUPABASE_URL", "")
     service_key = os.getenv("SUPABASE_SERVICE_KEY", "")
@@ -50,20 +50,13 @@ def main() -> int:
         registry = GovernedCorrespondenceRegistry.from_environment(
             SupabaseCorrespondenceRepository(supabase)
         )
-        if args.phase == "register":
-            stage = "registration"
-            reference = registry.register(
-                scope=scope, analysis_id=ANALYSIS_ID, category="COUNTERPARTY",
-                real_identity=SYNTHETIC_IDENTITY,
-            )
-        else:
-            # Deliberately read-only: registration may already have succeeded
-            # in a prior process even when its surrounding shell later failed.
-            stage = "existing_mapping_read"
-            reference = registry.reference_existing(
-                scope=scope, category="COUNTERPARTY",
-                real_identity=SYNTHETIC_IDENTITY,
-            )
+        # Deliberately read-only. New registrations require an ownership-issued
+        # V34 authority and cannot be initiated by this legacy rehearsal.
+        stage = "existing_mapping_read"
+        reference = registry.reference_existing(
+            scope=scope, category="COUNTERPARTY",
+            real_identity=SYNTHETIC_IDENTITY,
+        )
         stage = "local_rehydration"
         rehydrated = registry.rehydrate(
             {"subject": reference.pseudonym}, scope=scope, handles=[reference.handle],

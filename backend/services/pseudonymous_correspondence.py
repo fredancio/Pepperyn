@@ -20,11 +20,16 @@ from typing import Any, Iterable, Protocol
 from uuid import UUID, uuid4
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from services.ownership_authority import (
+    CorrespondenceRegistrationAuthorization, OwnershipRefused,
+    consume_correspondence_registration_authorization,
+)
 
 
 CRYPTO_VERSION = "v1-aes256gcm-hmacsha256"
 _CATEGORY = re.compile(r"^[A-Z][A-Z0-9_]{1,31}$")
 _PSEUDONYM = re.compile(r"^[A-Z][A-Z0-9_]{1,31}-[A-F0-9]{16}$")
+_PROJECTION_SEAL = object()
 
 
 class CorrespondenceRefused(RuntimeError):
@@ -56,12 +61,33 @@ class CorrespondenceRecord:
     ciphertext_sha256: str
     crypto_version: str
     mapping_version: int
+    registration_version: str | None = None
+    registration_request_sha256: str | None = None
+    registration_authority_sha256: str | None = None
+    registration_source_receipt_sha256: str | None = None
 
 
 @dataclass(frozen=True)
 class PseudonymousReference:
     pseudonym: str
     handle: str
+
+
+@dataclass(frozen=True)
+class ProjectionCorrespondenceBinding:
+    """Opaque proof that a pseudonym resolves in exact durable V33 scope."""
+
+    pseudonym: str
+    company_id: str
+    entity_id: str
+    correspondence_id: str
+    mapping_version: int
+    registration_authority_sha256: str | None
+    _seal: object
+
+    def __post_init__(self) -> None:
+        if self._seal is not _PROJECTION_SEAL:
+            raise CorrespondenceRefused("CORRESPONDENCE_BINDING_FORGED")
 
 
 class CorrespondenceRepository(Protocol):
@@ -101,7 +127,9 @@ class GovernedCorrespondenceRegistry:
 
     def register(
         self, *, scope: CorrespondenceScope, analysis_id: str,
-        category: str, real_identity: str, handle_ttl_seconds: int = 300,
+        category: str, real_identity: str, registration_request_id: str,
+        registration_authorization: CorrespondenceRegistrationAuthorization,
+        handle_ttl_seconds: int = 300,
     ) -> PseudonymousReference:
         category = category.strip().upper()
         real_identity = real_identity.strip()
@@ -114,6 +142,15 @@ class GovernedCorrespondenceRegistry:
         collision = self._repository.find_by_pseudonym(scope, pseudonym)
         if collision is not None and (record is None or collision.id != record.id):
             raise CorrespondenceRefused("CORRESPONDENCE_COLLISION")
+        try:
+            registration = consume_correspondence_registration_authorization(
+                registration_authorization, company_id=scope.company_id,
+                entity_id=scope.entity_id, analysis_id=analysis_id,
+                request_id=registration_request_id, category=category,
+                real_identity=real_identity,
+            )
+        except OwnershipRefused as exc:
+            raise CorrespondenceRefused("CORRESPONDENCE_REGISTRATION_AUTHORITY_REQUIRED") from exc
         if record is None:
             record_id = str(uuid4())
             nonce = secrets.token_bytes(12)
@@ -125,6 +162,11 @@ class GovernedCorrespondenceRegistry:
                 encrypted_value=_b64(encrypted), nonce=_b64(nonce),
                 ciphertext_sha256=hashlib.sha256(encrypted).hexdigest().upper(),
                 crypto_version=CRYPTO_VERSION, mapping_version=1,
+                registration_version="ownership-v1",
+                registration_request_sha256=hashlib.sha256(
+                    registration.request_id.encode()).hexdigest(),
+                registration_authority_sha256=registration.authority_sha256,
+                registration_source_receipt_sha256=registration.source_receipt_sha256,
             )
             try:
                 self._repository.insert(record)
@@ -167,6 +209,22 @@ class GovernedCorrespondenceRegistry:
             record = self._resolve_handle(handle, scope)
             replacements[record.pseudonym] = self._decrypt_and_verify(record)
         return _replace_recursive(value, replacements)
+
+    def authorize_projection_reference(
+        self, reference: PseudonymousReference, *, scope: CorrespondenceScope,
+    ) -> ProjectionCorrespondenceBinding:
+        """Resolve a V33 handle without revealing the protected identity."""
+
+        if not isinstance(reference, PseudonymousReference):
+            raise CorrespondenceRefused("CORRESPONDENCE_REFERENCE_INVALID")
+        record = self._resolve_handle(reference.handle, scope)
+        if not hmac.compare_digest(record.pseudonym, reference.pseudonym):
+            raise CorrespondenceRefused("CORRESPONDENCE_REFERENCE_MISMATCH")
+        return ProjectionCorrespondenceBinding(
+            record.pseudonym, record.scope.company_id, record.scope.entity_id,
+            record.id, record.mapping_version,
+            record.registration_authority_sha256, _PROJECTION_SEAL,
+        )
 
     def purge(
         self, *, scope: CorrespondenceScope, handle: str,
@@ -261,6 +319,18 @@ class GovernedCorrespondenceRegistry:
         ).encode("utf-8")
 
 
+def verify_projection_correspondence_binding(
+    binding: ProjectionCorrespondenceBinding, *, company_id: str, entity_id: str,
+) -> None:
+    if not isinstance(binding, ProjectionCorrespondenceBinding) or binding._seal is not _PROJECTION_SEAL:
+        raise CorrespondenceRefused("CORRESPONDENCE_BINDING_REQUIRED")
+    if binding.company_id != company_id or binding.entity_id != entity_id:
+        raise CorrespondenceRefused("CORRESPONDENCE_SCOPE_MISMATCH")
+    if not binding.registration_authority_sha256 or not re.fullmatch(
+        r"[a-f0-9]{64}", binding.registration_authority_sha256):
+        raise CorrespondenceRefused("CORRESPONDENCE_REGISTRATION_UNATTESTED")
+
+
 class SupabaseCorrespondenceRepository:
     """Service-role adapter; database RLS remains defense in depth."""
 
@@ -290,6 +360,10 @@ class SupabaseCorrespondenceRepository:
             "nonce": record.nonce, "ciphertext_sha256": record.ciphertext_sha256,
             "crypto_version": record.crypto_version,
             "mapping_version": record.mapping_version,
+            "registration_version": record.registration_version,
+            "registration_request_sha256": record.registration_request_sha256,
+            "registration_authority_sha256": record.registration_authority_sha256,
+            "registration_source_receipt_sha256": record.registration_source_receipt_sha256,
         }).execute()
 
     def bind_analysis(self, record_id, scope, analysis_id):
@@ -312,7 +386,7 @@ class SupabaseCorrespondenceRepository:
 
     def _base(self, scope):
         return (self._supabase.from_("pseudonymous_correspondence")
-            .select("id,company_id,entity_id,category,pseudonym,real_fingerprint,encrypted_value,nonce,ciphertext_sha256,crypto_version,mapping_version")
+            .select("id,company_id,entity_id,category,pseudonym,real_fingerprint,encrypted_value,nonce,ciphertext_sha256,crypto_version,mapping_version,registration_version,registration_request_sha256,registration_authority_sha256,registration_source_receipt_sha256")
             .eq("company_id", scope.company_id).eq("entity_id", scope.entity_id))
 
 
@@ -323,6 +397,10 @@ def _row_to_record(row: dict[str, Any]) -> CorrespondenceRecord:
         encrypted_value=row["encrypted_value"], nonce=row["nonce"],
         ciphertext_sha256=row["ciphertext_sha256"],
         crypto_version=row["crypto_version"], mapping_version=int(row["mapping_version"]),
+        registration_version=row.get("registration_version"),
+        registration_request_sha256=row.get("registration_request_sha256"),
+        registration_authority_sha256=row.get("registration_authority_sha256"),
+        registration_source_receipt_sha256=row.get("registration_source_receipt_sha256"),
     )
 
 

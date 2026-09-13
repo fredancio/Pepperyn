@@ -14,6 +14,7 @@ from enum import Enum
 import hashlib
 import json
 import logging
+import threading
 from types import MappingProxyType
 from typing import Any, Mapping
 
@@ -28,6 +29,14 @@ from services.provider_policy import (
     _mint_synthetic_test_provider_authorization,
     verify_provider_policy_authorization,
 )
+from services.governed_minimal_projection import (
+    GovernedProjection,
+    MinimalProjectionRefused,
+    _mint_synthetic_test_projection,
+    projection_binding_hash,
+    verify_governed_projection,
+)
+from services.information_state import TerminalOnlyReidentified
 
 
 logger = logging.getLogger(__name__)
@@ -40,6 +49,7 @@ class EgressRefusalCode(str, Enum):
     TRANSPORT_CLOSED = "TRANSPORT_CLOSED"
     OWNERSHIP_AUTHORIZATION_REQUIRED = "OWNERSHIP_AUTHORIZATION_REQUIRED"
     PROVIDER_POLICY_REQUIRED = "PROVIDER_POLICY_REQUIRED"
+    MINIMAL_PROJECTION_REQUIRED = "MINIMAL_PROJECTION_REQUIRED"
 
 
 class EgressRefused(RuntimeError):
@@ -72,6 +82,7 @@ class SyntheticEgressRequest:
     request_id: str = ""
     egress_authorization: EgressAuthorization | None = None
     provider_policy_authorization: ProviderPolicyAuthorization | None = None
+    governed_projection: GovernedProjection | None = None
 
 
 @dataclass(frozen=True)
@@ -159,9 +170,16 @@ class EgressResult:
     content: UntrustedProviderOutput
     payload_hash: str
     attempt_count: int
+    request_id: str = ""
+    projection_binding_hash: str = ""
+    response_hash: str = ""
+    _seal: object | None = None
 
 
 _SYNTHETIC_TEST_ADMISSION = object()
+_RESULT_SEAL = object()
+_ISSUED_RESULTS: dict[int, EgressResult] = {}
+_RESULT_LOCK = threading.Lock()
 
 
 def _dispatch_final_request(request: FrozenProviderRequest) -> Any:
@@ -185,7 +203,7 @@ def _canonical_json_bytes(value: Mapping[str, Any]) -> bytes:
 
 
 def _reject_provider_output(value: Any) -> None:
-    if isinstance(value, (UntrustedProviderOutput, _UntrustedProviderDerived)):
+    if isinstance(value, (UntrustedProviderOutput, _UntrustedProviderDerived, TerminalOnlyReidentified)):
         raise EgressRefused(EgressRefusalCode.IDENTITY_FORBIDDEN)
     if isinstance(value, Mapping):
         for key, nested in value.items():
@@ -225,6 +243,15 @@ class LlmEgressAuthority:
         except ProviderPolicyRefused as exc:
             raise EgressRefused(EgressRefusalCode.PROVIDER_POLICY_REQUIRED) from exc
         try:
+            projection_hash = projection_binding_hash(request.governed_projection)
+            verify_governed_projection(
+                request.governed_projection, task=request.task,
+                payload=request.provider_payload,
+                identity_state=request.identity_state.value,
+            )
+        except MinimalProjectionRefused as exc:
+            raise EgressRefused(EgressRefusalCode.MINIMAL_PROJECTION_REQUIRED) from exc
+        try:
             consume_egress_authorization(
                 request.egress_authorization,
                 task=request.task,
@@ -247,12 +274,20 @@ class LlmEgressAuthority:
         for attempt in range(1, request.max_attempts + 1):
             try:
                 raw_response = _dispatch_final_request(frozen)
-                return EgressResult(
+                response_snapshot, response_hash = _snapshot_response(raw_response)
+                result = EgressResult(
                     task=request.task,
-                    content=UntrustedProviderOutput(raw_response),
+                    content=UntrustedProviderOutput(response_snapshot),
                     payload_hash=frozen.payload_hash,
                     attempt_count=attempt,
+                    request_id=request.request_id,
+                    projection_binding_hash=projection_hash,
+                    response_hash=response_hash,
+                    _seal=_RESULT_SEAL,
                 )
+                with _RESULT_LOCK:
+                    _ISSUED_RESULTS[id(result)] = result
+                return result
             except RetryableProviderError:
                 logger.warning(
                     "LLM egress retry task=%s payload_hash=%s attempt=%d",
@@ -263,6 +298,48 @@ class LlmEgressAuthority:
                 if attempt == request.max_attempts:
                     raise
         raise AssertionError("unreachable")
+
+
+def consume_egress_result_receipt(
+    result: EgressResult, *, task: str, request_id: str,
+    payload_hash: str, expected_projection_binding_hash: str,
+) -> Any:
+    """Consume one genuine response receipt before provider output validation."""
+
+    if not isinstance(result, EgressResult) or result._seal is not _RESULT_SEAL:
+        raise EgressRefused(EgressRefusalCode.ROUTE_NOT_ALLOWED)
+    with _RESULT_LOCK:
+        if _ISSUED_RESULTS.pop(id(result), None) is not result:
+            raise EgressRefused(EgressRefusalCode.ROUTE_NOT_ALLOWED)
+    if (
+        result.task != task or result.request_id != request_id
+        or result.payload_hash != payload_hash
+        or result.projection_binding_hash != expected_projection_binding_hash
+    ):
+        raise EgressRefused(EgressRefusalCode.ROUTE_NOT_ALLOWED)
+    raw = result.content.raw_response
+    try:
+        body = json.dumps(raw, ensure_ascii=False, allow_nan=False,
+                          sort_keys=True, separators=(",", ":")).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise EgressRefused(EgressRefusalCode.ROUTE_NOT_ALLOWED) from exc
+    if not result.response_hash or hashlib.sha256(body).hexdigest() != result.response_hash:
+        raise EgressRefused(EgressRefusalCode.ROUTE_NOT_ALLOWED)
+    return raw
+
+
+def _snapshot_response(value: Any) -> tuple[Any, str]:
+    """Freeze JSON-shaped provider material at the transport boundary."""
+
+    try:
+        body = json.dumps(value, ensure_ascii=False, allow_nan=False,
+                          sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return json.loads(body), hashlib.sha256(body).hexdigest()
+    except (TypeError, ValueError):
+        # Legacy SDK response objects remain opaque and unreceipted. The
+        # governed return path accepts only JSON-shaped responses carrying a
+        # response hash, so an opaque legacy result cannot be rehydrated.
+        return value, ""
 
 
 _CLOSED_AUTHORITY = LlmEgressAuthority()
@@ -277,12 +354,21 @@ def _mint_synthetic_test_request(
     request_id: str = "",
     egress_authorization: EgressAuthorization | None = None,
     provider_policy_authorization: ProviderPolicyAuthorization | None = None,
+    governed_projection: GovernedProjection | None = None,
 ) -> SyntheticEgressRequest:
     """Test-harness-only mint; production use is forbidden by static policy."""
 
     policy = provider_policy_authorization or _mint_synthetic_test_provider_authorization(
         task=task, request_body=provider_payload,
     )
+    if governed_projection is None:
+        try:
+            governed_projection = _mint_synthetic_test_projection(
+                task=task, payload=provider_payload)
+        except MinimalProjectionRefused:
+            # Preserve dispatch as the sole refusal surface for malformed or
+            # tainted test payloads; no transport can be reached without it.
+            governed_projection = None
     return SyntheticEgressRequest(
         task=task,
         provider_payload=provider_payload,
@@ -292,6 +378,7 @@ def _mint_synthetic_test_request(
         request_id=request_id,
         egress_authorization=egress_authorization,
         provider_policy_authorization=policy,
+        governed_projection=governed_projection,
     )
 
 

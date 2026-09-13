@@ -1,0 +1,12 @@
+{
+  "fixture_id": "PEPPERYN_V1_D10_COMPOSITION_REHEARSAL",
+  "evidence_role": "D10_COMPOSITION_REHEARSAL_ONLY",
+  "synthetic": true,
+  "external_provider_allowed": false,
+  "real_data_allowed": false,
+  "periods": ["PREVIOUS", "CURRENT"],
+  "metrics": [
+    {"metric_code": "REVENUE", "previous": 1000000, "current": 1120000},
+    {"metric_code": "EBITDA", "previous": 100000, "current": 97000}
+  ]
+}

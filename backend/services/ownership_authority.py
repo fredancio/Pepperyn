@@ -134,6 +134,64 @@ class ProtectedReadReceipt:
 
 
 @dataclass(frozen=True)
+class ProjectionSourceAuthorization:
+    scope: OwnershipScope
+    request_id: str
+    task: str
+    policy_id: str
+    input_receipt_ids: frozenset[str]
+    input_hashes: tuple[tuple[str, str], ...]
+    _issuer: Any
+    _seal: object
+
+    def __post_init__(self) -> None:
+        if self._seal is not _MINT_SEAL:
+            raise OwnershipRefused("FORGED_PROJECTION_SOURCE_AUTHORIZATION")
+
+
+@dataclass(frozen=True)
+class CorrespondenceRegistrationAuthorization:
+    scope: OwnershipScope
+    request_id: str
+    category: str
+    identity_hash: str
+    source_receipt_id: str
+    capability_id: str
+    expires_at: float
+    _issuer: Any
+    _seal: object
+
+    def __post_init__(self) -> None:
+        if self._seal is not _MINT_SEAL:
+            raise OwnershipRefused("FORGED_CORRESPONDENCE_REGISTRATION_AUTHORIZATION")
+
+
+@dataclass(frozen=True)
+class ConsumedCorrespondenceRegistration:
+    scope: OwnershipScope
+    request_id: str
+    authority_sha256: str
+    source_receipt_sha256: str
+
+
+@dataclass(frozen=True)
+class RehydrationAuthorization:
+    scope: OwnershipScope
+    request_id: str
+    task: str
+    projection_binding_hash: str
+    correspondence_id: str
+    capability_id: str
+    expires_at: float
+    _issuer: Any
+    _seal: object
+
+    def __post_init__(self) -> None:
+        if self._seal is not _MINT_SEAL:
+            raise OwnershipRefused("FORGED_REHYDRATION_AUTHORIZATION")
+
+
+@dataclass(frozen=True)
 class ScopedContextRecord:
     resource: ProtectedResource
     company_id: str
@@ -256,6 +314,14 @@ class OwnershipAuthority:
         self._lock = threading.Lock()
         self._read_receipts: dict[str, tuple[str, OwnershipScope, str, ProtectedResource, Any, str, tuple | None]] = {}
         self._used_projected_receipts: set[str] = set()
+        self._used_projection_source_receipts: set[str] = set()
+        self._used_registration_source_receipts: set[str] = set()
+        self._correspondence_registration_registry: dict[str, tuple[
+            OwnershipScope, str, str, str, str, float, bool,
+        ]] = {}
+        self._rehydration_registry: dict[str, tuple[
+            OwnershipScope, str, str, str, str, float, bool,
+        ]] = {}
         self._disclosure_receipts: dict[str, tuple[str, frozenset[str], str, bool, OwnershipScope, str, frozenset[ProtectedResource]]] = {}
         self._projection_policy = dict(projection_policy or {})
         self._allowed_payload_keys = allowed_payload_keys
@@ -407,6 +473,190 @@ class OwnershipAuthority:
         )
         return authorization
 
+    def authorize_projection_sources(
+        self, *, grant: ProtectedReadGrant, request_id: str, task: str,
+        policy_id: str, inputs: Mapping[str, tuple[Any, ProtectedReadReceipt]],
+    ) -> ProjectionSourceAuthorization:
+        """Bind exact authoritative values to one deterministic projection."""
+
+        if not task or not policy_id or not inputs or len(inputs) > 32:
+            raise OwnershipRefused("PROJECTION_SOURCES_INVALID")
+        hashes: list[tuple[str, str]] = []
+        receipt_ids: set[str] = set()
+        with self._lock:
+            for label, pair in sorted(inputs.items()):
+                if not isinstance(label, str) or not label or not isinstance(pair, tuple) or len(pair) != 2:
+                    raise OwnershipRefused("PROJECTION_SOURCES_INVALID")
+                value, receipt = pair
+                if not isinstance(receipt, ProtectedReadReceipt):
+                    raise OwnershipRefused("INVALID_READ_RECEIPT")
+                _validate_read_grant(grant, request_id=request_id, resource=receipt.resource)
+                registered = self._read_receipts.get(receipt.receipt_id)
+                expected = (
+                    receipt.grant_id, receipt.scope, receipt.request_id, receipt.resource,
+                    registered[4] if registered else None, receipt.value_hash,
+                    receipt.projection_path,
+                )
+                if (
+                    receipt._seal is not _MINT_SEAL or receipt._issuer is not self
+                    or receipt.scope != grant.scope or receipt.request_id != request_id
+                    or receipt.grant_id != grant.capability_id or receipt.projection_path is None
+                    or registered != expected
+                    or receipt.receipt_id in self._used_projection_source_receipts
+                    or receipt.value_hash != _canonical_hash(value)
+                    or receipt.resource is not ProtectedResource.ANALYSIS_RESULT
+                ):
+                    raise OwnershipRefused("INVALID_PROJECTION_SOURCE_RECEIPT")
+                hashes.append((label, receipt.value_hash))
+                receipt_ids.add(receipt.receipt_id)
+            if len(receipt_ids) != len(inputs):
+                raise OwnershipRefused("DUPLICATE_PROJECTION_SOURCE_RECEIPT")
+            self._used_projection_source_receipts.update(receipt_ids)
+        return ProjectionSourceAuthorization(
+            grant.scope, request_id, task, policy_id, frozenset(receipt_ids),
+            tuple(hashes), self, _MINT_SEAL,
+        )
+
+    def mint_correspondence_registration_authorization(
+        self, *, grant: ProtectedReadGrant, request_id: str, category: str,
+        real_identity: str, identity_receipt: ProtectedReadReceipt,
+    ) -> CorrespondenceRegistrationAuthorization:
+        """Authorize one initial V33 registration from one governed identity read."""
+
+        normalized_category = category.strip().upper()
+        if not request_id or not normalized_category or not isinstance(real_identity, str):
+            raise OwnershipRefused("REGISTRATION_INPUT_INVALID")
+        if not isinstance(identity_receipt, ProtectedReadReceipt):
+            raise OwnershipRefused("INVALID_READ_RECEIPT")
+        _validate_read_grant(grant, request_id=request_id, resource=identity_receipt.resource)
+        registered = self._read_receipts.get(identity_receipt.receipt_id)
+        expected = (
+            identity_receipt.grant_id, identity_receipt.scope,
+            identity_receipt.request_id, identity_receipt.resource,
+            registered[4] if registered else None, identity_receipt.value_hash,
+            identity_receipt.projection_path,
+        )
+        if (
+            identity_receipt._seal is not _MINT_SEAL
+            or identity_receipt._issuer is not self
+            or identity_receipt.scope != grant.scope
+            or identity_receipt.request_id != request_id
+            or identity_receipt.grant_id != grant.capability_id
+            or identity_receipt.projection_path is None
+            or identity_receipt.resource is not ProtectedResource.ENTITY_CONTEXT
+            or registered != expected
+            or identity_receipt.value_hash != _canonical_hash(real_identity)
+        ):
+            raise OwnershipRefused("INVALID_REGISTRATION_SOURCE_RECEIPT")
+        capability_id = _new_id()
+        expiry = min(grant.expires_at, time.monotonic() + self._ttl_seconds)
+        with self._lock:
+            if identity_receipt.receipt_id in self._used_registration_source_receipts:
+                raise OwnershipRefused("REGISTRATION_SOURCE_RECEIPT_REPLAYED")
+            self._used_registration_source_receipts.add(identity_receipt.receipt_id)
+            authorization = CorrespondenceRegistrationAuthorization(
+                grant.scope, request_id, normalized_category,
+                identity_receipt.value_hash, identity_receipt.receipt_id,
+                capability_id, expiry, self, _MINT_SEAL,
+            )
+            self._correspondence_registration_registry[capability_id] = (
+                grant.scope, request_id, normalized_category,
+                identity_receipt.value_hash, identity_receipt.receipt_id,
+                expiry, False,
+            )
+        return authorization
+
+    def mint_rehydration_authorization(
+        self, *, grant: ProtectedReadGrant, request_id: str, task: str,
+        projection_binding_hash: str, correspondence_id: str,
+    ) -> RehydrationAuthorization:
+        """Authorize one terminal-only local resolution for one provider return."""
+
+        _validate_read_grant(
+            grant, request_id=request_id, resource=ProtectedResource.CORRESPONDENCE)
+        if (
+            not task or not correspondence_id
+            or not isinstance(projection_binding_hash, str)
+            or len(projection_binding_hash) != 64
+        ):
+            raise OwnershipRefused("REHYDRATION_INPUT_INVALID")
+        try:
+            int(projection_binding_hash, 16)
+        except ValueError as exc:
+            raise OwnershipRefused("REHYDRATION_INPUT_INVALID") from exc
+        capability_id = _new_id()
+        expiry = min(grant.expires_at, time.monotonic() + self._ttl_seconds)
+        authorization = RehydrationAuthorization(
+            grant.scope, request_id, task, projection_binding_hash.lower(),
+            correspondence_id, capability_id, expiry, self, _MINT_SEAL,
+        )
+        with self._lock:
+            self._rehydration_registry[capability_id] = (
+                grant.scope, request_id, task, projection_binding_hash.lower(),
+                correspondence_id, expiry, False,
+            )
+        return authorization
+
+    def _consume_rehydration(
+        self, authorization: RehydrationAuthorization, *, scope: OwnershipScope,
+        request_id: str, task: str, projection_binding_hash: str,
+        correspondence_id: str,
+    ) -> OwnershipScope:
+        with self._lock:
+            registered = self._rehydration_registry.get(authorization.capability_id)
+            expected = (
+                authorization.scope, authorization.request_id, authorization.task,
+                authorization.projection_binding_hash,
+                authorization.correspondence_id, authorization.expires_at, False,
+            )
+            if registered != expected or authorization._seal is not _MINT_SEAL:
+                raise OwnershipRefused("INVALID_REHYDRATION_AUTHORIZATION")
+            if time.monotonic() >= authorization.expires_at:
+                raise OwnershipRefused("REHYDRATION_AUTHORIZATION_EXPIRED")
+            if (
+                scope != authorization.scope or request_id != authorization.request_id
+                or task != authorization.task
+                or projection_binding_hash.lower() != authorization.projection_binding_hash
+                or correspondence_id != authorization.correspondence_id
+            ):
+                raise OwnershipRefused("REHYDRATION_AUTHORIZATION_SCOPE_MISMATCH")
+            self._rehydration_registry[authorization.capability_id] = (*registered[:-1], True)
+        return scope
+
+    def _consume_correspondence_registration(
+        self, authorization: CorrespondenceRegistrationAuthorization,
+        *, scope: OwnershipScope, analysis_id: str, request_id: str,
+        category: str, real_identity: str,
+    ) -> ConsumedCorrespondenceRegistration:
+        with self._lock:
+            registered = self._correspondence_registration_registry.get(
+                authorization.capability_id)
+            expected = (
+                authorization.scope, authorization.request_id,
+                authorization.category, authorization.identity_hash,
+                authorization.source_receipt_id, authorization.expires_at, False,
+            )
+            if registered != expected or authorization._seal is not _MINT_SEAL:
+                raise OwnershipRefused("INVALID_REGISTRATION_AUTHORIZATION")
+            if time.monotonic() >= authorization.expires_at:
+                raise OwnershipRefused("REGISTRATION_AUTHORIZATION_EXPIRED")
+            if (
+                scope != authorization.scope or analysis_id != scope.analysis_id
+                or request_id != authorization.request_id
+                or category != authorization.category
+                or _canonical_hash(real_identity) != authorization.identity_hash
+            ):
+                raise OwnershipRefused("REGISTRATION_AUTHORIZATION_SCOPE_MISMATCH")
+            # Burn before persistence. A failed insert cannot make the authority reusable.
+            self._correspondence_registration_registry[authorization.capability_id] = (
+                *registered[:-1], True,
+            )
+        return ConsumedCorrespondenceRegistration(
+            scope, request_id,
+            hashlib.sha256(authorization.capability_id.encode()).hexdigest(),
+            hashlib.sha256(authorization.source_receipt_id.encode()).hexdigest(),
+        )
+
     def project_read(self, receipt: ProtectedReadReceipt, path: tuple[str | int, ...]) -> ProtectedReadReceipt:
         with self._lock:
             registered = self._read_receipts.get(receipt.receipt_id)
@@ -458,6 +708,44 @@ class OwnershipAuthority:
                 scope, expected_task, expected_request, resources, expected_hash, expiry, True
             )
             return scope
+
+
+def consume_correspondence_registration_authorization(
+    authorization: CorrespondenceRegistrationAuthorization | None, *,
+    company_id: str, entity_id: str, analysis_id: str, request_id: str,
+    category: str, real_identity: str,
+) -> ConsumedCorrespondenceRegistration:
+    if (
+        not isinstance(authorization, CorrespondenceRegistrationAuthorization)
+        or authorization._seal is not _MINT_SEAL
+        or not isinstance(authorization._issuer, OwnershipAuthority)
+    ):
+        raise OwnershipRefused("INVALID_REGISTRATION_AUTHORIZATION")
+    expected_scope = authorization.scope
+    if expected_scope.company_id != company_id or expected_scope.entity_id != entity_id:
+        raise OwnershipRefused("REGISTRATION_AUTHORIZATION_SCOPE_MISMATCH")
+    return authorization._issuer._consume_correspondence_registration(
+        authorization, scope=expected_scope, analysis_id=analysis_id,
+        request_id=request_id, category=category, real_identity=real_identity,
+    )
+
+
+def consume_rehydration_authorization(
+    authorization: RehydrationAuthorization | None, *, scope: OwnershipScope,
+    request_id: str, task: str, projection_binding_hash: str,
+    correspondence_id: str,
+) -> OwnershipScope:
+    if (
+        not isinstance(authorization, RehydrationAuthorization)
+        or authorization._seal is not _MINT_SEAL
+        or not isinstance(authorization._issuer, OwnershipAuthority)
+    ):
+        raise OwnershipRefused("INVALID_REHYDRATION_AUTHORIZATION")
+    return authorization._issuer._consume_rehydration(
+        authorization, scope=scope, request_id=request_id, task=task,
+        projection_binding_hash=projection_binding_hash,
+        correspondence_id=correspondence_id,
+    )
 
 
 class ProtectedContextReader:

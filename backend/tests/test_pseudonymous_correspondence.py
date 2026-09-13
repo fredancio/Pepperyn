@@ -2,6 +2,7 @@
 
 from dataclasses import replace
 from pathlib import Path
+import time
 
 from services.pseudonymous_correspondence import (
     CRYPTO_VERSION,
@@ -9,6 +10,11 @@ from services.pseudonymous_correspondence import (
     CorrespondenceRefused,
     CorrespondenceScope,
     GovernedCorrespondenceRegistry,
+)
+from services.ownership_authority import (
+    InMemoryOwnershipRepository, InMemoryScopedContextRepository,
+    OwnershipAuthority, OwnershipRecord, OwnershipRefused, ProtectedContextReader,
+    ProtectedResource, ScopedContextRecord,
 )
 
 
@@ -69,15 +75,119 @@ def refuses(code, operation):
     raise AssertionError(f"expected {code}")
 
 
+def registration_authority(*, scope, analysis_id, category, real_identity,
+        ttl_seconds=30.0, details=False):
+    request_id = f"register-{analysis_id}-{category}"
+    source = {"identity": real_identity}
+    authority = OwnershipAuthority(InMemoryOwnershipRepository([
+        OwnershipRecord(analysis_id, scope.company_id, scope.entity_id,
+            f"engagement-{scope.entity_id}", scope.company_id, scope.entity_id),
+    ]), ttl_seconds=ttl_seconds,
+        projection_policy={ProtectedResource.ENTITY_CONTEXT: frozenset({("identity",)})})
+    principal = authority._accept_authenticated_principal("principal", scope.company_id)
+    grant = authority.resolve_and_mint_read_grant(principal=principal,
+        analysis_id=analysis_id, request_id=request_id,
+        resources=[ProtectedResource.ENTITY_CONTEXT])
+    record = ScopedContextRecord(ProtectedResource.ENTITY_CONTEXT,
+        scope.company_id, scope.entity_id, grant.scope.engagement_id, analysis_id, source)
+    whole = ProtectedContextReader(InMemoryScopedContextRepository([record])).read_receipted(
+        grant, request_id=request_id, resource=ProtectedResource.ENTITY_CONTEXT)[0][1]
+    identity_receipt = authority.project_read(whole, ("identity",))
+    authorization = authority.mint_correspondence_registration_authorization(
+        grant=grant, request_id=request_id, category=category,
+        real_identity=real_identity, identity_receipt=identity_receipt)
+    if details:
+        return request_id, authorization, authority, grant, identity_receipt
+    return request_id, authorization
+
+
+def authorized_register(registry, *, scope, analysis_id, category, real_identity):
+    request_id, authorization = registration_authority(scope=scope,
+        analysis_id=analysis_id, category=category, real_identity=real_identity)
+    return registry.register(scope=scope, analysis_id=analysis_id, category=category,
+        real_identity=real_identity, registration_request_id=request_id,
+        registration_authorization=authorization)
+
+
+def test_direct_registration_without_authority_fails_closed():
+    registry = GovernedCorrespondenceRegistry(DurableMemoryRepository(), KEY)
+    refuses("CORRESPONDENCE_REGISTRATION_AUTHORITY_REQUIRED", lambda: registry.register(
+        scope=CorrespondenceScope(TENANT_A, ENTITY_A), analysis_id=ANALYSIS_1,
+        category="CUSTOMER", real_identity="Synthetic Customer",
+        registration_request_id="direct", registration_authorization=None))
+
+
+def test_registration_authority_is_single_use_and_exactly_bound():
+    scope = CorrespondenceScope(TENANT_A, ENTITY_A)
+    registry = GovernedCorrespondenceRegistry(DurableMemoryRepository(), KEY)
+    request_id, authorization = registration_authority(scope=scope,
+        analysis_id=ANALYSIS_1, category="CUSTOMER", real_identity="Synthetic Customer")
+    kwargs = dict(scope=scope, analysis_id=ANALYSIS_1, category="CUSTOMER",
+        real_identity="Synthetic Customer", registration_request_id=request_id,
+        registration_authorization=authorization)
+    registry.register(**kwargs)
+    refuses("CORRESPONDENCE_REGISTRATION_AUTHORITY_REQUIRED", lambda: registry.register(**kwargs))
+
+
+def test_registration_source_receipt_cannot_mint_two_authorities():
+    scope = CorrespondenceScope(TENANT_A, ENTITY_A)
+    request_id, _, authority, grant, identity_receipt = registration_authority(
+        scope=scope, analysis_id=ANALYSIS_1, category="CUSTOMER",
+        real_identity="Synthetic Customer", details=True)
+    try:
+        authority.mint_correspondence_registration_authorization(
+            grant=grant, request_id=request_id, category="CUSTOMER",
+            real_identity="Synthetic Customer", identity_receipt=identity_receipt)
+    except OwnershipRefused as exc:
+        assert str(exc) == "REGISTRATION_SOURCE_RECEIPT_REPLAYED"
+    else:
+        raise AssertionError("registration source receipt replayed")
+
+
+def test_registration_substitution_and_foreign_scope_fail_closed():
+    scope = CorrespondenceScope(TENANT_A, ENTITY_A)
+    cases = (
+        dict(real_identity="Other Customer"),
+        dict(category="SUPPLIER"),
+        dict(analysis_id=ANALYSIS_2),
+        dict(scope=CorrespondenceScope(TENANT_A, ENTITY_B)),
+        dict(scope=CorrespondenceScope(TENANT_B, ENTITY_A)),
+        dict(registration_request_id="other-request"),
+    )
+    for change in cases:
+        registry = GovernedCorrespondenceRegistry(DurableMemoryRepository(), KEY)
+        request_id, authorization = registration_authority(scope=scope,
+            analysis_id=ANALYSIS_1, category="CUSTOMER", real_identity="Synthetic Customer")
+        values = dict(scope=scope, analysis_id=ANALYSIS_1, category="CUSTOMER",
+            real_identity="Synthetic Customer", registration_request_id=request_id,
+            registration_authorization=authorization)
+        values.update(change)
+        refuses("CORRESPONDENCE_REGISTRATION_AUTHORITY_REQUIRED",
+            lambda values=values: registry.register(**values))
+
+
+def test_stale_registration_authority_fails_closed():
+    scope = CorrespondenceScope(TENANT_A, ENTITY_A)
+    request_id, authorization = registration_authority(scope=scope,
+        analysis_id=ANALYSIS_1, category="CUSTOMER",
+        real_identity="Synthetic Customer", ttl_seconds=0.001)
+    time.sleep(0.05)
+    registry = GovernedCorrespondenceRegistry(DurableMemoryRepository(), KEY)
+    refuses("CORRESPONDENCE_REGISTRATION_AUTHORITY_REQUIRED", lambda: registry.register(
+        scope=scope, analysis_id=ANALYSIS_1, category="CUSTOMER",
+        real_identity="Synthetic Customer", registration_request_id=request_id,
+        registration_authorization=authorization))
+
+
 def test_same_identity_is_stable_across_analyses_and_restart_workers():
     repository = DurableMemoryRepository()
     scope = CorrespondenceScope(TENANT_A, ENTITY_A)
     first_worker = GovernedCorrespondenceRegistry(repository, KEY)
-    first = first_worker.register(scope=scope, analysis_id=ANALYSIS_1,
+    first = authorized_register(first_worker, scope=scope, analysis_id=ANALYSIS_1,
         category="CUSTOMER", real_identity="Dupont Construction SA")
     # A new object represents a restarted process or another worker.
     second_worker = GovernedCorrespondenceRegistry(repository, KEY)
-    second = second_worker.register(scope=scope, analysis_id=ANALYSIS_2,
+    second = authorized_register(second_worker, scope=scope, analysis_id=ANALYSIS_2,
         category="CUSTOMER", real_identity="Dupont Construction SA")
     assert first.pseudonym == second.pseudonym
     assert second_worker.rehydrate(
@@ -91,7 +201,7 @@ def test_second_process_verification_is_strictly_read_only():
     repository = DurableMemoryRepository()
     scope = CorrespondenceScope(TENANT_A, ENTITY_A)
     first_worker = GovernedCorrespondenceRegistry(repository, KEY)
-    registered = first_worker.register(scope=scope, analysis_id=ANALYSIS_1,
+    registered = authorized_register(first_worker, scope=scope, analysis_id=ANALYSIS_1,
         category="COUNTERPARTY", real_identity="Synthetic Counterparty")
     writes_after_registration = list(repository.writes)
     second_worker = GovernedCorrespondenceRegistry(repository, KEY)
@@ -107,7 +217,7 @@ def test_second_process_verifies_unicode_identity_without_writing():
     repository = DurableMemoryRepository()
     scope = CorrespondenceScope(TENANT_A, ENTITY_A)
     first_worker = GovernedCorrespondenceRegistry(repository, KEY)
-    first_worker.register(scope=scope, analysis_id=ANALYSIS_1,
+    authorized_register(first_worker, scope=scope, analysis_id=ANALYSIS_1,
         category="COUNTERPARTY",
         real_identity="V33 SYNTHETIC COUNTERPARTY — NO REAL IDENTITY")
     writes_after_registration = list(repository.writes)
@@ -125,11 +235,11 @@ def test_same_identity_is_non_correlatable_across_client_boundaries():
     repository = DurableMemoryRepository()
     registry = GovernedCorrespondenceRegistry(repository, KEY)
     references = [
-        registry.register(scope=CorrespondenceScope(TENANT_A, ENTITY_A), analysis_id=ANALYSIS_1,
+        authorized_register(registry, scope=CorrespondenceScope(TENANT_A, ENTITY_A), analysis_id=ANALYSIS_1,
             category="CUSTOMER", real_identity="Shared Counterparty"),
-        registry.register(scope=CorrespondenceScope(TENANT_A, ENTITY_B), analysis_id=ANALYSIS_1,
+        authorized_register(registry, scope=CorrespondenceScope(TENANT_A, ENTITY_B), analysis_id=ANALYSIS_1,
             category="CUSTOMER", real_identity="Shared Counterparty"),
-        registry.register(scope=CorrespondenceScope(TENANT_B, ENTITY_A), analysis_id=ANALYSIS_1,
+        authorized_register(registry, scope=CorrespondenceScope(TENANT_B, ENTITY_A), analysis_id=ANALYSIS_1,
             category="CUSTOMER", real_identity="Shared Counterparty"),
     ]
     assert len({reference.pseudonym for reference in references}) == 3
@@ -140,12 +250,16 @@ def test_repository_contains_ciphertext_not_identity_and_tampering_fails_closed(
     repository = DurableMemoryRepository()
     scope = CorrespondenceScope(TENANT_A, ENTITY_A)
     registry = GovernedCorrespondenceRegistry(repository, KEY)
-    reference = registry.register(scope=scope, analysis_id=ANALYSIS_1,
+    reference = authorized_register(registry, scope=scope, analysis_id=ANALYSIS_1,
         category="SUPPLIER", real_identity="Highly Sensitive Supplier")
     record = next(iter(repository.records.values()))
     serialized = repr(record)
     assert "Highly Sensitive Supplier" not in serialized
     assert record.crypto_version == CRYPTO_VERSION
+    assert record.registration_version == "ownership-v1"
+    assert len(record.registration_request_sha256) == 64
+    assert len(record.registration_authority_sha256) == 64
+    assert len(record.registration_source_receipt_sha256) == 64
     repository.records[record.id] = replace(record, encrypted_value=record.encrypted_value[:-2] + "AA")
     refuses("CORRESPONDENCE_INTEGRITY_FAILED", lambda: registry.rehydrate(
         reference.pseudonym, scope=scope, handles=[reference.handle]))
@@ -155,7 +269,7 @@ def test_handle_is_opaque_scope_bound_versioned_and_tamper_evident():
     repository = DurableMemoryRepository()
     scope = CorrespondenceScope(TENANT_A, ENTITY_A)
     registry = GovernedCorrespondenceRegistry(repository, KEY)
-    reference = registry.register(scope=scope, analysis_id=ANALYSIS_1,
+    reference = authorized_register(registry, scope=scope, analysis_id=ANALYSIS_1,
         category="CUSTOMER", real_identity="Dupont Construction SA")
     assert "Dupont" not in reference.handle
     refuses("CORRESPONDENCE_SCOPE_MISMATCH", lambda: registry.rehydrate(
@@ -172,7 +286,7 @@ def test_wrong_key_cannot_link_or_decrypt_existing_mapping():
     repository = DurableMemoryRepository()
     scope = CorrespondenceScope(TENANT_A, ENTITY_A)
     first = GovernedCorrespondenceRegistry(repository, KEY)
-    reference = first.register(scope=scope, analysis_id=ANALYSIS_1,
+    reference = authorized_register(first, scope=scope, analysis_id=ANALYSIS_1,
         category="CUSTOMER", real_identity="Dupont Construction SA")
     other_key_worker = GovernedCorrespondenceRegistry(repository, b"z" * 32)
     try:
@@ -187,7 +301,7 @@ def test_purge_requires_injected_policy_and_zero_active_analysis_bindings():
     repository = DurableMemoryRepository()
     scope = CorrespondenceScope(TENANT_A, ENTITY_A)
     registry = GovernedCorrespondenceRegistry(repository, KEY)
-    reference = registry.register(scope=scope, analysis_id=ANALYSIS_1,
+    reference = authorized_register(registry, scope=scope, analysis_id=ANALYSIS_1,
         category="CUSTOMER", real_identity="Transient Customer")
     refuses("PURGE_POLICY_REQUIRED", lambda: registry.purge(
         scope=scope, handle=reference.handle, policy=None))
@@ -208,6 +322,16 @@ def test_migration_is_backend_only_immutable_and_reference_guarded():
     assert "ON DELETE CASCADE" in sql  # bindings disappear with their analysis
     assert "GRANT SELECT, INSERT" in sql
     assert "GRANT UPDATE" not in sql and "GRANT DELETE" not in sql
+
+
+def test_v34_requires_authoritative_origin_for_every_new_mapping():
+    sql = (Path(__file__).parents[1] / "migrations" /
+        "v34_authorized_correspondence_registration.sql").read_text(encoding="utf-8")
+    assert "require_authorized_correspondence_registration_v1" in sql
+    assert "BEFORE INSERT" in sql
+    assert "registration_authority_sha256 IS NULL" in sql
+    assert "registration_source_receipt_sha256 IS NULL" in sql
+    assert "UPDATE public.pseudonymous_correspondence" not in sql
 
 
 def test_correspondence_component_has_no_provider_or_egress_dependency():
