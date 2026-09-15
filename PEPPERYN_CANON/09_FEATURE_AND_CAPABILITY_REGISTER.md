@@ -150,6 +150,15 @@ different maturity dimensions.
 
 ## Removal rule
 
+Temporal terminal consumption: LOCAL_TESTED panel for the existing bounded
+comparison endpoint (24 A4). Multi-client reload: LOCAL_TESTED through real
+envelope integrity with mocked storage/auth (24 A3). Neither promotes the
+general temporal reliability or two-user Beta gate.
+
+Portfolio read availability: IMPLEMENTED / TESTED distinction between source
+failure and a successful empty queue; execution evidence 24 A2. This does not
+certify completeness when stored rows themselves are missing or inconsistent.
+
 Post-takeover: selected-client synthetic mock ingestion is IMPLEMENTED / TESTED
 at its HTTP-to-persistence-call boundary (execution evidence 24, A1). Two-user
 and live multi-client continuity remain unproven; no gate is promoted.

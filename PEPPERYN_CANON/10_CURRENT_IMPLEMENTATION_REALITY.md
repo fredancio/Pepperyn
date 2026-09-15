@@ -6,6 +6,16 @@ Selected-client synthetic mock ingestion is IMPLEMENTED / TESTED at the HTTP
 and persistence-call boundary, with invalid ownership/engagement refusal.
 See `24_ASTRA_EXECUTION_EVIDENCE.md` A1. This is not two-user/live Beta proof.
 
+Portfolio source-read failures now refuse with HTTP 503 rather than masquerading
+as an empty/complete queue (A2, IMPLEMENTED / TESTED). Normal empty-state and
+executed-decision exclusion regressions pass; no live deployment proof claimed.
+
+A3 adds three-client HTTP upload/reload proof through the actual envelope
+integrity checks with mocked database/auth. A4 renders the existing temporal
+comparison in governed analysis UI with explicit uncertainty/provenance and
+stale-response isolation. Both are LOCAL_TESTED, not live multi-period/Beta
+proof; see execution evidence 24 for batch scope and limits.
+
 **Baseline:** `6fb05c11394ce33423e81697a3dd13e9513e7794`
 
 ## Live-proven bounded chain
