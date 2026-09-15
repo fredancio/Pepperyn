@@ -12,6 +12,10 @@ from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
+
+class PortfolioReadUnavailable(RuntimeError):
+    """Required portfolio evidence could not be read; empty is not established."""
+
 _PRIORITY_ORDER = {"urgent": 0, "to_check": 1, "done": 2, "closed": 3}
 _TERMINAL_INTENTIONS = {"rejected", "no_longer_relevant"}
 
@@ -32,13 +36,13 @@ def _rows_by(rows: list[dict], key: str) -> dict[str, dict]:
     return {row[key]: row for row in rows if row.get(key)}
 
 
-def _read_rows(query, label: str) -> Optional[list[dict]]:
-    """Return None on unavailable registry so callers fail closed."""
+def _read_rows(query, label: str) -> list[dict]:
+    """Never turn an unavailable registry into an empty attention queue."""
     try:
         return list(query.execute().data or [])
     except Exception as exc:
-        logger.warning("[GOVERNED PORTFOLIO] %s unavailable: %s", label, exc)
-        return None
+        logger.warning("[GOVERNED PORTFOLIO] %s unavailable: %s", label, type(exc).__name__)
+        raise PortfolioReadUnavailable("PORTFOLIO_SOURCE_UNAVAILABLE") from exc
 
 
 def _to_item(
@@ -123,7 +127,7 @@ def build_governed_portfolio_cards(supabase, company_id: str, *, now: Optional[d
             "decision_text,decision_confirmed_at,created_at"
         ).eq("company_id", company_id), "decision registry",
     )
-    if decisions is None or not decisions:
+    if not decisions:
         return []
     decisions = [row for row in decisions if row.get("company_id") == company_id]
     report_ids = [row.get("report_id") for row in decisions if row.get("report_id")]
@@ -140,8 +144,6 @@ def build_governed_portfolio_cards(supabase, company_id: str, *, now: Optional[d
             "company_id", company_id
         ).in_("analysis_id", report_ids), "governed envelope scope",
     )
-    if envelopes is None:
-        return []
     entity_by_report = {
         row["analysis_id"]: row.get("entity_id") for row in envelopes
         if row.get("analysis_id") and row.get("entity_id") and row.get("company_id") == company_id
@@ -160,8 +162,6 @@ def build_governed_portfolio_cards(supabase, company_id: str, *, now: Optional[d
         ).eq("company_id", company_id).in_("decision_feedback_id", decision_ids),
         "execution registry",
     )
-    if followups is None or executions is None:
-        return []
     followup_by_decision = _rows_by(
         [row for row in followups if row.get("company_id") == company_id], "decision_feedback_id"
     )
@@ -187,8 +187,6 @@ def build_governed_portfolio_cards(supabase, company_id: str, *, now: Optional[d
             "company_id", company_id
         ).in_("id", entity_ids), "entity registry",
     )
-    if entities is None:
-        return []
     names = {
         row["id"]: row.get("name") for row in entities
         if row.get("id") and row.get("name") and row.get("company_id") == company_id

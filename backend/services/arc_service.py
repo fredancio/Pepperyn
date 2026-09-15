@@ -866,6 +866,7 @@ class ArcService:
         company_id: str,
         entity_id: Optional[str] = None,
         limit: Optional[int] = 5,
+        strict_reads: bool = False,
     ) -> list[dict]:
         """
         Construit le Briefing de revue : arcs actifs (jamais 'abandoned'),
@@ -894,6 +895,8 @@ class ArcService:
 
         supabase = self._get_supabase()
         if not supabase:
+            if strict_reads:
+                raise RuntimeError("PORTFOLIO_SOURCE_UNAVAILABLE")
             return []
 
         query = (
@@ -913,6 +916,8 @@ class ArcService:
         try:
             result = query.order("updated_at", desc=True).execute()
         except Exception as e:
+            if strict_reads:
+                raise RuntimeError("PORTFOLIO_SOURCE_UNAVAILABLE") from e
             logger.error("[ARC] build_review_briefing — fetch failed: %s", e)
             return []
 
@@ -996,7 +1001,7 @@ class ArcService:
             return False
         return why_it_matters not in ArcService._WHY_IT_MATTERS_REDUNDANT_TEXTS
 
-    def build_portfolio_briefing(self, company_id: str) -> list[dict]:
+    def build_portfolio_briefing(self, company_id: str, *, strict_reads: bool = False) -> list[dict]:
         """
         Construit le Portfolio : une carte par client, portant son point le
         plus prioritaire parmi ses BriefingItem actifs, complétée par un
@@ -1026,7 +1031,8 @@ class ArcService:
         doit pouvoir consulter son historique clos — seul le Portfolio, qui
         répond à "quel client dois-je préparer maintenant", exclut le clos.
         """
-        items = self.build_review_briefing(company_id=company_id, entity_id=None, limit=None)
+        options = {"strict_reads": True} if strict_reads else {}
+        items = self.build_review_briefing(company_id=company_id, entity_id=None, limit=None, **options)
         if not items:
             return []
 
@@ -1068,9 +1074,13 @@ class ArcService:
                 for row in result.data or []:
                     entity_names[row["id"]] = row["name"]
             except Exception as e:
+                if strict_reads:
+                    raise RuntimeError("PORTFOLIO_SOURCE_UNAVAILABLE") from e
                 logger.warning(
                     "[ARC] build_portfolio_briefing — lecture des noms clients échouée: %s", e
                 )
+        elif strict_reads:
+            raise RuntimeError("PORTFOLIO_SOURCE_UNAVAILABLE")
 
         cards = []
         for eid, item in by_entity.items():

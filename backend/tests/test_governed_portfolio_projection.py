@@ -1,7 +1,8 @@
 """Falsification tests for the read-only governed V1 portfolio projection."""
 from datetime import datetime, timezone
+import pytest
 
-from services.governed_portfolio_service import build_governed_portfolio_cards, merge_portfolio_cards
+from services.governed_portfolio_service import PortfolioReadUnavailable, build_governed_portfolio_cards, merge_portfolio_cards
 
 NOW = datetime(2026, 9, 12, tzinfo=timezone.utc)
 
@@ -102,16 +103,19 @@ def test_legacy_feedback_without_governed_envelope_is_not_projected_twice():
     assert "Legacy" not in [card["entity_name"] for card in cards]
 
 
-def test_unavailable_required_registry_returns_no_governed_cards():
+@pytest.mark.parametrize("table", ["decision_feedback", "governed_analysis_envelopes",
+                                 "governed_decision_followups", "governed_decision_executions", "entities"])
+def test_unavailable_required_registry_is_not_an_empty_queue(table):
     class BrokenQuery(Query):
         def execute(self):
-            if self.table == "governed_decision_followups":
+            if self.table == table:
                 raise RuntimeError("registry unavailable")
             return super().execute()
     class Broken(ReadOnlyDatabase):
         def from_(self, table):
             return BrokenQuery(self.tables, table, self.calls)
-    assert build_governed_portfolio_cards(Broken(base_tables()), "tenant-a", now=NOW) == []
+    with pytest.raises(PortfolioReadUnavailable):
+        build_governed_portfolio_cards(Broken(base_tables()), "tenant-a", now=NOW)
 
 
 def test_merge_keeps_one_card_per_client_and_counts_both_models():
