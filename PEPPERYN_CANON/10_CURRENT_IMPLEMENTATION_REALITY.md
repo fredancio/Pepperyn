@@ -1,0 +1,56 @@
+# Current implementation reality
+
+**Baseline:** `6fb05c11394ce33423e81697a3dd13e9513e7794`
+
+## Live-proven bounded chain
+
+The synthetic Founder rehearsal has demonstrated, with External Provider and
+Real-data Admission closed:
+
+`ingestion -> governed analysis -> persistence -> governed XLSX/PDF/PPTX exports -> intention -> explicit decision -> follow-up -> synthetic prerequisite evidence -> explicit execution`
+
+The same development line also contains and has checkpointed:
+
+- governed portfolio suppression of an already executed item;
+- governed temporal comparison;
+- V33 durable encrypted pseudonymous correspondence;
+- V34 ownership-authorized initial correspondence registration;
+- bounded D10 `FINANCIAL_CHANGE_MINIMAL_V1` projection and projection receipt;
+- mock-provider response quarantine and validation;
+- capability-authorized local rehydration;
+- structural rejection of `REIDENTIFIED` content from projection/egress;
+- live V34-attested D10 composition rehearsal using synthetic data only.
+
+These are bounded proofs. They do not globally prove financial reliability,
+production security, every D10 task, production key custody, provider account
+configuration or real-data safety.
+
+## Explicitly open
+
+- OpenAI Provider Gate PG-3 and PG-4: project-specific ZDR/MAM/retention and
+  European API residency evidence remain open.
+- External Provider: **CLOSED**.
+- Real-data Admission: **CLOSED**.
+- Production encryption-key custody: open.
+- Financial Reliability Gate: not yet established and passed across the
+  professionally known/adversarial scenario set.
+- Production Security Gate: not yet passed.
+- Two-user Private Beta access and adversarial tenant/client isolation: not yet
+  live-proven in production topology.
+- Production/staging separation, backup/restore and deployment rollback: not
+  yet proven.
+- Finflate debranding on the actually deployed `www.pepperyn.com`: not yet
+  audited and passed.
+- Complete current-state verification of Vercel, Railway and OVH: open.
+- Generalized FRU and richer D10 task policies: deferred unless a V1 gate proves
+  them necessary.
+- Measured ExpectedImpact -> ActualOutcome -> Learning for the current synthetic
+  decision: intentionally absent; no prospective ExpectedImpact exists.
+- Self-Selling Control Center: **PARKED / DEFERRED**.
+
+## Calibration rule
+
+The long project-control journal is evidence-rich but cumulative. Every status
+in this Canon must be checked against current code/tests and the exact live
+proof before Astra acts on it. Historical test counts prove the recorded
+revision and bounded suite, not all future revisions.
