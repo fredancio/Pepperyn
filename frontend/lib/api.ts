@@ -165,10 +165,11 @@ export async function inspectV1SyntheticWorkbook(file: File): Promise<V1Syntheti
   return data as V1SyntheticWorkbookInspection;
 }
 
-export async function analyzeV1SyntheticWorkbook(file: File) {
+export async function analyzeV1SyntheticWorkbook(file: File, entityId?: string) {
   const headers = await getAuthHeaders();
   const formData = new FormData();
   formData.append('file', file);
+  if (entityId) formData.append('entity_id', entityId);
   let res: Response;
   try {
     res = await fetch(`${API_URL}/api/v1/synthetic-workbook-analysis`, {

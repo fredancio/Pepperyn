@@ -22,6 +22,7 @@
 | DEC-018 | Architecture and implementation are contestable; capabilities and guarantees are not silently contestable | CURRENT GOVERNANCE DECISION | Allow Astra improvement without identity loss | handover directive; No Silent Regression |
 | DEC-019 | Original Cowork set and 18-file divergence are not silently reconstructed | QUARANTINED_UNRESOLVED | Avoid invented history | authority inventory/map |
 | DEC-020 | Legal/operator replacement identity for debranding requires Founder confirmation | OPEN FOUNDER DECISION | Avoid false legal representation | handover directive |
+| DEC-021 | Astra takeover audit accepted; autonomous technical convergence authorized | CURRENT FOUNDER AUTHORITY 2026-09-15 | Execute HOW without routine approval; preserve WHY and all protected gates | Founder approval in this Work; contract 18 |
 
 This register records high-level current decisions. The detailed append-only
 project-control journal and Strategic Deferred Work Register remain evidence

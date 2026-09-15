@@ -1,5 +1,11 @@
 # Current implementation reality
 
+## Post-takeover delta — 2026-09-15
+
+Selected-client synthetic mock ingestion is IMPLEMENTED / TESTED at the HTTP
+and persistence-call boundary, with invalid ownership/engagement refusal.
+See `24_ASTRA_EXECUTION_EVIDENCE.md` A1. This is not two-user/live Beta proof.
+
 **Baseline:** `6fb05c11394ce33423e81697a3dd13e9513e7794`
 
 ## Live-proven bounded chain

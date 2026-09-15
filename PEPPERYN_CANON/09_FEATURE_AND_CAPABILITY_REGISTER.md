@@ -150,6 +150,10 @@ different maturity dimensions.
 
 ## Removal rule
 
+Post-takeover: selected-client synthetic mock ingestion is IMPLEMENTED / TESTED
+at its HTTP-to-persistence-call boundary (execution evidence 24, A1). Two-user
+and live multi-client continuity remain unproven; no gate is promoted.
+
 No row may disappear because its UI is absent or because it is outside V1.
 Retirement requires a source-grounded `REJECTED` or `SUPERSEDED` decision, impact
 analysis and Founder escalation when a capability or guarantee is material.

@@ -1,6 +1,6 @@
 # Pepperyn Master Canon
 
-**Status:** transfer-preparation canon, not authorization to complete V1
+**Status:** Astra takeover approved by Founder on 2026-09-15. Autonomous technical V1 convergence authorized under contract 18; provider, real-data and production activation remain unauthorized.
 
 **Baseline:** `6fb05c11394ce33423e81697a3dd13e9513e7794`
 
@@ -59,6 +59,7 @@ but does not prove implementation.
 | `21_PRODUCTION_SECURITY_GATE.md` | Production-specific security evidence standard |
 | `22_TRANSFER_VALIDATION.md` | Context-independent handover validation |
 | `23_FOUNDER_HANDOVER_AUTHORITY_RECORD.md` | Repository-resident Founder authority for transfer |
+| `24_ASTRA_EXECUTION_EVIDENCE.md` | Post-takeover bounded changes and proof debt |
 
 Open product and release gates are not hidden by this package. Their preparation
 status and missing evidence are recorded in `10_CURRENT_IMPLEMENTATION_REALITY.md`,

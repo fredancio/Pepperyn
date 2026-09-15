@@ -7,9 +7,9 @@ import logging
 import os
 import uuid
 from datetime import date, datetime, timezone
-from typing import Optional
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
@@ -194,9 +194,19 @@ async def analyze_v1_synthetic_workbook(
     file: UploadFile = File(...),
     authorization: Optional[str] = Header(default=None),
     x_auth_type: Optional[str] = Header(default=None),
+    entity_id: Annotated[Optional[str], Form()] = None,
 ):
     company_id, _, _ = await analyze_routes._resolve_auth(authorization, x_auth_type)
     _require_designated_company(company_id)
+    from main import get_supabase_service
+    supabase = get_supabase_service()
+    # An explicit client never falls back to the primary entity on refusal.
+    if entity_id is None:
+        _, entity_id, engagement_id = _resolve_primary_scope(supabase, company_id)
+    else:
+        _, entity_id, engagement_id = analyze_routes._resolve_analysis_entity_scope(
+            supabase, company_id=company_id, entity_id=entity_id,
+        )[0]
     raw = await file.read(1_000_001)
     if len(raw) > 1_000_000:
         raise HTTPException(status_code=413, detail="Classeur synthétique trop volumineux")
@@ -208,9 +218,6 @@ async def analyze_v1_synthetic_workbook(
             detail="Analyse simulée refusée : utilisez le classeur synthétique English enregistré.",
         ) from exc
 
-    from main import get_supabase_service
-    supabase = get_supabase_service()
-    _, entity_id, engagement_id = _resolve_primary_scope(supabase, company_id)
     analysis_id = str(uuid.uuid4())
     result = mock.envelope.analysis_result
     result.id = analysis_id

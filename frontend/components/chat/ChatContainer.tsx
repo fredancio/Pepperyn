@@ -299,7 +299,7 @@ export function ChatContainer() {
   const handleV1SyntheticMockAnalysis = useCallback(async (file: File) => {
     setIsTyping(true);
     try {
-      const response = await analyzeV1SyntheticWorkbook(file);
+      const response = await analyzeV1SyntheticWorkbook(file, selectedEntityId || undefined);
       if (!response.result || !response.analyse_id) throw new Error('Résultat simulé incomplet');
       setMessages([
         makeLocalMessage('user', file.name, 'file'),
@@ -326,7 +326,7 @@ export function ChatContainer() {
       if (syntheticMockAnalysisInputRef.current) syntheticMockAnalysisInputRef.current.value = '';
       setIsTyping(false);
     }
-  }, []);
+  }, [selectedEntityId, loadSessionHistory]);
 
   // Scroll to bottom on new messages
   useEffect(() => {

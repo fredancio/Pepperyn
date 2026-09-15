@@ -311,12 +311,21 @@ def test_explicit_followup_requires_decision_and_persists_without_arc(monkeypatc
 def test_explicit_execution_requires_followup_validations_and_persists_without_outcome(monkeypatch):
     import httpx
     from datetime import datetime, timezone
+    from pathlib import Path
 
     db = _Db(); _enable(monkeypatch, db)
     async def exercise():
         app = FastAPI(); app.include_router(v1_routes.router)
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
-            created = await client.post("/api/v1/synthetic-demo", headers={"Authorization": "Bearer test"})
+            # V32 is registered for these exact prerequisites, not the older
+            # demo's different cash-flow/aged-balance recommendation.
+            filename = "pepperyn_v1_heterogeneous_english.xlsx"
+            raw = (Path(__file__).parent / "golden" / "fixtures" / filename).read_bytes()
+            created = await client.post(
+                "/api/v1/synthetic-workbook-analysis",
+                headers={"Authorization": "Bearer test"}, files={"file": (filename, raw)},
+            )
+            assert created.status_code == 200
             analysis_id = created.json()["analyse_id"]
             rec = next(item for item in created.json()["recommendations_tracking"] if item["prerequisite_validation"])
             await client.post(f"/api/v1/governed-analyses/{analysis_id}/intention",

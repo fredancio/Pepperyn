@@ -6,6 +6,17 @@ jest.mock('./supabase', () => ({
   },
 }));
 
+describe('synthetic client selection', () => {
+  it('sends the selected client with the synthetic workbook', async () => {
+    sessionStorage.clear();
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({}) });
+    await analyzeV1SyntheticWorkbook(new File(['synthetic'], 'fixture.xlsx'), 'client-b');
+    const [, request] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(request.body.get('entity_id')).toBe('client-b');
+    expect(request.body.get('file').name).toBe('fixture.xlsx');
+  });
+});
+
 describe('runV1SyntheticDemo', () => {
   beforeEach(() => {
     sessionStorage.clear();
