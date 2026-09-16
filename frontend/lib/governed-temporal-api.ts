@@ -1,6 +1,8 @@
 import { getAuthHeaders } from './api';
 
 export type TemporalComparison = {
+  comparison_scope: 'ANNUAL_LABEL_ARITHMETIC_ONLY';
+  financial_comparability: 'NOT_ESTABLISHED';
   status: 'COMPARABLE' | 'PARTIALLY_COMPARABLE' | 'UNKNOWN' | 'CONTRADICTION';
   current_analysis_id: string;
   previous_analysis_id: string | null;
@@ -21,15 +23,19 @@ export async function fetchGovernedTemporalComparison(analysisId: string): Promi
   const strings = (v: unknown): v is string[] => Array.isArray(v) && v.every(x => typeof x === 'string');
   const nullableString = (v: unknown) => v === null || typeof v === 'string';
   if (!data || data.current_analysis_id !== analysisId || data.causal_interpretation !== null ||
+      data.comparison_scope !== 'ANNUAL_LABEL_ARITHMETIC_ONLY' || data.financial_comparability !== 'NOT_ESTABLISHED' ||
       !['COMPARABLE', 'PARTIALLY_COMPARABLE', 'UNKNOWN', 'CONTRADICTION'].includes(data.status) ||
       !nullableString(data.previous_analysis_id) || !nullableString(data.previous_period) ||
       !nullableString(data.current_period) || !strings(data.unknowns) || !strings(data.contradictions) ||
       !Array.isArray(data.changes) || !data.changes.every((c: Record<string, unknown>) => c &&
         ['metric', 'unit', 'previous_fact_id', 'current_fact_id'].every(k => typeof c[k] === 'string' && c[k]) &&
-        ['previous_value', 'current_value', 'absolute_change'].every(k => typeof c[k] === 'number' && Number.isFinite(c[k])))) {
+        ['previous_value', 'current_value', 'absolute_change'].every(k => typeof c[k] === 'number' && Number.isFinite(c[k]) && Math.abs(c[k]) <= Number.MAX_SAFE_INTEGER))) {
     throw new Error('Comparaison non vérifiable');
   }
   if ((['UNKNOWN', 'CONTRADICTION'].includes(data.status) && data.changes.length !== 0) ||
+      (['COMPARABLE', 'PARTIALLY_COMPARABLE'].includes(data.status) && (data.changes.length === 0 || data.contradictions.length > 0)) ||
+      (data.status === 'COMPARABLE' && data.unknowns.length > 0) ||
+      (data.status === 'PARTIALLY_COMPARABLE' && data.unknowns.length === 0) ||
       (data.changes.length > 0 && (!data.previous_analysis_id || !data.previous_period || !data.current_period))) {
     throw new Error('Comparaison incohérente');
   }

@@ -29,6 +29,7 @@ export function GovernedTemporalComparison({ analysisId }: { analysisId: string 
       {[...data.unknowns, ...data.contradictions].map((text, i) => <p key={i}>{text}</p>)}
       <p className="mt-2 text-xs">Analyse courante : {data.current_analysis_id}{data.previous_analysis_id && ` — antérieure : ${data.previous_analysis_id}`}</p>
       <p className="text-xs">Comparaison bornée aux faits disponibles. Ni explication causale, ni résultat d’une décision, ni apprentissage établi.</p>
+      <p className="text-xs">Arithmétique sur libellés annuels uniquement. Durée, couverture, périmètre et conventions comptables comparables non établis : aucune comparabilité financière professionnelle certifiée.</p>
     </>}
   </section>;
 }

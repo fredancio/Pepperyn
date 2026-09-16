@@ -30,6 +30,14 @@ test('partial comparison retains unknowns and provenance', async () => {
   expect(screen.getByText('REVENUE absent')).toBeInTheDocument();
   expect(screen.getByText('FOLD → FNEW')).toBeInTheDocument();
   expect(screen.getByText(/Ni explication causale/)).toBeInTheDocument();
+  expect(screen.getByText(/Durée, couverture, périmètre/)).toHaveTextContent('non établis');
+});
+
+test('a refused financial period pairing renders its reason and no delta table', async () => {
+  fetchComparison.mockResolvedValue({ ...base, unknowns: ['Le rapprochement des libellés calendaires et fiscaux n’est pas établi.'] });
+  render(<GovernedTemporalComparison analysisId="a" />);
+  expect(await screen.findByText(/calendaires et fiscaux/)).toBeInTheDocument();
+  expect(screen.queryByRole('table')).not.toBeInTheDocument();
 });
 
 test('late response from previous analysis cannot overwrite selected analysis', async () => {
