@@ -35,6 +35,12 @@ no fictitious primary client, read-only retry after confirmed creation, and
 ambiguous-workspace/missing-confirmation refusals. These await a new checkpoint;
 see execution evidence 24. Live creation/RLS/browser proof remains open.
 
+A8/A9 subsequently checkpointed at Founder-confirmed synchronized
+`6dc4e9fcb228821b6e750f55df21e06ddeb299f0`. A10–A12 are now LOCAL_TESTED:
+opened-result/synthetic-operation display guards, no governed-error fallback in
+synthetic mode, and single-message history rendering. Five frontend/four Canon
+files await checkpoint. Generic legacy operation races and live proof remain open.
+
 ## Live-proven bounded chain
 
 The synthetic Founder rehearsal has demonstrated, with External Provider and

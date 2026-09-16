@@ -266,3 +266,54 @@ or provider call. Shared central client context and creation/read semantics now
 form a durability boundary before wider workflow work: eight implementation/test
 files plus four Canon files. External Provider CLOSED; Real-data Admission
 CLOSED; Self-Selling DEFERRED. No financial/Beta/RLS gate promoted.
+
+## A8/A9 durability confirmation
+
+Founder confirms both commits synchronized at
+`6dc4e9fcb228821b6e750f55df21e06ddeb299f0`, RemainingEntries=0.
+The initial checkpoint stopped before commit after staging eight files: mixed
+line endings made filtered hash-object differ from the raw indexed api.ts blob.
+Raw index bytes and the pinned validated SHA256 matched. No product content was
+reset. The corrected checkpoint accepts only the pinned raw or Git-filtered
+blob, verifies exact staged scope and safely resumes it. This is not an ACL fix.
+
+## A10/A11/A12 — terminal session context (2026-09-16)
+
+WHY: prior history-list scoping is insufficient if the opened result itself can
+arrive late under another client or replace a newer analysis. No Silent Regression
+requires unavailable governed results not be silently replaced by another path.
+
+A10 BEFORE: loadSession had no request-generation guard; every governed error
+fell back to legacy messages. AFTER: latest operation/selection invalidates old
+success and failure results, including new conversation and unmount. Client
+switch clears the prior session identifier and analysis-interaction state.
+Governed API reads require the requested analysis ID and an object result.
+In synthetic V1 mode, any governed failure is explicit with NO legacy fallback,
+including 404 (which can also represent integrity/ownership refusal). This does
+not certify the entire response schema. Legacy direct reads remain outside
+synthetic mode and now show read errors without private diagnostics.
+
+A11: mock workbook, registered inspection and fixed synthetic demo responses
+obey the same operation-generation boundary. Navigating away suppresses obsolete
+display; requests already sent are not cancelled, rolled back or repeated.
+This does not establish global race protection for generic legacy uploads/chat,
+deletion races, auth-user switching, live RLS or backend persistence cancellation.
+
+A12: compatibility testing exposed an existing one-message history rendering
+bug: message count=1 was treated as an empty welcome screen. The terminal now
+distinguishes the actual local welcome ID from a stored message. A stored single
+legacy message renders; legacy read failure remains visible. No backend change.
+
+Evidence: ChatContainer.clients tests cover stale success/failure, newer analysis,
+new conversation, client-switch during mock analysis, demo/inspection suppression
+and no duplicate request; legacy-read tests cover direct-read compatibility and
+single-message rendering; API tests reject wrong ID/missing result. Final run:
+87 tests across 10 frontend suites PASS, TypeScript no-emit PASS. Includes the
+governed intention/decision/follow-up/execution card regressions. Tests use JSDOM
+and mocked API/auth/child surfaces, not browser-E2E or real data. Backend unchanged;
+no fresh backend regression claim is made for this batch.
+
+Status: LOCAL_TESTED, NOT LIVE_PROVEN, NOT CHECKPOINTED. Five frontend files plus
+four Canon files form a coherent session-lifecycle checkpoint before further
+central ChatContainer work. External Provider CLOSED; Real-data Admission CLOSED;
+Self-Selling DEFERRED. No Private Beta or financial-reliability gate promoted.

@@ -150,6 +150,11 @@ different maturity dimensions.
 
 ## Removal rule
 
+Session-result context: LOCAL_TESTED (24 A10–A12). Stale reads and synthetic
+operation results cannot overwrite newer selected contexts; governed errors
+are explicit in synthetic mode. Legacy direct read remains available outside
+that mode, including single-message histories. Not global async/RLS proof.
+
 Client availability and history request scoping: LOCAL_TESTED (24 A8/A9).
 Errors are not empty clients/history; stale responses cannot replace current
 client history. Atomic creation/auth/plan doctrine preserved; no live RLS claim.
