@@ -14,6 +14,20 @@ SOURCE_HASH = "A" * 64
 NONCE = "B" * 32
 
 
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_nonfinite_financial_input_cannot_become_understood_or_dispatchable(value):
+    payload = {
+        "temporal_context": {"columns_by_role": {"CURRENT_ACTUAL": ["2025"]}},
+        "sheets": [{"sheet_name": "Synthetic", "columns": ["Label", "2025"],
+                    "full_table": [{"Label": "Revenue", "2025": value}]}],
+    }
+    # Existing strict JSON canonicalization rejects before creating source facts.
+    with pytest.raises(ValueError):
+        build_financial_understanding(payload)
+    with pytest.raises(ValueError):
+        build_openai_request(payload, model="mock-local")
+
+
 def _understanding(**changes):
     value = {"status": "UNDERSTOOD", "current_period": "2025", "facts": [{
         "fact_id": FACT_ID, "metric": "EBITDA", "value": -145000, "unit": "EUR",
