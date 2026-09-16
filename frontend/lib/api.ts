@@ -370,12 +370,13 @@ export async function fetchAnalysesHistory(entityId?: string): Promise<Array<{
 }>> {
   const headers = await getAuthHeaders();
   const url = entityId
-    ? `${API_URL}/api/analyses/history?entity_id=${entityId}`
+    ? `${API_URL}/api/analyses/history?entity_id=${encodeURIComponent(entityId)}`
     : `${API_URL}/api/analyses/history`;
   const res = await fetch(url, { headers });
-  if (!res.ok) return [];
+  if (!res.ok) throw new Error('Historique indisponible.');
   const data = await res.json();
-  return data.analyses || [];
+  if (!Array.isArray(data.analyses)) throw new Error('Historique non vérifiable.');
+  return data.analyses;
 }
 
 export async function deleteAnalysesHistory(): Promise<{ success: boolean; deleted: number }> {
@@ -419,19 +420,23 @@ export async function createEntity(name: string, relationType?: EntityRelationTy
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || 'Erreur création client ou entreprise');
   }
-  return res.json();
+  const result = await res.json();
+  if (result.success !== true || !result.data || typeof result.data.id !== 'string' || !result.data.id) {
+    throw new Error('Résultat de création non vérifiable. Vérifiez la liste avant toute nouvelle tentative.');
+  }
+  return result.data;
 }
 
 export async function fetchEntities(): Promise<Entity[]> {
-  try {
     const headers = await getAuthHeaders();
     const res = await fetch(`${API_URL}/api/entities`, { headers });
-    if (!res.ok) return [];
+    if (!res.ok) throw new Error('Liste des clients indisponible.');
     const data = await res.json();
-    return data.data || [];
-  } catch {
-    return [];
-  }
+    if (data.success !== true || !Array.isArray(data.data) || !data.data.every((e: Entity) =>
+      e && typeof e.id === 'string' && e.id && typeof e.name === 'string' && e.name)) {
+      throw new Error('Liste des clients non vérifiable.');
+    }
+    return data.data;
 }
 
 export interface BillingUsage {

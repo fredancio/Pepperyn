@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { Message, Session } from '@/lib/types';
+import { useClientHistory } from './useClientHistory';
 import { analyzeFile, analyzeText, analyzeV1SyntheticWorkbook, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, fetchPreviousRecommendations, fetchConversationContext, runV1SyntheticDemo, inspectV1SyntheticWorkbook, fetchV1GovernedAnalysis, type BillingUsage, type Entity, type EntityRelationType } from '@/lib/api';
 import { getCurrentAuthMode, signOutAdmin, clearGuestAuth, getGuestPlan } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -59,11 +60,9 @@ export function ChatContainer() {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [isTyping, setIsTyping] = useState(false);
   const [sessionId, setSessionId] = useState<string | undefined>();
-  const [sessions, setSessions] = useState<Session[]>([]);
   const [authMode, setAuthMode] = useState<'admin' | 'guest' | null>(null);
   const [plan, setPlan] = useState<string>('free');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [loadingSessions, setLoadingSessions] = useState(false);
   const [adminName, setAdminName] = useState<string>('');
   const [adminEmail, setAdminEmail] = useState<string>('');
   // Question counter for free plan (post-analysis)
@@ -74,6 +73,20 @@ export function ChatContainer() {
   const [usageData, setUsageData] = useState<BillingUsage | null>(null);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const { sessions, setSessions, loading: loadingSessions, error: historyError, refresh: loadSessionHistory } = useClientHistory(selectedEntityId);
+  const [entitiesError, setEntitiesError] = useState(false);
+  const [entitiesLoading, setEntitiesLoading] = useState(true);
+  const loadEntities = async () => {
+    setEntitiesLoading(true);
+    try {
+      setEntities(await fetchEntities());
+      setEntitiesError(false);
+    } catch {
+      setEntitiesError(true);
+    } finally {
+      setEntitiesLoading(false);
+    }
+  };
   const [showAddEntity, setShowAddEntity] = useState(false);
   const [newEntityName, setNewEntityName] = useState('');
   const [newEntityRelation, setNewEntityRelation] = useState<EntityRelationType | null>(null);
@@ -137,32 +150,11 @@ export function ChatContainer() {
       if (usage) setUsageData(usage);
 
       // Fetch entities for sidebar
-      const ents = await fetchEntities();
-      if (ents.length > 0) setEntities(ents);
+      await loadEntities();
     }
     init();
   }, []);
 
-  const loadSessionHistory = async () => {
-    setLoadingSessions(true);
-    try {
-      const analyses = await fetchAnalysesHistory(selectedEntityId || undefined);
-      const mapped: Session[] = analyses.map(a => ({
-        id: a.id,
-        company_id: '',
-        is_admin_session: false,
-        titre: a.fichier_nom || `Analyse ${a.type_document || ''}`.trim(),
-        is_archived: false,
-        created_at: a.created_at,
-        updated_at: a.created_at,
-      }));
-      setSessions(mapped);
-    } catch {
-      // silently fail
-    } finally {
-      setLoadingSessions(false);
-    }
-  };
 
   // Reload history whenever the selected entity changes
   useEffect(() => {
@@ -177,11 +169,10 @@ export function ChatContainer() {
     setAddingEntity(true);
     try {
       await createEntity(newEntityName.trim(), newEntityRelation);
-      const updated = await fetchEntities();
-      setEntities(updated);
       setNewEntityName('');
       setNewEntityRelation(null);
       setShowAddEntity(false);
+      await loadEntities();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Erreur lors de la création');
     } finally {
@@ -765,10 +756,13 @@ export function ChatContainer() {
                 {canAccess(plan, 'entities') ? (
                   /* User has access: show real entities from API */
                   <div className="flex flex-col gap-1">
-                    {(entities.length > 0
-                      ? entities
-                      : [{ id: 'placeholder', name: adminName || 'Entreprise principale', is_primary: true }] as Entity[]
-                    ).map(entity => (
+                    {entitiesLoading ? <p className="text-xs px-2">Chargement des clients…</p> : entitiesError ? (
+                      <div role="alert" className="text-xs px-2">
+                        Liste des clients indisponible — aucune absence de client ne peut être déduite.
+                        <button type="button" onClick={() => void loadEntities()} className="block underline">Réessayer la lecture</button>
+                      </div>
+                    ) : entities.length === 0 ? <p className="text-xs px-2">Aucun client enregistré.</p> : null}
+                    {(!entitiesLoading && !entitiesError ? entities : []).map(entity => (
                       <div
                         key={entity.id}
                         onClick={() => {
@@ -885,7 +879,8 @@ export function ChatContainer() {
                 <p className="text-xs font-semibold text-[#5F6368] px-2 mb-1.5 uppercase tracking-wide">
                   Historique
                 </p>
-                {loadingSessions ? (
+                {historyError && <p role="alert" className="text-xs px-2">Historique indisponible. <button type="button" className="underline" onClick={() => void loadSessionHistory()}>Réessayer la lecture</button></p>}
+                {historyError ? null : loadingSessions ? (
                   <div className="flex justify-center py-4">
                     <Spinner size="sm" />
                   </div>

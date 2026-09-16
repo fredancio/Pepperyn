@@ -1,10 +1,28 @@
-import { analyzeV1SyntheticWorkbook, inspectV1SyntheticWorkbook, runV1SyntheticDemo } from './api';
+import { analyzeV1SyntheticWorkbook, inspectV1SyntheticWorkbook, runV1SyntheticDemo, fetchEntities, createEntity } from './api';
 
 jest.mock('./supabase', () => ({
   supabase: {
     auth: { getSession: jest.fn().mockResolvedValue({ data: { session: null } }) },
   },
 }));
+
+describe('client-list availability', () => {
+  beforeEach(() => sessionStorage.clear());
+  test.each([{ success: false, data: [] }, { success: true, data: {} }, { success: true, data: [{ name: 'Synthetic' }] }])('rejects unverified list %j', async body => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => body });
+    await expect(fetchEntities()).rejects.toThrow();
+  });
+  test('503 refuses while successful empty remains empty', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({ ok: false }).mockResolvedValueOnce({ ok: true, json: async () => ({ success: true, data: [] }) });
+    await expect(fetchEntities()).rejects.toThrow('indisponible');
+    await expect(fetchEntities()).resolves.toEqual([]);
+  });
+  test('creation returns the confirmed entity rather than its response wrapper', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true, data: { id: 'synthetic', name: 'Synthetic' } }) });
+    await expect(createEntity('Synthetic', 'client')).resolves.toEqual({ id: 'synthetic', name: 'Synthetic' });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('synthetic client selection', () => {
   it('sends the selected client with the synthetic workbook', async () => {

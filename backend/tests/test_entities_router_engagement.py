@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import pytest
 from fastapi import HTTPException
 
-from routers.entities import create_entity, CreateEntityRequest
+from routers.entities import create_entity, list_entities, CreateEntityRequest
 
 
 def make_supabase_mock(workspace_id="ws-1", rpc_response_data=None):
@@ -50,6 +50,44 @@ def _resolve_company_patch(company_id="company-1", plan="pro"):
 
 
 class TestCreateEntityEngagementIntegration:
+
+    def test_duplicate_default_workspace_refuses_before_rpc(self):
+        sb = make_supabase_mock()
+        sb.from_.return_value.execute.return_value.data = [{"id": "one"}, {"id": "two"}]
+        with _resolve_company_patch(), patch("main.get_supabase_service", return_value=sb):
+            with pytest.raises(HTTPException) as error:
+                asyncio.run(create_entity(CreateEntityRequest(name="Synthetic"), authorization="Bearer synthetic"))
+        assert error.value.status_code == 409
+        sb.rpc.assert_not_called()
+
+    def test_empty_rpc_result_is_not_reported_as_creation_success(self):
+        sb = make_supabase_mock(rpc_response_data=[])
+        with _resolve_company_patch(), patch("main.get_supabase_service", return_value=sb):
+            with pytest.raises(HTTPException) as error:
+                asyncio.run(create_entity(CreateEntityRequest(name="Synthetic"), authorization="Bearer synthetic"))
+        assert error.value.status_code == 503
+        sb.rpc.assert_called_once()
+
+    @pytest.mark.parametrize("unavailable", [False, True])
+    def test_list_unavailability_is_not_empty_success(self, unavailable):
+        sb = MagicMock()
+        query = sb.from_.return_value
+        for method in ("select", "eq", "order"):
+            getattr(query, method).return_value = query
+        query.execute.return_value.data = []
+        if unavailable:
+            query.execute.side_effect = RuntimeError("sensitive diagnostic")
+        with _resolve_company_patch(), patch("main.get_supabase_service", return_value=sb):
+            if unavailable:
+                with pytest.raises(HTTPException) as error:
+                    asyncio.run(list_entities(authorization="Bearer synthetic"))
+                assert error.value.status_code == 503
+                assert "sensitive" not in error.value.detail
+            else:
+                result = asyncio.run(list_entities(authorization="Bearer synthetic"))
+                assert result == {"success": True, "data": [], "plan": "pro"}
+        query.eq.assert_called_with("company_id", "company-1")
+        sb.rpc.assert_not_called()
 
     def test_nominal_creates_entity_via_engagement_service_rpc(self):
         sb = make_supabase_mock(rpc_response_data=[{"id": "entity-1", "name": "Acme"}])

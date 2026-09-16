@@ -85,8 +85,8 @@ async def list_entities(
             "plan": plan,
         }
     except Exception as e:
-        logger.error(f"[ENTITIES] list error: {e}")
-        return {"success": True, "data": [], "plan": plan}
+        logger.error("[ENTITIES] list unavailable: %s", type(e).__name__)
+        raise HTTPException(status_code=503, detail="Liste des clients indisponible.") from e
 
 
 class CreateEntityRequest(BaseModel):
@@ -131,11 +131,13 @@ async def create_entity(
             .select("id")
             .eq("company_id", company_id)
             .eq("is_default", True)
-            .limit(1)
+            .limit(2)
             .execute()
         )
         if not ws.data:
             raise HTTPException(status_code=404, detail="Workspace par défaut introuvable.")
+        if len(ws.data) != 1:
+            raise HTTPException(status_code=409, detail="Workspace par défaut ambigu. Création refusée.")
 
         workspace_id = ws.data[0]["id"]
 
@@ -155,6 +157,8 @@ async def create_entity(
             business_model=body.business_model,
             relation_type=body.relation_type,
         )
+        if not isinstance(entity_data, dict) or not entity_data.get("id"):
+            raise HTTPException(status_code=503, detail="Confirmation de création indisponible. Vérifiez la liste avant toute nouvelle tentative.")
         return {"success": True, "data": entity_data}
 
     except HTTPException:
