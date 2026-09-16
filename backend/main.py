@@ -41,6 +41,8 @@ def get_supabase_service() -> Client:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from services.private_beta_access import beta_users
+    beta_users()  # Production/beta cannot start with a missing or invalid allowlist.
     env = os.getenv("ENVIRONMENT", "development")
     supabase_url = os.getenv("SUPABASE_URL", "not set")
 
@@ -72,6 +74,9 @@ app = FastAPI(
 )
 
 # CORS
+from services.private_beta_access import PrivateBetaAccessMiddleware
+app.add_middleware(PrivateBetaAccessMiddleware)
+
 cors_origins_raw = os.getenv("CORS_ORIGINS", "http://localhost:3000")
 cors_origins = [o.strip() for o in cors_origins_raw.split(",")]
 
