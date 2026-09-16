@@ -150,6 +150,10 @@ different maturity dimensions.
 
 ## Removal rule
 
+Client availability and history request scoping: LOCAL_TESTED (24 A8/A9).
+Errors are not empty clients/history; stale responses cannot replace current
+client history. Atomic creation/auth/plan doctrine preserved; no live RLS claim.
+
 Later-period multi-client composition: LOCAL_TESTED (24 A7) from synthetic
 parsed sources through real persisted envelope verification and HTTP reads.
 Workbook admission/browser proof and real RLS remain open.

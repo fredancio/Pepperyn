@@ -27,7 +27,13 @@ comparability and the Financial Reliability Gate remain unproven/open.
 A7 adds LOCAL_TESTED three-client later-period composition through actual
 envelope validation/persistence and HTTP reads, with mock auth/database;
 opposing deltas, missing-year refusal and substituted-source refusal. This is
-not a real upload/browser/RLS proof. A5–A7 await a grouped durability checkpoint.
+not a real upload/browser/RLS proof. A5–A7 are now Founder-confirmed checkpointed
+through `74d01fb849b4cf961ae4089d4276ecfe55bbc34c`.
+
+A8/A9 add LOCAL_TESTED client-list availability and scoped history race guards,
+no fictitious primary client, read-only retry after confirmed creation, and
+ambiguous-workspace/missing-confirmation refusals. These await a new checkpoint;
+see execution evidence 24. Live creation/RLS/browser proof remains open.
 
 ## Live-proven bounded chain
 

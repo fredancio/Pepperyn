@@ -223,3 +223,46 @@ preserve a clear regression/recovery baseline. Planned commits: six A5/A6
 implementation/test files; two A7/falsification test files; four Canon files.
 No gate is promoted. External Provider CLOSED; Real-data Admission CLOSED;
 Self-Selling DEFERRED.
+
+## A5–A7 checkpoint confirmation
+
+Founder confirms three commits synchronized through
+`74d01fb849b4cf961ae4089d4276ecfe55bbc34c` with no remaining entries. These
+bounded local proofs are now durable, not LIVE_PROVEN.
+
+## A8/A9 — client availability and scoped history (2026-09-16)
+
+WHY: a CFO must not select a fabricated client after a read failure, repeat a
+confirmed creation merely because refresh failed, or see an older response
+overwrite the current client's history. Grounding: Golden Workflow, UNKNOWN
+invariant, No Silent Regression and ADR-002/T2A atomic Entity+Engagement creation.
+
+A8 BEFORE: list errors became empty success and a selectable placeholder client;
+failed post-creation refresh left the creation form open. Default workspace
+resolution chose the first row; an empty RPC result could look successful.
+AFTER: list errors return safe 503, failed/malformed client responses refuse,
+loading/empty/unavailable remain distinct and retry only reads. No placeholder.
+Confirmed creation closes the form before refresh; the API unwraps the entity.
+Ambiguous default workspaces refuse before RPC. Missing creation confirmation
+returns 503 with a verify-list instruction. No automatic write retry or new
+idempotency claim for network-ambiguous writes. Plan/auth/atomic SQL unchanged.
+
+A9 BEFORE: late history responses could overwrite another client's selection;
+HTTP failure became empty and caught failures were silent. AFTER: history results
+are bound to current selection/latest request, invalidated on selection change
+or unmount; other-scope stored lists are suppressed. Failures are visible, not
+empty-success claims. This is frontend race isolation, not proof of backend
+completeness, arbitrary payload authorization, live RLS or user-switch isolation.
+
+Evidence: entity router/engagement mocks; API tests; rendered ChatContainer
+with mocked auth/API/child surfaces proves placeholder absence and read-only
+retry after successful creation/failed refresh; hook tests cover late-client,
+same-client ordering and failure. JSDOM, not browser-E2E. Combined regression:
+210 backend tests across 18 modules PASS (3 dependency warnings), 45 frontend
+tests across six suites PASS, TypeScript no-emit PASS.
+
+A8/A9 LOCAL_TESTED, not checkpointed/live. No migration, live write, real data
+or provider call. Shared central client context and creation/read semantics now
+form a durability boundary before wider workflow work: eight implementation/test
+files plus four Canon files. External Provider CLOSED; Real-data Admission
+CLOSED; Self-Selling DEFERRED. No financial/Beta/RLS gate promoted.
