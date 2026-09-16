@@ -73,6 +73,13 @@ export function ChatContainer() {
   const [usageData, setUsageData] = useState<BillingUsage | null>(null);
   const [entities, setEntities] = useState<Entity[]>([]);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
+  const sessionReadVersion = useRef(0);
+  const selectedScope = useRef(selectedEntityId);
+  if (selectedScope.current !== selectedEntityId) {
+    selectedScope.current = selectedEntityId;
+    sessionReadVersion.current += 1;
+  }
+  useEffect(() => () => { sessionReadVersion.current += 1; }, []);
   const { sessions, setSessions, loading: loadingSessions, error: historyError, refresh: loadSessionHistory } = useClientHistory(selectedEntityId);
   const [entitiesError, setEntitiesError] = useState(false);
   const [entitiesLoading, setEntitiesLoading] = useState(true);
@@ -94,7 +101,7 @@ export function ChatContainer() {
   const [confirmDeleteHistory, setConfirmDeleteHistory] = useState(false);
   const [deletingHistory, setDeletingHistory] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const hasMessages = messages.length > 1;
+  const hasMessages = messages.some(message => message.id !== WELCOME_MESSAGE.id);
   // Review Briefing — "Préparer cette question" (jamais d'envoi automatique).
   const [prefillToken, setPrefillToken] = useState<PrefillToken | null>(null);
   const prefillCounterRef = useRef(0);
@@ -198,14 +205,19 @@ export function ChatContainer() {
   };
 
   const loadSession = async (session: Session) => {
+    const version = ++sessionReadVersion.current;
+    const active = () => sessionReadVersion.current === version;
     setSessionId(session.id);
+    setIsTyping(false);
+    setMessages([WELCOME_MESSAGE]);
     setSidebarOpen(false);
     setAnalysisReceived(false);
     setQuestionsPostAnalysis(0);
     try {
       if (V1_SYNTHETIC_DEMO_ENABLED) {
-        try {
           const governed = await fetchV1GovernedAnalysis(session.id);
+          if (!active()) return;
+          if (governed.analyse_id !== session.id || !governed.result) throw new Error('Invalid governed result');
           if (governed.result) {
             const governedMessages = [WELCOME_MESSAGE, makeLocalMessage('assistant', '', 'analysis', {
               ...governed.result, id: governed.analyse_id, _filename: session.titre,
@@ -221,15 +233,14 @@ export function ChatContainer() {
             setAnalysisReceived(true);
             return;
           }
-        } catch {
-          // Not a governed V1 result; continue with the legacy session path.
-        }
       }
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('messages')
         .select('*')
         .eq('session_id', session.id)
         .order('created_at', { ascending: true });
+      if (!active()) return;
+      if (error) throw new Error('Stored session unavailable');
       if (data && data.length > 0) {
         setMessages(data);
         // Check if session had an analysis
@@ -237,14 +248,21 @@ export function ChatContainer() {
         if (hasAnalysis) setAnalysisReceived(true);
       }
     } catch {
-      // silently fail
+      if (!active()) return;
+      setSessionId(undefined);
+      setMessages([WELCOME_MESSAGE, makeLocalMessage('assistant',
+        'Analyse indisponible — aucun résultat de remplacement n’a été chargé. Réessayez depuis l’historique.', 'error')]);
     }
   };
 
   const handleV1SyntheticDemo = useCallback(async () => {
+    const version = ++sessionReadVersion.current;
+    const active = () => sessionReadVersion.current === version;
+    setSessionId(undefined);
     setIsTyping(true);
     try {
       const response = await runV1SyntheticDemo();
+      if (!active()) return;
       if (!response.result || !response.analyse_id) throw new Error('Résultat synthétique incomplet');
       setMessages([
         makeLocalMessage('assistant', 'Démonstration V1 synthétique — données représentatives sans donnée client.', 'text'),
@@ -256,20 +274,24 @@ export function ChatContainer() {
       setQuestionsPostAnalysis(0);
       await loadSessionHistory();
     } catch (error) {
+      if (!active()) return;
       setMessages(prev => [...prev, makeLocalMessage(
         'assistant', error instanceof Error ? error.message : 'Démonstration V1 indisponible', 'error',
       )]);
     } finally {
-      setIsTyping(false);
+      if (active()) setIsTyping(false);
     }
   }, []);
 
   const syntheticWorkbookInputRef = useRef<HTMLInputElement>(null);
   const syntheticMockAnalysisInputRef = useRef<HTMLInputElement>(null);
   const handleV1SyntheticWorkbook = useCallback(async (file: File) => {
+    const version = ++sessionReadVersion.current;
+    const active = () => sessionReadVersion.current === version;
     setIsTyping(true);
     try {
       const result = await inspectV1SyntheticWorkbook(file);
+      if (!active()) return;
       const detail = result.status === 'UNDERSTOOD'
         ? `Compréhension établie pour ${result.current_period} : ${result.facts.length} faits gouvernés.`
         : `Compréhension ${result.status.toLowerCase()} : ${result.unknowns.join(' ')}`;
@@ -278,19 +300,24 @@ export function ChatContainer() {
         makeLocalMessage('assistant', `Inspection synthétique V1 — ${detail} Aucun appel fournisseur n’a été effectué.`, 'text'),
       ]);
     } catch (error) {
+      if (!active()) return;
       setMessages(prev => [...prev, makeLocalMessage(
         'assistant', error instanceof Error ? error.message : 'Inspection synthétique indisponible', 'error',
       )]);
     } finally {
       if (syntheticWorkbookInputRef.current) syntheticWorkbookInputRef.current.value = '';
-      setIsTyping(false);
+      if (active()) setIsTyping(false);
     }
   }, []);
 
   const handleV1SyntheticMockAnalysis = useCallback(async (file: File) => {
+    const version = ++sessionReadVersion.current;
+    const active = () => sessionReadVersion.current === version;
+    setSessionId(undefined);
     setIsTyping(true);
     try {
       const response = await analyzeV1SyntheticWorkbook(file, selectedEntityId || undefined);
+      if (!active()) return;
       if (!response.result || !response.analyse_id) throw new Error('Résultat simulé incomplet');
       setMessages([
         makeLocalMessage('user', file.name, 'file'),
@@ -310,12 +337,13 @@ export function ChatContainer() {
       setQuestionsPostAnalysis(0);
       await loadSessionHistory();
     } catch (error) {
+      if (!active()) return;
       setMessages(prev => [...prev, makeLocalMessage(
         'assistant', error instanceof Error ? error.message : 'Analyse synthétique simulée indisponible', 'error',
       )]);
     } finally {
       if (syntheticMockAnalysisInputRef.current) syntheticMockAnalysisInputRef.current.value = '';
-      setIsTyping(false);
+      if (active()) setIsTyping(false);
     }
   }, [selectedEntityId, loadSessionHistory]);
 
@@ -572,6 +600,8 @@ export function ChatContainer() {
               <button
                 onClick={() => {
                   setMessages([WELCOME_MESSAGE]);
+                  sessionReadVersion.current += 1;
+                  setIsTyping(false);
                   setSessionId(undefined);
                   setSidebarOpen(false);
                   setAnalysisReceived(false);
@@ -767,6 +797,11 @@ export function ChatContainer() {
                         key={entity.id}
                         onClick={() => {
                           const newId = selectedEntityId === entity.id ? null : entity.id;
+                          sessionReadVersion.current += 1;
+                          setIsTyping(false);
+                          setSessionId(undefined);
+                          setAnalysisReceived(false);
+                          setQuestionsPostAnalysis(0);
                           setSelectedEntityId(newId);
                           setSessions([]);
                           setMessages([WELCOME_MESSAGE]);

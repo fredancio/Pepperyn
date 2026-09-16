@@ -188,6 +188,9 @@ export async function fetchV1GovernedAnalysis(analyseId: string) {
   const res = await fetch(`${API_URL}/api/v1/governed-analyses/${encodeURIComponent(analyseId)}`, { headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((data as { detail?: string }).detail || 'Analyse gouvernée introuvable');
+  if (data.analyse_id !== analyseId || !data.result || typeof data.result !== 'object' || Array.isArray(data.result)) {
+    throw new Error('Analyse gouvernée non vérifiable.');
+  }
   return data;
 }
 

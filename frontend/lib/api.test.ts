@@ -1,4 +1,4 @@
-import { analyzeV1SyntheticWorkbook, inspectV1SyntheticWorkbook, runV1SyntheticDemo, fetchEntities, createEntity } from './api';
+import { analyzeV1SyntheticWorkbook, inspectV1SyntheticWorkbook, runV1SyntheticDemo, fetchEntities, createEntity, fetchV1GovernedAnalysis } from './api';
 
 jest.mock('./supabase', () => ({
   supabase: {
@@ -22,6 +22,18 @@ describe('client-list availability', () => {
     await expect(createEntity('Synthetic', 'client')).resolves.toEqual({ id: 'synthetic', name: 'Synthetic' });
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
+});
+
+test.each([{ analyse_id: 'foreign', result: {} }, { analyse_id: 'expected', result: null }, { analyse_id: 'expected', result: [] }])('governed read rejects mismatched or absent result %j', async body => {
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => body });
+  await expect(fetchV1GovernedAnalysis('expected')).rejects.toThrow('non vérifiable');
+});
+
+test('governed read preserves matching result and makes only one GET', async () => {
+  const body = { analyse_id: 'expected', result: { verification_tag: 'V1_GOVERNED_SINGLE_CALL' } };
+  global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => body });
+  await expect(fetchV1GovernedAnalysis('expected')).resolves.toEqual(body);
+  expect(global.fetch).toHaveBeenCalledTimes(1);
 });
 
 describe('synthetic client selection', () => {
