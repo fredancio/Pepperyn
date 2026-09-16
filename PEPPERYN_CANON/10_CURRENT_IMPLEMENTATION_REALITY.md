@@ -41,6 +41,12 @@ opened-result/synthetic-operation display guards, no governed-error fallback in
 synthetic mode, and single-message history rendering. Five frontend/four Canon
 files await checkpoint. Generic legacy operation races and live proof remain open.
 
+A10–A12 are now Founder-confirmed checkpointed at
+`dc69e0fc7e6756606504df06865296e017bcbe9f`. A13/A14 add locally tested two-user
+backend admission and frontend registration/checkout route restriction. NOT
+activated/deployed or checkpointed yet; no actual identities configured. Canon 13
+and execution evidence 24 preserve the live Auth/RLS/signup/production proof debt.
+
 ## Live-proven bounded chain
 
 The synthetic Founder rehearsal has demonstrated, with External Provider and

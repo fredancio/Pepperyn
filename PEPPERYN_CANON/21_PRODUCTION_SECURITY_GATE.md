@@ -31,3 +31,8 @@ actual topology and evidence. Critical/high findings must be closed or explicitl
 accepted by the Founder where acceptance is legally and ethically permissible.
 
 **Current status:** `DEFINED AT CONTROL LEVEL / NOT EXECUTED / NOT PASS`.
+
+Supporting local evidence A13/A14: backend verified-user allowlist and frontend
+signup-route restriction implemented/tested, not enabled or deployed. This does
+not establish effective production Auth, two-user isolation, RLS or signup settings.
+The gate status remains unchanged; see Canon 13 and execution evidence 24.

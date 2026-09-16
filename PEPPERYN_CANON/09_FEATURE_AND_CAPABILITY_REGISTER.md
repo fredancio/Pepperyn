@@ -150,6 +150,10 @@ different maturity dimensions.
 
 ## Removal rule
 
+Two-user beta admission / public-registration surface: IMPLEMENTED, LOCAL_TESTED,
+NOT ACTIVATED (24 A13/A14; 13 configuration). Additive to route ownership/admin
+checks, not a replacement for actual Supabase signup/RLS/storage evidence.
+
 Session-result context: LOCAL_TESTED (24 A10–A12). Stale reads and synthetic
 operation results cannot overwrite newer selected contexts; governed errors
 are explicit in synthetic mode. Legacy direct read remains available outside

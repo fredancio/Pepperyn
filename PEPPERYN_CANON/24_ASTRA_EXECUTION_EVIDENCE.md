@@ -317,3 +317,46 @@ Status: LOCAL_TESTED, NOT LIVE_PROVEN, NOT CHECKPOINTED. Five frontend files plu
 four Canon files form a coherent session-lifecycle checkpoint before further
 central ChatContainer work. External Provider CLOSED; Real-data Admission CLOSED;
 Self-Selling DEFERRED. No Private Beta or financial-reliability gate promoted.
+
+## A10–A12 durability confirmation
+
+Founder reports two scoped commits synchronized at
+`dc69e0fc7e6756606504df06865296e017bcbe9f`, RemainingEntries=0.
+This is checkpoint evidence, not live/browser proof.
+
+## A13/A14 — two-user beta admission and public signup route restriction
+
+WHY: exact two-user authorization and no public signup are explicit Beta entry
+requirements (Canon 13/21). The repository previously had only per-route auth,
+guest login and a public registration page, not a global two-tester boundary.
+
+A13 implements additive verified-user allowlisting for backend HTTP requests.
+Production cannot disable it; explicit beta development mode is available for
+validation but has NOT been enabled. Configuration requires exactly two distinct
+Auth UUIDs. Startup/runtime configuration failures refuse; auth-service failures,
+unknown users and duplicate Authorization headers refuse before endpoint work.
+Existing ownership/admin checks still execute for admitted users. PIN surfaces
+and checkout/portal refuse in beta. Ordinary development remains unchanged.
+
+A14 adds Next middleware restriction of registration/checkout routes in a
+production build or explicit beta mode, without touching login/callback. Direct
+Supabase signup and database permissions are outside this route-level proof.
+
+Evidence: test_private_beta_access.py uses mocked Auth, real ASGI middleware and
+HTTP requests including actual main.app denial paths and lifespan refusal.
+Tests verify both allowed identities, third-user denial, no credential leakage,
+configuration refusal, no route-auth bypass, immediate configured-list revocation,
+guest/commercial denial, CORS preflight and unchanged ordinary development.
+Frontend tests exercise NextResponse and middleware policy with a literal matcher;
+not a deployed matcher/browser test. Targeted backend regression: 62 tests across
+8 modules PASS (3 dependency warnings). Frontend: 92 tests across 11 suites PASS;
+TypeScript no-emit PASS. No real accounts, real data, external LLM or live writes.
+
+Status IMPLEMENTED / LOCAL_TESTED / NOT ACTIVATED / NOT CHECKPOINTED. Backend
+global admission is a security-sensitive durability boundary before further auth
+or deployment work. Canon 13 records configuration and actual activation evidence
+still required. Production build/deployment, effective Supabase signup settings,
+live token verification, RLS/storage/RPC privileges, account lifecycle, exact beta
+tenancy and professional financial reliability remain unproven. No Beta/security
+gate is closed. External Provider CLOSED; Real-data Admission CLOSED; Self-Selling
+DEFERRED. No deployed environment or credential configuration was changed.
