@@ -18,6 +18,17 @@ proof; see execution evidence 24 for batch scope and limits.
 
 **Baseline:** `6fb05c11394ce33423e81697a3dd13e9513e7794`
 
+2026-09-16 update: A2–A4 are checkpointed through Founder-confirmed synchronized
+`dc7a14fda86f23e3ea653ccb73dc9b16533f17b1`. A5/A6 temporal ambiguity/numeric
+refusals and explicit arithmetic-only terminal scope are LOCAL_TESTED, not yet
+checkpointed or live proven. See execution evidence 24. General financial
+comparability and the Financial Reliability Gate remain unproven/open.
+
+A7 adds LOCAL_TESTED three-client later-period composition through actual
+envelope validation/persistence and HTTP reads, with mock auth/database;
+opposing deltas, missing-year refusal and substituted-source refusal. This is
+not a real upload/browser/RLS proof. A5–A7 await a grouped durability checkpoint.
+
 ## Live-proven bounded chain
 
 The synthetic Founder rehearsal has demonstrated, with External Provider and

@@ -139,3 +139,87 @@ No live database writes or external LLM calls. A2/A3/A4 are LOCAL_TESTED,
 checkpoint pending. Their combined boundary is a meaningful recovery point
 before adding new financial/period semantics. Durable baseline remains A1
 `606e7afa36db14672e3b6e69013f9c49b7a05fbf` until batch confirmation.
+
+## A2–A4 durability confirmation
+
+Founder confirms four scoped commits synchronized through
+`dc7a14fda86f23e3ea653ccb73dc9b16533f17b1`, no remaining entries.
+Local HEAD and origin tracking ref were inspected and match. Remote synchronization
+is Founder-reported, not a fresh network query. These local test proofs are now
+Git-checkpointed, not thereby promoted to LIVE_PROVEN.
+
+## A5/A6 — temporal refusal and terminal scope (2026-09-16)
+
+WHY: a CFO must not mistake annual-label arithmetic for established financial
+comparability. Grounding: FTE_MINIMAL_IMPLEMENTATION_CONTRACT sections 2–4,
+15–16; Financial Reliability Gate families 4–6; UNKNOWN is not implicit certainty.
+
+A5 BEFORE: mixed fiscal/plain labels and missing years allowed deltas; unknown
+history was skipped; duplicate current-period analyses were not refused.
+Subtraction used default Decimal precision and lacked nonfinite operand guards.
+AFTER: these chronological ambiguities refuse numeric comparison; duplicated
+current periods return CONTRADICTION, unordered history returns UNKNOWN.
+Invalid year-zero/unbound short labels refuse. Existing FYxx -> 20xx convention
+remains bounded, not a fiscal calendar. Non-UNDERSTOOD sources cannot authorize
+comparison. Nonfinite metrics are refused and subtraction precision is derived
+from operands to avoid rounding large integers. No dates or closure invented.
+Every response states ANNUAL_LABEL_ARITHMETIC_ONLY and financial comparability
+NOT_ESTABLISHED. No new canonical source, decision, outcome or learning.
+
+A6: frontend requires those exact scope markers and coherent status/changes/
+uncertainty combinations. Numeric magnitudes beyond the browser safe-integer
+range refuse display rather than silently round. This is not a complete exact-
+decimal transport contract. The panel explicitly discloses that duration,
+coverage, perimeter and accounting conventions are not established. Existing
+fact/analysis references and causal disclaimer remain. An old backend lacking
+the markers becomes visibly unavailable, not silently accepted.
+
+Evidence: backend/tests/test_temporal_comparison_safety.py and existing temporal
+tests; frontend temporal API/panel suites. Comparator fixtures use constructed
+synthetic envelopes and database doubles, not independent professional evidence.
+HTTP/persistence and portfolio regressions are run separately. No live database
+writes, migrations, provider transport or real data. A5/A6 are LOCAL_TESTED,
+NOT LIVE_PROVEN and NOT GIT_CHECKPOINTED. The twelve-family Financial Reliability
+Gate, full interval comparability, real two-user RLS and actual multi-period
+upload/browser proof remain OPEN. External Provider CLOSED; Real-data Admission
+CLOSED; Self-Selling DEFERRED. No Founder action needed for these local slices.
+
+Final validation on 2026-09-16: 187 backend tests across 15 modules PASS
+(3 dependency warnings), 36 frontend tests across four suites PASS, TypeScript
+no-emit PASS. Working-tree diff whitespace check PASS. Ten scoped files remain
+local (six implementation/test files and four Canon files); HEAD unchanged at
+`dc7a14fda86f23e3ea653ccb73dc9b16533f17b1`. No commit/push performed. Batched
+checkpoint model retained; no per-slice Founder Git intervention requested.
+
+## A7 — multi-client later-period persistence proof (2026-09-16)
+
+WHY: the CFO needs the prior facts of the exact client, not whichever record was
+uploaded last. BEFORE A3 proved three-client reload and no-prior UNKNOWN only.
+AFTER test_v1_multiperiod_persistence.py builds parsed synthetic sources, passes
+them through real financial understanding, a declared local mock response,
+response validation, envelope construction, real save/hash/binding logic and
+HTTP comparison after in-memory database reconstruction. Current periods are
+inserted before prior periods deliberately. Three clients retain their own prior
+analysis/fact references: EBITDA deltas +50 and -70, while a missing intermediate
+year refuses a delta. Reads leave storage unchanged. Substituting another
+client's prior payload without its binding causes HTTP 503, not an accepted delta.
+
+No new ingestion route, registered workbook, database migration or live write.
+This proves the bounded composition from parsed source to persisted comparison,
+NOT real workbook multi-period admission, browser integration, process restart,
+live RLS or professional financial correctness. Authentication/database remain
+test doubles. General comparability stays NOT_ESTABLISHED.
+
+Additional falsification: test_v1_analysis_contract.py pins existing NaN/+Inf/
+-Inf refusal before understanding or request creation. Inspection found strict
+JSON canonicalization already provides this guarantee; no redundant runtime
+change was retained. No provider transport occurred.
+
+Final combined run: 191 backend tests across 16 modules PASS (3 dependency
+warnings). A5/A6/A7 remain LOCAL_TESTED, NOT LIVE_PROVEN and checkpoint pending.
+This cumulative batch now spans comparison semantics, terminal interpretation
+and multi-client persistence proof; checkpoint before further expansion to
+preserve a clear regression/recovery baseline. Planned commits: six A5/A6
+implementation/test files; two A7/falsification test files; four Canon files.
+No gate is promoted. External Provider CLOSED; Real-data Admission CLOSED;
+Self-Selling DEFERRED.

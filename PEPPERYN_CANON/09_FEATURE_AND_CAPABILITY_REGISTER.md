@@ -150,6 +150,14 @@ different maturity dimensions.
 
 ## Removal rule
 
+Later-period multi-client composition: LOCAL_TESTED (24 A7) from synthetic
+parsed sources through real persisted envelope verification and HTTP reads.
+Workbook admission/browser proof and real RLS remain open.
+
+Temporal safeguards and bounded terminal disclosure: LOCAL_TESTED (24 A5/A6).
+Ambiguous chronology/nonfinite values refuse comparison. Arithmetic-only scope
+does not supersede full financial period semantics or professional validation.
+
 Temporal terminal consumption: LOCAL_TESTED panel for the existing bounded
 comparison endpoint (24 A4). Multi-client reload: LOCAL_TESTED through real
 envelope integrity with mocked storage/auth (24 A3). Neither promotes the
