@@ -58,6 +58,15 @@ revoked access, cross-user IDOR/BOLA, frontend route enforcement and rollback.
 Do not enable live mode or provision users from these instructions alone. Provider,
 real-data and production approvals remain independently required. No gate PASS.
 
+## Professional login surface (A15, local evidence only)
+
+A15 local implementation: `/login` resolves the same surface policy server-side
+per request. In Beta it offers professional password login/recovery and invitation
+notice, without guest PIN/signup/purchase prompts or an Administrator role label.
+Login redirect is limited to chat/portfolio/settings in Beta. Authentication and
+authorization remain unchanged. Production build and mocked UI tests PASS; actual
+HTTP/browser/auth/account-lifecycle proof remains open (execution evidence 24).
+
 ## Non-goals (unchanged)
 
 Sales, pricing, automated prospecting, public onboarding, broad commercial

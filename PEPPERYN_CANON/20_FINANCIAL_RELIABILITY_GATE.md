@@ -64,3 +64,40 @@ financial failure. Passing this gate does not itself pass production security,
 Provider Gate or Real-data Admission.
 
 **Current status:** `DEFINED / NOT EXECUTED / NOT PASS`.
+
+## Professional oracle preparation (A16, historical draft stage)
+
+The draft casebook at
+`docs/Product/PEPPERYN_PRIVATE_BETA_FINANCIAL_REVIEW_CASEBOOK_V1.md` instantiates
+the twelve families with synthetic numbers, proposed expected/forbidden findings
+and source conventions. It is not independent approval, executable fixture proof,
+or a gate PASS. Each contract requires authorized professional review before it
+becomes an acceptance oracle. Review of expectations and review of actual outputs
+must be recorded separately. Current gate status above remains unchanged.
+
+## Reviewed oracle freeze (A17)
+
+Founder has transmitted the independent professional review with clarifications
+for every FR01–FR12. Full preserved source, v2 casebook, transversal doctrine,
+separate synthetic inputs/evaluator-only expectations and frozen hashes are in
+`docs/Product/FinancialReliability/`. Normative revision: `FR-EXPECTED-2`.
+The V1 draft is preserved unchanged. V2 is the active expected-result contract.
+This review adopts professional reasoning integrity, not just factual integrity;
+see PR-01..PR-08 and Canon 11. No runtime behavior is inferred from this adoption.
+
+Reviewer name/date/signature are not supplied. Founder transmission is the source
+of authority for preparing this oracle; final independent review-owner/signoff
+evidence remains an explicit audit item. Do not ask for re-approval of the twelve
+contracts merely because metadata is missing, and do not invent that metadata.
+
+Readiness: FR01/02/03/09/11 have bounded current component paths; FR04/06/10 have
+expected scope refusals; FR05/07/08 require additional governed implementation;
+FR12 needs the actual synthetic two-user API/DB/RLS/UI/export topology. None is
+fully gate-ready. Generic input adapters and terminal execution evidence remain
+missing. Refusal evidence is bounded; it does not waive required professional
+usefulness or silently redefine the full gate. Do not widen FR10 vocabulary to pass.
+
+Preparation ran artifact integrity/schema falsifications ONLY (eight tests), zero
+financial analyses. Source/period/scope references and frozen hashes are validated,
+not Pepperyn's financial conclusions. Gate remains OPEN / NOT EXECUTED / NOT PASS.
+The execution protocol is in `casebook-v2.md`; report precedes any gate execution.

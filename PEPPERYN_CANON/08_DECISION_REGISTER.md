@@ -24,6 +24,15 @@
 | DEC-020 | Legal/operator replacement identity for debranding requires Founder confirmation | OPEN FOUNDER DECISION | Avoid false legal representation | handover directive |
 | DEC-021 | Astra takeover audit accepted; autonomous technical convergence authorized | CURRENT FOUNDER AUTHORITY 2026-09-15 | Execute HOW without routine approval; preserve WHY and all protected gates | Founder approval in this Work; contract 18 |
 
+## Professional review adoption
+
+DEC-022: Founder transmitted completed independent FR01–FR12 review and authorized
+integration/freezing with clarifications. Adopt PR-01..PR-08 as professional
+requirements; freeze revision FR-EXPECTED-2 as expected-result oracle, NOT system
+output approval. Full source: `docs/Product/FinancialReliability/review-source-v2.txt`.
+Reviewer identity/date not supplied; preserve attribution debt. No Provider/RD/gate
+opening, no ontology expansion for FR10, no scenario-specific production teaching.
+
 This register records high-level current decisions. The detailed append-only
 project-control journal and Strategic Deferred Work Register remain evidence
 sources and must be consulted before changing a related capability.

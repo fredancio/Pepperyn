@@ -41,7 +41,27 @@ Every material change must state:
 - Self-Selling remains parked until its explicit reopening criteria are met;
 - active Pepperyn surfaces must not present Pepperyn as a Finflate product.
 
-## Founder escalation
+## Reviewed professional reasoning invariants (PR-01..PR-08)
+
+Source: `docs/Product/FinancialReliability/review-source-v2.txt`; normative
+reconciliation: `professional-reasoning-doctrine-v2.md` in the same directory.
+
+- no automatic observation-to-causality-to-impact-to-action promotion;
+- prudence does not suppress useful explicitly unverified signals/hypotheses;
+- UNKNOWN may drive a proportionate prioritized minimal evidence request;
+- AMBIGUOUS != UNKNOWN != CONTRADICTION != FORBIDDEN != EMPTY;
+- valid arithmetic does not establish its professional semantic label;
+- comparability dimensions must be established independently with provenance;
+- source reported and derived values/discrepancies remain distinguishable;
+- contradiction propagates to dependent conclusions, not necessarily all facts;
+- authorization and contextual relevance are separate, before reasoning;
+- conclusions/memory inherit evidence scope across UI, history and exports;
+- reviewed expectations never constitute executed or approved system output.
+
+These do not withdraw explicit human conditional decision authority or weaken
+privacy/fail-closed behavior. No reviewed requirement is silently labelled implemented.
+
+## Founder escalation boundary
 
 Explicit Founder approval is required to weaken/remove a critical invariant or
 to change the North Star, professional doctrine, privacy/security guarantee,

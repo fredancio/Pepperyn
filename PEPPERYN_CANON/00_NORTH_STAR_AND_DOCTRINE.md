@@ -30,6 +30,17 @@ dashboard whose truth changes with the current model.
 
 ## Product sequence
 
+Founder-transmitted professional review FR01–FR12 additionally establishes
+professionally bounded usefulness: correct numbers do not ensure correct reasoning.
+No automatic promotion from observation/signal/hypothesis through investigation,
+established causality, economic impact and options to decision. Prudence is not
+silence; explicit useful hypotheses remain unverified. UNKNOWN may lead to a
+prioritized minimal information request and re-evaluation, not fabricated certainty.
+Calculation does not license a professional semantic label; comparability and
+evidence scope are governed. Normative details and source:
+`docs/Product/FinancialReliability/professional-reasoning-doctrine-v2.md` and
+`review-source-v2.txt`. These are requirements, not implementation or gate PASS.
+
 `DATA -> NORMALIZATION -> DETERMINISTIC FACTS -> PROFESSIONAL DOCTRINE -> TEMPORAL CONTEXT -> GOVERNED REASONING -> VERIFICATION -> EPISTEMIC STATUS -> MEMORY -> DECISION -> FOLLOW-UP -> NEW FACTS -> CONTEXTUAL LEARNING`
 
 No step may be invented merely to make the sequence appear complete. In

@@ -24,5 +24,22 @@
 | U-020 | D10 policies for any V1 task beyond `FINANCIAL_CHANGE_MINIMAL_V1` | OPEN BY TASK | use of that task with provider |
 | U-021 | Measured outcome for current synthetic decision | INTENTIONALLY NOT CREATED | does not block V1 absent prospective contract |
 
+U-022 — FR review attribution: reviewer identity/date and independent signoff
+artifact were not provided with the Founder-transmitted completed review. Does
+not block authorized oracle freezing; remains required final gate audit evidence.
+
+U-023 — reviewed reasoning implementation gaps: distinct source CONTRADICTION
+(not AMBIGUOUS), dependency-local propagation, reported/derived reconciliation,
+multi-dimensional comparability and semantically validated hypotheses/information
+requests are not established end-to-end. These block affected financial gate
+claims, not preservation of contracts or bounded component preparation. FR12
+terminal two-user topology remains U-015, not passed by fixture scope labels.
+
+No new WHY contradiction found with Constitution/Profession Model. The reviewed
+chain restricts automatic reasoning promotion, not already-authorized explicit
+human conditional decisions. Historical bounded mock PASS evidence is not deleted
+or reinterpreted as satisfying the new reviewed terminal contracts. The FR08 sign
+phrase is scoped to its explicit formula, not generalized accounting doctrine.
+
 Unresolved items are not assumed false, abandoned or passed. Astra may work
 around them only when the bounded task does not rely on the missing authority.

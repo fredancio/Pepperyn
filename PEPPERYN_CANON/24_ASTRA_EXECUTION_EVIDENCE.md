@@ -360,3 +360,106 @@ live token verification, RLS/storage/RPC privileges, account lifecycle, exact be
 tenancy and professional financial reliability remain unproven. No Beta/security
 gate is closed. External Provider CLOSED; Real-data Admission CLOSED; Self-Selling
 DEFERRED. No deployed environment or credential configuration was changed.
+
+## A13/A14 durability confirmation
+
+Founder reports scoped checkpoints synchronized at
+`06d19c2e1293767f8c75916986c496fe951a776f`, RemainingEntries=0. Repository HEAD
+and clean worktree verified at start of this turn. Remote equality is Founder
+evidence, not a new ls-remote observation. No activation or gate promotion.
+
+## A15 — usable professional Beta entry and production-build evidence
+
+BEFORE: Beta backend rejects PIN and frontend blocks signup/checkout, but login
+still offers guest PIN, public signup, commercial redirect and an Administrator
+label. This obstructs the second professional without representing actual roles.
+AFTER: server-only shared surface policy supplies a boolean to the login screen.
+Beta offers password login and recovery, invitation notice and professional
+wording. It offers neither PIN nor signup and redirects only to the existing
+chat/portfolio/settings workspace. Ordinary development retains legacy options.
+Existing Supabase authentication/backend authorization are unchanged; no role is
+granted by the UI. Login is dynamic so server configuration is not frozen at build.
+
+Evidence: 100 frontend tests in 12 targeted suites PASS, including login policy,
+mocked sign-in redirects, development compatibility and prior governed chat tests.
+TypeScript no-emit PASS. Next 15.5.24 production build PASS with existing image/hook
+warnings, synthetic non-credential key and loopback-only Supabase/API URLs, no .env
+files. Built login is dynamic. No real account or backend was contacted by this
+build. Explicit ES2017 target retains Next's build-required configuration without
+its formatting churn; generated next-env changes restored to prior content/EOL.
+
+HTTP smoke script `frontend/scripts/check-private-beta-http.cjs` is prepared but
+NOT EXECUTED. Work denied the local server-launch command before process creation,
+including after a network permission grant. No workaround or alternative transport
+attempted. Build success does not establish middleware behavior on HTTP, browser
+hydration, credential login, recovery delivery, live Auth, RLS or deployment.
+Status LOCAL_TESTED / LOCAL_BUILD_PASS / HTTP_PROOF_BLOCKED / NOT_CHECKPOINTED.
+
+## A16 — financial professional-oracle preparation
+
+WHY: Canon 20 requires independent expected professional findings, not more tests
+which merely confirm an agent-authored mock output. Existing semantic Golden cases
+explicitly test deterministic models, not professional extraction/analysis quality.
+No financial engine or current analysis chain is extended for architectural closure.
+
+`docs/Product/PEPPERYN_PRIVATE_BETA_FINANCIAL_REVIEW_CASEBOOK_V1.md` contains twelve
+synthetic, numerically specified draft contracts aligned one-for-one with Canon 20:
+source conventions, proposed facts, UNKNOWN/CONTRADICTION, prerequisites, forbidden
+claims, tolerances and separate review/execution records. All reviewer identities,
+dates and approvals remain UNASSIGNED/PENDING. No actual result, workbook admission,
+input-hash evidence, UI/export run or independent approval is invented.
+
+Status DOCUMENTED_DRAFT / INDEPENDENT_REVIEW_PENDING / NOT_CHECKPOINTED. This is a
+review artifact, NOT twelve executed cases, NOT canonical financial doctrine and
+NOT Financial Reliability PASS. Next professional evidence is per-case approval or
+correction before freezing executable expected-result oracles. Later execution and
+independent output review remain separate. Provider/RD CLOSED; Self-Selling DEFERRED.
+
+## A17 — reviewed financial oracle freeze, not financial execution
+
+Founder supplied the full completed FR01–FR12 independent review with clarifications
+and expressly authorized reversible integration/freeze/preparation before execution.
+Captured full text at `docs/Product/FinancialReliability/review-source-v2.txt`;
+original attachment raw SHA256 AD1B854D9EAF0EA83893371DA8959A426BB673643C292C3E503589BC2F124E1B.
+Capture changes line endings/terminal whitespace only. Reviewer identity/date
+were not supplied, remain UNKNOWN; no fabricated signature or personal approval.
+
+BEFORE: twelve draft expectations, local implementation evidence, no professional
+oracle. AFTER: FR-EXPECTED-2 preserves every scenario-specific review excerpt,
+formalizes PR-01..PR-08 separately, versions independent synthetic input assertions
+and evaluator-only expectations, and hashes cases/sources/files. Original V1 draft
+is untouched (SHA256 831E3CA935CD42C8A8CEFFF2405E9F208E6594D95BDDFFD88101809C3D88EF81).
+No product analysis, runtime ontology, prompt, provider or financial algorithm changed.
+Prior A15 frontend deltas are preserved, not part of financial implementation.
+
+Frozen casebook UTF-8/LF SHA256:
+`A7A78B93B473E86D61C2123DA5C6DBFDC65614F19DF6B4491EF8C39E59A59DAA`.
+Frozen manifest UTF-8/LF SHA256:
+`63003A44CFAB7922977C3355EDCA0C7E782E379A850EFCFD2A6359A94FA878EF`.
+Manifest covers five frozen files, twelve input contracts, twelve expected-result
+contracts and twenty-two synthetic sources. Baseline code hashes record inspected
+implementation only, not execution proof. CRLF checkout normalization is explicit.
+The manifest is integrity/version evidence, not a signature or independent review.
+
+Read-only checker `backend/sandbox/verify_financial_review_bundle.py` and eight
+unittest integrity tests PASS: frozen content, CRLF stability, tampered numeric
+input refusal, foreign source/numeric basis refusal, substituted review refusal,
+missing/duplicate fixture refusal and no invented gate/attribution. These execute
+NO financial analysis. No provider, account, DB write, live system or real data.
+
+Static readiness only: FR01/02/03/09/11 have bounded literal/arithmetic component
+paths; FR04/06/10 expected capability refusals; FR05/07/08 need missing governed
+implementation; FR12 also needs live synthetic two-user topology. No FULL_GATE_READY
+case. Generic adapters and actual terminal/output professional review remain due.
+FR07 current AMBIGUOUS refusal is not reviewed CONTRADICTION PASS; annual-label
+COMPARABLE is not economic comparability; citation validation is not semantic proof.
+
+No WHY conflict found with Constitution Articles II/III/VII or Profession Model
+chapters 2/7/8. Canon 00/02/08/11/20 records adopted professional requirements;
+Canon 10/16 records implementation/attribution debt. Do not force a new ontology or
+revoke explicit human conditional decision authority to complete the reasoning chain.
+
+Status LOCAL_FROZEN / STRUCTURAL_CHECKS_PASS / NOT_CHECKPOINTED / EXECUTION_NOT_STARTED.
+Stop before gate execution and report protocol/readiness. A scoped durability
+checkpoint is appropriate before using this immutable oracle in later implementation.
+External Provider CLOSED; Real-data Admission CLOSED; Self-Selling DEFERRED.

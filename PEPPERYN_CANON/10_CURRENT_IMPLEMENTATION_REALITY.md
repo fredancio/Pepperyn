@@ -95,6 +95,24 @@ configuration or real-data safety.
 
 ## Calibration rule
 
+A17 supersedes A16's draft-only expectation status: professionally reviewed
+contracts with clarifications are frozen as FR-EXPECTED-2 (Founder transmission;
+reviewer identity/date still absent). Separate synthetic JSON inputs, evaluator-only
+contracts, full review source and PR-01..08 doctrine are prepared. Eight artifact
+integrity tests PASS; ZERO financial analyses executed. No analysis engine, runtime
+ontology, provider transport or production permission changed. Source conflict
+extraction still returns AMBIGUOUS; governed comparability and reported/derived
+reconciliation are incomplete; two-user terminal topology is unproven. All are
+explicit gaps, not waived requirements. Bundle and Canon are LOCAL_NOT_CHECKPOINTED.
+
+Post-A13/A14: durable checkpoint `06d19c2e1293767f8c75916986c496fe951a776f`
+confirmed by Founder; local HEAD/clean state verified before A15/A16. A15 adds
+professional Beta login UX, shared server surface policy and a successful local
+production build; 100 targeted frontend tests PASS. HTTP smoke remains NOT RUN
+because Work refused local server launch. A16 supplies twelve draft financial
+review contracts, NOT independent approval or executed analysis evidence. Both
+slices are local and NOT CHECKPOINTED; see execution evidence 24. No gate promotion.
+
 The long project-control journal is evidence-rich but cumulative. Every status
 in this Canon must be checked against current code/tests and the exact live
 proof before Astra acts on it. Historical test counts prove the recorded

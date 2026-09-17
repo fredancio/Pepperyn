@@ -29,6 +29,13 @@ Pepperyn intelligence is the governed system around replaceable models:
 
 ## Non-negotiable boundaries
 
+Reviewed professional reasoning PR-01..PR-08 is now ADOPTED_AS_REQUIREMENTS,
+not a newly implemented reasoning engine. Its scope/semantics/comparability and
+minimal-information-request constraints are defined in
+`docs/Product/FinancialReliability/professional-reasoning-doctrine-v2.md`.
+Existing canonical financial doctrine v0 retains its bounded implementation role;
+this review neither expands its ontology nor reinstates superseded architecture.
+
 - deterministic facts are not provider assertions;
 - provider output is untrusted until governed validation;
 - confidence does not convert an inference into a fact;

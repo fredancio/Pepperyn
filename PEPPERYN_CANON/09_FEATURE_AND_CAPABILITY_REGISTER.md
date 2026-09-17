@@ -185,5 +185,20 @@ at its HTTP-to-persistence-call boundary (execution evidence 24, A1). Two-user
 and live multi-client continuity remain unproven; no gate is promoted.
 
 No row may disappear because its UI is absent or because it is outside V1.
+Additional bounded A15 capability: professional Beta login entry suppresses
+legacy PIN/signup/purchase UX without granting any role. LOCAL_TESTED and local
+production build PASS; HTTP/browser/live Auth unproven. A16 financial casebook is
+DOCUMENTED_DRAFT awaiting independent professional expected-result review, not
+implemented financial inference or gate closure. Sources: execution evidence 24
+and `docs/Product/PEPPERYN_PRIVATE_BETA_FINANCIAL_REVIEW_CASEBOOK_V1.md`.
+
 Retirement requires a source-grounded `REJECTED` or `SUPERSEDED` decision, impact
 analysis and Founder escalation when a capability or guarantee is material.
+
+A17 supersedes A16 draft review status: Founder-transmitted professional review
+with clarifications is preserved and frozen as FR-EXPECTED-2. Professional
+reasoning PR-01..PR-08 is ADOPTED_AS_REQUIREMENTS / IMPLEMENTATION_PARTIAL, not a
+newly implemented engine. Synthetic input/expected-result artifacts and integrity
+checker are PREPARED / STRUCTURALLY_TESTED; financial execution NOT_STARTED.
+Source: `docs/Product/FinancialReliability/casebook-v2.md`, full review and frozen
+manifest. No ontology widening, self-certified financial answer or gate promotion.
