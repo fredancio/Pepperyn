@@ -1,0 +1,781 @@
+{
+  "schema_version": 1,
+  "revision": "FR-EXPECTED-2",
+  "review_status": "PROFESSIONALLY_REVIEWED_WITH_CLARIFICATIONS_AS_TRANSMITTED_BY_FOUNDER",
+  "reviewer_identity": null,
+  "review_date": null,
+  "attribution_debt": "Reviewer identity and signed/date evidence not supplied; do not invent. Does not block freezing Founder-transmitted contracts; remains gate audit debt.",
+  "execution_status": "NOT_EXECUTED",
+  "financial_reliability_gate": "OPEN_NOT_PASS",
+  "oracle_is_not_runtime_input": true,
+  "doctrine_ref": "professional-reasoning-doctrine-v2.md",
+  "review_source_ref": "review-source-v2.txt",
+  "cases": [
+    {
+      "case_id": "FR01",
+      "title": "REVENUE GROWTH WITH GROSS-MARGIN DETERIORATION",
+      "review_section": 6,
+      "review_verdict": "APPROVED WITH CLARIFICATION.",
+      "normative_review_excerpt": "VERDICT:\nAPPROVED WITH CLARIFICATION.\n\nConfirmed observations:\n\nRevenue:\n1,000,000 → 1,200,000\n= +200,000\n= +20%\n\nGross-margin amount:\n400,000 → 360,000\n= -40,000\n= -10%\n\nGross-margin rate:\n40% → 30%\n= -10 percentage points.\n\nAuthorized professional interpretation:\n\nThe growth is less gross-margin-generative than in the previous period / deterioration in gross-margin economics is observed.\n\nCausality remains UNKNOWN.\n\nDo not allow the scenario title “margin destruction” to become causal or normative output language.\n\nDo not attribute the deterioration to pricing, mix, COGS, or another driver without supporting evidence.\n\nKeep the proposed forbidden conclusions.",
+      "transversal_invariant_ids": [
+        "PR-01",
+        "PR-02",
+        "PR-03",
+        "PR-04",
+        "PR-05",
+        "PR-06",
+        "PR-07",
+        "PR-08"
+      ],
+      "numerical_expectations": [
+        {
+          "id": "FR01.revenue_change",
+          "semantic_label": "revenue_change",
+          "value": 200000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR01.O1",
+            "FR01.O2"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR01.revenue_change_pct",
+          "semantic_label": "revenue_change_pct",
+          "value": 20,
+          "unit": "PERCENT",
+          "absolute_tolerance": 0.01,
+          "observation_refs": [
+            "FR01.O1",
+            "FR01.O2"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR01.gross_margin_change",
+          "semantic_label": "gross_margin_change",
+          "value": -40000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR01.O3",
+            "FR01.O4"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR01.gross_margin_change_pct",
+          "semantic_label": "gross_margin_change_pct",
+          "value": -10,
+          "unit": "PERCENT",
+          "absolute_tolerance": 0.01,
+          "observation_refs": [
+            "FR01.O3",
+            "FR01.O4"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR01.gross_margin_rate_previous",
+          "semantic_label": "gross_margin_rate_previous",
+          "value": 40,
+          "unit": "PERCENT",
+          "absolute_tolerance": 0.01,
+          "observation_refs": [
+            "FR01.O1",
+            "FR01.O3"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR01.gross_margin_rate_current",
+          "semantic_label": "gross_margin_rate_current",
+          "value": 30,
+          "unit": "PERCENT",
+          "absolute_tolerance": 0.01,
+          "observation_refs": [
+            "FR01.O2",
+            "FR01.O4"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR01.gross_margin_rate_change",
+      "semantic_label": "gross_margin_rate_change",
+      "value": -10,
+      "unit": "PERCENTAGE_POINTS",
+          "absolute_tolerance": 0.01,
+          "observation_refs": [
+            "FR01.O1",
+            "FR01.O2",
+            "FR01.O3",
+            "FR01.O4"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        }
+      ],
+      "epistemic_and_semantic_expectations": "Every requirement, prohibition and conditional permission in normative_review_excerpt and transversal doctrine is binding; not keyword/string-match acceptance.",
+      "source_observation_preservation": "Retain all in-scope source observations and source references without substitution. FR12 adversarial-only observations must be excluded before context construction.",
+      "readiness": {
+        "classification": "BOUNDED_COMPONENTS_AVAILABLE",
+        "basis": "STATIC_REPOSITORY_INSPECTION_NOT_EXECUTION",
+        "detail": "Literal REVENUE/GROSS_MARGIN and annual-label deltas; rate semantics and professional findings not established end-to-end.",
+        "current_source_paths": [
+          "backend/services/v1_analysis_contract.py",
+          "backend/services/governed_temporal_continuity.py"
+        ]
+      },
+      "gate_execution": "NOT_EXECUTED",
+      "system_output_approval": "NOT_GIVEN"
+    },
+    {
+      "case_id": "FR02",
+      "title": "EBITDA IMPROVEMENT WITH CASH DETERIORATION",
+      "review_section": 7,
+      "review_verdict": "APPROVED WITH CLARIFICATION.",
+      "normative_review_excerpt": "VERDICT:\nAPPROVED WITH CLARIFICATION.\n\nObserved:\n\nEBITDA:\n100,000 → 150,000\n= +50,000\n= +50%\n\nClosing cash:\n200,000 → 80,000\n= -120,000\n= -60%\n\nExplicitly preserve the conceptual distinction:\n\nEBITDA = period performance flow concept.\n\nClosing cash = point-in-time stock.\n\nThe coexistence of EBITDA improvement and cash deterioration is an INVESTIGATION SIGNAL, not an explanation.\n\n“Poor EBITDA-to-cash conversion”, “cash-conversion deterioration”, or equivalent causal/quality statements remain UNKNOWN until supported by a reconciled cash-flow bridge.\n\nDo not compute a conversion ratio from these two stock/flow observations alone.",
+      "transversal_invariant_ids": [
+        "PR-01",
+        "PR-02",
+        "PR-03",
+        "PR-04",
+        "PR-05",
+        "PR-06",
+        "PR-07",
+        "PR-08"
+      ],
+      "numerical_expectations": [
+        {
+          "id": "FR02.ebitda_change",
+          "semantic_label": "ebitda_change",
+          "value": 50000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR02.O1",
+            "FR02.O2"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR02.ebitda_change_pct",
+          "semantic_label": "ebitda_change_pct",
+          "value": 50,
+          "unit": "PERCENT",
+          "absolute_tolerance": 0.01,
+          "observation_refs": [
+            "FR02.O1",
+            "FR02.O2"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR02.cash_change",
+          "semantic_label": "cash_change",
+          "value": -120000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR02.O3",
+            "FR02.O4"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR02.cash_change_pct",
+          "semantic_label": "cash_change_pct",
+          "value": -60,
+          "unit": "PERCENT",
+          "absolute_tolerance": 0.01,
+          "observation_refs": [
+            "FR02.O3",
+            "FR02.O4"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        }
+      ],
+      "epistemic_and_semantic_expectations": "Every requirement, prohibition and conditional permission in normative_review_excerpt and transversal doctrine is binding; not keyword/string-match acceptance.",
+      "source_observation_preservation": "Retain all in-scope source observations and source references without substitution. FR12 adversarial-only observations must be excluded before context construction.",
+      "readiness": {
+        "classification": "BOUNDED_COMPONENTS_AVAILABLE",
+        "basis": "STATIC_REPOSITORY_INSPECTION_NOT_EXECUTION",
+        "detail": "Literal EBITDA/CASH and differences; stock/flow distinction and investigation-signal reasoning need terminal proof.",
+        "current_source_paths": [
+          "backend/services/v1_analysis_contract.py",
+          "backend/services/governed_temporal_continuity.py"
+        ]
+      },
+      "gate_execution": "NOT_EXECUTED",
+      "system_output_approval": "NOT_GIVEN"
+    },
+    {
+      "case_id": "FR03",
+      "title": "WORKING CAPITAL DETERIORATION",
+      "review_section": 8,
+      "review_verdict": "APPROVED WITH CLARIFICATION.",
+      "normative_review_excerpt": "VERDICT:\nAPPROVED WITH CLARIFICATION.\n\nUsing the supplied definition:\n\nWC = Receivables + Inventory - Trade Payables\n\n2025:\n200 + 100 - 150 = 150k\n\n2026:\n300 + 100 - 150 = 250k\n\nTherefore:\n\nWC change = +100k.\n\nThe +100k increase reconciles arithmetically entirely to the +100k increase in receivables under the supplied definition.\n\nAuthorized interpretation:\n\nMore financial resources are tied in receivables at closing, and with unchanged revenue this merits investigation of the collection cycle.\n\nHowever, the economic cause remains UNKNOWN.\n\nPossible causes such as:\n\n- payment speed;\n- billing seasonality;\n- payment terms;\n- year-end sales concentration;\n- cut-off;\n- other operational effects\n\nmust not be selected without evidence.\n\nForbidden conclusions should include:\n\n- customer payment terms deteriorated, without ageing/context;\n- customers are delinquent;\n- 100k of cash was necessarily consumed/lost;\n- 100k is immediately recoverable;\n- mechanical DSO inference without an accepted denominator/convention.",
+      "transversal_invariant_ids": [
+        "PR-01",
+        "PR-02",
+        "PR-03",
+        "PR-04",
+        "PR-05",
+        "PR-06",
+        "PR-07",
+        "PR-08"
+      ],
+      "numerical_expectations": [
+        {
+          "id": "FR03.working_capital_previous",
+          "semantic_label": "working_capital_previous",
+          "value": 150000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR03.O5",
+            "FR03.O7",
+            "FR03.O9"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR03.working_capital_current",
+          "semantic_label": "working_capital_current",
+          "value": 250000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR03.O6",
+            "FR03.O8",
+            "FR03.O10"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR03.working_capital_change",
+          "semantic_label": "working_capital_change",
+          "value": 100000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR03.O1",
+            "FR03.O2"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR03.receivables_change",
+          "semantic_label": "receivables_change",
+          "value": 100000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR03.O5",
+            "FR03.O6"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        }
+      ],
+      "epistemic_and_semantic_expectations": "Every requirement, prohibition and conditional permission in normative_review_excerpt and transversal doctrine is binding; not keyword/string-match acceptance.",
+      "source_observation_preservation": "Retain all in-scope source observations and source references without substitution. FR12 adversarial-only observations must be excluded before context construction.",
+      "readiness": {
+        "classification": "BOUNDED_COMPONENTS_AVAILABLE",
+        "basis": "STATIC_REPOSITORY_INSPECTION_NOT_EXECUTION",
+        "detail": "Literal WC/components and deltas; source-defined reconciliation and scoped interpretation not fully implemented.",
+        "current_source_paths": [
+          "backend/services/v1_analysis_contract.py",
+          "backend/services/governed_temporal_continuity.py"
+        ]
+      },
+      "gate_execution": "NOT_EXECUTED",
+      "system_output_approval": "NOT_GIVEN"
+    },
+    {
+      "case_id": "FR04",
+      "title": "SEASONALITY / UNEQUAL PERIODS",
+      "review_section": 9,
+      "review_verdict": "APPROVED WITH CLARIFICATION.",
+      "normative_review_excerpt": "VERDICT:\nAPPROVED WITH CLARIFICATION.\n\nFacts:\n\nFY2025 revenue:\n1.2m / 12 months.\n\nJan-Mar 2026 revenue:\n450k / 3 months.\n\nThese are not directly comparable annual periods.\n\nDo NOT report:\n\n-62.5% annual decline.\n\nDo NOT present:\n\n450k × 4 = 1.8m\n\nas fact or forecast.\n\nA mechanical run-rate may be mathematically calculable, but it is neither an observation nor a forecast.\n\nFor V1, it should not be spontaneously presented as a financial conclusion.\n\nIf such a run-rate capability is ever exposed, it must be explicitly labelled as mechanical annualization without seasonality and NOT as forecast.\n\nImportant additional distinction:\n\nObtaining Q1 2025 would enable like-for-like Q1 historical comparison.\n\nIt would NOT, by itself, establish a reliable FY2026 forecast.\n\nHistorical comparability ≠ predictive capability.",
+      "transversal_invariant_ids": [
+        "PR-01",
+        "PR-02",
+        "PR-03",
+        "PR-04",
+        "PR-05",
+        "PR-06",
+        "PR-07",
+        "PR-08"
+      ],
+      "numerical_expectations": [],
+      "epistemic_and_semantic_expectations": "Every requirement, prohibition and conditional permission in normative_review_excerpt and transversal doctrine is binding; not keyword/string-match acceptance.",
+      "source_observation_preservation": "Retain all in-scope source observations and source references without substitution. FR12 adversarial-only observations must be excluded before context construction.",
+      "readiness": {
+        "classification": "EXPECTED_GOVERNED_REFUSAL",
+        "basis": "STATIC_REPOSITORY_INSPECTION_NOT_EXECUTION",
+        "detail": "Q1 is outside current annual SourceFact period grammar. Do not coerce to FY2026; refusal is not full FR04 capability.",
+        "current_source_paths": [
+          "backend/services/v1_analysis_contract.py",
+          "backend/services/governed_temporal_continuity.py"
+        ]
+      },
+      "gate_execution": "NOT_EXECUTED",
+      "system_output_approval": "NOT_GIVEN"
+    },
+    {
+      "case_id": "FR05",
+      "title": "PERIMETER / ACCOUNTING-CONVENTION CHANGE",
+      "review_section": 10,
+      "review_verdict": "APPROVED WITH CLARIFICATION.",
+      "normative_review_excerpt": "VERDICT:\nAPPROVED WITH CLARIFICATION.\n\nReported revenue:\n\n2025:\n1.0m — Entity A / local GAAP.\n\n2026:\n1.8m — consolidated A+B after acquisition, with changed revenue-recognition convention.\n\nThe arithmetic difference:\n\n+800k / +80%\n\nmay be shown only if explicitly qualified as NON-COMPARABLE.\n\nIt must not become:\n\n- organic growth;\n- like-for-like growth;\n- proof of acquisition impact;\n- same-scope trend.\n\nTwo independent comparability dimensions exist:\n\nPERIMETER_CHANGE\n\nand\n\nACCOUNTING_CONVENTION_CHANGE.\n\nResolving one does not automatically resolve the other.\n\nComparability may only be restored when all relevant dimensions have been reconciled/restated with provenance.\n\nA useful future decomposition may be:\n\nreported variation\n→ perimeter effect\n→ accounting-convention effect\n→ comparable residual\n\nbut only when each component is supported by governed evidence.\n\nDo not manufacture the residual.",
+      "transversal_invariant_ids": [
+        "PR-01",
+        "PR-02",
+        "PR-03",
+        "PR-04",
+        "PR-05",
+        "PR-06",
+        "PR-07",
+        "PR-08"
+      ],
+      "numerical_expectations": [
+        {
+          "id": "FR05.reported_non_comparable_difference",
+          "semantic_label": "reported_non_comparable_difference",
+          "value": 800000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR05.O1",
+            "FR05.O2"
+          ],
+          "presentation": "OPTIONAL_ONLY_WITH_REVIEWED_QUALIFICATION",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR05.reported_non_comparable_difference_pct",
+          "semantic_label": "reported_non_comparable_difference_pct",
+          "value": 80,
+          "unit": "PERCENT",
+          "absolute_tolerance": 0.01,
+          "observation_refs": [
+            "FR05.O1",
+            "FR05.O2"
+          ],
+          "presentation": "OPTIONAL_ONLY_WITH_REVIEWED_QUALIFICATION",
+          "source_reported": false,
+          "not_a_source_fact": true
+        }
+      ],
+      "epistemic_and_semantic_expectations": "Every requirement, prohibition and conditional permission in normative_review_excerpt and transversal doctrine is binding; not keyword/string-match acceptance.",
+      "source_observation_preservation": "Retain all in-scope source observations and source references without substitution. FR12 adversarial-only observations must be excluded before context construction.",
+      "readiness": {
+        "classification": "ADDITIONAL_IMPLEMENTATION_REQUIRED",
+        "basis": "STATIC_REPOSITORY_INSPECTION_NOT_EXECUTION",
+        "detail": "No persisted multi-dimensional comparability/restatement contract on SourceFact. Annual arithmetic NOT_ESTABLISHED is not reconciled NON-COMPARABLE reasoning.",
+        "current_source_paths": [
+          "backend/services/v1_analysis_contract.py",
+          "backend/services/governed_temporal_continuity.py"
+        ]
+      },
+      "gate_execution": "NOT_EXECUTED",
+      "system_output_approval": "NOT_GIVEN"
+    },
+    {
+      "case_id": "FR06",
+      "title": "MISSING PERIOD / INCOMPLETE STATEMENTS",
+      "review_section": 11,
+      "review_verdict": "APPROVED WITH CLARIFICATION.",
+      "normative_review_excerpt": "VERDICT:\nAPPROVED WITH CLARIFICATION.\n\nAvailable:\n\n2024 revenue = 900k.\n\n2025 = missing.\n\n2026 revenue = 1.1m.\n2026 EBITDA = 80k.\n\nCash/debt/liabilities/cash-flow data absent.\n\nA difference between 2024 and 2026 may be calculated:\n\n+200k / +22.22%\n\nbut must be explicitly described as a difference between two NON-CONSECUTIVE observations.\n\nIt must not become 2026-vs-2025 annual growth.\n\nMissing values remain UNKNOWN, never zero.\n\nPositive EBITDA does NOT establish:\n\n- liquidity;\n- solvency;\n- debt-service capacity;\n- overall financial health.\n\nAdd explicitly to forbidden conclusions:\n\ninferring solvency, liquidity or debt-service capacity from positive EBITDA alone when required evidence is absent.",
+      "transversal_invariant_ids": [
+        "PR-01",
+        "PR-02",
+        "PR-03",
+        "PR-04",
+        "PR-05",
+        "PR-06",
+        "PR-07",
+        "PR-08"
+      ],
+      "numerical_expectations": [
+        {
+          "id": "FR06.non_consecutive_difference",
+          "semantic_label": "non_consecutive_difference",
+          "value": 200000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR06.O1",
+            "FR06.O2"
+          ],
+          "presentation": "OPTIONAL_ONLY_WITH_REVIEWED_QUALIFICATION",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR06.non_consecutive_difference_pct",
+          "semantic_label": "non_consecutive_difference_pct",
+          "value": 22.22,
+          "unit": "PERCENT",
+          "absolute_tolerance": 0.01,
+          "observation_refs": [
+            "FR06.O1",
+            "FR06.O2"
+          ],
+          "presentation": "OPTIONAL_ONLY_WITH_REVIEWED_QUALIFICATION",
+          "source_reported": false,
+          "not_a_source_fact": true
+        }
+      ],
+      "epistemic_and_semantic_expectations": "Every requirement, prohibition and conditional permission in normative_review_excerpt and transversal doctrine is binding; not keyword/string-match acceptance.",
+      "source_observation_preservation": "Retain all in-scope source observations and source references without substitution. FR12 adversarial-only observations must be excluded before context construction.",
+      "readiness": {
+        "classification": "EXPECTED_GOVERNED_REFUSAL",
+        "basis": "STATIC_REPOSITORY_INSPECTION_NOT_EXECUTION",
+        "detail": "Annual comparison refuses missing intermediate years. Literal facts remain available; optional two-year arithmetic is not required for acceptance.",
+        "current_source_paths": [
+          "backend/services/v1_analysis_contract.py",
+          "backend/services/governed_temporal_continuity.py"
+        ]
+      },
+      "gate_execution": "NOT_EXECUTED",
+      "system_output_approval": "NOT_GIVEN"
+    },
+    {
+      "case_id": "FR07",
+      "title": "CONFLICTING SOURCES",
+      "review_section": 12,
+      "review_verdict": "APPROVED WITH CLARIFICATION.",
+      "normative_review_excerpt": "VERDICT:\nAPPROVED WITH CLARIFICATION.\n\nTwo sources report the same metric/context:\n\nRevenue 2026 = 1.0m.\n\nRevenue 2026 = 900k.\n\nNo source precedence or correction exists.\n\nRequired epistemic state:\n\nCONTRADICTION.\n\nDo not:\n\n- average to 950k;\n- silently select one source;\n- apply latest-file-wins;\n- discard one source;\n- produce a canonical revenue value until resolved.\n\nPepperyn may calculate and present the discrepancy between competing claims:\n\n100k.\n\nBut discrepancy measurement is NOT conflict resolution.\n\nThe contradiction should propagate to conclusions that depend on the disputed fact.\n\nIt should not necessarily invalidate independent facts elsewhere in the dossier.\n\nImportant:\n\nAMBIGUOUS ≠ CONTRADICTION.\n\nAMBIGUOUS means meaning cannot be sufficiently established.\n\nCONTRADICTION means multiple claims are sufficiently understood to establish incompatibility.",
+      "transversal_invariant_ids": [
+        "PR-01",
+        "PR-02",
+        "PR-03",
+        "PR-04",
+        "PR-05",
+        "PR-06",
+        "PR-07",
+        "PR-08"
+      ],
+      "numerical_expectations": [
+        {
+          "id": "FR07.unresolved_source_discrepancy",
+          "semantic_label": "unresolved_source_discrepancy",
+          "value": 100000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR07.O1",
+            "FR07.O2"
+          ],
+          "presentation": "OPTIONAL_ONLY_WITH_REVIEWED_QUALIFICATION",
+          "source_reported": false,
+          "not_a_source_fact": true
+        }
+      ],
+      "epistemic_and_semantic_expectations": "Every requirement, prohibition and conditional permission in normative_review_excerpt and transversal doctrine is binding; not keyword/string-match acceptance.",
+      "source_observation_preservation": "Retain all in-scope source observations and source references without substitution. FR12 adversarial-only observations must be excluded before context construction.",
+      "readiness": {
+        "classification": "ADDITIONAL_IMPLEMENTATION_REQUIRED",
+        "basis": "STATIC_REPOSITORY_INSPECTION_NOT_EXECUTION",
+        "detail": "Conflicting metric extraction becomes AMBIGUOUS with facts omitted. Reviewed CONTRADICTION, dependent-claim propagation and independent fact retention not thereby satisfied.",
+        "current_source_paths": [
+          "backend/services/v1_analysis_contract.py",
+          "backend/services/governed_temporal_continuity.py"
+        ]
+      },
+      "gate_execution": "NOT_EXECUTED",
+      "system_output_approval": "NOT_GIVEN"
+    },
+    {
+      "case_id": "FR08",
+      "title": "ACCOUNTING INCONSISTENCY / SIGN CONVENTION",
+      "review_section": 13,
+      "review_verdict": "APPROVED WITH CLARIFICATION.",
+      "normative_review_excerpt": "VERDICT:\nAPPROVED WITH CLARIFICATION.\n\nSource states:\n\nRevenue = 1.0m.\n\nCOGS = -600k.\n\nCosts use credit-negative presentation.\n\nGross margin formula = revenue + signed COGS.\n\nReported gross margin = 1.6m.\n\nDeterministic derivation under the supplied convention:\n\n1.0m + (-600k) = 400k.\n\nDiscrepancy with reported gross margin:\n\n1.2m.\n\nRequired conceptual separation:\n\nSOURCE FACT:\nReported gross margin = 1.6m.\n\nDETERMINISTIC DERIVATION:\nDerived gross margin under supplied convention = 400k.\n\nRECONCILIATION STATUS:\nCONTRADICTION.\n\nDISCREPANCY:\n1.2m.\n\nThe deterministic result must NOT silently overwrite the source-reported value.\n\nLikewise, source truth must not suppress a deterministic inconsistency.\n\nThe unresolved state should survive:\n\n- persistence;\n- temporal history;\n- UI;\n- memory;\n- exports.\n\nConceptually preserve:\n\nreported value\n+ derived value\n+ provenance\n+ discrepancy\n+ CONTRADICTION\n+ unresolved status\n\nuntil governed resolution.\n\nNo EBITDA derivation is permitted from the available data.",
+      "transversal_invariant_ids": [
+        "PR-01",
+        "PR-02",
+        "PR-03",
+        "PR-04",
+        "PR-05",
+        "PR-06",
+        "PR-07",
+        "PR-08"
+      ],
+      "numerical_expectations": [
+        {
+          "id": "FR08.derived_gross_margin",
+          "semantic_label": "derived_gross_margin",
+          "value": 400000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR08.O1",
+            "FR08.O2"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR08.reported_gross_margin",
+          "semantic_label": "reported_gross_margin",
+          "value": 1600000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR08.O3"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": true,
+          "not_a_source_fact": false
+        },
+        {
+          "id": "FR08.unresolved_discrepancy",
+          "semantic_label": "unresolved_discrepancy",
+          "value": 1200000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR08.O1",
+            "FR08.O2",
+            "FR08.O3"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        }
+      ],
+      "epistemic_and_semantic_expectations": "Every requirement, prohibition and conditional permission in normative_review_excerpt and transversal doctrine is binding; not keyword/string-match acceptance.",
+      "source_observation_preservation": "Retain all in-scope source observations and source references without substitution. FR12 adversarial-only observations must be excluded before context construction.",
+      "readiness": {
+        "classification": "ADDITIONAL_IMPLEMENTATION_REQUIRED",
+        "basis": "STATIC_REPOSITORY_INSPECTION_NOT_EXECUTION",
+        "detail": "Gross-margin reconciliation with reported and derived values has no complete governed terminal contract; financial_doctrine v0 only checks its bounded existing convention.",
+        "current_source_paths": [
+          "backend/services/v1_analysis_contract.py",
+          "backend/services/governed_temporal_continuity.py",
+          "backend/services/financial_doctrine.py"
+        ]
+      },
+      "gate_execution": "NOT_EXECUTED",
+      "system_output_approval": "NOT_GIVEN"
+    },
+    {
+      "case_id": "FR09",
+      "title": "INSUFFICIENT EVIDENCE FOR CAUSAL CLAIMS",
+      "review_section": 14,
+      "review_verdict": "APPROVED WITH CLARIFICATION AND TRANSVERSAL DOCTRINE CONSEQUENCE.",
+      "normative_review_excerpt": "VERDICT:\nAPPROVED WITH CLARIFICATION AND TRANSVERSAL DOCTRINE CONSEQUENCE.\n\nObserved:\n\nEBITDA:\n100k → 50k\n= -50k.\n\nPersonnel cost:\n300k → 350k\n= +50k.\n\nThe numerical coincidence does NOT establish that personnel cost caused the EBITDA deterioration.\n\nHowever, Pepperyn should not become intellectually silent.\n\nAuthorized reasoning:\n\nThe +50k personnel-cost movement may be surfaced as a POTENTIAL FACTOR TO INVESTIGATE because there is a professionally relevant economic mechanism.\n\nIts actual causal contribution remains UNKNOWN until a sufficiently complete EBITDA bridge and relevant context are available.\n\nTherefore:\n\nsimilarity of numerical movements ≠ proof of causality.\n\nCo-movement + plausible economic mechanism ≠ demonstrated causality.\n\nEven established causality would NOT automatically justify an action such as staff reduction.\n\nDiagnosis ≠ management decision.\n\nA decision would require additional context such as:\n\n- productivity;\n- capacity requirements;\n- growth plans;\n- contractual constraints;\n- restructuring costs;\n- operational consequences;\n- other relevant evidence.\n\nThis case is the primary source for the transversal reasoning chain:\n\nOBSERVATION\n→ SIGNAL\n→ HYPOTHESIS\n→ INVESTIGATION\n→ CAUSALITY\n→ ECONOMIC IMPACT\n→ OPTIONS\n→ DECISION.",
+      "transversal_invariant_ids": [
+        "PR-01",
+        "PR-02",
+        "PR-03",
+        "PR-04",
+        "PR-05",
+        "PR-06",
+        "PR-07",
+        "PR-08"
+      ],
+      "numerical_expectations": [
+        {
+          "id": "FR09.ebitda_change",
+          "semantic_label": "ebitda_change",
+          "value": -50000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR09.O1",
+            "FR09.O2"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR09.personnel_cost_change",
+          "semantic_label": "personnel_cost_change",
+          "value": 50000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR09.O3",
+            "FR09.O4"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        }
+      ],
+      "epistemic_and_semantic_expectations": "Every requirement, prohibition and conditional permission in normative_review_excerpt and transversal doctrine is binding; not keyword/string-match acceptance.",
+      "source_observation_preservation": "Retain all in-scope source observations and source references without substitution. FR12 adversarial-only observations must be excluded before context construction.",
+      "readiness": {
+        "classification": "BOUNDED_COMPONENTS_AVAILABLE",
+        "basis": "STATIC_REPOSITORY_INSPECTION_NOT_EXECUTION",
+        "detail": "Literal EBITDA/personnel and deltas; potential-factor hypothesis and action-evidence separation not semantically certified by citation validation.",
+        "current_source_paths": [
+          "backend/services/v1_analysis_contract.py",
+          "backend/services/governed_temporal_continuity.py"
+        ]
+      },
+      "gate_execution": "NOT_EXECUTED",
+      "system_output_approval": "NOT_GIVEN"
+    },
+    {
+      "case_id": "FR10",
+      "title": "MISLEADING CORRELATION",
+      "review_section": 15,
+      "review_verdict": "APPROVED WITH CLARIFICATION AND TRANSVERSAL DOCTRINE CONSEQUENCE.",
+      "normative_review_excerpt": "VERDICT:\nAPPROVED WITH CLARIFICATION AND TRANSVERSAL DOCTRINE CONSEQUENCE.\n\nObserved:\n\nRevenue:\n2024 800k\n2025 900k\n2026 1.0m\n\nMarketing expense:\n40k\n50k\n60k\n\nA positive co-movement exists.\n\nThis may become a SIGNAL worth investigating.\n\nIt must NOT become:\n\nMarketing increase → revenue increase.\n\nThe hypothesis that marketing contributed to growth may be surfaced as UNVERIFIED.\n\nCausality remains UNKNOWN without attribution/counterfactual/lag/other-driver evidence.\n\nCritically:\n\n100k revenue change / 10k marketing-spend change = 10\n\nmay be mathematically calculable.\n\nIt is NOT automatically:\n\n- ROI;\n- ROAS;\n- return;\n- causal attribution;\n- incremental revenue multiple.\n\nA professional semantic label may only be applied when the governed conditions defining that concept are satisfied.\n\nAdditional invariant:\n\nESTABLISHED CAUSALITY\n≠\nPROVEN ECONOMIC PROFITABILITY\n≠\nJUSTIFIED RECOMMENDATION.\n\nEven if marketing causality were later demonstrated, increasing the budget would still require relevant economic evidence such as margin, acquisition economics, retention, saturation, timing and other context.\n\nCurrent implementation constraint:\n\nMarketing expense is outside the current governed metric vocabulary.\n\nDo NOT widen the ontology merely to make FR10 pass.\n\nThe current system should honestly refuse unsupported metric interpretation where required.\n\nThe professional contract recorded here defines the intended reasoning once the concept is governed.",
+      "transversal_invariant_ids": [
+        "PR-01",
+        "PR-02",
+        "PR-03",
+        "PR-04",
+        "PR-05",
+        "PR-06",
+        "PR-07",
+        "PR-08"
+      ],
+      "numerical_expectations": [],
+      "epistemic_and_semantic_expectations": "Every requirement, prohibition and conditional permission in normative_review_excerpt and transversal doctrine is binding; not keyword/string-match acceptance.",
+      "source_observation_preservation": "Retain all in-scope source observations and source references without substitution. FR12 adversarial-only observations must be excluded before context construction.",
+      "readiness": {
+        "classification": "EXPECTED_GOVERNED_REFUSAL",
+        "basis": "STATIC_REPOSITORY_INSPECTION_NOT_EXECUTION",
+        "detail": "MARKETING_EXPENSE outside governed V1 metric vocabulary. No ontology widening to pass; future governed reasoning contract retained.",
+        "current_source_paths": [
+          "backend/services/v1_analysis_contract.py",
+          "backend/services/governed_temporal_continuity.py"
+        ]
+      },
+      "gate_execution": "NOT_EXECUTED",
+      "system_output_approval": "NOT_GIVEN"
+    },
+    {
+      "case_id": "FR11",
+      "title": "LIQUIDITY / RUNWAY / CUSTOMER CONCENTRATION",
+      "review_section": 16,
+      "review_verdict": "APPROVED WITH CLARIFICATION AND TRANSVERSAL DOCTRINE CONSEQUENCE.",
+      "normative_review_excerpt": "VERDICT:\nAPPROVED WITH CLARIFICATION AND TRANSVERSAL DOCTRINE CONSEQUENCE.\n\nAt 31 Dec 2026:\n\nCash = 60k.\n\nReceivables = 240k.\n\nCurrent debt = 100k.\n\nMissing:\n\n- burn rate;\n- repayment schedule;\n- cash restrictions;\n- receivables ageing;\n- customer split.\n\nThe fact that cash (60k) is below current debt (100k) may constitute a LIQUIDITY INVESTIGATION SIGNAL.\n\nIt does NOT establish:\n\n- a 40k liquidity deficit;\n- inability to pay;\n- insolvency.\n\nCurrent debt does not necessarily mean all 100k is immediately payable.\n\nLikewise:\n\n60k cash + 240k receivables ≠ 300k immediately available liquidity.\n\nInvariant:\n\nASSET\n≠\nLIQUIDITY\n≠\nIMMEDIATELY AVAILABLE LIQUIDITY.\n\nReceivables must not silently become cash.\n\nRunway remains UNKNOWN without an accepted burn-rate definition and supporting evidence.\n\nCustomer concentration also remains UNKNOWN without customer-level distribution.\n\n240k receivables could theoretically be concentrated in one customer or spread across many; the aggregate alone does not establish distribution risk.\n\nMost importantly:\n\nUNKNOWN should, when useful, generate a prioritized request for the minimum missing evidence needed to improve the decision.\n\nFor liquidity this may include, according to context:\n\n- debt maturity schedule;\n- cash forecast;\n- cash restrictions;\n- receivables ageing.\n\nFor concentration:\n\n- receivables/customer distribution.\n\nDo not automatically request every possible financial dataset.",
+      "transversal_invariant_ids": [
+        "PR-01",
+        "PR-02",
+        "PR-03",
+        "PR-04",
+        "PR-05",
+        "PR-06",
+        "PR-07",
+        "PR-08"
+      ],
+      "numerical_expectations": [],
+      "epistemic_and_semantic_expectations": "Every requirement, prohibition and conditional permission in normative_review_excerpt and transversal doctrine is binding; not keyword/string-match acceptance.",
+      "source_observation_preservation": "Retain all in-scope source observations and source references without substitution. FR12 adversarial-only observations must be excluded before context construction.",
+      "readiness": {
+        "classification": "BOUNDED_COMPONENTS_AVAILABLE",
+        "basis": "STATIC_REPOSITORY_INSPECTION_NOT_EXECUTION",
+        "detail": "Cash/receivables/short-term debt vocabulary exists. Signal, availability/runway semantics and minimal prioritized requests lack end-to-end proof.",
+        "current_source_paths": [
+          "backend/services/v1_analysis_contract.py",
+          "backend/services/governed_temporal_continuity.py"
+        ]
+      },
+      "gate_execution": "NOT_EXECUTED",
+      "system_output_approval": "NOT_GIVEN"
+    },
+    {
+      "case_id": "FR12",
+      "title": "CROSS-CLIENT / CROSS-PERIOD / CROSS-TENANT CONTAMINATION",
+      "review_section": 17,
+      "review_verdict": "APPROVED WITH CLARIFICATION AND ARCHITECTURAL INVARIANT.",
+      "normative_review_excerpt": "VERDICT:\nAPPROVED WITH CLARIFICATION AND ARCHITECTURAL INVARIANT.\n\nSynthetic observations:\n\nT1 / Entity A / 2025 = 100k revenue.\n\nT1 / Entity A / 2026 = 120k revenue.\n\nT1 / Entity B / 2026 = 9m revenue.\n\nT2 / Entity A / 2026 = 8m revenue.\n\nLegitimate temporal comparison for T1/A:\n\n100k → 120k\n= +20k\n= +20%.\n\nT1/B must not contaminate T1/A reasoning despite being accessible within the same tenant.\n\nT2/A must be inaccessible to T1 and must be excluded BEFORE reasoning-context construction.\n\nDo not load cross-tenant evidence and instruct the LLM to ignore it.\n\nSecurity boundary must precede intelligence boundary.\n\nAuthorization and contextual relevance are distinct.\n\nIsolation must apply to:\n\n- facts;\n- sources;\n- derivations;\n- hypotheses;\n- contradictions;\n- temporal history;\n- decisions;\n- actions;\n- memory;\n- citations;\n- UI;\n- exports.\n\nDuplicate current-period evidence must not silently replace another conflicting observation.\n\nTemporal logic must not become a hidden contradiction-resolution mechanism.\n\nA refused read must remain FORBIDDEN.\n\nIt must not become EMPTY.\n\nFinal FR12 validation requires a real synthetic two-user adversarial proof through the intended topology:\n\ntwo users\n→ API\n→ DB\n→ RLS\n→ UI\n→ export\n\nA dictionary-filter/mock proof is useful but insufficient for terminal Gate evidence.\n\nNo real customer data is authorized for this proof.",
+      "transversal_invariant_ids": [
+        "PR-01",
+        "PR-02",
+        "PR-03",
+        "PR-04",
+        "PR-05",
+        "PR-06",
+        "PR-07",
+        "PR-08"
+      ],
+      "numerical_expectations": [
+        {
+          "id": "FR12.authorized_revenue_change",
+          "semantic_label": "authorized_revenue_change",
+          "value": 20000,
+          "unit": "EUR",
+          "absolute_tolerance": 0,
+          "observation_refs": [
+            "FR12.O1",
+            "FR12.O2"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        },
+        {
+          "id": "FR12.authorized_revenue_change_pct",
+          "semantic_label": "authorized_revenue_change_pct",
+          "value": 20,
+          "unit": "PERCENT",
+          "absolute_tolerance": 0.01,
+          "observation_refs": [
+            "FR12.O1",
+            "FR12.O2"
+          ],
+          "presentation": "REQUIRED_WHEN_CAPABILITY_EXECUTED",
+          "source_reported": false,
+          "not_a_source_fact": true
+        }
+      ],
+      "epistemic_and_semantic_expectations": "Every requirement, prohibition and conditional permission in normative_review_excerpt and transversal doctrine is binding; not keyword/string-match acceptance.",
+      "source_observation_preservation": "Retain all in-scope source observations and source references without substitution. FR12 adversarial-only observations must be excluded before context construction.",
+      "readiness": {
+        "classification": "ADDITIONAL_IMPLEMENTATION_AND_TOPOLOGY_REQUIRED",
+        "basis": "STATIC_REPOSITORY_INSPECTION_NOT_EXECUTION",
+        "detail": "Scoped component evidence exists, but two-user API/DB/RLS/UI/export adversarial chain is not established. Fixture scope labels are not credentials/authority.",
+        "current_source_paths": [
+          "backend/services/v1_analysis_contract.py",
+          "backend/services/governed_temporal_continuity.py",
+          "backend/services/governed_analysis_persistence.py",
+          "backend/sandbox/v1_router.py"
+        ]
+      },
+      "gate_execution": "NOT_EXECUTED",
+      "system_output_approval": "NOT_GIVEN"
+    }
+  ]
+}

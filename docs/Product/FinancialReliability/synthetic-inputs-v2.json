@@ -1,0 +1,1295 @@
+{
+  "schema_version": 1,
+  "casebook_revision": "FR-EXPECTED-2",
+  "synthetic_only": true,
+  "not_upload_registered": true,
+  "carrier_metadata_policy": "Synthetic scope labels and FR08 year are engineering carrier data, not additional approved professional conclusions.",
+  "cases": [
+    {
+      "case_id": "FR01",
+      "synthetic_only": true,
+      "revision": 2,
+      "authorized_context": {
+        "tenant": "SYN-FR01-T1",
+        "entity": "A",
+        "engagement": "SYN-FR01-A"
+      },
+      "sources": [
+        {
+          "id": "FR01.S1",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        }
+      ],
+      "observations": [
+        {
+          "id": "FR01.O1",
+          "source_ref": "FR01.S1",
+          "metric": "REVENUE",
+          "reported_value": 1000000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2025-01-01",
+            "end": "2025-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR01-T1",
+            "entity": "A",
+            "engagement": "SYN-FR01-A"
+          }
+        },
+        {
+          "id": "FR01.O2",
+          "source_ref": "FR01.S1",
+          "metric": "REVENUE",
+          "reported_value": 1200000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR01-T1",
+            "entity": "A",
+            "engagement": "SYN-FR01-A"
+          }
+        },
+        {
+          "id": "FR01.O3",
+          "source_ref": "FR01.S1",
+          "metric": "GROSS_MARGIN",
+          "reported_value": 400000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2025-01-01",
+            "end": "2025-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR01-T1",
+            "entity": "A",
+            "engagement": "SYN-FR01-A"
+          }
+        },
+        {
+          "id": "FR01.O4",
+          "source_ref": "FR01.S1",
+          "metric": "GROSS_MARGIN",
+          "reported_value": 360000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR01-T1",
+            "entity": "A",
+            "engagement": "SYN-FR01-A"
+          }
+        }
+      ],
+      "adversarial_only_observations": [],
+      "missing_evidence": [
+        "SEGMENTED_PRICE_MIX_COST_BRIDGE",
+        "CASH_EFFECT"
+      ],
+      "comparability": {
+        "status": "DECLARED_WITHIN_CASE",
+        "duration": "SAME_ANNUAL_FLOW_DURATION_OR_YEAR_END_STOCK",
+        "perimeter": "SAME_FOR_AUTHORIZED_PAIR",
+        "conventions": "UNCHANGED",
+        "limitation": "Case declaration is not a production comparability attestation."
+      },
+      "definitions": {
+        "GROSS_MARGIN": "Amount after cost of sales, not EBITDA and not percentage"
+      }
+    },
+    {
+      "case_id": "FR02",
+      "synthetic_only": true,
+      "revision": 2,
+      "authorized_context": {
+        "tenant": "SYN-FR02-T1",
+        "entity": "A",
+        "engagement": "SYN-FR02-A"
+      },
+      "sources": [
+        {
+          "id": "FR02.S1",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        },
+        {
+          "id": "FR02.S2",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        }
+      ],
+      "observations": [
+        {
+          "id": "FR02.O1",
+          "source_ref": "FR02.S1",
+          "metric": "EBITDA",
+          "reported_value": 100000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2025-01-01",
+            "end": "2025-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR02-T1",
+            "entity": "A",
+            "engagement": "SYN-FR02-A"
+          }
+        },
+        {
+          "id": "FR02.O2",
+          "source_ref": "FR02.S1",
+          "metric": "EBITDA",
+          "reported_value": 150000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR02-T1",
+            "entity": "A",
+            "engagement": "SYN-FR02-A"
+          }
+        },
+        {
+          "id": "FR02.O3",
+          "source_ref": "FR02.S2",
+          "metric": "CASH",
+          "reported_value": 200000,
+          "unit": "EUR",
+          "period": {
+            "kind": "STOCK",
+            "as_of": "2025-12-31"
+          },
+          "scope": {
+            "tenant": "SYN-FR02-T1",
+            "entity": "A",
+            "engagement": "SYN-FR02-A"
+          }
+        },
+        {
+          "id": "FR02.O4",
+          "source_ref": "FR02.S2",
+          "metric": "CASH",
+          "reported_value": 80000,
+          "unit": "EUR",
+          "period": {
+            "kind": "STOCK",
+            "as_of": "2026-12-31"
+          },
+          "scope": {
+            "tenant": "SYN-FR02-T1",
+            "entity": "A",
+            "engagement": "SYN-FR02-A"
+          }
+        }
+      ],
+      "adversarial_only_observations": [],
+      "missing_evidence": [
+        "RECONCILED_CASH_FLOW_BRIDGE",
+        "DEBT_MOVEMENTS"
+      ],
+      "comparability": {
+        "status": "DECLARED_WITHIN_CASE",
+        "duration": "SAME_ANNUAL_FLOW_DURATION_OR_YEAR_END_STOCK",
+        "perimeter": "SAME_FOR_AUTHORIZED_PAIR",
+        "conventions": "UNCHANGED",
+        "limitation": "Case declaration is not a production comparability attestation."
+      }
+    },
+    {
+      "case_id": "FR03",
+      "synthetic_only": true,
+      "revision": 2,
+      "authorized_context": {
+        "tenant": "SYN-FR03-T1",
+        "entity": "A",
+        "engagement": "SYN-FR03-A"
+      },
+      "sources": [
+        {
+          "id": "FR03.S1",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        },
+        {
+          "id": "FR03.S2",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        }
+      ],
+      "observations": [
+        {
+          "id": "FR03.O1",
+          "source_ref": "FR03.S1",
+          "metric": "WORKING_CAPITAL",
+          "reported_value": 150000,
+          "unit": "EUR",
+          "period": {
+            "kind": "STOCK",
+            "as_of": "2025-12-31"
+          },
+          "scope": {
+            "tenant": "SYN-FR03-T1",
+            "entity": "A",
+            "engagement": "SYN-FR03-A"
+          }
+        },
+        {
+          "id": "FR03.O2",
+          "source_ref": "FR03.S1",
+          "metric": "WORKING_CAPITAL",
+          "reported_value": 250000,
+          "unit": "EUR",
+          "period": {
+            "kind": "STOCK",
+            "as_of": "2026-12-31"
+          },
+          "scope": {
+            "tenant": "SYN-FR03-T1",
+            "entity": "A",
+            "engagement": "SYN-FR03-A"
+          }
+        },
+        {
+          "id": "FR03.O3",
+          "source_ref": "FR03.S1",
+          "metric": "REVENUE",
+          "reported_value": 1000000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2025-01-01",
+            "end": "2025-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR03-T1",
+            "entity": "A",
+            "engagement": "SYN-FR03-A"
+          }
+        },
+        {
+          "id": "FR03.O4",
+          "source_ref": "FR03.S1",
+          "metric": "REVENUE",
+          "reported_value": 1000000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR03-T1",
+            "entity": "A",
+            "engagement": "SYN-FR03-A"
+          }
+        },
+        {
+          "id": "FR03.O5",
+          "source_ref": "FR03.S2",
+          "metric": "RECEIVABLES",
+          "reported_value": 200000,
+          "unit": "EUR",
+          "period": {
+            "kind": "STOCK",
+            "as_of": "2025-12-31"
+          },
+          "scope": {
+            "tenant": "SYN-FR03-T1",
+            "entity": "A",
+            "engagement": "SYN-FR03-A"
+          }
+        },
+        {
+          "id": "FR03.O6",
+          "source_ref": "FR03.S2",
+          "metric": "RECEIVABLES",
+          "reported_value": 300000,
+          "unit": "EUR",
+          "period": {
+            "kind": "STOCK",
+            "as_of": "2026-12-31"
+          },
+          "scope": {
+            "tenant": "SYN-FR03-T1",
+            "entity": "A",
+            "engagement": "SYN-FR03-A"
+          }
+        },
+        {
+          "id": "FR03.O7",
+          "source_ref": "FR03.S2",
+          "metric": "INVENTORY",
+          "reported_value": 100000,
+          "unit": "EUR",
+          "period": {
+            "kind": "STOCK",
+            "as_of": "2025-12-31"
+          },
+          "scope": {
+            "tenant": "SYN-FR03-T1",
+            "entity": "A",
+            "engagement": "SYN-FR03-A"
+          }
+        },
+        {
+          "id": "FR03.O8",
+          "source_ref": "FR03.S2",
+          "metric": "INVENTORY",
+          "reported_value": 100000,
+          "unit": "EUR",
+          "period": {
+            "kind": "STOCK",
+            "as_of": "2026-12-31"
+          },
+          "scope": {
+            "tenant": "SYN-FR03-T1",
+            "entity": "A",
+            "engagement": "SYN-FR03-A"
+          }
+        },
+        {
+          "id": "FR03.O9",
+          "source_ref": "FR03.S2",
+          "metric": "PAYABLES",
+          "reported_value": 150000,
+          "unit": "EUR",
+          "period": {
+            "kind": "STOCK",
+            "as_of": "2025-12-31"
+          },
+          "scope": {
+            "tenant": "SYN-FR03-T1",
+            "entity": "A",
+            "engagement": "SYN-FR03-A"
+          }
+        },
+        {
+          "id": "FR03.O10",
+          "source_ref": "FR03.S2",
+          "metric": "PAYABLES",
+          "reported_value": 150000,
+          "unit": "EUR",
+          "period": {
+            "kind": "STOCK",
+            "as_of": "2026-12-31"
+          },
+          "scope": {
+            "tenant": "SYN-FR03-T1",
+            "entity": "A",
+            "engagement": "SYN-FR03-A"
+          }
+        }
+      ],
+      "adversarial_only_observations": [],
+      "missing_evidence": [
+        "RECEIVABLES_AGEING",
+        "PAYMENT_TERMS_AND_CUTOFF",
+        "CASH_FLOW_BRIDGE"
+      ],
+      "comparability": {
+        "status": "DECLARED_WITHIN_CASE",
+        "duration": "SAME_ANNUAL_FLOW_DURATION_OR_YEAR_END_STOCK",
+        "perimeter": "SAME_FOR_AUTHORIZED_PAIR",
+        "conventions": "UNCHANGED",
+        "limitation": "Case declaration is not a production comparability attestation."
+      },
+      "definitions": {
+        "WORKING_CAPITAL": "RECEIVABLES + INVENTORY - PAYABLES"
+      }
+    },
+    {
+      "case_id": "FR04",
+      "synthetic_only": true,
+      "revision": 2,
+      "authorized_context": {
+        "tenant": "SYN-FR04-T1",
+        "entity": "A",
+        "engagement": "SYN-FR04-A"
+      },
+      "sources": [
+        {
+          "id": "FR04.S1",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        },
+        {
+          "id": "FR04.S2",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        }
+      ],
+      "observations": [
+        {
+          "id": "FR04.O1",
+          "source_ref": "FR04.S1",
+          "metric": "REVENUE",
+          "reported_value": 1200000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2025-01-01",
+            "end": "2025-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR04-T1",
+            "entity": "A",
+            "engagement": "SYN-FR04-A"
+          }
+        },
+        {
+          "id": "FR04.O2",
+          "source_ref": "FR04.S2",
+          "metric": "REVENUE",
+          "reported_value": 450000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-03-31",
+            "months": 3
+          },
+          "scope": {
+            "tenant": "SYN-FR04-T1",
+            "entity": "A",
+            "engagement": "SYN-FR04-A"
+          }
+        }
+      ],
+      "adversarial_only_observations": [],
+      "missing_evidence": [
+        "Q1_2025",
+        "SEASONAL_PROFILE",
+        "FORECAST_ASSUMPTIONS"
+      ],
+      "comparability": {
+        "status": "NON_COMPARABLE",
+        "dimensions": [
+          "DURATION"
+        ],
+        "historical_missing": "Q1_2025"
+      }
+    },
+    {
+      "case_id": "FR05",
+      "synthetic_only": true,
+      "revision": 2,
+      "authorized_context": {
+        "tenant": "SYN-FR05-T1",
+        "entity": "A",
+        "engagement": "SYN-FR05-A"
+      },
+      "sources": [
+        {
+          "id": "FR05.S1",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        },
+        {
+          "id": "FR05.S2",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        }
+      ],
+      "observations": [
+        {
+          "id": "FR05.O1",
+          "source_ref": "FR05.S1",
+          "metric": "REVENUE",
+          "reported_value": 1000000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2025-01-01",
+            "end": "2025-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR05-T1",
+            "entity": "A",
+            "engagement": "SYN-FR05-A"
+          },
+          "accounting_convention": "LOCAL_GAAP_ORIGINAL",
+          "perimeter": "A"
+        },
+        {
+          "id": "FR05.O2",
+          "source_ref": "FR05.S2",
+          "metric": "REVENUE",
+          "reported_value": 1800000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR05-T1",
+            "entity": "A+B",
+            "engagement": "SYN-FR05-A"
+          },
+          "accounting_convention": "CHANGED_RECOGNITION_UNSPECIFIED",
+          "perimeter": "CONSOLIDATED_A_PLUS_B"
+        }
+      ],
+      "adversarial_only_observations": [],
+      "missing_evidence": [
+        "PERIMETER_BRIDGE",
+        "ACCOUNTING_RECOGNITION_BRIDGE",
+        "RESTATED_COMPARABLE"
+      ],
+      "comparability": {
+        "status": "NON_COMPARABLE",
+        "dimensions": [
+          "PERIMETER_CHANGE",
+          "ACCOUNTING_CONVENTION_CHANGE"
+        ],
+        "restatement": "ABSENT"
+      }
+    },
+    {
+      "case_id": "FR06",
+      "synthetic_only": true,
+      "revision": 2,
+      "authorized_context": {
+        "tenant": "SYN-FR06-T1",
+        "entity": "A",
+        "engagement": "SYN-FR06-A"
+      },
+      "sources": [
+        {
+          "id": "FR06.S1",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        },
+        {
+          "id": "FR06.S2",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        }
+      ],
+      "observations": [
+        {
+          "id": "FR06.O1",
+          "source_ref": "FR06.S1",
+          "metric": "REVENUE",
+          "reported_value": 900000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2024-01-01",
+            "end": "2024-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR06-T1",
+            "entity": "A",
+            "engagement": "SYN-FR06-A"
+          }
+        },
+        {
+          "id": "FR06.O2",
+          "source_ref": "FR06.S2",
+          "metric": "REVENUE",
+          "reported_value": 1100000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR06-T1",
+            "entity": "A",
+            "engagement": "SYN-FR06-A"
+          }
+        },
+        {
+          "id": "FR06.O3",
+          "source_ref": "FR06.S2",
+          "metric": "EBITDA",
+          "reported_value": 80000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR06-T1",
+            "entity": "A",
+            "engagement": "SYN-FR06-A"
+          }
+        }
+      ],
+      "adversarial_only_observations": [],
+      "missing_evidence": [
+        "FY2025",
+        "CASH",
+        "DEBT",
+        "LIABILITIES",
+        "CASH_FLOW"
+      ],
+      "comparability": {
+        "status": "NON_CONSECUTIVE",
+        "missing_period": "2025"
+      }
+    },
+    {
+      "case_id": "FR07",
+      "synthetic_only": true,
+      "revision": 2,
+      "authorized_context": {
+        "tenant": "SYN-FR07-T1",
+        "entity": "A",
+        "engagement": "SYN-FR07-A"
+      },
+      "sources": [
+        {
+          "id": "FR07.S1",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        },
+        {
+          "id": "FR07.S2",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        }
+      ],
+      "observations": [
+        {
+          "id": "FR07.O1",
+          "source_ref": "FR07.S1",
+          "metric": "REVENUE",
+          "reported_value": 1000000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR07-T1",
+            "entity": "A",
+            "engagement": "SYN-FR07-A"
+          }
+        },
+        {
+          "id": "FR07.O2",
+          "source_ref": "FR07.S2",
+          "metric": "REVENUE",
+          "reported_value": 900000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR07-T1",
+            "entity": "A",
+            "engagement": "SYN-FR07-A"
+          }
+        }
+      ],
+      "adversarial_only_observations": [],
+      "missing_evidence": [
+        "GOVERNED_SOURCE_PRECEDENCE",
+        "RECONCILIATION"
+      ],
+      "comparability": {
+        "status": "NOT_DECLARED"
+      },
+      "definitions": {
+        "SOURCE_PRECEDENCE": "NONE"
+      }
+    },
+    {
+      "case_id": "FR08",
+      "synthetic_only": true,
+      "revision": 2,
+      "authorized_context": {
+        "tenant": "SYN-FR08-T1",
+        "entity": "A",
+        "engagement": "SYN-FR08-A"
+      },
+      "sources": [
+        {
+          "id": "FR08.S1",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        }
+      ],
+      "observations": [
+        {
+          "id": "FR08.O1",
+          "source_ref": "FR08.S1",
+          "metric": "REVENUE",
+          "reported_value": 1000000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR08-T1",
+            "entity": "A",
+            "engagement": "SYN-FR08-A"
+          }
+        },
+        {
+          "id": "FR08.O2",
+          "source_ref": "FR08.S1",
+          "metric": "COST_OF_SALES",
+          "reported_value": -600000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR08-T1",
+            "entity": "A",
+            "engagement": "SYN-FR08-A"
+          }
+        },
+        {
+          "id": "FR08.O3",
+          "source_ref": "FR08.S1",
+          "metric": "GROSS_MARGIN",
+          "reported_value": 1600000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR08-T1",
+            "entity": "A",
+            "engagement": "SYN-FR08-A"
+          }
+        }
+      ],
+      "adversarial_only_observations": [],
+      "missing_evidence": [
+        "CORRECTION_OR_SIGN_BASIS_CONFIRMATION",
+        "PERSONNEL_COST",
+        "EBITDA"
+      ],
+      "comparability": {
+        "status": "NOT_DECLARED"
+      },
+      "definitions": {
+        "cost_presentation": "credit-negative as explicitly supplied; not a general bookkeeping rule",
+        "GROSS_MARGIN_FORMULA": "REVENUE + SIGNED_COST_OF_SALES",
+        "period_assumption": "2026 annual solely as synthetic carrier metadata; review did not specify a year"
+      }
+    },
+    {
+      "case_id": "FR09",
+      "synthetic_only": true,
+      "revision": 2,
+      "authorized_context": {
+        "tenant": "SYN-FR09-T1",
+        "entity": "A",
+        "engagement": "SYN-FR09-A"
+      },
+      "sources": [
+        {
+          "id": "FR09.S1",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        }
+      ],
+      "observations": [
+        {
+          "id": "FR09.O1",
+          "source_ref": "FR09.S1",
+          "metric": "EBITDA",
+          "reported_value": 100000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2025-01-01",
+            "end": "2025-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR09-T1",
+            "entity": "A",
+            "engagement": "SYN-FR09-A"
+          }
+        },
+        {
+          "id": "FR09.O2",
+          "source_ref": "FR09.S1",
+          "metric": "EBITDA",
+          "reported_value": 50000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR09-T1",
+            "entity": "A",
+            "engagement": "SYN-FR09-A"
+          }
+        },
+        {
+          "id": "FR09.O3",
+          "source_ref": "FR09.S1",
+          "metric": "PERSONNEL_COST",
+          "reported_value": 300000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2025-01-01",
+            "end": "2025-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR09-T1",
+            "entity": "A",
+            "engagement": "SYN-FR09-A"
+          }
+        },
+        {
+          "id": "FR09.O4",
+          "source_ref": "FR09.S1",
+          "metric": "PERSONNEL_COST",
+          "reported_value": 350000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR09-T1",
+            "entity": "A",
+            "engagement": "SYN-FR09-A"
+          }
+        }
+      ],
+      "adversarial_only_observations": [],
+      "missing_evidence": [
+        "COMPLETE_EBITDA_BRIDGE",
+        "PRODUCTIVITY_CAPACITY_CONTRACTUAL_CONTEXT"
+      ],
+      "comparability": {
+        "status": "DECLARED_WITHIN_CASE",
+        "duration": "SAME_ANNUAL_FLOW_DURATION_OR_YEAR_END_STOCK",
+        "perimeter": "SAME_FOR_AUTHORIZED_PAIR",
+        "conventions": "UNCHANGED",
+        "limitation": "Case declaration is not a production comparability attestation."
+      },
+      "definitions": {
+        "PERSONNEL_COST": "POSITIVE_EXPENSE"
+      }
+    },
+    {
+      "case_id": "FR10",
+      "synthetic_only": true,
+      "revision": 2,
+      "authorized_context": {
+        "tenant": "SYN-FR10-T1",
+        "entity": "A",
+        "engagement": "SYN-FR10-A"
+      },
+      "sources": [
+        {
+          "id": "FR10.S1",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        },
+        {
+          "id": "FR10.S2",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        }
+      ],
+      "observations": [
+        {
+          "id": "FR10.O1",
+          "source_ref": "FR10.S1",
+          "metric": "REVENUE",
+          "reported_value": 800000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2024-01-01",
+            "end": "2024-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR10-T1",
+            "entity": "A",
+            "engagement": "SYN-FR10-A"
+          }
+        },
+        {
+          "id": "FR10.O2",
+          "source_ref": "FR10.S2",
+          "metric": "MARKETING_EXPENSE",
+          "reported_value": 40000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2024-01-01",
+            "end": "2024-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR10-T1",
+            "entity": "A",
+            "engagement": "SYN-FR10-A"
+          }
+        },
+        {
+          "id": "FR10.O3",
+          "source_ref": "FR10.S1",
+          "metric": "REVENUE",
+          "reported_value": 900000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2025-01-01",
+            "end": "2025-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR10-T1",
+            "entity": "A",
+            "engagement": "SYN-FR10-A"
+          }
+        },
+        {
+          "id": "FR10.O4",
+          "source_ref": "FR10.S2",
+          "metric": "MARKETING_EXPENSE",
+          "reported_value": 50000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2025-01-01",
+            "end": "2025-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR10-T1",
+            "entity": "A",
+            "engagement": "SYN-FR10-A"
+          }
+        },
+        {
+          "id": "FR10.O5",
+          "source_ref": "FR10.S1",
+          "metric": "REVENUE",
+          "reported_value": 1000000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR10-T1",
+            "entity": "A",
+            "engagement": "SYN-FR10-A"
+          }
+        },
+        {
+          "id": "FR10.O6",
+          "source_ref": "FR10.S2",
+          "metric": "MARKETING_EXPENSE",
+          "reported_value": 60000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-FR10-T1",
+            "entity": "A",
+            "engagement": "SYN-FR10-A"
+          }
+        }
+      ],
+      "adversarial_only_observations": [],
+      "missing_evidence": [
+        "ATTRIBUTION",
+        "COUNTERFACTUAL",
+        "LAG",
+        "OTHER_DRIVERS",
+        "MARGIN",
+        "ACQUISITION_ECONOMICS"
+      ],
+      "comparability": {
+        "status": "NOT_DECLARED"
+      },
+      "definitions": {
+        "MARKETING_EXPENSE": "POSITIVE_EXPENSE; not in current governed V1 vocabulary"
+      }
+    },
+    {
+      "case_id": "FR11",
+      "synthetic_only": true,
+      "revision": 2,
+      "authorized_context": {
+        "tenant": "SYN-FR11-T1",
+        "entity": "A",
+        "engagement": "SYN-FR11-A"
+      },
+      "sources": [
+        {
+          "id": "FR11.S1",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        }
+      ],
+      "observations": [
+        {
+          "id": "FR11.O1",
+          "source_ref": "FR11.S1",
+          "metric": "CASH",
+          "reported_value": 60000,
+          "unit": "EUR",
+          "period": {
+            "kind": "STOCK",
+            "as_of": "2026-12-31"
+          },
+          "scope": {
+            "tenant": "SYN-FR11-T1",
+            "entity": "A",
+            "engagement": "SYN-FR11-A"
+          }
+        },
+        {
+          "id": "FR11.O2",
+          "source_ref": "FR11.S1",
+          "metric": "RECEIVABLES",
+          "reported_value": 240000,
+          "unit": "EUR",
+          "period": {
+            "kind": "STOCK",
+            "as_of": "2026-12-31"
+          },
+          "scope": {
+            "tenant": "SYN-FR11-T1",
+            "entity": "A",
+            "engagement": "SYN-FR11-A"
+          }
+        },
+        {
+          "id": "FR11.O3",
+          "source_ref": "FR11.S1",
+          "metric": "SHORT_TERM_DEBT",
+          "reported_value": 100000,
+          "unit": "EUR",
+          "period": {
+            "kind": "STOCK",
+            "as_of": "2026-12-31"
+          },
+          "scope": {
+            "tenant": "SYN-FR11-T1",
+            "entity": "A",
+            "engagement": "SYN-FR11-A"
+          }
+        }
+      ],
+      "adversarial_only_observations": [],
+      "missing_evidence": [
+        "BURN_RATE_DEFINITION_AND_SERIES",
+        "DEBT_MATURITIES",
+        "CASH_RESTRICTIONS",
+        "AGEING",
+        "CUSTOMER_SPLIT"
+      ],
+      "comparability": {
+        "status": "NOT_DECLARED"
+      }
+    },
+    {
+      "case_id": "FR12",
+      "synthetic_only": true,
+      "revision": 2,
+      "authorized_context": {
+        "tenant": "SYN-T1",
+        "entity": "A",
+        "engagement": "SYN-T1-A"
+      },
+      "sources": [
+        {
+          "id": "FR12.S1",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        },
+        {
+          "id": "FR12.S2",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        },
+        {
+          "id": "FR12.S3",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        },
+        {
+          "id": "FR12.S4",
+          "revision": 2,
+          "provenance": "SYNTHETIC_FINANCIAL_REVIEW_CASEBOOK",
+          "source_authority": "CASE_INPUT_ONLY_NOT_CANONICAL_RUNTIME_EVIDENCE"
+        }
+      ],
+      "observations": [
+        {
+          "id": "FR12.O1",
+          "source_ref": "FR12.S1",
+          "metric": "REVENUE",
+          "reported_value": 100000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2025-01-01",
+            "end": "2025-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-T1",
+            "entity": "A",
+            "engagement": "SYN-T1-A"
+          }
+        },
+        {
+          "id": "FR12.O2",
+          "source_ref": "FR12.S2",
+          "metric": "REVENUE",
+          "reported_value": 120000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-T1",
+            "entity": "A",
+            "engagement": "SYN-T1-A"
+          }
+        }
+      ],
+      "adversarial_only_observations": [
+        {
+          "id": "FR12.O3",
+          "source_ref": "FR12.S3",
+          "metric": "REVENUE",
+          "reported_value": 9000000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-T1",
+            "entity": "B",
+            "engagement": "SYN-T1-B"
+          },
+          "adversarial_only": true
+        },
+        {
+          "id": "FR12.O4",
+          "source_ref": "FR12.S4",
+          "metric": "REVENUE",
+          "reported_value": 8000000,
+          "unit": "EUR",
+          "period": {
+            "kind": "FLOW",
+            "start": "2026-01-01",
+            "end": "2026-12-31",
+            "months": 12
+          },
+          "scope": {
+            "tenant": "SYN-T2",
+            "entity": "A",
+            "engagement": "SYN-T2-A"
+          },
+          "adversarial_only": true
+        }
+      ],
+      "missing_evidence": [
+        "LIVE_SYNTHETIC_TWO_USER_TOPOLOGY_EVIDENCE"
+      ],
+      "comparability": {
+        "status": "DECLARED_WITHIN_CASE",
+        "duration": "SAME_ANNUAL_FLOW_DURATION_OR_YEAR_END_STOCK",
+        "perimeter": "SAME_FOR_AUTHORIZED_PAIR",
+        "conventions": "UNCHANGED",
+        "limitation": "Case declaration is not a production comparability attestation."
+      }
+    }
+  ]
+}

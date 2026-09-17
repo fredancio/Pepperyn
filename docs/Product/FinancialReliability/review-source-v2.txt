@@ -1,0 +1,911 @@
+Astra,
+
+The independent professional review of:
+
+docs/Product/PEPPERYN_PRIVATE_BETA_FINANCIAL_REVIEW_CASEBOOK_V1.md
+
+is now complete for FR01 through FR12.
+
+IMPORTANT:
+This review does NOT constitute execution evidence, system-output approval, Financial Reliability Gate PASS, Provider Gate opening, or Real-data Admission opening.
+
+It is the professional validation/correction of the EXPECTED RESULT CONTRACTS that must become the frozen oracle before execution.
+
+Do not collapse the review below into twelve simple APPROVED labels.
+
+The review revealed transversal professional-reasoning invariants that materially refine what “financial reliability” means for Pepperyn. These are part of the professional contract and should be integrated into the Canon at the appropriate level before the Casebook is frozen/executed.
+
+External Provider remains CLOSED.
+Real-data Admission remains CLOSED.
+Self-Selling Control Center remains DEFERRED.
+No real data may be used.
+
+============================================================
+1. TRANSVERSAL PROFESSIONAL REASONING DOCTRINE
+============================================================
+
+The review produced an important conclusion:
+
+Financial reliability is not only factual/calculation reliability.
+
+A system can calculate every number correctly and still produce a professionally wrong financial conclusion.
+
+Pepperyn must therefore protect not only against factual hallucination, but also against PROFESSIONAL REASONING HALLUCINATION, including:
+
+- premature causality;
+- correlation presented as explanation;
+- incomplete diagnosis presented as certainty;
+- arithmetic difference presented as economic trend;
+- causality presented as proof of economic desirability;
+- diagnosis automatically converted into action;
+- mathematically calculable ratios given unjustified professional semantic labels;
+- missing evidence silently converted into zero;
+- contradictory evidence silently reconciled;
+- non-comparable periods/perimeters treated as comparable;
+- accessible but contextually irrelevant evidence contaminating reasoning;
+- conclusions escaping the legitimate scope of their evidence.
+
+The core professional reasoning progression established by this review is:
+
+OBSERVATION
+→ SIGNAL
+→ HYPOTHESIS
+→ INVESTIGATION
+→ ESTABLISHED CAUSALITY
+→ ECONOMIC IMPACT
+→ OPTIONS
+→ DECISION
+
+Pepperyn MUST NOT automatically jump from one level to the next.
+
+It must be able to stop honestly at any level when evidence for the next level is insufficient.
+
+This is not intended to make Pepperyn intellectually passive.
+
+A financially relevant but unproven relationship may be surfaced as a SIGNAL or HYPOTHESIS TO INVESTIGATE without being promoted to established causality.
+
+Therefore:
+
+prudence ≠ silence.
+
+Pepperyn should remain useful under uncertainty while preserving epistemic status.
+
+A second transversal progression is:
+
+UNKNOWN
+→ MISSING EVIDENCE
+→ PRIORITIZED INFORMATION REQUEST
+→ NEW EVIDENCE
+→ RE-EVALUATION
+
+UNKNOWN should not necessarily be a dead end.
+
+When professionally useful, Pepperyn should identify the minimum relevant missing evidence that would reduce the uncertainty.
+
+Information requests should be:
+
+- decision-oriented;
+- proportionate;
+- prioritized;
+- minimal enough to remain operationally useful.
+
+Pepperyn should not respond to every uncertainty by asking for the entire accounting/ERP/CRM universe.
+
+============================================================
+2. EPISTEMIC STATES MUST REMAIN DISTINCT
+============================================================
+
+The review confirms that these concepts must NOT collapse into each other:
+
+AMBIGUOUS
+≠ UNKNOWN
+≠ CONTRADICTION
+≠ FORBIDDEN
+≠ EMPTY
+
+Examples:
+
+AMBIGUOUS:
+Pepperyn cannot determine sufficiently what the evidence means.
+
+UNKNOWN:
+The required conclusion cannot be established from available evidence.
+
+CONTRADICTION:
+Pepperyn understands multiple claims sufficiently to establish that they are mutually incompatible.
+
+FORBIDDEN:
+The caller/context is not authorized to access the evidence.
+
+EMPTY:
+The caller is authorized and the legitimate scope contains no relevant evidence.
+
+CONTRADICTION is a valid epistemic state, not merely “low confidence”.
+
+Absence of evidence remains different from evidence of absence.
+
+============================================================
+3. CALCULATION ≠ PROFESSIONAL SEMANTICS
+============================================================
+
+Another transversal invariant:
+
+A mathematically valid calculation does not automatically justify the professional semantic label attached to it.
+
+Examples from the review:
+
+- a difference between unequal periods is not automatically growth;
+- a ratio between revenue change and marketing-spend change is not automatically ROI or ROAS;
+- receivables are not cash;
+- a mechanical annualization is not a forecast;
+- a reported-vs-derived discrepancy is not permission to overwrite source truth.
+
+The deterministic layer may calculate a number while the professional layer refuses an unjustified interpretation of that number.
+
+This distinction is fundamental.
+
+============================================================
+4. COMPARABILITY IS A GOVERNED PROPERTY
+============================================================
+
+Temporal comparison is not merely “find N and N-1”.
+
+Comparability may depend on, among other things:
+
+- duration;
+- period;
+- perimeter;
+- entity scope;
+- accounting convention;
+- source definition;
+- metric definition;
+- restatement status.
+
+Arithmetic difference may remain calculable while economic/temporal comparability remains UNKNOWN or NON-COMPARABLE.
+
+Comparability itself should therefore be treated as a governed property, not assumed from the presence of two dated values.
+
+============================================================
+5. EVIDENCE SCOPE INVARIANT
+============================================================
+
+Every conclusion inherits the scope of its evidence.
+
+Conceptually, relevant scope may include:
+
+Tenant
+→ Client/Entity
+→ Engagement
+→ Analysis
+→ Period
+→ Source
+→ Decision/Memory context
+
+A conclusion or memory item must not silently acquire broader scope than the evidence supporting it.
+
+Authorization and reasoning relevance are separate controls.
+
+Evidence may be legally/technically accessible to a tenant while still being inadmissible in the currently selected client's reasoning context.
+
+Cross-tenant evidence must be excluded BEFORE construction of the reasoning context.
+
+The LLM must never be used as the tenant-isolation mechanism.
+
+Isolation applies not only to raw facts but also to:
+
+- sources;
+- derived facts;
+- hypotheses;
+- contradictions;
+- temporal history;
+- decisions;
+- actions;
+- memory;
+- citations;
+- UI;
+- exports.
+
+============================================================
+6. FR01 — REVENUE GROWTH WITH GROSS-MARGIN DETERIORATION
+============================================================
+
+VERDICT:
+APPROVED WITH CLARIFICATION.
+
+Confirmed observations:
+
+Revenue:
+1,000,000 → 1,200,000
+= +200,000
+= +20%
+
+Gross-margin amount:
+400,000 → 360,000
+= -40,000
+= -10%
+
+Gross-margin rate:
+40% → 30%
+= -10 percentage points.
+
+Authorized professional interpretation:
+
+The growth is less gross-margin-generative than in the previous period / deterioration in gross-margin economics is observed.
+
+Causality remains UNKNOWN.
+
+Do not allow the scenario title “margin destruction” to become causal or normative output language.
+
+Do not attribute the deterioration to pricing, mix, COGS, or another driver without supporting evidence.
+
+Keep the proposed forbidden conclusions.
+
+============================================================
+7. FR02 — EBITDA IMPROVEMENT WITH CASH DETERIORATION
+============================================================
+
+VERDICT:
+APPROVED WITH CLARIFICATION.
+
+Observed:
+
+EBITDA:
+100,000 → 150,000
+= +50,000
+= +50%
+
+Closing cash:
+200,000 → 80,000
+= -120,000
+= -60%
+
+Explicitly preserve the conceptual distinction:
+
+EBITDA = period performance flow concept.
+
+Closing cash = point-in-time stock.
+
+The coexistence of EBITDA improvement and cash deterioration is an INVESTIGATION SIGNAL, not an explanation.
+
+“Poor EBITDA-to-cash conversion”, “cash-conversion deterioration”, or equivalent causal/quality statements remain UNKNOWN until supported by a reconciled cash-flow bridge.
+
+Do not compute a conversion ratio from these two stock/flow observations alone.
+
+============================================================
+8. FR03 — WORKING CAPITAL DETERIORATION
+============================================================
+
+VERDICT:
+APPROVED WITH CLARIFICATION.
+
+Using the supplied definition:
+
+WC = Receivables + Inventory - Trade Payables
+
+2025:
+200 + 100 - 150 = 150k
+
+2026:
+300 + 100 - 150 = 250k
+
+Therefore:
+
+WC change = +100k.
+
+The +100k increase reconciles arithmetically entirely to the +100k increase in receivables under the supplied definition.
+
+Authorized interpretation:
+
+More financial resources are tied in receivables at closing, and with unchanged revenue this merits investigation of the collection cycle.
+
+However, the economic cause remains UNKNOWN.
+
+Possible causes such as:
+
+- payment speed;
+- billing seasonality;
+- payment terms;
+- year-end sales concentration;
+- cut-off;
+- other operational effects
+
+must not be selected without evidence.
+
+Forbidden conclusions should include:
+
+- customer payment terms deteriorated, without ageing/context;
+- customers are delinquent;
+- 100k of cash was necessarily consumed/lost;
+- 100k is immediately recoverable;
+- mechanical DSO inference without an accepted denominator/convention.
+
+============================================================
+9. FR04 — SEASONALITY / UNEQUAL PERIODS
+============================================================
+
+VERDICT:
+APPROVED WITH CLARIFICATION.
+
+Facts:
+
+FY2025 revenue:
+1.2m / 12 months.
+
+Jan-Mar 2026 revenue:
+450k / 3 months.
+
+These are not directly comparable annual periods.
+
+Do NOT report:
+
+-62.5% annual decline.
+
+Do NOT present:
+
+450k × 4 = 1.8m
+
+as fact or forecast.
+
+A mechanical run-rate may be mathematically calculable, but it is neither an observation nor a forecast.
+
+For V1, it should not be spontaneously presented as a financial conclusion.
+
+If such a run-rate capability is ever exposed, it must be explicitly labelled as mechanical annualization without seasonality and NOT as forecast.
+
+Important additional distinction:
+
+Obtaining Q1 2025 would enable like-for-like Q1 historical comparison.
+
+It would NOT, by itself, establish a reliable FY2026 forecast.
+
+Historical comparability ≠ predictive capability.
+
+============================================================
+10. FR05 — PERIMETER / ACCOUNTING-CONVENTION CHANGE
+============================================================
+
+VERDICT:
+APPROVED WITH CLARIFICATION.
+
+Reported revenue:
+
+2025:
+1.0m — Entity A / local GAAP.
+
+2026:
+1.8m — consolidated A+B after acquisition, with changed revenue-recognition convention.
+
+The arithmetic difference:
+
++800k / +80%
+
+may be shown only if explicitly qualified as NON-COMPARABLE.
+
+It must not become:
+
+- organic growth;
+- like-for-like growth;
+- proof of acquisition impact;
+- same-scope trend.
+
+Two independent comparability dimensions exist:
+
+PERIMETER_CHANGE
+
+and
+
+ACCOUNTING_CONVENTION_CHANGE.
+
+Resolving one does not automatically resolve the other.
+
+Comparability may only be restored when all relevant dimensions have been reconciled/restated with provenance.
+
+A useful future decomposition may be:
+
+reported variation
+→ perimeter effect
+→ accounting-convention effect
+→ comparable residual
+
+but only when each component is supported by governed evidence.
+
+Do not manufacture the residual.
+
+============================================================
+11. FR06 — MISSING PERIOD / INCOMPLETE STATEMENTS
+============================================================
+
+VERDICT:
+APPROVED WITH CLARIFICATION.
+
+Available:
+
+2024 revenue = 900k.
+
+2025 = missing.
+
+2026 revenue = 1.1m.
+2026 EBITDA = 80k.
+
+Cash/debt/liabilities/cash-flow data absent.
+
+A difference between 2024 and 2026 may be calculated:
+
++200k / +22.22%
+
+but must be explicitly described as a difference between two NON-CONSECUTIVE observations.
+
+It must not become 2026-vs-2025 annual growth.
+
+Missing values remain UNKNOWN, never zero.
+
+Positive EBITDA does NOT establish:
+
+- liquidity;
+- solvency;
+- debt-service capacity;
+- overall financial health.
+
+Add explicitly to forbidden conclusions:
+
+inferring solvency, liquidity or debt-service capacity from positive EBITDA alone when required evidence is absent.
+
+============================================================
+12. FR07 — CONFLICTING SOURCES
+============================================================
+
+VERDICT:
+APPROVED WITH CLARIFICATION.
+
+Two sources report the same metric/context:
+
+Revenue 2026 = 1.0m.
+
+Revenue 2026 = 900k.
+
+No source precedence or correction exists.
+
+Required epistemic state:
+
+CONTRADICTION.
+
+Do not:
+
+- average to 950k;
+- silently select one source;
+- apply latest-file-wins;
+- discard one source;
+- produce a canonical revenue value until resolved.
+
+Pepperyn may calculate and present the discrepancy between competing claims:
+
+100k.
+
+But discrepancy measurement is NOT conflict resolution.
+
+The contradiction should propagate to conclusions that depend on the disputed fact.
+
+It should not necessarily invalidate independent facts elsewhere in the dossier.
+
+Important:
+
+AMBIGUOUS ≠ CONTRADICTION.
+
+AMBIGUOUS means meaning cannot be sufficiently established.
+
+CONTRADICTION means multiple claims are sufficiently understood to establish incompatibility.
+
+============================================================
+13. FR08 — ACCOUNTING INCONSISTENCY / SIGN CONVENTION
+============================================================
+
+VERDICT:
+APPROVED WITH CLARIFICATION.
+
+Source states:
+
+Revenue = 1.0m.
+
+COGS = -600k.
+
+Costs use credit-negative presentation.
+
+Gross margin formula = revenue + signed COGS.
+
+Reported gross margin = 1.6m.
+
+Deterministic derivation under the supplied convention:
+
+1.0m + (-600k) = 400k.
+
+Discrepancy with reported gross margin:
+
+1.2m.
+
+Required conceptual separation:
+
+SOURCE FACT:
+Reported gross margin = 1.6m.
+
+DETERMINISTIC DERIVATION:
+Derived gross margin under supplied convention = 400k.
+
+RECONCILIATION STATUS:
+CONTRADICTION.
+
+DISCREPANCY:
+1.2m.
+
+The deterministic result must NOT silently overwrite the source-reported value.
+
+Likewise, source truth must not suppress a deterministic inconsistency.
+
+The unresolved state should survive:
+
+- persistence;
+- temporal history;
+- UI;
+- memory;
+- exports.
+
+Conceptually preserve:
+
+reported value
++ derived value
++ provenance
++ discrepancy
++ CONTRADICTION
++ unresolved status
+
+until governed resolution.
+
+No EBITDA derivation is permitted from the available data.
+
+============================================================
+14. FR09 — INSUFFICIENT EVIDENCE FOR CAUSAL CLAIMS
+============================================================
+
+VERDICT:
+APPROVED WITH CLARIFICATION AND TRANSVERSAL DOCTRINE CONSEQUENCE.
+
+Observed:
+
+EBITDA:
+100k → 50k
+= -50k.
+
+Personnel cost:
+300k → 350k
+= +50k.
+
+The numerical coincidence does NOT establish that personnel cost caused the EBITDA deterioration.
+
+However, Pepperyn should not become intellectually silent.
+
+Authorized reasoning:
+
+The +50k personnel-cost movement may be surfaced as a POTENTIAL FACTOR TO INVESTIGATE because there is a professionally relevant economic mechanism.
+
+Its actual causal contribution remains UNKNOWN until a sufficiently complete EBITDA bridge and relevant context are available.
+
+Therefore:
+
+similarity of numerical movements ≠ proof of causality.
+
+Co-movement + plausible economic mechanism ≠ demonstrated causality.
+
+Even established causality would NOT automatically justify an action such as staff reduction.
+
+Diagnosis ≠ management decision.
+
+A decision would require additional context such as:
+
+- productivity;
+- capacity requirements;
+- growth plans;
+- contractual constraints;
+- restructuring costs;
+- operational consequences;
+- other relevant evidence.
+
+This case is the primary source for the transversal reasoning chain:
+
+OBSERVATION
+→ SIGNAL
+→ HYPOTHESIS
+→ INVESTIGATION
+→ CAUSALITY
+→ ECONOMIC IMPACT
+→ OPTIONS
+→ DECISION.
+
+============================================================
+15. FR10 — MISLEADING CORRELATION
+============================================================
+
+VERDICT:
+APPROVED WITH CLARIFICATION AND TRANSVERSAL DOCTRINE CONSEQUENCE.
+
+Observed:
+
+Revenue:
+2024 800k
+2025 900k
+2026 1.0m
+
+Marketing expense:
+40k
+50k
+60k
+
+A positive co-movement exists.
+
+This may become a SIGNAL worth investigating.
+
+It must NOT become:
+
+Marketing increase → revenue increase.
+
+The hypothesis that marketing contributed to growth may be surfaced as UNVERIFIED.
+
+Causality remains UNKNOWN without attribution/counterfactual/lag/other-driver evidence.
+
+Critically:
+
+100k revenue change / 10k marketing-spend change = 10
+
+may be mathematically calculable.
+
+It is NOT automatically:
+
+- ROI;
+- ROAS;
+- return;
+- causal attribution;
+- incremental revenue multiple.
+
+A professional semantic label may only be applied when the governed conditions defining that concept are satisfied.
+
+Additional invariant:
+
+ESTABLISHED CAUSALITY
+≠
+PROVEN ECONOMIC PROFITABILITY
+≠
+JUSTIFIED RECOMMENDATION.
+
+Even if marketing causality were later demonstrated, increasing the budget would still require relevant economic evidence such as margin, acquisition economics, retention, saturation, timing and other context.
+
+Current implementation constraint:
+
+Marketing expense is outside the current governed metric vocabulary.
+
+Do NOT widen the ontology merely to make FR10 pass.
+
+The current system should honestly refuse unsupported metric interpretation where required.
+
+The professional contract recorded here defines the intended reasoning once the concept is governed.
+
+============================================================
+16. FR11 — LIQUIDITY / RUNWAY / CUSTOMER CONCENTRATION
+============================================================
+
+VERDICT:
+APPROVED WITH CLARIFICATION AND TRANSVERSAL DOCTRINE CONSEQUENCE.
+
+At 31 Dec 2026:
+
+Cash = 60k.
+
+Receivables = 240k.
+
+Current debt = 100k.
+
+Missing:
+
+- burn rate;
+- repayment schedule;
+- cash restrictions;
+- receivables ageing;
+- customer split.
+
+The fact that cash (60k) is below current debt (100k) may constitute a LIQUIDITY INVESTIGATION SIGNAL.
+
+It does NOT establish:
+
+- a 40k liquidity deficit;
+- inability to pay;
+- insolvency.
+
+Current debt does not necessarily mean all 100k is immediately payable.
+
+Likewise:
+
+60k cash + 240k receivables ≠ 300k immediately available liquidity.
+
+Invariant:
+
+ASSET
+≠
+LIQUIDITY
+≠
+IMMEDIATELY AVAILABLE LIQUIDITY.
+
+Receivables must not silently become cash.
+
+Runway remains UNKNOWN without an accepted burn-rate definition and supporting evidence.
+
+Customer concentration also remains UNKNOWN without customer-level distribution.
+
+240k receivables could theoretically be concentrated in one customer or spread across many; the aggregate alone does not establish distribution risk.
+
+Most importantly:
+
+UNKNOWN should, when useful, generate a prioritized request for the minimum missing evidence needed to improve the decision.
+
+For liquidity this may include, according to context:
+
+- debt maturity schedule;
+- cash forecast;
+- cash restrictions;
+- receivables ageing.
+
+For concentration:
+
+- receivables/customer distribution.
+
+Do not automatically request every possible financial dataset.
+
+============================================================
+17. FR12 — CROSS-CLIENT / CROSS-PERIOD / CROSS-TENANT CONTAMINATION
+============================================================
+
+VERDICT:
+APPROVED WITH CLARIFICATION AND ARCHITECTURAL INVARIANT.
+
+Synthetic observations:
+
+T1 / Entity A / 2025 = 100k revenue.
+
+T1 / Entity A / 2026 = 120k revenue.
+
+T1 / Entity B / 2026 = 9m revenue.
+
+T2 / Entity A / 2026 = 8m revenue.
+
+Legitimate temporal comparison for T1/A:
+
+100k → 120k
+= +20k
+= +20%.
+
+T1/B must not contaminate T1/A reasoning despite being accessible within the same tenant.
+
+T2/A must be inaccessible to T1 and must be excluded BEFORE reasoning-context construction.
+
+Do not load cross-tenant evidence and instruct the LLM to ignore it.
+
+Security boundary must precede intelligence boundary.
+
+Authorization and contextual relevance are distinct.
+
+Isolation must apply to:
+
+- facts;
+- sources;
+- derivations;
+- hypotheses;
+- contradictions;
+- temporal history;
+- decisions;
+- actions;
+- memory;
+- citations;
+- UI;
+- exports.
+
+Duplicate current-period evidence must not silently replace another conflicting observation.
+
+Temporal logic must not become a hidden contradiction-resolution mechanism.
+
+A refused read must remain FORBIDDEN.
+
+It must not become EMPTY.
+
+Final FR12 validation requires a real synthetic two-user adversarial proof through the intended topology:
+
+two users
+→ API
+→ DB
+→ RLS
+→ UI
+→ export
+
+A dictionary-filter/mock proof is useful but insufficient for terminal Gate evidence.
+
+No real customer data is authorized for this proof.
+
+============================================================
+18. PROFESSIONAL RELIABILITY PRINCIPLE
+============================================================
+
+The review suggests the following high-level principle for Pepperyn:
+
+Pepperyn should not merely know what it knows.
+
+It should also know:
+
+- what it observed;
+- what changed;
+- whether the observations are comparable;
+- what is merely a signal;
+- what is only a hypothesis;
+- what evidence would test that hypothesis;
+- what causality is actually established;
+- whether established causality is economically material;
+- which actions are supported;
+- what remains unknown;
+- why it remains unknown;
+- what minimum evidence should be obtained next;
+- and exactly which tenant/client/period/source/context every conclusion belongs to.
+
+The purpose is NOT maximal refusal.
+
+The purpose is professionally bounded usefulness.
+
+A strong CFO does not invent certainty.
+
+But a strong CFO also does not respond to every incomplete dossier with “insufficient information”.
+
+The system should help direct professional attention while preserving the boundary between what is known, inferred, hypothesized, unresolved and decided.
+
+============================================================
+19. REQUIRED NEXT ACTION
+============================================================
+
+Please now:
+
+1. Integrate this independent review into the Casebook and/or the appropriate canonical doctrine files without weakening existing invariants.
+
+2. Preserve the distinction between:
+   - scenario-specific expected-result contracts;
+   - transversal professional reasoning doctrine;
+   - current implementation reality;
+   - future intended capability.
+
+3. Do NOT mark the Financial Reliability Gate PASS.
+
+4. Do NOT treat these approved expected-result contracts as evidence that Pepperyn itself already behaves correctly.
+
+5. Freeze/version the professionally reviewed expected-result contracts so they can serve as the oracle for subsequent execution.
+
+6. Identify any contradictions between this review and current Canon/Profession Model rather than silently resolving them.
+
+7. Identify which expectations are:
+   - already executable with the current governed vocabulary and architecture;
+   - expected to produce a governed refusal because capability is intentionally absent;
+   - not yet technically testable without additional implementation.
+
+8. Prepare the machine-readable synthetic fixtures and expected-result contracts required for execution, preserving source hashes/revisions/provenance.
+
+9. Do NOT use the expected result to hard-code or teach the implementation how to pass an individual scenario. The Casebook must test generalized professional reasoning/invariants, not scenario-specific pattern matching.
+
+10. Before executing the Financial Reliability Gate, report back:
+    - what Canon/Casebook changes were made;
+    - what new transversal invariants were formalized;
+    - any conflicts or unresolved questions discovered;
+    - the frozen Casebook revision/hash;
+    - the execution-readiness classification of FR01–FR12;
+    - the proposed execution protocol;
+    - whether any Founder decision is genuinely required.
+
+Do not ask the Founder to arbitrate implementation details that can be resolved from the Canon, this review, professional accounting/finance semantics, or established engineering/security best practices.
+
+Continue autonomously on reversible technical/documentation work.
+
+Stop only for a genuinely material Founder decision, an invariant conflict that cannot be resolved without changing WHY, or a durability checkpoint requiring normal Windows Git access.
+
+External Provider remains CLOSED.
+Real-data Admission remains CLOSED.
+No real customer data.
+Self-Selling remains DEFERRED.
