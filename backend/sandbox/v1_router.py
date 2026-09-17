@@ -29,6 +29,7 @@ from sandbox.v1_prerequisite_evidence import (
     PrerequisiteEvidenceRefused, load_validated_prerequisite_evidence,
 )
 from sandbox.synthetic_product import SandboxRefused
+from sandbox import source_dossiers
 
 router = APIRouter(prefix="/api/v1", tags=["v1-synthetic"])
 logger = logging.getLogger(__name__)
@@ -187,6 +188,62 @@ async def inspect_v1_synthetic_workbook(
             status_code=400,
             detail="Fichier refusé : sélectionnez uniquement un classeur synthétique V1 enregistré.",
         ) from exc
+
+
+async def _source_dossier_access(authorization, x_auth_type):
+    if os.getenv("ENVIRONMENT") != "development" or os.getenv("PEPPERYN_ENABLE_SYNTHETIC_V1_DEMO") != "1":
+        raise HTTPException(status_code=404, detail="Ressource introuvable")
+    company_id, _, _ = await analyze_routes._resolve_auth(authorization, x_auth_type)
+    _require_designated_company(company_id)
+    from main import get_supabase_service
+    try:
+        return get_supabase_service(), company_id
+    except Exception:
+        raise HTTPException(status_code=503, detail="Dossiers sources indisponibles") from None
+
+
+def _source_dossier_error(exc):
+    code = 404 if str(exc) == "NOT_FOUND" else 503
+    return HTTPException(status_code=code, detail="Dossier source introuvable" if code == 404 else "Dossiers sources indisponibles")
+
+
+@router.post("/synthetic-source-dossiers")
+async def capture_source_dossier(
+    file: UploadFile = File(...), entity_id: str = Form(...),
+    authorization: Optional[str] = Header(default=None), x_auth_type: Optional[str] = Header(default=None),
+):
+    db, company_id = await _source_dossier_access(authorization, x_auth_type)
+    raw = await file.read(1_000_001)
+    if len(raw) > 1_000_000:
+        raise HTTPException(status_code=413, detail="Classeur synthétique trop volumineux")
+    try:
+        return source_dossiers.capture_dossier(db, company_id=company_id, entity_id=entity_id,
+                                              raw=raw, filename=file.filename or "")
+    except source_dossiers.SourceDossierRefused as exc:
+        raise _source_dossier_error(exc) from None
+    except SandboxRefused:
+        raise HTTPException(status_code=400, detail="Classeur synthétique enregistré requis") from None
+
+
+@router.get("/synthetic-source-dossiers")
+async def list_source_dossiers(entity_id: str, authorization: Optional[str] = Header(default=None),
+                              x_auth_type: Optional[str] = Header(default=None)):
+    db, company_id = await _source_dossier_access(authorization, x_auth_type)
+    try:
+        return source_dossiers.list_dossiers(db, company_id=company_id, entity_id=entity_id)
+    except source_dossiers.SourceDossierRefused as exc:
+        raise _source_dossier_error(exc) from None
+
+
+@router.get("/synthetic-source-dossiers/{dossier_id}")
+async def read_source_dossier(dossier_id: str, entity_id: str,
+                              authorization: Optional[str] = Header(default=None),
+                              x_auth_type: Optional[str] = Header(default=None)):
+    db, company_id = await _source_dossier_access(authorization, x_auth_type)
+    try:
+        return source_dossiers.load_dossier(db, company_id=company_id, entity_id=entity_id, dossier_id=dossier_id)
+    except source_dossiers.SourceDossierRefused as exc:
+        raise _source_dossier_error(exc) from None
 
 
 @router.post("/synthetic-workbook-analysis", response_model=AnalyzeResponse)
