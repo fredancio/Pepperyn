@@ -463,3 +463,27 @@ Status LOCAL_FROZEN / STRUCTURAL_CHECKS_PASS / NOT_CHECKPOINTED / EXECUTION_NOT_
 Stop before gate execution and report protocol/readiness. A scoped durability
 checkpoint is appropriate before using this immutable oracle in later implementation.
 External Provider CLOSED; Real-data Admission CLOSED; Self-Selling DEFERRED.
+
+## A18/A19 — source consistency and bounded financial measurement — 2026-09-17
+
+Previous A15/A17 durability confirmed by Founder; actual inspected HEAD and local
+origin tracking ref `a2b0c782125bcbdca188bb688a3e4a9f634c8c03`, initially clean.
+The shortened hash in the Founder message is not used in checkpoint preconditions.
+A18/A19 are LOCAL_TESTED / NOT_CHECKPOINTED, not live/production or full gate proof.
+
+A18 replaces conflict-as-ambiguity loss with retained source claims and exact
+references, distinct CONTRADICTION, discrepancy measurement and investigation in
+synthetic inspection/chat. No contradictory canonical facts or provider admission.
+A19 implements pure explicit-definition signed-sum reconciliation with separate
+reported/derived/discrepancy values and bounded UNKNOWN requests. Caller ownership
+and definition authority are not established by this internal arithmetic function.
+
+175 targeted/regression backend tests PASS; 104 frontend tests PASS; TypeScript
+no-emit PASS. FR07/FR08 frozen-input component runner executed without provider,
+DB write, real data or new analysis. Numeric outputs match separate frozen oracle
+checks; professional/full-case approval remains absent. Source and full scope:
+`docs/Product/FinancialReliability/consistency-component-evidence-A18-A19.md`.
+
+Next: ownership-bound durable unresolved findings and terminal integration, not
+more speculative reasoning or redundant arithmetic tests. Provider/RD CLOSED;
+Self-Selling DEFERRED. Preserve original frozen review artifacts unchanged.

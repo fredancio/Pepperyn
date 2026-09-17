@@ -101,3 +101,10 @@ Preparation ran artifact integrity/schema falsifications ONLY (eight tests), zer
 financial analyses. Source/period/scope references and frozen hashes are validated,
 not Pepperyn's financial conclusions. Gate remains OPEN / NOT EXECUTED / NOT PASS.
 The execution protocol is in `casebook-v2.md`; report precedes any gate execution.
+
+2026-09-17 A18/A19 supersedes the NOT EXECUTED preparation snapshot only for
+FR07/FR08 bounded local components. Their numerical outputs match the frozen
+contracts; no complete case, professional output review or Financial Reliability
+Gate PASS is claimed. Terminal persistence/export and governed definition authority
+remain missing. Full gate stays OPEN_NOT_PASS. Exact evidence and limitations:
+`docs/Product/FinancialReliability/consistency-component-evidence-A18-A19.md`.

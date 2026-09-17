@@ -202,3 +202,13 @@ newly implemented engine. Synthetic input/expected-result artifacts and integrit
 checker are PREPARED / STRUCTURALLY_TESTED; financial execution NOT_STARTED.
 Source: `docs/Product/FinancialReliability/casebook-v2.md`, full review and frozen
 manifest. No ontology widening, self-certified financial answer or gate promotion.
+
+A18/A19 (2026-09-17): source contradiction inspection is IMPLEMENTED / LOCAL_TESTED:
+retain conflicting and independent source claims without canonical promotion;
+measure discrepancy without resolving it; preserve references to chat consumption.
+Signed reported/derived reconciliation is IMPLEMENTED / COMPONENT_TESTED ONLY:
+explicit definition and same-scope inputs; UNKNOWN requests; conflict dependency
+refusal; no semantic/causal/economic/decision promotion. Production definition
+authority and durable contradiction lifecycle remain unproven. FR07/FR08 local
+component outputs are not full-case PASS. Source/evidence:
+`docs/Product/FinancialReliability/consistency-component-evidence-A18-A19.md`.

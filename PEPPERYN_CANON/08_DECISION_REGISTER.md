@@ -36,3 +36,10 @@ opening, no ontology expansion for FR10, no scenario-specific production teachin
 This register records high-level current decisions. The detailed append-only
 project-control journal and Strategic Deferred Work Register remain evidence
 sources and must be consulted before changing a related capability.
+
+DEC-023 (HOW, A18/A19): retain source contradictions and reconcile explicitly
+reported/derived values without changing stored successful envelopes or provider
+admission. Reconciliation stays internal until governed source/definition authority
+and durable terminal integration are proven. Local FR-EXPECTED-2 measurements are
+component evidence, not self-certification of the Financial Reliability Gate.
+WHY remains PR-01..PR-08; no Founder doctrine change.

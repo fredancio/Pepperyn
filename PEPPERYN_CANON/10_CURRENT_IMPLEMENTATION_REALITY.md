@@ -117,3 +117,15 @@ The long project-control journal is evidence-rich but cumulative. Every status
 in this Canon must be checked against current code/tests and the exact live
 proof before Astra acts on it. Historical test counts prove the recorded
 revision and bounded suite, not all future revisions.
+
+## Current A18/A19 delta — 2026-09-17
+
+Supersedes earlier A17 snapshots above: FR-EXPECTED-2 and A15/A17 are checkpointed
+at inspected HEAD `a2b0c782125bcbdca188bb688a3e4a9f634c8c03`; Founder reports remote
+synchronization and prior clean tree. A18/A19 are LOCAL_TESTED / NOT_CHECKPOINTED.
+Source conflicts retain claims as CONTRADICTION in bounded synthetic inspection,
+not AMBIGUOUS merely for conflict. Signed-sum reconciliation exists as an internal
+component, not a production-authorized service. FR07/FR08 component outputs have
+executed locally; full cases and Financial Reliability Gate remain OPEN_NOT_PASS.
+No persistence/export/browser/live/professional output validation is implied. See
+`docs/Product/FinancialReliability/consistency-component-evidence-A18-A19.md`.
