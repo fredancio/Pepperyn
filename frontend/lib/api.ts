@@ -141,9 +141,14 @@ export async function runV1SyntheticDemo() {
 export type V1SyntheticWorkbookInspection = {
   filename: string;
   source_sha256: string;
-  status: 'UNDERSTOOD' | 'AMBIGUOUS' | 'INSUFFICIENT';
+  status: 'UNDERSTOOD' | 'AMBIGUOUS' | 'INSUFFICIENT' | 'CONTRADICTION';
   current_period: string | null;
   facts: Array<{ metric: string; value: number; unit: string }>;
+  source_claims?: Array<{ fact_id: string; metric: string; value: number; unit: string;
+    period: string; source_sheet_ref: string; source_field: string }>;
+  conflicting_metrics?: string[];
+  discrepancies?: Array<{ metric: string; claim_ids: string[]; absolute_spread: string;
+    interpretation: 'DISCREPANCY_NOT_RESOLUTION' }>;
   unknowns: string[];
   provider_dispatch: 'CLOSED';
 };

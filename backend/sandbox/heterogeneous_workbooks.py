@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal, localcontext
+
 import hashlib
 from dataclasses import dataclass
 from typing import Any, Mapping
@@ -68,9 +70,32 @@ def inspect_registered_workbook(raw: bytes, filename: str) -> dict[str, Any]:
     return {
         "filename": filename,
         "source_sha256": digest,
+        **summarize_understanding(understanding),
+    }
+
+
+def summarize_understanding(understanding: UnderstandingResult) -> dict[str, Any]:
+    """Read-only presentation; retained conflicting claims are never canonical facts."""
+    def spread(metric: str) -> str:
+        values = [Decimal(str(fact.value)) for fact in understanding.facts if fact.metric == metric]
+        with localcontext() as arithmetic:
+            arithmetic.prec = max(28, max(v.adjusted() for v in values) - min(v.as_tuple().exponent for v in values) + 3)
+            return str(max(values) - min(values))
+
+    return {
         "status": understanding.status,
         "current_period": understanding.current_period,
-        "facts": [fact.model_dump(mode="json") for fact in understanding.facts],
+        "facts": [fact.model_dump(mode="json") for fact in understanding.facts]
+        if understanding.status == "UNDERSTOOD" else [],
+        "source_claims": [fact.model_dump(mode="json") for fact in understanding.facts]
+        if understanding.status == "CONTRADICTION" else [],
+        "conflicting_metrics": list(understanding.conflicting_metrics),
+        "discrepancies": [{
+            "metric": metric,
+            "claim_ids": [fact.fact_id for fact in understanding.facts if fact.metric == metric],
+            "absolute_spread": spread(metric),
+            "interpretation": "DISCREPANCY_NOT_RESOLUTION",
+        } for metric in understanding.conflicting_metrics],
         "unknowns": list(understanding.unknowns),
         "provider_dispatch": "CLOSED",
     }

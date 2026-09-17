@@ -99,15 +99,19 @@ def test_mixed_supported_and_unsupported_financial_rows_disclose_partial_scope()
         }, model="gpt-test")
 
 
-def test_conflicting_duplicate_metric_is_ambiguous():
+def test_conflicting_duplicate_metric_preserves_both_claims_without_resolution():
     result = build_financial_understanding({
         "temporal_context": {"columns_by_role": {"CURRENT_ACTUAL": ["2025"]}},
         "sheets": [{"sheet_name": "P&L", "columns": ["Label", "2025"], "full_table": [
             {"Label": "Revenue", "2025": 1000}, {"Label": "Net sales", "2025": 900},
         ]}],
     })
-    assert result.status == "AMBIGUOUS"
+    assert result.status == "CONTRADICTION"
     assert "Conflicting values" in result.unknowns[0]
+    assert {fact.value for fact in result.facts} == {1000, 900}
+    assert result.conflicting_metrics == ("REVENUE",)
+    with pytest.raises(ValueError, match="cannot be UNDERSTOOD"):
+        UnderstandingResult.model_validate({**result.model_dump(), "status": "UNDERSTOOD"})
 
 
 def test_identity_or_instruction_bearing_period_is_not_disclosed():

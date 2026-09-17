@@ -61,7 +61,7 @@ def test_route_accepts_registered_workbook_and_rejects_changed_identity(monkeypa
     assert renamed.status_code == unknown.status_code == 400
 
 
-def test_route_preserves_all_three_fail_closed_ambiguities(monkeypatch):
+def test_route_distinguishes_conflict_from_ambiguity_without_promoting_claims(monkeypatch):
     _enable(monkeypatch)
     filenames = [
         "pepperyn_v1_heterogeneous_ambiguous_period.xlsx",
@@ -78,8 +78,18 @@ def test_route_preserves_all_three_fail_closed_ambiguities(monkeypatch):
 
     responses = asyncio.run(exercise())
     assert all(response.status_code == 200 for response in responses)
-    assert all(response.json()["status"] == "AMBIGUOUS" for response in responses)
+    assert [response.json()["status"] for response in responses] == ["AMBIGUOUS", "AMBIGUOUS", "CONTRADICTION"]
     assert all(response.json()["facts"] == [] for response in responses)
+    conflict = responses[-1].json()
+    assert conflict["conflicting_metrics"]
+    assert len(conflict["source_claims"]) >= 2
+    for discrepancy in conflict["discrepancies"]:
+        claims = [c for c in conflict["source_claims"] if c["metric"] == discrepancy["metric"]]
+        assert set(discrepancy["claim_ids"]) == {c["fact_id"] for c in claims}
+        assert discrepancy["interpretation"] == "DISCREPANCY_NOT_RESOLUTION"
+        assert float(discrepancy["absolute_spread"]) == max(c["value"] for c in claims) - min(c["value"] for c in claims)
+    assert all(claim["source_field"] and claim["source_sheet_ref"] and claim["fact_id"]
+               for claim in conflict["source_claims"])
     assert all(response.json()["unknowns"] for response in responses)
     assert all(response.json()["provider_dispatch"] == "CLOSED" for response in responses)
 

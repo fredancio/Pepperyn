@@ -30,7 +30,7 @@ CASES = {
     ),
     "pepperyn_v1_heterogeneous_conflict.xlsx": (
         "176F8F1A9E6A20B61E61C773AD54000D1D91E769B84C99BD2DA7B8ACB038D7E5",
-        "AMBIGUOUS",
+        "CONTRADICTION",
     ),
 }
 
@@ -126,7 +126,10 @@ def test_unsafe_workbooks_preserve_specific_unknown_and_forbid_provider_request(
 ):
     _, _, _, anonymized, understanding = _actual_pipeline(filename)
     assert expected_unknown in understanding.unknowns
-    assert understanding.facts == ()
+    if understanding.status == "CONTRADICTION":
+        assert understanding.conflicting_metrics and understanding.facts
+    else:
+        assert understanding.facts == ()
     with pytest.raises(ValueError, match="provider dispatch forbidden"):
         build_openai_request(anonymized, model="gpt-test")
 

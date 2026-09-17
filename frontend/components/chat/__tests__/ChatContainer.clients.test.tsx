@@ -24,6 +24,25 @@ beforeEach(() => {
   (api.fetchBillingUsage as jest.Mock).mockResolvedValue(null);
 });
 
+test('source conflict reaches chat with both references and never triggers a mock analysis', async () => {
+  (api.fetchEntities as jest.Mock).mockResolvedValue([]);
+  (api.inspectV1SyntheticWorkbook as jest.Mock).mockResolvedValue({
+    status: 'CONTRADICTION', facts: [], unknowns: [], conflicting_metrics: ['REVENUE'],
+    source_claims: [721, 804].map((value, i) => ({ fact_id: `F${i}`, metric: 'REVENUE',
+      value, unit: 'EUR', period: '2031', source_sheet_ref: 'S1', source_field: `R${i}` })),
+  });
+  render(<ChatContainer />);
+  await screen.findByText('Aucun client enregistré.');
+  const input = screen.getByText('Tester un classeur synthétique V1 enregistré').previousElementSibling as HTMLInputElement;
+  fireEvent.change(input, { target: { files: [new File(['synthetic'], 'fixture.xlsx')] } });
+  const message = await screen.findByText(/Contradiction de sources/);
+  expect(message).toHaveTextContent('721 EUR'); expect(message).toHaveTextContent('804 EUR');
+  expect(message).toHaveTextContent('F0 / S1 / R0'); expect(message).toHaveTextContent('F1 / S1 / R1');
+  expect(message).toHaveTextContent('Aucun appel fournisseur');
+  expect(api.analyzeV1SyntheticWorkbook).not.toHaveBeenCalled();
+  expect(api.analyzeFile).not.toHaveBeenCalled();
+});
+
 test('unavailable list has no fictitious primary client and retry only reads', async () => {
   (api.fetchEntities as jest.Mock).mockRejectedValueOnce(new Error('private')).mockResolvedValueOnce([]);
   render(<ChatContainer />);

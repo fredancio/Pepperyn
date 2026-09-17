@@ -42,11 +42,19 @@ class SourceFact(_ClosedModel):
 
 
 class UnderstandingResult(_ClosedModel):
-    status: Literal["UNDERSTOOD", "AMBIGUOUS", "INSUFFICIENT"]
+    status: Literal["UNDERSTOOD", "AMBIGUOUS", "INSUFFICIENT", "CONTRADICTION"]
     current_period: str | None = None
     facts: tuple[SourceFact, ...] = Field(default=(), max_length=250)
     unknowns: tuple[str, ...] = Field(default=(), max_length=20)
     source_representation_sha256: str = Field(pattern=r"^[A-F0-9]{64}$")
+
+    @property
+    def conflicting_metrics(self) -> tuple[str, ...]:
+        """Source claims, not a resolution. Keep successful serialized envelopes unchanged."""
+        values: dict[str, set[int | float]] = {}
+        for fact in self.facts:
+            values.setdefault(fact.metric, set()).add(fact.value)
+        return tuple(sorted(metric for metric, claims in values.items() if len(claims) > 1))
 
     @model_validator(mode="after")
     def require_safe_state(self) -> "UnderstandingResult":
@@ -54,6 +62,10 @@ class UnderstandingResult(_ClosedModel):
             raise ValueError("UNDERSTOOD requires a current period and source facts")
         if self.status != "UNDERSTOOD" and not self.unknowns:
             raise ValueError("ambiguous/insufficient understanding requires explicit unknowns")
+        if self.status == "UNDERSTOOD" and self.conflicting_metrics:
+            raise ValueError("conflicting source claims cannot be UNDERSTOOD")
+        if self.status == "CONTRADICTION" and not self.conflicting_metrics:
+            raise ValueError("CONTRADICTION requires incompatible source claims")
         ids = [fact.fact_id for fact in self.facts]
         if len(ids) != len(set(ids)):
             raise ValueError("fact ids must be unique")
@@ -357,8 +369,16 @@ def build_financial_understanding(parsed_data: Mapping[str, Any]) -> Understandi
     by_metric: dict[str, set[int | float]] = {}
     for fact in facts:
         by_metric.setdefault(fact.metric, set()).add(fact.value)
-    if any(len(values) > 1 for values in by_metric.values()):
+    has_conflict = any(len(values) > 1 for values in by_metric.values())
+    if has_conflict:
         ambiguities.append("Conflicting values exist for a governed metric in the current period.")
+    if has_conflict and len(facts) <= 250:
+        # Preserve recognized claims, including independent ones, for inspection only.
+        # Other unresolved ambiguities remain explicit; no claim is silently selected.
+        return UnderstandingResult(
+            status="CONTRADICTION", current_period=current_column, facts=tuple(facts),
+            unknowns=tuple(ambiguities), source_representation_sha256=digest,
+        )
     if ambiguities:
         return UnderstandingResult(status="AMBIGUOUS", current_period=current_column, unknowns=tuple(ambiguities), source_representation_sha256=digest)
     if not facts:

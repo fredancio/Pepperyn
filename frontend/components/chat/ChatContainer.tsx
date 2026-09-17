@@ -3,6 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { Message, Session } from '@/lib/types';
+import { syntheticInspectionSummary } from '@/lib/synthetic-inspection-summary';
 import { useClientHistory } from './useClientHistory';
 import { analyzeFile, analyzeText, analyzeV1SyntheticWorkbook, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, fetchPreviousRecommendations, fetchConversationContext, runV1SyntheticDemo, inspectV1SyntheticWorkbook, fetchV1GovernedAnalysis, type BillingUsage, type Entity, type EntityRelationType } from '@/lib/api';
 import { getCurrentAuthMode, signOutAdmin, clearGuestAuth, getGuestPlan } from '@/lib/auth';
@@ -292,9 +293,7 @@ export function ChatContainer() {
     try {
       const result = await inspectV1SyntheticWorkbook(file);
       if (!active()) return;
-      const detail = result.status === 'UNDERSTOOD'
-        ? `Compréhension établie pour ${result.current_period} : ${result.facts.length} faits gouvernés.`
-        : `Compréhension ${result.status.toLowerCase()} : ${result.unknowns.join(' ')}`;
+      const detail = syntheticInspectionSummary(result);
       setMessages(prev => [...prev,
         makeLocalMessage('user', file.name, 'file'),
         makeLocalMessage('assistant', `Inspection synthétique V1 — ${detail} Aucun appel fournisseur n’a été effectué.`, 'text'),
