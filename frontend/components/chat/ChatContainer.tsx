@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import type { Message, Session } from '@/lib/types';
 import { syntheticInspectionSummary } from '@/lib/synthetic-inspection-summary';
+import { SourceDossiers } from './SourceDossiers';
 import { useClientHistory } from './useClientHistory';
 import { analyzeFile, analyzeText, analyzeV1SyntheticWorkbook, fetchAnalysesHistory, fetchBillingUsage, fetchEntities, createEntity, deleteAnalysesHistory, fetchPreviousRecommendations, fetchConversationContext, runV1SyntheticDemo, inspectV1SyntheticWorkbook, fetchV1GovernedAnalysis, type BillingUsage, type Entity, type EntityRelationType } from '@/lib/api';
 import { getCurrentAuthMode, signOutAdmin, clearGuestAuth, getGuestPlan } from '@/lib/auth';
@@ -1189,6 +1190,8 @@ export function ChatContainer() {
                       Analyser le classeur English via le fournisseur simulé
                     </button>
                     <p className="text-center text-xs text-[#5F6368]">Tout autre fichier est refusé · appel fournisseur fermé</p>
+                    {process.env.NEXT_PUBLIC_ENABLE_SYNTHETIC_SOURCE_DOSSIERS === '1' &&
+                      <SourceDossiers entityId={selectedEntityId} />}
                   </div>
                 )}
 

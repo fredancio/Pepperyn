@@ -43,3 +43,10 @@ admission. Reconciliation stays internal until governed source/definition author
 and durable terminal integration are proven. Local FR-EXPECTED-2 measurements are
 component evidence, not self-certification of the Financial Reliability Gate.
 WHY remains PR-01..PR-08; no Founder doctrine change.
+
+DEC-024 (HOW, A20/A21): preserve unresolved source inspections separately from
+UNDERSTOOD-only analyses. Do not repurpose V18's analysis-dependent nonblocking
+capture or V24 human-confirmed knowledge. Initial storage/HTTP/UI slice admits only
+existing registered synthetic workbooks; no real-data/provider gate change. V35
+must be deployment-tested before live durability claims. Source dossier is a scoped
+technical evidence snapshot, not a new professional decision/outcome concept.

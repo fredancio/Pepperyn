@@ -129,3 +129,10 @@ component, not a production-authorized service. FR07/FR08 component outputs have
 executed locally; full cases and Financial Reliability Gate remain OPEN_NOT_PASS.
 No persistence/export/browser/live/professional output validation is implied. See
 `docs/Product/FinancialReliability/consistency-component-evidence-A18-A19.md`.
+
+A20/A21 superseding status: A18/A19 are durably checkpointed at
+`b3f59e2fb0c5e6b50872b1d32a9beb4fef978ae5` (Founder remote confirmation).
+Synthetic source dossiers now have implementation and local mock/HTTP/UI tests,
+separate from completed analyses and confirmed knowledge. V35 is NOT DEPLOYED;
+new frontend feature OFF by default. No live persistence/RLS or full financial
+reliability claim. Details: `docs/Product/FinancialReliability/source-dossier-evidence-A20-A21.md`.

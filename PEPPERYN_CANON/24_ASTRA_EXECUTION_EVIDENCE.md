@@ -487,3 +487,25 @@ checks; professional/full-case approval remains absent. Source and full scope:
 Next: ownership-bound durable unresolved findings and terminal integration, not
 more speculative reasoning or redundant arithmetic tests. Provider/RD CLOSED;
 Self-Selling DEFERRED. Preserve original frozen review artifacts unchanged.
+
+## A20/A21 — scoped source dossiers and terminal reloading
+
+A18/A19 durable commits confirmed by Founder: `f8e01977be010e151925ac6df1c65db67c392511`
+and `b3f59e2fb0c5e6b50872b1d32a9beb4fef978ae5`; local HEAD/clean tree verified.
+A20/A21 remain LOCAL_TESTED / NOT_CHECKPOINTED / V35_NOT_DEPLOYED.
+
+Distinct synthetic source snapshots preserve contradictions independently of V27
+analyses, historical V18 capture and V24 confirmed knowledge. Entity/engagement
+ownership, insert-only/idempotent capture, source hashes and schema are checked;
+no provider, new governed analysis, canonical-value selection or decision write.
+Explicit UI capture and scoped reload are behind an additional OFF-by-default flag.
+
+389 backend PASS / 2 absent-real-file SKIP; 111 frontend PASS; TypeScript PASS.
+Mock store reconstruction and HTTP/component proofs only; no actual PostgreSQL/RLS,
+live restart, browser E2E or professional gate proof. V35 SQL was not executed.
+No reachable local Docker daemon; no external account or credentials changed.
+
+Full scope, inherited design reconciliation, limitations and conditional integration
+protocol: `docs/Product/FinancialReliability/source-dossier-evidence-A20-A21.md`.
+Persisted arithmetic reconciliation/definition authority, temporal/exports/memory
+propagation remain open. FR-EXPECTED-2 unchanged. Provider/RD CLOSED; Self-Selling DEFERRED.

@@ -212,3 +212,10 @@ refusal; no semantic/causal/economic/decision promotion. Production definition
 authority and durable contradiction lifecycle remain unproven. FR07/FR08 local
 component outputs are not full-case PASS. Source/evidence:
 `docs/Product/FinancialReliability/consistency-component-evidence-A18-A19.md`.
+
+A20/A21: unresolved synthetic source dossier capture/reload is IMPLEMENTED /
+LOCAL_MOCK_HTTP_UI_TESTED / NOT_DEPLOYED. WHY: source contradictions must survive
+without pretending to be completed analyses or confirmed interpretations. V35
+preserves tenant/entity/engagement scope and immutability; existing V18/V24/V27
+semantics unchanged. No full persistence/exports/professional gate PASS. See
+`docs/Product/FinancialReliability/source-dossier-evidence-A20-A21.md`.

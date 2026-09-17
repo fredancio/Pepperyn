@@ -108,3 +108,9 @@ contracts; no complete case, professional output review or Financial Reliability
 Gate PASS is claimed. Terminal persistence/export and governed definition authority
 remain missing. Full gate stays OPEN_NOT_PASS. Exact evidence and limitations:
 `docs/Product/FinancialReliability/consistency-component-evidence-A18-A19.md`.
+
+A20/A21 implements synthetic unresolved-source snapshot capture/reload and UI with
+local mock/HTTP/component tests. V35 has not executed; live durability/RLS, persisted
+reported/derived reconciliation and full temporal/memory/export propagation remain
+unproven. This narrows an implementation gap without closing FR07/FR08 or this gate.
+See `docs/Product/FinancialReliability/source-dossier-evidence-A20-A21.md`.
