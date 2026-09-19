@@ -509,3 +509,60 @@ Full scope, inherited design reconciliation, limitations and conditional integra
 protocol: `docs/Product/FinancialReliability/source-dossier-evidence-A20-A21.md`.
 Persisted arithmetic reconciliation/definition authority, temporal/exports/memory
 propagation remain open. FR-EXPECTED-2 unchanged. Provider/RD CLOSED; Self-Selling DEFERRED.
+
+## V35 bounded live proof — 2026-09-18
+
+A20/A21 checkpoints confirmed: `bca16876fba1c08f6265f3880eb6513c410ae0e5`,
+`4eede4adc1de11f5e6ea669be8dcec07cc3144c6`. Founder applied V35 once, inspected
+configuration read-only and captured one registered conflict source. Explicit
+detail GET after restart (new PID 10700) returned 200 with unchanged claims and
+noncanonical semantics; no new POST. Evidence attribution, exact dossier/entity,
+references, limits and local JWT recovery/rotation record:
+`docs/Product/FinancialReliability/source-dossier-evidence-A20-A21.md`.
+
+This closes only the tested synthetic live persistence debt. Not actual RLS
+adversarial execution, cross-client proof, professional review, or production.
+The observed retained-detail ambiguity motivates a bounded local UI correction:
+clear old detail when refreshing list so an outage cannot appear to revalidate it.
+No new analysis, canonical fact, provider use or live write by the agent.
+Local correction validation: 112 frontend tests PASS / 15 suites; TypeScript PASS.
+Working-tree-only code/docs delta, not yet checkpointed. Pre-existing generated
+`frontend/next-env.d.ts` change preserved and excluded from this slice.
+
+## A22 — source clarification portfolio — 2026-09-18
+
+Independent read-only synthetic source section complements decisions without
+creating arcs or prioritization claims. Bound 100 verified dossiers; foreign,
+corrupt, duplicate, unavailable or unauthorized evidence fails closed. Two-client
+mock separation, HTTP closed-mode and component/API falsifications PASS.
+398 backend PASS / 2 absent-real-file SKIP; 115 frontend PASS / 16 suites;
+TypeScript PASS. LOCAL_TESTED / NOT_CHECKPOINTED, no live query or write by agent.
+No FR-EXPECTED-2 edit, provider call, real data or production activation.
+Full before/after/rationale/debt: `docs/Product/FinancialReliability/source-attention-evidence-A22.md`.
+
+2026-09-19 recorded live update: agent browser read-only navigation after Founder
+backend restart observed A22 source card separate from empty decision register,
+correct entity link, exact V35 dossier and references, and no stale selected detail
+after list refresh. One-client UI path PASS, not network/DB audit or adversarial
+multi-user isolation. No capture/analysis/write control used; no gate change.
+See dated live section in the evidence document above. Local code/docs not committed.
+
+## A23 - temporal context through terminal exports - 2026-09-19
+
+Added owned temporal-service composition to authenticated governed XLSX/PDF/PPTX
+exports, without new persistence or reinterpretation. Previous/current analysis IDs,
+fact IDs, values, units and unknown/contradiction boundaries survive. Historical
+outage/integrity failure refuses export. Financial comparability remains unestablished.
+
+21 new local actual-byte/HTTP falsification cases; regression selection including
+temporal modules: 461 PASS / 2 absent-real-file SKIP. Frontend 115 PASS / 16 suites;
+TypeScript no-emit and frozen FR-EXPECTED-2 integrity PASS. Bounded synthetic PDF pages,
+XLSX temporal sheet and PPTX temporal slides rendered and visually inspected.
+No live DB/provider/write or new Founder analysis requested. NOT_CHECKPOINTED.
+Evidence and explicit limits: `docs/Product/FinancialReliability/temporal-export-evidence-A23.md`.
+
+V35 closeout/A22 and A23 form the next meaningful durability batch. Shared router
+and canonical records are checkpointed coherently; unrelated generated
+frontend/next-env.d.ts remains preserved and excluded. Wider beta isolation,
+professional financial validation, admitted-data Golden workflow and production
+gates remain open. External Provider/RD CLOSED; Self-Selling DEFERRED.

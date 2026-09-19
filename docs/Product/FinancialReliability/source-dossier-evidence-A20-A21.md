@@ -87,3 +87,61 @@ review of complete outputs. No FR07/FR08 full-case or Financial Reliability Gate
 
 Do not apply migration or perform capture merely because this protocol exists.
 External Provider CLOSED; Real-data Admission CLOSED; Self-Selling DEFERRED.
+
+## Superseding integration evidence — 2026-09-18
+
+A20/A21 implementation is checkpointed at `bca16876fba1c08f6265f3880eb6513c410ae0e5`
+and `4eede4adc1de11f5e6ea669be8dcec07cc3144c6`. Founder confirmed push/synchronization;
+local HEAD verified. Earlier NOT_CHECKPOINTED / NOT_DEPLOYED statements above are
+historical snapshots, superseded only within the following explicit scope.
+
+Evidence source: Founder-run SQL, backend logs and visual observations reported in
+this task, not an independently captured agent browser/DB session.
+
+- V35 applied once in Pepperyn Integration Test: Success. No rows returned.
+- Read-only preflight all checks true; project selection confirmed by Founder.
+- Postflight: nine validated constraints; RLS enabled; zero policies; anon and
+  authenticated have no table privileges; service_role SELECT/INSERT only;
+  immutable trigger present; initial dossier count zero. These are configuration
+  observations, not adversarial RLS or effective mutation-denial execution proof.
+- Explicit client: Optilux Synthetic Internal Pilot, entity
+  `dfd01f5c-a095-4fcb-8873-ccc3f427d348`. Initial empty list GET 200 and disabled save
+  observed. File selection alone emitted no POST.
+- One explicit POST of registered `pepperyn_v1_heterogeneous_conflict.xlsx` returned
+  200; dossier `c35d9b59-f8b8-5ede-8863-d2a32b1f106c`. REVENUE 1000000 and 990000 EUR
+  for 2025 retained distinct references; spread 10000 is measurement, not resolution.
+  References: F4266C45F58F2/S7D13FDB50702/R4F3826EAF275 and
+  F2650BFF0923D/S9B4C1992BB34/RCC47F485B271. EBITDA 80000 and CASH 115000 remain
+  independent, unvalidated observations. Investigation and noncanonical status retained.
+- Browser Ctrl+F5 reload restored the same dossier without another write.
+- After backend restart (Founder-reported new Uvicorn PID 10700), list GET 200;
+  subsequently explicit detail GET for the exact dossier/entity above returned 200
+  with unchanged content. No new POST. This is bounded live restart persistence PASS.
+
+UI placement: source dossiers mount only on the empty/New analysis screen under
+both synthetic flags. Opening a historical analysis hides that section. The New
+analysis button resets local view only; it does not create a persisted analysis.
+List returns full verified content but list refresh formerly retained the previous
+selected detail. Therefore explicit detail GET, not a retained display alone, was
+required for the restart claim. Local follow-up now clears selected detail on list
+refresh; capture receipts retain their separately verified response. This UI delta
+is not included in the live proof above. Local validation: full frontend suite
+112 PASS / 15 suites; TypeScript no-emit PASS. Regression explicitly exercises
+old-detail removal during pending list refresh and failed refresh; no write and
+no false empty state. LOCAL_TESTED / NOT_CHECKPOINTED, not live-browser proof.
+
+Still OPEN: adversarial two-user/client isolation, actual privilege/mutation tests,
+multi-worker concurrency, persisted reported/derived definition authority, temporal
+and export propagation, independent professional output review, full FR07/FR08.
+No real-data, provider, production or global Financial Reliability Gate PASS.
+
+Operational evidence: Founder-authorized local Integration Test JWT guest signing
+key rotation completed with DPAPI CurrentUser protect/restore PASS; separate from
+V33/V34 key. Durable local source is
+`Pepperyn-runtime/secrets/jwt-guest-integration/jwt-guest-secret.dpapi`, using UTF-8
+entropy `Pepperyn|IntegrationTest|JWT_GUEST_SECRET|v1` and UTF-8 decrypted secret.
+Reuse under the same Windows account; never regenerate at restart, print or commit.
+Old guest tokens are invalid against the new local key; no Supabase Auth, PIN,
+business record or correspondence key rotation. This is local custody evidence,
+not production custody/recovery proof. Windows PowerShell 5 startup must pass
+multiline Python through stdin (`python -`), not quote-sensitive `python -c`.

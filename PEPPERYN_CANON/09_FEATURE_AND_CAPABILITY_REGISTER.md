@@ -219,3 +219,23 @@ without pretending to be completed analyses or confirmed interpretations. V35
 preserves tenant/entity/engagement scope and immutability; existing V18/V24/V27
 semantics unchanged. No full persistence/exports/professional gate PASS. See
 `docs/Product/FinancialReliability/source-dossier-evidence-A20-A21.md`.
+
+2026-09-18 update: A20/A21 is CHECKPOINTED; V35 DEPLOYED_IN_INTEGRATION.
+Source dossier capture/reload is LIVE_PROVEN only for the registered conflict
+workbook, exact client and restart/detail-read protocol documented above.
+No automatic canonical promotion; all wider isolation/professional gates remain open.
+
+A22: separate synthetic source clarification portfolio is IMPLEMENTED / LOCAL_TESTED,
+not live. Exact dossiers/provenance/client context remain distinct from decisions.
+No priority score or automatic resolution. See `docs/Product/FinancialReliability/source-attention-evidence-A22.md`.
+
+A22 bounded update recorded 2026-09-19: LIVE_NAVIGATION_PROVEN for one existing
+synthetic dossier from portfolio to scoped client detail; wider isolation and
+professional reliability remain open. This supersedes only the not-live statement.
+
+A23: temporal context in governed XLSX/PDF/PPTX is IMPLEMENTED / LOCAL_HTTP_TESTED /
+BOUNDED_RENDER_REVIEWED, NOT_LIVE_PROVEN and NOT_CHECKPOINTED. Both persisted
+analysis/fact references and unknown/contradiction limitations survive export.
+WHY: a CFO report must not lose the source-bound history visible in the interface.
+No promotion of arithmetic to financial comparability or measured outcome.
+See `docs/Product/FinancialReliability/temporal-export-evidence-A23.md`.

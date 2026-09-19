@@ -50,3 +50,16 @@ capture or V24 human-confirmed knowledge. Initial storage/HTTP/UI slice admits o
 existing registered synthetic workbooks; no real-data/provider gate change. V35
 must be deployment-tested before live durability claims. Source dossier is a scoped
 technical evidence snapshot, not a new professional decision/outcome concept.
+
+DEC-025 (HOW, A22): surface unresolved synthetic source dossiers separately from
+decision/arc portfolio attention. Preserve evidence provenance and no automatic
+canonical promotion; alphabetical order is not a financial priority score. Read-only,
+same designated synthetic organization gates; unavailable never means no concerns.
+No resolution lifecycle or new evidence/decision ontology is implied. Details:
+`docs/Product/FinancialReliability/source-attention-evidence-A22.md`.
+
+DEC-026 (HOW, A23): carry the existing owned temporal comparison into all three
+governed exports. History failure refuses output instead of implying absent history.
+Annual-label arithmetic stays distinct from professional financial comparability,
+causality and outcome. Do not attach unrelated V35 findings by client coincidence.
+Source: `docs/Product/FinancialReliability/temporal-export-evidence-A23.md`.

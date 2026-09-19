@@ -136,3 +136,27 @@ Synthetic source dossiers now have implementation and local mock/HTTP/UI tests,
 separate from completed analyses and confirmed knowledge. V35 is NOT DEPLOYED;
 new frontend feature OFF by default. No live persistence/RLS or full financial
 reliability claim. Details: `docs/Product/FinancialReliability/source-dossier-evidence-A20-A21.md`.
+
+2026-09-18 superseding evidence: A20/A21 checkpointed at `4eede4adc1de11f5e6ea669be8dcec07cc3144c6`.
+V35 deployed in Integration Test; Founder-observed synthetic conflict dossier
+capture, browser reload and explicit detail GET after backend restart PASS.
+Not adversarial RLS/isolation, production, or professional reliability proof.
+See the dated integration evidence in the dossier document above. Local follow-up
+clears stale detail during list refresh; not part of the earlier live proof.
+
+A22 local delta: synthetic source clarification appears separately in the portfolio,
+with read-only scoped retrieval and provenance. 398 backend PASS / 2 SKIP; 115 frontend
+PASS; TypeScript PASS. Not checkpointed or live browser/RLS evidence. Details:
+`docs/Product/FinancialReliability/source-attention-evidence-A22.md`.
+
+A22 live update recorded 2026-09-19: agent-observed portfolio -> exact client ->
+existing conflict dossier navigation PASS in local integration browser after restart.
+Refresh removes stale detail. One synthetic client only; no HTTP capture, DB audit,
+multi-user adversarial isolation or financial gate claim. Still NOT_CHECKPOINTED.
+
+A23 (2026-09-19): governed exports now consume the ownership/integrity-checked
+temporal read service. Local actual-byte HTTP tests and bounded synthetic rendering
+verify references, arithmetic scope, UNKNOWN/CONTRADICTION and fail-closed history.
+461 backend PASS / 2 absent-real-file SKIP in the documented regression selection.
+NOT_CHECKPOINTED / NOT_LIVE_PROVEN. No full temporal/financial/professional gate PASS.
+Evidence: `docs/Product/FinancialReliability/temporal-export-evidence-A23.md`.

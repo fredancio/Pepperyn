@@ -114,3 +114,25 @@ local mock/HTTP/component tests. V35 has not executed; live durability/RLS, pers
 reported/derived reconciliation and full temporal/memory/export propagation remain
 unproven. This narrows an implementation gap without closing FR07/FR08 or this gate.
 See `docs/Product/FinancialReliability/source-dossier-evidence-A20-A21.md`.
+
+2026-09-18: V35 installation and one synthetic conflict dossier's capture/browser
+reload/backend-restart detail read are Founder-reported LIVE_PROVEN. This supersedes
+the preceding not-executed V35 snapshot only. It demonstrates preservation of
+contradictory claims, not their resolution or professional approval. Full gate stays
+OPEN_NOT_PASS; adversarial isolation, reconciliation and terminal propagation remain due.
+
+A22 narrows the portfolio visibility gap for persisted synthetic unresolved sources;
+local service/HTTP/UI proof only. It does not resolve contradictory claims or their
+financial consequences. No full case/gate promotion. Source:
+`docs/Product/FinancialReliability/source-attention-evidence-A22.md`.
+
+A22 bounded live browser navigation now observed (recorded 2026-09-19), for the
+existing synthetic conflict dossier only. Visibility/provenance is not professional
+validation or source resolution; Financial Reliability Gate remains OPEN_NOT_PASS.
+
+A23 carries bounded owned temporal arithmetic and provenance to three governed
+exports. Local HTTP/output/render checks narrow terminal-loss risk, not professional
+financial comparability or full-case reliability. V35 contradictory-source linkage
+to conclusions/exports remains a separate contextual-relevance debt. FR-EXPECTED-2
+unchanged; Financial Reliability Gate remains OPEN_NOT_PASS. Evidence:
+`docs/Product/FinancialReliability/temporal-export-evidence-A23.md`.
