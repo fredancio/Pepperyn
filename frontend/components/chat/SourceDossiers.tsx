@@ -16,8 +16,11 @@ function ScopedDossiers({ entityId }: { entityId: string }) {
   const [busy, setBusy] = useState(false);
   const active = useRef(true), epoch = useRef(0), writing = useRef(false);
   const input = useRef<HTMLInputElement>(null);
-  async function refresh() {
+  async function refresh(preserveCapture = false) {
     const version = ++epoch.current;
+    // A list refresh must not present an older detail as newly revalidated.
+    // Only a just-confirmed capture retains its independently verified receipt.
+    if (!preserveCapture) setSelected(null);
     setError(''); setRows(null);
     try {
       const result = await listSourceDossiers(entityId);
@@ -47,7 +50,7 @@ function ScopedDossiers({ entityId }: { entityId: string }) {
     try {
       const result = await captureSourceDossier(entityId, file);
       if (!active.current) return;
-      setSelected(result); setFile(null); if (input.current) input.current.value = ''; await refresh();
+      setSelected(result); setFile(null); if (input.current) input.current.value = ''; await refresh(true);
     } catch {
       if (active.current) setError('Enregistrement non confirmé. Relisez les dossiers avant toute nouvelle tentative.');
     } finally {

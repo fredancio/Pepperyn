@@ -114,3 +114,41 @@ def capture_dossier(db, *, company_id, entity_id, raw, filename):
     if stored["payload_sha256"] != record["payload_sha256"]:
         raise SourceDossierRefused("INTEGRITY_FAILED")
     return stored
+
+
+def list_source_attention(db, *, company_id):
+    """Bounded read model, not decision memory or a financial priority score.
+
+    Verify every stored dossier before filtering: corrupt evidence is never
+    silently omitted as if the client's source state were clear.
+    """
+    try:
+        company_id = str(UUID(company_id))
+        rows = db.from_(TABLE).select("*").eq("company_id", company_id).limit(101).execute().data
+        if not isinstance(rows, list) or len(rows) > 100:
+            raise ValueError()
+        grouped = {}
+        seen = set()
+        for row in rows:
+            if row.get("company_id") != company_id or row.get("id") in seen:
+                raise ValueError()
+            seen.add(row["id"])
+            scope = authorized_scope(db, company_id, row["entity_id"])
+            dossier = _verified(row, scope)
+            if dossier["status"] == "UNDERSTOOD":
+                continue
+            entity = scope["entity_id"]
+            if entity not in grouped:
+                names = (db.from_("entities").select("id,company_id,name")
+                         .eq("id", entity).eq("company_id", company_id).limit(2).execute().data)
+                if (not isinstance(names, list) or len(names) != 1
+                        or names[0].get("id") != entity or names[0].get("company_id") != company_id
+                        or not isinstance(names[0].get("name"), str) or not names[0]["name"].strip()):
+                    raise ValueError()
+                grouped[entity] = {"entity_id": entity, "entity_name": names[0]["name"], "dossiers": []}
+            grouped[entity]["dossiers"].append(dossier)
+        for group in grouped.values():
+            group["dossiers"].sort(key=lambda d: d["dossier_id"])
+        return sorted(grouped.values(), key=lambda g: (g["entity_name"].casefold(), g["entity_id"]))
+    except Exception:
+        raise SourceDossierRefused("UNAVAILABLE") from None

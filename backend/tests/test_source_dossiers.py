@@ -58,6 +58,68 @@ def capture(db, **overrides):
     return service.capture_dossier(db, **args)
 
 
+def test_source_attention_retains_provenance_without_decision_or_write():
+    db = Database(); db.tables['entities'][0]['name'] = 'Synthetic A'
+    saved = capture(db)
+    before = copy.deepcopy(db.tables); writes = db.writes
+    assert service.list_source_attention(db, company_id=COMPANY) == [
+        {'entity_id': ENTITY, 'entity_name': 'Synthetic A', 'dossiers': [saved]}]
+    assert db.tables == before and db.writes == writes
+    assert service.list_source_attention(db, company_id='20000000-0000-0000-0000-000000000099') == []
+
+
+def test_source_attention_separates_clients_and_does_not_invent_global_urgency():
+    db = Database(); db.tables['entities'][0]['name'] = 'Synthetic A'
+    first = capture(db)
+    second_entity = '30000000-0000-0000-0000-000000000002'
+    db.tables['entities'].append({'id': second_entity, 'company_id': COMPANY, 'name': 'Synthetic B'})
+    db.tables['engagements'].append({'id': '40000000-0000-0000-0000-000000000002', 'entity_id': second_entity})
+    second = capture(db, entity_id=second_entity)
+    groups = service.list_source_attention(db, company_id=COMPANY)
+    assert [g['entity_id'] for g in groups] == [ENTITY, second_entity]
+    assert groups[0]['dossiers'] == [first] and groups[1]['dossiers'] == [second]
+    assert all(set(g) == {'entity_id', 'entity_name', 'dossiers'} for g in groups)
+    assert db.writes == 2
+
+
+@pytest.mark.parametrize('failure', ['corrupt', 'foreign', 'duplicate', 'bound', 'unavailable', 'ownership'])
+def test_source_attention_refuses_incomplete_or_foreign_evidence(failure):
+    db = Database(); db.tables['entities'][0]['name'] = 'Synthetic A'; capture(db)
+    if failure == 'corrupt': db.tables[service.TABLE][0]['payload_sha256'] = '0' * 64
+    if failure == 'foreign':
+        db.tables[service.TABLE][0]['company_id'] = '20000000-0000-0000-0000-000000000099'
+        db.ignore_scope = True
+    if failure == 'duplicate': db.tables[service.TABLE] *= 2
+    if failure == 'bound': db.tables[service.TABLE] *= 101
+    if failure == 'unavailable': db.fail = True
+    if failure == 'ownership': db.tables['engagements'] = []
+    with pytest.raises(service.SourceDossierRefused, match='UNAVAILABLE'):
+        service.list_source_attention(db, company_id=COMPANY)
+
+
+def test_source_attention_http_is_read_only_and_feature_gated(monkeypatch):
+    import main
+    db = Database(); db.tables['entities'][0]['name'] = 'Synthetic A'; capture(db)
+    monkeypatch.setenv('ENVIRONMENT', 'development')
+    monkeypatch.setenv('PEPPERYN_ENABLE_SYNTHETIC_V1_DEMO', '1')
+    monkeypatch.setenv('PEPPERYN_SYNTHETIC_V1_COMPANY_ID', COMPANY)
+    async def auth(*_): return COMPANY, 'pro', 'admin'
+    monkeypatch.setattr(routes.analyze_routes, '_resolve_auth', auth)
+    monkeypatch.setattr(main, 'get_supabase_service', lambda: db)
+    async def exercise():
+        app = FastAPI(); app.include_router(routes.router)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+            response = await client.get('/api/v1/synthetic-source-attention')
+            assert response.status_code == 200 and response.json()[0]['dossiers'][0]['status'] == 'CONTRADICTION'
+            assert db.writes == 1
+            db.fail = True
+            response = await client.get('/api/v1/synthetic-source-attention')
+            assert response.status_code == 503 and 'private' not in response.text
+            monkeypatch.setenv('ENVIRONMENT', 'production')
+            assert (await client.get('/api/v1/synthetic-source-attention')).status_code == 404
+    asyncio.run(exercise())
+
+
 def test_reload_and_retry_preserve_conflict_without_analysis_or_duplicate_write():
     db = Database(); saved = capture(db)
     assert capture(db) == saved and db.writes == 1

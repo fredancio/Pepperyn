@@ -57,3 +57,28 @@ export async function captureSourceDossier(entity: string, file: File): Promise<
   const data = new FormData(); data.append('entity_id', entity); data.append('file', file);
   return checked(await request('', { method: 'POST', body: data }), entity);
 }
+
+export type SourceAttentionGroup = { entity_id: string; entity_name: string; dossiers: SourceDossier[] };
+export async function listSourceAttention(): Promise<SourceAttentionGroup[]> {
+  const response = await fetch(`${API}/api/v1/synthetic-source-attention`, {
+    headers: await getAuthHeaders(), cache: 'no-store',
+  });
+  if (!response.ok) throw new Error('Lecture des sources indisponible.');
+  const groups = await response.json();
+  if (!Array.isArray(groups) || groups.length > 100) throw new Error('Sources non vérifiables.');
+  const entities = new Set<string>(), dossiers = new Set<string>(), companies = new Set<string>();
+  return groups.map(group => {
+    if (!group || !uuid.test(group.entity_id) || entities.has(group.entity_id) ||
+        typeof group.entity_name !== 'string' || !group.entity_name.trim() ||
+        !Array.isArray(group.dossiers) || !group.dossiers.length) throw new Error('Client source non vérifiable.');
+    entities.add(group.entity_id);
+    const verified = group.dossiers.map((value: unknown) => {
+      const row = checked(value, group.entity_id);
+      if (row.status === 'UNDERSTOOD' || dossiers.has(row.dossier_id)) throw new Error('Source incohérente.');
+      dossiers.add(row.dossier_id); companies.add(row.company_id);
+      if (dossiers.size > 100 || companies.size > 1) throw new Error('Périmètre source incohérent.');
+      return row;
+    });
+    return { entity_id: group.entity_id, entity_name: group.entity_name, dossiers: verified };
+  });
+}

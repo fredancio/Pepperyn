@@ -30,6 +30,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { fetchPortfolio } from '@/lib/arc-api';
 import type { PortfolioCard, BriefingPriority } from '@/lib/types';
+import { SourceAttention } from './SourceAttention';
+
+const SOURCE_ATTENTION_ENABLED = process.env.NEXT_PUBLIC_ENABLE_SYNTHETIC_V1_DEMO === '1'
+  && process.env.NEXT_PUBLIC_ENABLE_SYNTHETIC_SOURCE_DOSSIERS === '1';
 
 const PRIORITY_META: Record<BriefingPriority, { icon: string; label: string }> = {
   urgent: { icon: '🔥', label: 'Urgent' },
@@ -93,7 +97,9 @@ export function PortfolioHome() {
             data-testid="portfolio-empty"
           >
             <p className="text-sm text-[#5F6368]">
-              Aucun point actif à traiter pour l&apos;instant.
+              {SOURCE_ATTENTION_ENABLED
+                ? 'Aucun point actif dans le registre des décisions. Les sources à clarifier sont présentées séparément ci-dessous.'
+                : "Aucun point actif à traiter pour l'instant."}
             </p>
           </div>
         )}
@@ -157,6 +163,7 @@ export function PortfolioHome() {
             })}
           </div>
         )}
+        {SOURCE_ATTENTION_ENABLED && <SourceAttention />}
       </div>
     </div>
   );

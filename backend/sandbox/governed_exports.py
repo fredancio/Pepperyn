@@ -24,6 +24,7 @@ from pptx.enum.text import PP_ALIGN
 from pptx.util import Inches, Pt
 
 from services.v1_analysis_contract import GovernedAnalysisEnvelope
+from sandbox.temporal_export import temporal_export_rows
 
 _NAVY = "183B56"
 _BLUE = "2A6F97"
@@ -87,6 +88,7 @@ def _decision_kind_label(kind: str) -> str:
 
 def generate_governed_excel(
     envelope: GovernedAnalysisEnvelope, analysis_id: str, decisions: list[dict] | None = None,
+    *, temporal_comparison: dict | None = None,
 ) -> bytes:
     """Render an auditable workbook from the validated envelope only."""
 
@@ -165,6 +167,13 @@ def generate_governed_excel(
     for item in source.unknowns:
         unknowns.append(["SOURCE", item])
 
+    temporal_rows = temporal_export_rows(envelope, analysis_id, temporal_comparison)
+    if temporal_rows:
+        temporal = wb.create_sheet("Continuite temporelle")
+        temporal.append(["Continuite temporelle", "Valeur ou reference"])
+        for row in temporal_rows:
+            temporal.append(row)
+
     for ws in wb.worksheets:
         ws.freeze_panes = "A2" if ws.max_row > 1 else None
         ws.auto_filter.ref = ws.dimensions if ws.max_column > 1 and ws.max_row > 1 else None
@@ -187,6 +196,13 @@ def generate_governed_excel(
     summary["A1"].font = Font(name="Arial", size=14, bold=True, color="FFFFFF")
     summary["A10"].fill = PatternFill("solid", fgColor=_PALE)
     summary["A10"].font = Font(name="Arial", bold=True, color=_NAVY)
+    if temporal_rows:
+        temporal.auto_filter.ref = None
+        temporal.column_dimensions["A"].width = 42
+        temporal.column_dimensions["B"].width = 70
+        for row in temporal.iter_rows():
+            lines = max((len(str(cell.value or "")) + 59) // 60 for cell in row)
+            temporal.row_dimensions[row[0].row].height = max(22, 16 * lines)
 
     output = BytesIO()
     wb.save(output)
@@ -195,6 +211,7 @@ def generate_governed_excel(
 
 def generate_governed_pdf(
     envelope: GovernedAnalysisEnvelope, analysis_id: str, decisions: list[dict] | None = None,
+    *, temporal_comparison: dict | None = None,
 ) -> bytes:
     """Render a professional, bounded PDF from the validated envelope only."""
 
@@ -317,6 +334,16 @@ def generate_governed_pdf(
                 p("Aucun arc decisionnel n'a ete cree.", small), Spacer(1, 2*mm),
             ]))
 
+    temporal_rows = temporal_export_rows(envelope, analysis_id, temporal_comparison)
+    if temporal_rows:
+        story.append(KeepTogether([
+            Paragraph("Continuite temporelle", heading),
+            p(f"{temporal_rows[0][0]}: {temporal_rows[0][1]}"),
+            p(f"{temporal_rows[1][0]}: {temporal_rows[1][1]}"),
+        ]))
+        for label, value in temporal_rows[2:]:
+            story.append(p(f"{label}: {value}"))
+
     doc = SimpleDocTemplate(output, pagesize=A4, rightMargin=15*mm, leftMargin=15*mm,
                             topMargin=14*mm, bottomMargin=14*mm,
                             title="Pepperyn - Analyse financiere gouvernee")
@@ -326,10 +353,11 @@ def generate_governed_pdf(
 
 def generate_governed_pptx(
     envelope: GovernedAnalysisEnvelope, analysis_id: str, decisions: list[dict] | None = None,
+    *, temporal_comparison: dict | None = None,
 ) -> bytes:
     """Render a governed CODIR deck without reinterpreting provider output.
 
-    The deck consumes only the immutable envelope. Long sections create
+    The deck consumes the immutable envelope and explicit governed snapshots. Long sections create
     continuation slides instead of losing content or silently shrinking it.
     """
 
@@ -416,7 +444,10 @@ def generate_governed_pptx(
                 add_text(slide, entry, left=0.9, top=top, width=11.6,
                          height=height, size=15)
                 top += height + 0.13
-            add_text(slide, "Les analyses et recommandations restent soumises aux validations indiquees.",
+            footer = ("Comparabilite financiere non etablie. Ecarts arithmetiques uniquement. Aucune causalite deduite."
+                      if title == "Continuite temporelle" else
+                      "Les analyses et recommandations restent soumises aux validations indiquees.")
+            add_text(slide, footer,
                      left=0.65, top=7.05, width=12, height=0.25, size=9, text_color=_BLUE)
 
     cover = prs.slides.add_slide(prs.slide_layouts[6])
@@ -480,6 +511,21 @@ def generate_governed_pptx(
             "Aucun arc decisionnel n'a ete cree."
             for item in decisions
         ])
+
+    temporal_rows = temporal_export_rows(envelope, analysis_id, temporal_comparison)
+    if temporal_rows:
+        entries = [f"{label} | {value}" for label, value in temporal_rows[:7]]
+        for change in temporal_comparison["changes"]:
+            entries.append(
+                f"{change['metric']} | Unite: {change['unit']}. "
+                f"Anterieur ({temporal_comparison['previous_period']}): {change['previous_value']}. "
+                f"Courant ({temporal_comparison['current_period']}): {change['current_value']}. "
+                f"Ecart arithmetique: {change['absolute_change']}. "
+                f"Fait anterieur: {change['previous_fact_id']}. Fait courant: {change['current_fact_id']}."
+            )
+        entries.extend(f"{label} | {value}" for label, value in
+                       temporal_rows[7 + 6 * len(temporal_comparison["changes"]):])
+        paginate("Continuite temporelle", entries)
 
     output = BytesIO()
     prs.save(output)

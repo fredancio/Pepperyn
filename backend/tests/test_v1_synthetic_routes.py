@@ -499,7 +499,7 @@ def test_governed_exports_reload_after_restart_and_preserve_epistemic_labels(mon
     assert pptx.content.startswith(b"PK")
 
     workbook = load_workbook(BytesIO(excel.content), data_only=False)
-    assert workbook.sheetnames == ["Synthese", "Faits sources", "Inferences", "Recommandations", "UNKNOWN"]
+    assert workbook.sheetnames == ["Synthese", "Faits sources", "Inferences", "Recommandations", "UNKNOWN", "Continuite temporelle"]
     cells = "\n".join(str(cell.value) for sheet in workbook for row in sheet.iter_rows() for cell in row if cell.value is not None)
     assert "Diagnostic (inference)" in cells
     assert "Observation source-matched - severite inferentielle HIGH" in cells

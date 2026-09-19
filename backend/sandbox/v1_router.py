@@ -246,6 +246,16 @@ async def read_source_dossier(dossier_id: str, entity_id: str,
         raise _source_dossier_error(exc) from None
 
 
+@router.get("/synthetic-source-attention")
+async def source_attention(authorization: Optional[str] = Header(default=None),
+                           x_auth_type: Optional[str] = Header(default=None)):
+    db, company_id = await _source_dossier_access(authorization, x_auth_type)
+    try:
+        return source_dossiers.list_source_attention(db, company_id=company_id)
+    except source_dossiers.SourceDossierRefused as exc:
+        raise _source_dossier_error(exc) from None
+
+
 @router.post("/synthetic-workbook-analysis", response_model=AnalyzeResponse)
 async def analyze_v1_synthetic_workbook(
     file: UploadFile = File(...),
@@ -765,6 +775,16 @@ async def record_v1_governed_execution(
             "learning_created": False, "arc_created": False}
 
 
+def _export_temporal_context(supabase, analysis_id: str, company_id: str) -> dict:
+    """History outage/integrity failure must not look like absent history."""
+    try:
+        return load_governed_temporal_comparison(
+            supabase, analysis_id=analysis_id, company_id=company_id,
+        )
+    except GovernedTemporalContinuityRefused as exc:
+        raise HTTPException(status_code=503, detail="Continuité temporelle indisponible pour l'export") from exc
+
+
 @router.get("/governed-analyses/{analysis_id}/export.xlsx")
 async def export_v1_governed_excel(
     analysis_id: str,
@@ -780,7 +800,8 @@ async def export_v1_governed_excel(
         envelope, analysis_id, supabase, feedback_required=True,
     )
                  if item.get("decision_confirmed_at")]
-    content = generate_governed_excel(envelope, analysis_id, decisions)
+    content = generate_governed_excel(envelope, analysis_id, decisions,
+                                     temporal_comparison=_export_temporal_context(supabase, analysis_id, company_id))
     return Response(content=content,
                     media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     headers={"Content-Disposition": f'attachment; filename="pepperyn_v1_{analysis_id[:8]}.xlsx"'})
@@ -801,7 +822,8 @@ async def export_v1_governed_pdf(
         envelope, analysis_id, supabase, feedback_required=True,
     )
                  if item.get("decision_confirmed_at")]
-    content = generate_governed_pdf(envelope, analysis_id, decisions)
+    content = generate_governed_pdf(envelope, analysis_id, decisions,
+                                   temporal_comparison=_export_temporal_context(supabase, analysis_id, company_id))
     return Response(content=content, media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="pepperyn_v1_{analysis_id[:8]}.pdf"'})
 
@@ -821,7 +843,8 @@ async def export_v1_governed_pptx(
         envelope, analysis_id, supabase, feedback_required=True,
     )
                  if item.get("decision_confirmed_at")]
-    content = generate_governed_pptx(envelope, analysis_id, decisions)
+    content = generate_governed_pptx(envelope, analysis_id, decisions,
+                                    temporal_comparison=_export_temporal_context(supabase, analysis_id, company_id))
     return Response(content=content,
                     media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                     headers={"Content-Disposition": f'attachment; filename="pepperyn_v1_{analysis_id[:8]}.pptx"'})

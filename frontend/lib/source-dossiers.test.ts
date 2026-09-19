@@ -1,4 +1,4 @@
-import { listSourceDossiers, loadSourceDossier, captureSourceDossier } from './source-dossiers';
+import { listSourceDossiers, loadSourceDossier, captureSourceDossier, listSourceAttention } from './source-dossiers';
 jest.mock('./api', () => ({ getAuthHeaders: async () => ({ Authorization: 'Bearer test' }) }));
 const entity = '30000000-0000-0000-0000-000000000001';
 const row = { dossier_id: '50000000-0000-0000-0000-000000000001', entity_id: entity,
@@ -26,4 +26,16 @@ test('capture binds selected entity without caller-controlled company or analysi
   const options = (fetch as jest.Mock).mock.calls[0][1];
   expect(options.method).toBe('POST'); expect(options.body.get('entity_id')).toBe(entity);
   expect(options.body.has('company_id')).toBe(false); expect(options.body.has('analysis_id')).toBe(false);
+});
+
+test('attention validates every client and dossier without a caller-supplied company', async () => {
+  const group = { entity_id: entity, entity_name: 'Synthetic A', dossiers: [row] };
+  respond([group]); expect(await listSourceAttention()).toEqual([group]);
+  expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/\/synthetic-source-attention$/), expect.objectContaining({ cache: 'no-store' }));
+  for (const value of [null, [group, group], [{ ...group, dossiers: [row, row] }],
+    [{ ...group, dossiers: [{ ...row, entity_id: 'foreign' }] }],
+    [{ ...group, dossiers: [{ ...row, status: 'UNDERSTOOD' }] }]]) {
+    respond(value); await expect(listSourceAttention()).rejects.toThrow();
+  }
+  respond([], false); await expect(listSourceAttention()).rejects.toThrow();
 });

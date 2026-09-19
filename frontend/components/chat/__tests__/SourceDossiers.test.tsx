@@ -55,3 +55,20 @@ test('switching clients suppresses a stale source result', async () => {
   expect(screen.queryByText(/Dossier enregistré/)).not.toBeInTheDocument();
   expect(api.captureSourceDossier).not.toHaveBeenCalled();
 });
+
+test('list refresh removes old detail and a failed refresh cannot attest it', async () => {
+  (api.listSourceDossiers as jest.Mock).mockResolvedValueOnce([fixture]);
+  (api.loadSourceDossier as jest.Mock).mockResolvedValue(fixture);
+  render(<SourceDossiers entityId="a" />);
+  fireEvent.click(await screen.findByText('synthetic.xlsx — CONTRADICTION'));
+  await screen.findByText(/Dossier enregistré : dossier-a/);
+  let reject!: (reason: Error) => void;
+  (api.listSourceDossiers as jest.Mock).mockImplementationOnce(() => new Promise((_, r) => { reject = r; }));
+  fireEvent.click(screen.getByText('Relire les dossiers'));
+  expect(screen.queryByText(/Dossier enregistré/)).not.toBeInTheDocument();
+  await act(async () => reject(new Error('unavailable')));
+  await screen.findByRole('alert');
+  expect(screen.queryByText(/Dossier enregistré/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Aucun dossier source enregistré/)).not.toBeInTheDocument();
+  expect(api.captureSourceDossier).not.toHaveBeenCalled();
+});
