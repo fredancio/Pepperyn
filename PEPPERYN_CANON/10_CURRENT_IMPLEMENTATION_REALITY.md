@@ -175,3 +175,12 @@ adversarial/professional/production gates remain OPEN; A24 not yet checkpointed.
 2026-09-20 A24: FOUNDER_RUN_LIVE_PROVEN_BOUNDED_READS for two technical accounts.
 Global isolation, write isolation, analysis/export isolation and production remain
 unproven; no real-data/provider admission. A24 ready for grouped durability checkpoint.
+
+Durability update: A24 synchronized at 78059c213c2e6eb57092abc3bb5433eb5c915a40.
+A25 history fail-closed availability and ownership binding LOCAL_TESTED;
+Founder live bounded history-scope rehearsal PASS on 2026-09-20. NOT_CHECKPOINTED.
+Populated histories, writes, analysis/exports and production isolation remain OPEN.
+See `docs/Security/PEPPERYN_HISTORY_READ_BOUNDARY_A25.md`.
+Active task: A25 functional/documentary closeout complete; stopped per Founder.
+Next development: not started; await instruction. New V1 Operating Protocol read;
+state reconciliation required before significant new development. No gate changed.

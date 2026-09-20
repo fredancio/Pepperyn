@@ -251,3 +251,10 @@ PASS supersede NOT_DEPLOYED; two-user adversarial isolation remains OPEN.
 
 2026-09-20: bounded two-technical-user READ rehearsal now Founder live PASS.
 Wider two-user isolation (writes and populated financial outputs) remains OPEN.
+
+A25: history availability is distinct from empty success; explicit client ownership
+and response bindings are verified before public projection. IMPLEMENTED/LOCAL_TESTED,
+Founder live bounded history-scope PASS; not checkpointed. Populated history and
+live outage handling remain unproven. WHY: a CFO must not confuse missing continuity with
+a failed read; a foreign client query must not masquerade as a successful empty read.
+Evidence: `docs/Security/PEPPERYN_HISTORY_READ_BOUNDARY_A25.md`, PPR-041.

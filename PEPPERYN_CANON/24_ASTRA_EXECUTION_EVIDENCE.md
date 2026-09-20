@@ -608,3 +608,34 @@ for the exact two-account read suite, not global isolation, write isolation,
 analysis/export isolation or production (all explicitly false in returned result).
 No new business write/provider or secret disclosure. A24 now reaches a meaningful
 durability checkpoint before further implementation. Full scope remains in A24.
+
+## A24 durability and A25 history boundary - 2026-09-20
+
+Founder confirms commits 1ebe5752714284a1ad30fde90001911aa676b20b3 and
+78059c213c2e6eb57092abc3bb5433eb5c915a40 synchronized; local baseline matches.
+This supersedes A24 pending-checkpoint statements only. next-env.d.ts is preserved.
+
+A25 corrects false-empty history failures and enforces explicit entity ownership
+plus response binding. Six local HTTP tests and seven provisioning/read-runner
+test methods PASS; 116 frontend tests PASS. Live history-scope continuation is
+prepared with existing accounts and no business writes, NOT EXECUTED. Details and
+limits: `docs/Security/PEPPERYN_HISTORY_READ_BOUNDARY_A25.md`. Local changes not yet
+checkpointed. No global isolation or admission gate is closed.
+
+### A25 final bounded closeout - 2026-09-20
+
+Founder reports one history rehearsal: BOUNDED_HISTORY_SCOPE_READ_PASS and existing
+DPAPI unchanged. This supersedes NOT EXECUTED above only for the runner's bounded
+own-empty/foreign-refused/anonymous-refused history checks. Populated history,
+global isolation, writes, analysis/export isolation and production remain false.
+Final rerun: 13 backend unittest methods and 116 frontend tests PASS. No live
+replay or new write by agent. A25 functional/documentary scope complete, local
+changes NOT_CHECKPOINTED; pre-existing next-env.d.ts remains excluded.
+
+New Founder Operating Protocol read and acknowledged: V1 scope freeze; classify
+work as REQUIRED / FIX-BLOCKER / POST-V1 / REJECTED; convergence over expansion;
+no stack replacement without concrete blocker. A25 is FIX-BLOCKER. Per the latest
+explicit stop instruction no subsequent workstream has begun. Wider V1 state
+reconciliation is pending before further significant development, not claimed
+complete here. Await new Founder instruction. External Provider/RD CLOSED and
+Self-Selling DEFERRED remain unchanged.
