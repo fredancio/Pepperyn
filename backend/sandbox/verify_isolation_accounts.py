@@ -15,7 +15,7 @@ EMAILS = [f"pepperyn-isolation-a24-{s}@pepperyn-test.invalid" for s in ("a", "b"
 TABLES = ["sessions", "analyses", "evidence_ledger_entries", "arc_analysis_links", "decision_arcs", "knowledge_model"]
 
 
-def verify(bundle, anon_key, factory, get):
+def verify(bundle, anon_key, factory, get, *, include_history=False):
     stage = "INPUT"
     passed = []
     def check(name, condition):
@@ -67,7 +67,22 @@ def verify(bundle, anon_key, factory, get):
         stage = "BACKEND_ANONYMOUS"
         status, _ = get(API + "/api/entities", {})
         check(stage, status == 401)
-        return {"status": "BOUNDED_TWO_USER_READ_ISOLATION_PASS", "checks_passed": passed,
+        if include_history:
+            for i, own in enumerate(scopes):
+                headers = {"Authorization": f"Bearer {own[3]}"}
+                stage = f"USER_{i+1}_OWN_HISTORY"
+                status, data = get(API + f"/api/analyses/history?entity_id={own[2]}", headers)
+                # These technical accounts have no analyses. This is availability,
+                # NOT evidence of isolation of populated financial records.
+                check(stage, status == 200 and data == {"analyses": []})
+                stage = f"USER_{i+1}_FOREIGN_HISTORY"
+                status, data = get(API + f"/api/analyses/history?entity_id={scopes[1-i][2]}", headers)
+                check(stage, status == 404 and data == {"detail": "Entité introuvable"})
+            stage = "HISTORY_ANONYMOUS"
+            status, _ = get(API + "/api/analyses/history", {})
+            check(stage, status == 401)
+        return {"status": "BOUNDED_HISTORY_SCOPE_READ_PASS" if include_history else "BOUNDED_TWO_USER_READ_ISOLATION_PASS", "checks_passed": passed,
+                "populated_history_isolation_proven": False,
                 "business_write_performed": False, "auth_sessions_created": True,
                 "external_provider_used": False, "real_data_used": False,
                 "global_isolation_proven": False, "write_isolation_proven": False,
@@ -80,7 +95,11 @@ def verify(bundle, anon_key, factory, get):
 def live_get(url, headers):
     import httpx
     # Fixed origins; no redirects and no data in output, even on a detected leak.
-    if not (url.startswith(URL + "/rest/v1/") or url.startswith(API + "/api/entities")):
+    from urllib.parse import urlsplit
+    target = urlsplit(url)
+    if not (url.startswith(URL + "/rest/v1/") or
+            (target.scheme == "http" and target.netloc == "127.0.0.1:8000"
+             and target.path in ("/api/entities", "/api/analyses/history"))):
         raise ValueError("TARGET_REFUSED")
     with httpx.Client(timeout=15, follow_redirects=False, trust_env=False) as http:
         response = http.get(url, headers=headers)
@@ -88,13 +107,19 @@ def live_get(url, headers):
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--include-history", action="store_true")
+    args = parser.parse_args()
     logging.disable(logging.CRITICAL)
     warnings.filterwarnings("ignore")
     try:
         from supabase import create_client
         result = verify(json.loads(os.environ["PEPPERYN_ISOLATION_BOOTSTRAP"]),
-                        os.environ["PEPPERYN_ISOLATION_ANON_KEY"], create_client, live_get)
+                        os.environ["PEPPERYN_ISOLATION_ANON_KEY"], create_client, live_get,
+                        include_history=args.include_history)
     except Exception:
         result = {"status": "REFUSED", "stage": "LOCAL_INPUT_OR_IMPORT"}
     print(json.dumps(result))
-    raise SystemExit(0 if result["status"] == "BOUNDED_TWO_USER_READ_ISOLATION_PASS" else 1)
+    expected = "BOUNDED_HISTORY_SCOPE_READ_PASS" if args.include_history else "BOUNDED_TWO_USER_READ_ISOLATION_PASS"
+    raise SystemExit(0 if result["status"] == expected else 1)

@@ -296,13 +296,25 @@ async def get_analyses_history(
     try:
         from main import get_supabase_service
         supabase = get_supabase_service()
+        if entity_id is not None:
+            entities = (
+                supabase.from_("entities").select("id,company_id")
+                .eq("id", entity_id).eq("company_id", company_id).limit(2).execute()
+            ).data
+            if not isinstance(entities, list):
+                raise ValueError("Invalid history ownership response")
+            if not entities:
+                raise HTTPException(status_code=404, detail="Entité introuvable")
+            if (len(entities) != 1 or entities[0].get("id") != entity_id
+                    or entities[0].get("company_id") != company_id):
+                raise ValueError("Invalid history ownership binding")
         query = (
             supabase.from_("analyses")
-            .select("id, fichier_nom, type_document, created_at, score_confiance, entity_id")
+            .select("id, fichier_nom, type_document, created_at, score_confiance, entity_id, company_id, status")
             .eq("company_id", company_id)
             .eq("status", "completed")
         )
-        if entity_id:
+        if entity_id is not None:
             query = query.eq("entity_id", entity_id)
         result = (
             query
@@ -310,9 +322,25 @@ async def get_analyses_history(
             .limit(20)
             .execute()
         )
-        return {"analyses": result.data or []}
-    except Exception:
-        return {"analyses": []}
+        rows = result.data
+        if not isinstance(rows, list) or len(rows) > 20:
+            raise ValueError("Invalid history response")
+        public_fields = ("id", "fichier_nom", "type_document", "created_at", "score_confiance", "entity_id")
+        seen = set()
+        for row in rows:
+            if (not isinstance(row, dict) or row.get("company_id") != company_id
+                    or row.get("status") != "completed"
+                    or (entity_id is not None and row.get("entity_id") != entity_id)
+                    or not isinstance(row.get("id"), str) or not row["id"]
+                    or row["id"] in seen):
+                raise ValueError("Invalid history row binding")
+            seen.add(row["id"])
+        return {"analyses": [{key: row.get(key) for key in public_fields} for row in rows]}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("[HISTORY] Read unavailable: %s", type(exc).__name__)
+        raise HTTPException(status_code=503, detail="Historique indisponible.") from exc
 
 
 @router.delete("/analyses/history")

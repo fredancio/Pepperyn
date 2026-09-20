@@ -1,11 +1,11 @@
-param([switch]$CheckOnly)
+param([switch]$CheckOnly, [switch]$IncludeHistory)
 $ErrorActionPreference = 'Stop'
 $stage = 'LOCAL_PREFLIGHT'
 $exitCode = 1
 $secretFile = 'C:\Users\ADMIN-FRED\Documents\Codex\Pepperyn-runtime\secrets\a24-isolation-accounts.dpapi'
 $source = 'C:\Users\ADMIN-FRED\Documents\Codex\Pepperyn-development\backend\sandbox\verify_isolation_accounts.py'
 $python = 'C:\Users\ADMIN-FRED\Documents\Codex\Pepperyn-runtime\fresh-founder-20260907-075758\backend-venv\Scripts\python.exe'
-$expected = 'D4C032705C3E7548CB57F94743BD0C20FD3B278EE32B128820B8E1BEC40D6CC9'
+$expected = 'D918EFA0F5B6335ECD840022028C8F857255742E4002FD3F0A8AF098FF600C81'
 $previousBundle = $env:PEPPERYN_ISOLATION_BOOTSTRAP
 $previousAnon = $env:PEPPERYN_ISOLATION_ANON_KEY
 try {
@@ -37,15 +37,22 @@ try {
         $stage = 'READ_REHEARSAL'
         $env:PEPPERYN_ISOLATION_BOOTSTRAP = $json
         $env:PEPPERYN_ISOLATION_ANON_KEY = $anon
-        $output = & $python -B -W ignore $source 2>$null
+        $rehearsalArguments = @('-B', '-W', 'ignore', $source)
+        $expectedStatus = 'BOUNDED_TWO_USER_READ_ISOLATION_PASS'
+        if ($IncludeHistory) {
+            $rehearsalArguments += '--include-history'
+            $expectedStatus = 'BOUNDED_HISTORY_SCOPE_READ_PASS'
+        }
+        $output = & $python @rehearsalArguments 2>$null
         $pythonExit = $LASTEXITCODE
         $result = ($output -join "`n") | ConvertFrom-Json
-        if ($pythonExit -ne 0 -or $result.status -ne 'BOUNDED_TWO_USER_READ_ISOLATION_PASS') {
+        if ($pythonExit -ne 0 -or $result.status -ne $expectedStatus) {
             if ($result.stage -match '^[A-Z0-9_]+$') { $stage = $result.stage }
             throw 'REHEARSAL_REFUSED'
         }
         $stage = 'RESULT_GATE'
         if ($result.global_isolation_proven -ne $false -or $result.business_write_performed -ne $false -or $result.external_provider_used -ne $false -or $result.real_data_used -ne $false) { throw 'RESULT_REFUSED' }
+        if ($result.populated_history_isolation_proven -ne $false -or $result.write_isolation_proven -ne $false -or $result.analysis_export_isolation_proven -ne $false -or $result.production_proof -ne $false) { throw 'PROOF_SCOPE_REFUSED' }
         if ((Get-FileHash -LiteralPath $secretFile -Algorithm SHA256).Hash -ne $beforeHash) { throw 'BUNDLE_CHANGED' }
         $result | ConvertTo-Json -Depth 5 -Compress | Write-Output
         Write-Output 'EXISTING_DPAPI_UNCHANGED: PASS; EXTERNAL_PROVIDER: CLOSED; REAL_DATA_ADMISSION: CLOSED'

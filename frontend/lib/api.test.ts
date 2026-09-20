@@ -1,10 +1,21 @@
-import { analyzeV1SyntheticWorkbook, inspectV1SyntheticWorkbook, runV1SyntheticDemo, fetchEntities, createEntity, fetchV1GovernedAnalysis } from './api';
+import { analyzeV1SyntheticWorkbook, inspectV1SyntheticWorkbook, runV1SyntheticDemo, fetchEntities, createEntity, fetchV1GovernedAnalysis, fetchAnalysesHistory } from './api';
 
 jest.mock('./supabase', () => ({
   supabase: {
     auth: { getSession: jest.fn().mockResolvedValue({ data: { session: null } }) },
   },
 }));
+
+test('history distinguishes outage and scope refusal from successful empty', async () => {
+  global.fetch = jest.fn()
+    .mockResolvedValueOnce({ ok: false, status: 503 })
+    .mockResolvedValueOnce({ ok: false, status: 404 })
+    .mockResolvedValueOnce({ ok: true, json: async () => ({ analyses: [] }) });
+  await expect(fetchAnalysesHistory('synthetic-a')).rejects.toThrow('Historique indisponible');
+  await expect(fetchAnalysesHistory('synthetic-b')).rejects.toThrow('Historique indisponible');
+  await expect(fetchAnalysesHistory('synthetic-a')).resolves.toEqual([]);
+  expect(global.fetch).toHaveBeenLastCalledWith(expect.stringContaining('entity_id=synthetic-a'), expect.anything());
+});
 
 describe('client-list availability', () => {
   beforeEach(() => sessionStorage.clear());

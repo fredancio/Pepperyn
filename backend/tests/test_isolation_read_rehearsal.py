@@ -5,7 +5,7 @@ from sandbox.verify_isolation_accounts import verify
 
 
 class ReadRehearsalTests(unittest.TestCase):
-    def run_case(self, fault=None):
+    def run_case(self, fault=None, include_history=False):
         factory = Factory()
         count = 0
         def make(url, key):
@@ -27,10 +27,30 @@ class ReadRehearsalTests(unittest.TestCase):
                 return 200, []
             if not headers: return 401, {}
             i = int(headers["Authorization"][-1])
+            if "/api/analyses/history" in url:
+                own = f"entity_id={uuid(i+20)}" in url
+                if fault == "history-outage": return 503, {}
+                if fault == "history-false-empty": return 200, {"analyses": []}
+                if fault == "history-wrong-denial": return 404, {"detail": "unrelated"}
+                if fault == "history-populated": return 200, {"analyses": [{"id": "must-not-be-output"}]}
+                return (200, {"analyses": []}) if own else (404, {"detail": "Entité introuvable"})
             if fault == "substitution" and "?" in url: i = 3-i
             if fault == "backend-outage": return 503, {}
             return 200, {"success": True, "data": [{"id": uuid(i+20)}]}
-        return verify(bundle(), "anon-test", make, get)
+        return verify(bundle(), "anon-test", make, get, include_history=include_history)
+
+    def test_history_scope_pass_is_not_populated_history_proof(self):
+        result = self.run_case(include_history=True)
+        self.assertEqual(result["status"], "BOUNDED_HISTORY_SCOPE_READ_PASS")
+        self.assertFalse(result["populated_history_isolation_proven"])
+        self.assertFalse(result["analysis_export_isolation_proven"])
+
+    def test_history_failure_cannot_pass_by_empty_or_unrelated_refusal(self):
+        for fault in ("history-outage", "history-false-empty", "history-wrong-denial", "history-populated"):
+            with self.subTest(fault=fault):
+                result = self.run_case(fault, include_history=True)
+                self.assertEqual(result["status"], "REFUSED")
+                self.assertNotIn("must-not-be-output", str(result))
 
     def test_bounded_pass(self):
         result = self.run_case()
