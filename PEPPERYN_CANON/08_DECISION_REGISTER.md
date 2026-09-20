@@ -63,3 +63,11 @@ governed exports. History failure refuses output instead of implying absent hist
 Annual-label arithmetic stays distinct from professional financial comparability,
 causality and outcome. Do not attach unrelated V35 findings by client coincidence.
 Source: `docs/Product/FinancialReliability/temporal-export-evidence-A23.md`.
+
+DEC-027 (HOW, A24): contain legacy direct database client privileges rather than
+rely solely on backend ownership checks. V36 enables RLS and revokes client grants
+on six backend-only tables; profiles/companies retain existing authenticated
+own-row reads but no direct writes; exact entity-creation RPC becomes service-only.
+No row changes or retroactive integrity claim. Candidate locally tested, pending
+remote approval/deployment; actual two-user isolation remains OPEN. Full rationale,
+scope, compatibility and rollback boundaries: `docs/Security/PEPPERYN_V36_PRIVILEGE_CONTAINMENT_A24.md`.

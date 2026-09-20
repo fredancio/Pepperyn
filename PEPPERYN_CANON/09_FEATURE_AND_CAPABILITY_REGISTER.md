@@ -239,3 +239,15 @@ analysis/fact references and unknown/contradiction limitations survive export.
 WHY: a CFO report must not lose the source-bound history visible in the interface.
 No promotion of arithmetic to financial comparability or measured outcome.
 See `docs/Product/FinancialReliability/temporal-export-evidence-A23.md`.
+
+A24: legacy database privilege containment candidate V36 is IMPLEMENTED /
+LOCAL_POSTGRES_TESTED / NOT_DEPLOYED / NOT_CHECKPOINTED. WHY: backend ownership
+checks must not be bypassable via direct client table/RPC access. Existing
+authenticated identity reads remain; backend writes stay service-bound. Live
+two-user isolation and production proof remain OPEN. PPR-040 and DEC-027.
+
+A24 update: authorized Integration Test application and live catalog postflight
+PASS supersede NOT_DEPLOYED; two-user adversarial isolation remains OPEN.
+
+2026-09-20: bounded two-technical-user READ rehearsal now Founder live PASS.
+Wider two-user isolation (writes and populated financial outputs) remains OPEN.

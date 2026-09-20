@@ -566,3 +566,45 @@ and canonical records are checkpointed coherently; unrelated generated
 frontend/next-env.d.ts remains preserved and excluded. Wider beta isolation,
 professional financial validation, admitted-data Golden workflow and production
 gates remain open. External Provider/RD CLOSED; Self-Selling DEFERRED.
+
+## Durability update and A24 - 2026-09-19
+
+Founder confirmed V35/A22/A23 checkpoints 20900c097de48a7e281327853a1417f81f49608f
+and 1bd73b2fa6649b6e9de44908064271506b1627f1 synchronized. Local HEAD verified at
+the latter. This supersedes earlier NOT_CHECKPOINTED notes, not their proof scope.
+Generated frontend/next-env.d.ts remains excluded and preserved.
+
+A24: live metadata-only Integration Test audit established missing RLS/client
+privilege containment and exposed entity-creation RPC. V36 migration plus read-only
+postflight prepared, not applied. 9 local PostgreSQL-engine scenarios PASS,
+56 targeted backend and 115 frontend tests PASS. No business-row reads or writes
+in Supabase, provider calls, real data, credentials or Auth changes. Full source,
+before/after, evidence and explicit debt: `docs/Security/PEPPERYN_V36_PRIVILEGE_CONTAINMENT_A24.md`.
+Actual two-user Supabase adversarial proof remains OPEN. A24 NOT_CHECKPOINTED.
+
+A24 live update: Founder-approved V36 applied once; SQL Editor success and versioned
+catalog postflight all table/RPC checks true. One-user source portfolio rendered
+existing synthetic evidence after read-only retry (initial unavailability cause
+unestablished). No business write/provider/account creation. V36 catalog containment
+is LIVE_PROVEN_INTEGRATION, not two-user API/DB/browser or production isolation.
+Working-tree evidence awaits a grouped checkpoint; detailed record in A24 above.
+
+A24 technical accounts authorized next; protected Founder-local provisioning
+procedure prepared because agent has no Supabase keys. Parser/check-only and eight
+mock scenarios PASS; no live users created yet. New user passwords are DPAPI-bound
+before first write; existing-attempt file blocks reruns. No gate/allowlist/provider
+change. See account preparation section in the A24 security evidence document.
+
+Founder provisioning result supersedes pending account creation: two technical Auth
+users/scopes and protected credentials reported PASS; no secrets transmitted.
+Bounded real-session READ adversarial runner prepared, not live-executed. Five local
+unittest methods / 15 mock scenarios and PowerShell CheckOnly PASS. Requires local
+DPAPI restoration plus anon key only; no service key or reprovisioning. Global
+two-user isolation, writes and populated financial outputs/exports remain OPEN.
+
+2026-09-20 Founder live result: BOUNDED_TWO_USER_READ_ISOLATION_PASS; existing DPAPI
+unchanged; one execution after backend restart. This supersedes NOT LIVE EXECUTED
+for the exact two-account read suite, not global isolation, write isolation,
+analysis/export isolation or production (all explicitly false in returned result).
+No new business write/provider or secret disclosure. A24 now reaches a meaningful
+durability checkpoint before further implementation. Full scope remains in A24.

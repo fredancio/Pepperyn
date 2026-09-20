@@ -160,3 +160,18 @@ verify references, arithmetic scope, UNKNOWN/CONTRADICTION and fail-closed histo
 461 backend PASS / 2 absent-real-file SKIP in the documented regression selection.
 NOT_CHECKPOINTED / NOT_LIVE_PROVEN. No full temporal/financial/professional gate PASS.
 Evidence: `docs/Product/FinancialReliability/temporal-export-evidence-A23.md`.
+
+Durability update 2026-09-19: V35/A22/A23 are now checkpointed through
+1bd73b2fa6649b6e9de44908064271506b1627f1 (Founder reported remote equality).
+A24 V36 privilege containment is locally SQL-tested but NOT DEPLOYED or checkpointed.
+Live Integration Test metadata shows six RLS-disabled legacy tables and exposed
+client privileges/RPC. This blocks isolation claims; no data exposure test executed.
+See `docs/Security/PEPPERYN_V36_PRIVILEGE_CONTAINMENT_A24.md`.
+
+A24 subsequent update: V36 DEPLOYED once to approved Integration Test and catalog
+postflight PASS. Candidate-not-deployed statement above is superseded. Two-user
+adversarial/professional/production gates remain OPEN; A24 not yet checkpointed.
+
+2026-09-20 A24: FOUNDER_RUN_LIVE_PROVEN_BOUNDED_READS for two technical accounts.
+Global isolation, write isolation, analysis/export isolation and production remain
+unproven; no real-data/provider admission. A24 ready for grouped durability checkpoint.
