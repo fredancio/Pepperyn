@@ -184,3 +184,38 @@ See `docs/Security/PEPPERYN_HISTORY_READ_BOUNDARY_A25.md`.
 Active task: A25 functional/documentary closeout complete; stopped per Founder.
 Next development: not started; await instruction. New V1 Operating Protocol read;
 state reconciliation required before significant new development. No gate changed.
+
+Subsequent Founder resumption: A25 checkpoint synchronized at 3a80529b513ce255d36ae57ab0c52d575ff50f80.
+Active task A26: populated-history prerequisite inspection, prepared and locally
+tested, not live-executed. Bounded state reconciliation and critical path recorded
+in `docs/Security/PEPPERYN_POPULATED_HISTORY_A26.md`. Local protected credentials are
+the current execution dependency; no fixture writes or gate changes authorized by
+this preflight. Prior A25 stop/pending durability notes superseded.
+
+A26 update: Founder live preflight PASS (both exact technical scopes empty;
+DPAPI unchanged; no business writes). Current blocker is authorization of two
+controlled registered synthetic analysis/envelope pairs, not further empty-read
+tests. No populated-history/write/output/global isolation claim. Seed not run.
+
+Subsequent GO: seed authorized and prepared/tested locally; current dependency
+is Founder-local DPAPI/key execution, no longer write approval. Live seed pending.
+
+A26 seed reported successful once (two verified pairs). Current task is session-only
+cross-user populated-history verification, prepared/tested but not yet live proven.
+No new write authorization required; Founder-local protected execution remains
+necessary. All broader isolation/admission gates unchanged.
+
+A26 populated read live REFUSED at USER_1_ENGAGEMENT; no PASS. Direct engagement
+visibility assumption in verifier conflicts with V19 backend-only access model.
+Read-only diagnostic pending to distinguish actual response and verify persisted
+bindings; no seed/permission/gate modification performed.
+
+A26 diagnosis confirmed: direct user engagement visibility empty, existing pair
+bindings valid. Verifier-only correction locally tested using V19 reference lookup;
+history authorization still tested exclusively through user API sessions.
+Corrected live run pending, all wider gates unchanged.
+
+A26 corrected live run now Founder PASS for the two exact populated histories.
+No write/output/global/production proof. Functional closeout complete, Git
+durability pending. Next selected risk: ownership at legacy decision-feedback
+write boundary; not yet tested live. Existing A26 pairs remain unchanged.

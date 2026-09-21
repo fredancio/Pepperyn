@@ -639,3 +639,56 @@ explicit stop instruction no subsequent workstream has begun. Wider V1 state
 reconciliation is pending before further significant development, not claimed
 complete here. Await new Founder instruction. External Provider/RD CLOSED and
 Self-Selling DEFERRED remain unchanged.
+
+## A25 durable / A26 preflight preparation
+
+Founder confirmed A25 commits 9281ee7749bc416588a82d6bc4bfc0ab81eaed8b and
+3a80529b513ce255d36ae57ab0c52d575ff50f80 synchronized; local HEAD matches latter.
+This supersedes A25 NOT_CHECKPOINTED and stop state after new resumption instruction.
+A26 state reconciliation and bounded read-only technical-scope preflight prepared:
+`docs/Security/PEPPERYN_POPULATED_HISTORY_A26.md`. Four methods / ten scenarios
+locally tested; PowerShell CheckOnly PASS. Live preflight pending local protected
+credentials. No seed, mutation, gate widening or populated-history proof. Existing
+next-env.d.ts preserved; no product implementation changed by A26 preparation.
+
+A26 Founder live preflight: A26_SCOPES_INSPECTED once, both technical scopes have
+zero analyses and zero envelopes; DPAPI unchanged, no business writes. This
+supersedes preflight LIVE_PENDING, not any isolation proof debt. The existing
+registered English fixture was locally executed successfully through its
+deterministic mock without DB/provider calls. Next proposed operation is two
+synthetic analysis/envelope pairs in the existing technical scopes via V27;
+explicit remote-write authorization pending. No seed performed and no gate
+expanded. Detailed write/recovery boundary in the A26 evidence document.
+
+A26 Founder GO supersedes pending authorization for exactly two synthetic pairs.
+Seed runner/wrapper locally validated (four seed methods and four preflight
+methods; CheckOnly PASS). Existing V27 transaction per pair, stable IDs, repeated
+scope checks and verified rereads; no retry/upsert/delete. Two-pair atomicity not
+claimed. Await Founder-local protected credential execution; no live seed by agent
+and no isolation proof promoted. See A26 document for limits and recovery rules.
+
+A26 seed now Founder-reported once: two acknowledged/verified synthetic pairs,
+DPAPI unchanged, business_write_performed=true. Isolation flags remain false.
+Dedicated session-only populated-history read verifier prepared (positive plus
+ten falsifications local PASS); no service key, no new writes/provider. Live
+cross-user verification pending protected Founder execution. Scope remains
+history GET metadata for the two exact fixtures, never global/output/write proof.
+
+A26 populated read refused live at USER_1_ENGAGEMENT. No history isolation PASS.
+V19 documents backend-only engagement access; verifier assumed direct client
+visibility without an established contract. Exact live denial vs empty vs other
+failure remains unknown. Read-only differential diagnostic prepared/tested; no
+V36, persisted pair or permission changes. Details in A26 evidence document.
+
+A26 differential diagnostic Founder result: both user engagement queries 200/empty,
+both persisted seed bindings verified, no writes. Corrected test harness uses V19
+service-only engagement reference lookup while every history GET uses user sessions.
+Local positive/ten falsifications and CheckOnly PASS; corrected live run pending.
+No product or privilege changes, no repopulation, no populated-history proof yet.
+
+A26 corrected Founder live run PASS on 2026-09-21: bounded populated histories
+only, reference service read separated from user-session history probes. No
+business write, unchanged DPAPI; write/output/global/production proof flags false.
+Supersedes pending corrected run above. A26 durability batch now warranted before
+legacy decision-feedback mutation-boundary investigation; no live mutation probe
+executed. Detailed scope and preserved failures in A26 evidence document.

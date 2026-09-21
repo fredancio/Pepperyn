@@ -258,3 +258,10 @@ Founder live bounded history-scope PASS; not checkpointed. Populated history and
 live outage handling remain unproven. WHY: a CFO must not confuse missing continuity with
 a failed read; a foreign client query must not masquerade as a successful empty read.
 Evidence: `docs/Security/PEPPERYN_HISTORY_READ_BOUNDARY_A25.md`, PPR-041.
+
+A25 is durable at 3a80529b513ce255d36ae57ab0c52d575ff50f80. A26 now adds
+FOUNDER_LIVE_BOUNDED_POPULATED_HISTORY_PASS: exact seeded own histories, foreign
+entity refusal and tenant-query substitution via user sessions; service authority
+only for V19 engagement reference. WHY: empty reads alone cannot establish isolation
+of existing client history. No writes/analysis/export/global/production claim.
+Evidence: `docs/Security/PEPPERYN_POPULATED_HISTORY_A26.md`, PPR-042; not checkpointed.
