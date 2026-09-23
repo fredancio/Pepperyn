@@ -7,6 +7,16 @@ const base = { status: 'UNKNOWN', current_analysis_id: 'a', previous_analysis_id
   previous_period: null, current_period: '2025', changes: [], unknowns: ['Aucune période antérieure'], contradictions: [] };
 beforeEach(() => jest.resetAllMocks());
 
+test.each(['courante', 'antérieure la plus proche'])('explains non-unique %s reference without inventing conflicting amounts', async period => {
+  fetchComparison.mockResolvedValue({ ...base, status: 'CONTRADICTION', unknowns: [],
+    contradictions: [`Plusieurs analyses gouvernées existent pour la période ${period}.`] });
+  render(<GovernedTemporalComparison analysisId="a" />);
+  expect(await screen.findByText(/couple de références temporelles/)).toHaveTextContent('ne démontre pas');
+  expect(screen.getByText(/À résoudre/)).toHaveTextContent('ne choisit pas automatiquement la plus récente');
+  expect(screen.getByText(/Ne supprimez pas/)).toBeInTheDocument();
+  expect(screen.queryByRole('table')).not.toBeInTheDocument();
+});
+
 test('unknown is visible, without a numeric table', async () => {
   fetchComparison.mockResolvedValue(base);
   render(<GovernedTemporalComparison analysisId="a" />);

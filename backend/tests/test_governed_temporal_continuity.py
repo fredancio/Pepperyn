@@ -2,6 +2,7 @@
 
 from services.v1_analysis_contract import GovernedAnalysisEnvelope, SourceFact, UnderstandingResult
 import services.governed_temporal_continuity as temporal
+import pytest
 
 
 def fact(metric, value, period, suffix, unit="EUR"):
@@ -131,3 +132,25 @@ def test_duplicate_nearest_period_fails_as_contradiction_before_loading():
         temporal.load_governed_envelope = original
     assert result["status"] == "CONTRADICTION"
     assert result["previous_analysis_id"] is None
+
+
+@pytest.mark.parametrize("competing_value", [100, 999])
+def test_current_period_collision_refuses_even_equal_values_without_selecting_latest(monkeypatch, competing_value):
+    rows = [row("target", "tenant-a", "entity-a", "eng-a", "2026"),
+            row("competing", "tenant-a", "entity-a", "eng-a", "FY26 ACTUAL"),
+            row("prior", "tenant-a", "entity-a", "eng-a", "2025")]
+    loaded = []
+    def fake_load(_database, **scope):
+        identifier = scope["analysis_id"]
+        loaded.append(identifier)
+        period = next(r["envelope_json"]["source_facts"]["current_period"] for r in rows if r["analysis_id"] == identifier)
+        return envelope(period, [fact("REVENUE", competing_value if identifier == "competing" else 100, period, "A")])
+    monkeypatch.setattr(temporal, "load_governed_envelope", fake_load)
+    database = ReadOnlyDatabase(rows)
+    result = temporal.load_governed_temporal_comparison(database, analysis_id="target", company_id="tenant-a")
+    assert result["status"] == "CONTRADICTION"
+    assert result["contradictions"] == ["Plusieurs analyses gouvernées existent pour la période courante."]
+    assert result["changes"] == []
+    assert result["previous_analysis_id"] is None
+    assert set(loaded) == {"target", "competing", "prior"}
+    assert set(database.calls) == {"select"}

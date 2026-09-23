@@ -94,6 +94,8 @@ test('confirme explicitement une décision conditionnelle et conserve les valida
     prerequisites_acknowledged: true,
   }));
   expect(await screen.findByText('Décision professionnelle confirmée explicitement')).toBeInTheDocument();
+  expect(screen.queryByText('Intention enregistrée — aucune décision confirmée.')).not.toBeInTheDocument();
+  expect(screen.getByText('Intention conservée — décision confirmée séparément ci-dessous.')).toBeInTheDocument();
   expect(screen.getByText('Aucun arc décisionnel n’a été créé.')).toBeInTheDocument();
 });
 
@@ -109,6 +111,9 @@ test('réaffiche une décision persistée sans contrôle de mutation', () => {
   }]} governedV1 />);
   expect(screen.getByText('Décision professionnelle confirmée explicitement')).toBeInTheDocument();
   expect(screen.getByText('Adapter le calendrier après validation.')).toBeInTheDocument();
+  expect(screen.getByText('Mémoire décisionnelle')).toBeInTheDocument();
+  expect(screen.queryByText('Quelle est votre intention ?')).not.toBeInTheDocument();
+  expect(screen.queryByText('Intention enregistrée — aucune décision confirmée.')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Confirmer explicitement la décision' })).not.toBeInTheDocument();
   expect(screen.getByText('Enregistrer le premier point de suivi')).toBeInTheDocument();
 });
@@ -211,5 +216,6 @@ test('réaffiche une exécution persistée sans formulaire de mutation', () => {
   }]} governedV1 />);
   expect(screen.getByText('Exécution confirmée explicitement')).toBeInTheDocument();
   expect(screen.getByText('Action exécutée.')).toBeInTheDocument();
+  expect(screen.queryByText('Intention enregistrée — aucune décision confirmée.')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Enregistrer explicitement l’exécution' })).not.toBeInTheDocument();
 });

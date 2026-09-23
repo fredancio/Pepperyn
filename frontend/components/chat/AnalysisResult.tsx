@@ -583,7 +583,10 @@ export function AnalysisResult({ data, questionsRestantes, plan = 'free' }: Anal
           {/* Décision */}
           {result.decision && (
             <div className="bg-[#EFF6FF] border border-[#1B73E8]/30 rounded-xl p-4">
-              <h3 className="font-bold text-[#1B73E8] text-sm mb-2">⚡ DÉCISION</h3>
+              <h3 className="font-bold text-[#1B73E8] text-sm mb-2">{result.verification_tag === 'V1_GOVERNED_SINGLE_CALL' ? 'Position proposée lors de l’analyse initiale' : '⚡ DÉCISION'}</h3>
+              {result.verification_tag === 'V1_GOVERNED_SINGLE_CALL' && (
+                <p className="text-xs text-[#5F6368] mb-2">Texte historique de l’analyse, non actualisé par les décisions ultérieures. L’état actuel de chaque décision, de son suivi et de son exécution figure dans la carte de mémoire décisionnelle ci-dessous.</p>
+              )}
               <p className="text-sm text-[#1A1A2E] font-medium leading-relaxed"><InlineMarkdown text={result.decision as string} /></p>
             </div>
           )}

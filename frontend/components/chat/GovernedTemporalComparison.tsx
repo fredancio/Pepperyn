@@ -27,6 +27,14 @@ export function GovernedTemporalComparison({ analysisId }: { analysisId: string 
         </tr>)}</tbody>
       </table></div>}
       {[...data.unknowns, ...data.contradictions].map((text, i) => <p key={i}>{text}</p>)}
+      {data.status === 'CONTRADICTION' && data.contradictions.some(reason =>
+        reason === 'Plusieurs analyses gouvernées existent pour la période courante.' ||
+        reason === 'Plusieurs analyses gouvernées existent pour la période antérieure la plus proche.',
+      ) && <div className="mt-2 rounded-lg bg-amber-50 p-3 text-amber-950">
+        <p>Le couple de références temporelles n’est pas unique pour ce client et cette mission. Ce refus ne démontre pas, à lui seul, que les montants sont contradictoires.</p>
+        <p>À résoudre : vérifier les versions, les sources et les périodes des analyses concernées, puis établir de façon gouvernée quelle référence fait autorité pour chaque période. Pepperyn ne choisit pas automatiquement la plus récente et ne fusionne pas les analyses.</p>
+        <p>Aucun écart temporel n’est établi tant que cette ambiguïté subsiste. Ne supprimez pas une analyse pour forcer la comparaison ; la résolution des références reste à documenter.</p>
+      </div>}
       <p className="mt-2 text-xs">Analyse courante : {data.current_analysis_id}{data.previous_analysis_id && ` — antérieure : ${data.previous_analysis_id}`}</p>
       <p className="text-xs">Comparaison bornée aux faits disponibles. Ni explication causale, ni résultat d’une décision, ni apprentissage établi.</p>
       <p className="text-xs">Arithmétique sur libellés annuels uniquement. Durée, couverture, périmètre et conventions comptables comparables non établis : aucune comparabilité financière professionnelle certifiée.</p>

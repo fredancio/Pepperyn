@@ -236,11 +236,13 @@ export function FeedbackCard({ reportId, recommendations, governedV1 = false }: 
         </div>
         <div>
           <p className="font-bold text-sm text-[#1A1A2E]">
-            {governedV1 ? 'Quelle est votre intention ?' : 'Que comptez-vous faire ?'}
+            {governedV1 ? items.some(item => decided[item.id]) ? 'Mémoire décisionnelle' : 'Quelle est votre intention ?' : 'Que comptez-vous faire ?'}
           </p>
           <p className="text-xs mt-0.5 text-[#5F6368]">
             {governedV1
-              ? 'Votre réponse est enregistrée comme une intention, jamais comme une décision confirmée.'
+              ? items.some(item => decided[item.id])
+                ? 'Intention, décision confirmée, suivi et exécution restent des étapes distinctes.'
+                : 'Votre réponse est enregistrée comme une intention, jamais comme une décision confirmée.'
               : 'Une réponse rapide m\'aide à adapter mes prochaines recommandations.'}
           </p>
         </div>
@@ -331,7 +333,11 @@ export function FeedbackCard({ reportId, recommendations, governedV1 = false }: 
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
-                    {governedV1 ? 'Intention enregistrée — aucune décision confirmée.' : 'Merci, c\'est noté.'}
+                    {governedV1
+                      ? isDecided
+                        ? 'Intention conservée — décision confirmée séparément ci-dessous.'
+                        : 'Intention enregistrée — aucune décision confirmée.'
+                      : 'Merci, c\'est noté.'}
                   </div>
                   {/* Arc Décisionnel MVP v16 : confirmation non-intrusive de la traçabilité */}
                   {arcTracked[rec.id] && (
