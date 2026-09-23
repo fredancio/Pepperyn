@@ -16,7 +16,7 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from routers.analyze import _resolve_auth
-from services.decision_memory_service import DecisionMemoryService
+from services.decision_memory_service import DecisionMemoryService, FeedbackWriteRefused
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +71,9 @@ async def get_previous_recommendations(
     }
 
 
-@router.post("/decision-feedback")
+@router.post("/decision-feedback", openapi_extra={
+    "x-pepperyn-write-authority": "owned-persisted-recommendation-v1",
+})
 async def submit_decision_feedback(
     request: DecisionFeedbackRequest,
     authorization: Optional[str] = Header(default=None),
@@ -83,15 +85,18 @@ async def submit_decision_feedback(
     if request.status not in VALID_STATUSES:
         raise HTTPException(status_code=400, detail=f"status invalide : {request.status}")
 
-    ok = _decision_memory_service.upsert_feedback(
-        company_id=company_id,
-        report_id=request.report_id,
-        recommendation_id=request.recommendation_id,
-        recommendation_text=request.recommendation_text,
-        recommendation_source=request.recommendation_source,
-        status=request.status,
-        comment=request.comment,
-    )
+    try:
+        ok = _decision_memory_service.upsert_legacy_feedback(
+            company_id=company_id,
+            report_id=request.report_id,
+            recommendation_id=request.recommendation_id,
+            recommendation_text=request.recommendation_text,
+            recommendation_source=request.recommendation_source,
+            status=request.status,
+            comment=request.comment,
+        )
+    except FeedbackWriteRefused as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
     if not ok:
         raise HTTPException(status_code=500, detail="Erreur lors de l'enregistrement du feedback")

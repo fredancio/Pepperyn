@@ -125,6 +125,15 @@ def classify_action(text: str) -> str:
 
 # ─── Service ──────────────────────────────────────────────────────────────────
 
+class FeedbackWriteRefused(RuntimeError):
+    """Content-free refusal before any legacy feedback side effect."""
+
+    def __init__(self, status_code: int, detail: str):
+        super().__init__(detail)
+        self.status_code = status_code
+        self.detail = detail
+
+
 class DecisionMemoryService:
 
     def __init__(self, supabase=None):
@@ -212,6 +221,52 @@ class DecisionMemoryService:
             return None
 
     # ── Écriture : feedback utilisateur ──────────────────────────────────────
+
+    def _authorize_legacy_feedback(self, db, company_id, report_id, recommendation_id,
+                                   recommendation_text, recommendation_source):
+        try:
+            reports = db.from_("analyses").select("id,company_id,status,analyse_json").eq("id", report_id).eq("company_id", company_id).limit(2).execute().data
+            if not isinstance(reports, list):
+                raise ValueError()
+            if not reports:
+                raise FeedbackWriteRefused(404, "Analyse introuvable")
+            if (len(reports) != 1 or reports[0].get("id") != report_id
+                    or reports[0].get("company_id") != company_id):
+                raise ValueError()
+            envelopes = db.from_("governed_analysis_envelopes").select("analysis_id").eq("analysis_id", report_id).eq("company_id", company_id).limit(2).execute().data
+            if not isinstance(envelopes, list):
+                raise ValueError()
+            if envelopes:
+                raise FeedbackWriteRefused(409, "Utilisez le parcours gouverné pour cette analyse.")
+            if reports[0].get("status") != "completed":
+                raise FeedbackWriteRefused(409, "Analyse non terminée")
+            candidates = extract_recommendations(reports[0].get("analyse_json"), report_id)
+            matches = [r for r in candidates if r["id"] == recommendation_id]
+            if (len(matches) != 1 or matches[0]["text"] != recommendation_text
+                    or matches[0]["source"] != recommendation_source):
+                raise FeedbackWriteRefused(409, "Recommandation non vérifiable")
+            existing = db.from_("decision_feedback").select("company_id,report_id,recommendation_id").eq("report_id", report_id).eq("recommendation_id", recommendation_id).limit(2).execute().data
+            if not isinstance(existing, list) or len(existing) > 1:
+                raise ValueError()
+            if any(r.get("company_id") != company_id or r.get("report_id") != report_id
+                   or r.get("recommendation_id") != recommendation_id for r in existing):
+                raise FeedbackWriteRefused(409, "Rattachement du retour non vérifiable")
+        except FeedbackWriteRefused:
+            raise
+        except Exception as exc:
+            logger.warning("[DECISION MEMORY] Write authority unavailable: %s", type(exc).__name__)
+            raise FeedbackWriteRefused(503, "Validation du retour indisponible") from exc
+
+    def upsert_legacy_feedback(self, *, company_id, report_id, recommendation_id,
+                              recommendation_text, recommendation_source, status, comment=None):
+        """Legacy entry point; governed V1 retains its separately validated path."""
+        db = self._get_supabase()
+        if db is None:
+            raise FeedbackWriteRefused(503, "Validation du retour indisponible")
+        self._authorize_legacy_feedback(db, company_id, report_id, recommendation_id,
+                                        recommendation_text, recommendation_source)
+        return self.upsert_feedback(company_id, report_id, recommendation_id,
+                                    recommendation_text, recommendation_source, status, comment)
 
     def upsert_feedback(
         self,
