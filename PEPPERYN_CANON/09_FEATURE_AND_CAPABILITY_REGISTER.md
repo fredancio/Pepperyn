@@ -286,3 +286,26 @@ unsure writes and fifteen refusals; zero fixture inserts, no arcs, A26 preserved
 V38 backend-only derived-pattern table deployed and inspected. WHY: positive own
 writes plus foreign refusals, not mere denial of all writes. Wider write and
 analysis/export/global/production isolation remain OPEN. Package not checkpointed.
+
+A27/A28 package now durable at 999ba51b1f1f3d6a5def46dac5d377b644dd7529.
+A29 output ownership proof harness LOCAL_TESTED: WHY positive owned financial
+deliverables must precede cross-scope denial claims. Single designated-company
+guard preserved; real-session in-process GET proof pending. Running server,
+browser/global/production not proven. See A29 security protocol.
+
+A29 now Founder real-session persisted-output PASS within isolated ASGI scope.
+A30 adds temporary Uvicorn and actual middleware/lifespan, locally tested only;
+WHY: route-only proof omits network serving and application middleware. No global
+isolation or ordinary-server/browser claim; guards preserved and gates CLOSED.
+
+A30 now Founder real-session temporary-Uvicorn bounded PASS, 8 positive outputs
+and 24 denials. Browser/ordinary-server configuration and global proof remain
+open; next browser work blocked by frontend availability, not a new product gate.
+
+A31/A32 supersede the frontend-availability blocker: actual single-session history
+reload and download navigation observed. A32 corrects terminal decision wording
+and explains temporal reference ambiguity without resolving or weakening it.
+WHY: a CFO must distinguish initial recommendations from later confirmed decisions
+and refusal of reference selection from contradiction of amounts. LOCAL_TESTED /
+BOUNDED_BROWSER_OBSERVED, not two-user browser/global proof, not checkpointed.
+See docs/Product/PEPPERYN_TERMINAL_STATE_REVIEW_A32.md.

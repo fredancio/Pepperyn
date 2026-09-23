@@ -788,3 +788,51 @@ before/after snapshots and numeric HTTP diagnostics. 24 targeted local tests and
 protected-wrapper CheckOnly PASS. Live continuation still pending Founder local
 execution; A26/V37/V38 unchanged. No cleanup, reseed or remote business write by
 agent. Current work remains local/uncheckpointed, admission gates CLOSED.
+
+2026-09-23 durability: Founder confirms A27/A28 checkpoint 999ba51b1f1f3d6a5def46dac5d377b644dd7529,
+local=remote, only excluded next-env.d.ts remains; agent HEAD/status match.
+Supersedes pending durability for V37/V38/A27/A28, not their bounded proof scopes.
+
+A29 prepared: isolated ASGI GET-only analysis/export verification, one designated
+technical company per phase, real-session/persisted A26 execution pending. No
+change to product guard or backend 8000. Service adapter refuses mutation/RPC;
+eight positive parsed outputs and twenty-four denials required. Local doubles
+are not live proof. Running-server/middleware/browser/global/production isolation
+remain open. See PEPPERYN_GOVERNED_OUTPUT_ISOLATION_A29.md. No remote A29 run yet.
+
+2026-09-23 Founder A29 PASS: real-session persisted A26 isolated ASGI GET scope,
+8 positive outputs / 24 denials, no business writes, DPAPI unchanged. No transport,
+global/write/production proof. Supersedes A29 pending, never those open flags.
+A30 temporary Uvicorn/main.app/lifespan/Private Beta transport delta prepared;
+single-company guard preserved with sequential isolated designation. GET-only
+outer containment and service read-only adapter remain explicit test restrictions.
+62 local tests and wrapper CheckOnly PASS; actual real-session A30 pending.
+No remote mutation, port 8000 change, migration or admission opening.
+
+Founder A30 PASS 2026-09-23: eight positive outputs / twenty-four denials,
+REAL_SESSIONS_A26_TEMPORARY_LOOPBACK_UVICORN_READ_SURFACE; transport=true only
+there; no business writes, global/write/production=false, DPAPI unchanged.
+Provider/Real-data CLOSED. A29/A30 evidence local, not yet checkpointed.
+Next actual browser proof blocked on frontend connection refused at port 3000;
+backend port 8000 health read succeeds in development. No new financial analysis
+or mutation attempted. Existing client designation must remain unchanged.
+
+A31 2026-09-23: frontend restored by Founder. Agent browser observed existing
+Optilux history load, reload/reopen of UUID 75132a71-c80c-4469-aba8-5171d947a9d0,
+lifecycle restitution and three downloads (new file hashes in A31 protocol).
+Bounded single-session navigation/download PASS, not two-user browser isolation
+or fresh export render/content acceptance. Temporal CONTRADICTION remains an
+explicit refusal; historical intention wording conflicts visually with later
+confirmed decision. Reservations preserved, no underlying records modified.
+See docs/Security/PEPPERYN_BROWSER_READ_REHEARSAL_A31.md. Both gates CLOSED.
+
+A32 2026-09-23: two A31 reservations treated separately. Exact temporal refusal
+branch is same normalized current-period key in another integrity-checked envelope
+within company/entity/engagement; rules untouched. UI explains reference ambiguity
+versus conflicting amounts and required governed resolution, never latest-wins.
+Competing row IDs/history not independently audited; no records modified/deleted.
+Decision card now conditions intention wording on actual confirmed state; immutable
+analysis decision text explicitly historical. Full frontend 120 tests / TypeScript
+PASS; targeted backend 41 PASS. Actual same-session browser reload/reopen confirms
+corrected text and preserved lifecycle; NOT two-user browser isolation. See
+docs/Product/PEPPERYN_TERMINAL_STATE_REVIEW_A32.md. Local/uncheckpointed; gates CLOSED.

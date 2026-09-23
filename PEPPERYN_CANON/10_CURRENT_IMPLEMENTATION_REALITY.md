@@ -263,3 +263,26 @@ A26 unchanged and no arcs. This supersedes A28 pending status, not broader write
 analysis/export/global or production isolation. Preserve rows; no further rerun.
 Next output-isolation proof must include positive own responses; existing single
 designated-company gate must not be weakened or mistaken for ownership proof.
+
+V37/V38–A27/A28 durable at 999ba51b1f1f3d6a5def46dac5d377b644dd7529.
+A29 isolated ASGI output rehearsal prepared locally; protected real-session run
+pending. Guard unchanged. Positive own outputs required before foreign denials;
+this is not running-server/browser or global-isolation evidence.
+
+A29 now Founder BOUNDED REAL-SESSION ASGI PASS: 8 positive outputs / 24 denials,
+no business writes. A30 isolated loopback Uvicorn transport prepared and locally
+tested, not yet real-session proven. Browser, normal server configuration and
+global/production isolation remain OPEN. Product designation guard unchanged.
+
+A30 Founder bounded temporary-Uvicorn PASS now observed: 8 positives/24 denials;
+not normal-server/browser/production/global proof. Next browser verification
+requires frontend availability (port 3000 connection refused; backend healthy).
+
+A31/A32 update: frontend restored; actual Founder-session persisted history,
+reload and downloads observed. Two UI reservations addressed and reread live:
+confirmed decision no longer carries an intention-only non-confirmation message;
+analysis text is explicitly historical; temporal CONTRADICTION retains its exact
+rule and explains non-unique references. No data resolution or mutation. 120
+frontend tests and 41 targeted backend tests PASS; TypeScript PASS. This is not
+two-user browser isolation, financial reliability or production proof. A29-A32
+are local/uncheckpointed pending grouped durability. See A32 product evidence.
