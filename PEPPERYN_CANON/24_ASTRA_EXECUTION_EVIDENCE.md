@@ -692,3 +692,99 @@ business write, unchanged DPAPI; write/output/global/production proof flags fals
 Supersedes pending corrected run above. A26 durability batch now warranted before
 legacy decision-feedback mutation-boundary investigation; no live mutation probe
 executed. Detailed scope and preserved failures in A26 evidence document.
+
+## A26 durable / A27 feedback authority — 2026-09-21
+
+A26 HEAD verified locally at 4094416b69ec0e3af893ab56f65238edc2eb2196;
+Founder confirms remote equality and two commits/17 files. Supersedes pending
+durability, not wider proof debts. A26 pairs and excluded next-env.d.ts untouched.
+
+A27 FIX-BLOCKER: legacy feedback route now validates owned completed analysis and
+persisted recommendation before side effects; governed reports must use V1.
+Shared V1 persistence remains unchanged. 44 targeted local tests PASS (feedback
+authority, V1 synthetic routes, decision-memory repair, history read boundary).
+Deployed read-only catalog inspection independently found direct client write
+grants plus company-only RLS on decision_feedback. No exploit/write attempted.
+V37 containment prepared, not applied; approval required before remote permission
+change. Details: docs/Security/PEPPERYN_FEEDBACK_WRITE_BOUNDARY_A27.md.
+Local NOT_CHECKPOINTED; no live write isolation PASS. External Provider/RD CLOSED.
+
+Final A27 run: 46 tests PASS including two static migration checks; these do not
+establish PostgreSQL execution. Repository-wide whitespace check still flags the
+pre-existing excluded next-env.d.ts; it was not changed. Scoped check excludes it.
+
+V37 Founder GO received and migration applied once in Integration Test: success.
+Independent postflight confirms client table/column write grants absent, RLS and
+service CRUD retained. Six SQL-role DML refusals across exact A24 identities PASS,
+all predicates false and rollback: no business changes. Not JWT-session/API proof.
+49 local tests and protected-runner CheckOnly PASS. Actual user-session direct DML
+denial runner prepared; local anon credential required. A26 untouched. No global
+write isolation claim; no production/provider/real-data activation. See A27 doc.
+
+A27 Founder real-session runner executed once: six direct DML denials PASS;
+authority TWO_REAL_AUTHENTICATED_USER_SESSIONS and scope
+DECISION_FEEDBACK_DIRECT_TABLE_PRIVILEGES_ONLY. DPAPI unchanged, no business write.
+API/write/global/output/production flags remain false. Supersedes live-run pending.
+A28 API preparation identifies separate legacy fixtures as necessary for positive
+writes: A26 governed reports must remain rejected by this endpoint. Local two-
+identity HTTP matrix added; auth/DB doubles only. Bounded seed/feedback/pattern
+authorization pending; no new remote writes. See A28 protocol. Not checkpointed.
+Final targeted rerun: 50 tests PASS, including the local two-identity HTTP matrix.
+Synthetic auth doubles are not a live session claim. No gate widened.
+
+A28 bounded write GO received. Runner implemented with explicit seed/authorized
+feedback/adversarial counters, no retry, two-scope before/after comparisons and
+unchanged A26 pairs. Five local harness tests PASS; real route/service exercised
+with synthetic auth/DB doubles. Read-only running-backend check: reachable but
+new authority marker absent. No seed or API POST attempted; backend reload and
+protected local credentials required. Canon A28 protocol records this blocker.
+Final regression: 55 tests PASS; scoped whitespace check PASS. Live remains pending.
+
+Founder backend restart followed by agent read-only check: A28GuardLoaded=true.
+Protected A28 PowerShell runner hash/check-only validated; local keys absent in
+agent process, so Founder masked execution required. No A28 write or live API PASS.
+
+A28 first execution refused before seed/POST (all five counters zero). Read-only
+Integration diagnosis 2026-09-22 proves user_patterns table absent; both technical
+scopes still contain one A26-marked analysis/envelope and zero A28/feedback/arcs.
+Runner's broad stage masked a dependency read error. Precise per-table stage and
+regression added; no empty fallback. V38 backend-only restoration of V7 table
+prepared NOT_APPLIED pending Founder approval. 58 local tests/CheckOnly PASS.
+No remote writes, no V37/A26 mutation or live A28 isolation claim. See A28 protocol.
+
+V38 Founder GO executed once on Integration Test, 2026-09-22: migration query
+bdbcea94-dcb7-4833-b7d6-a3e2201b94a8 succeeded. Read-only postflight query
+065e3faa-f170-492b-952e-846ccb01b82f confirms empty user_patterns, RLS on,
+zero policies, expected PK/FK and enabled timestamp trigger, no anon/authenticated
+table/column rights and backend SELECT/INSERT/UPDATE only. V37 client table write
+denials remain in place. No business DML, A26 change or A28 rerun. This supersedes
+V38 NOT_APPLIED, not A28 pending proof. Local documentation not yet checkpointed.
+External Provider/Real-data Admission CLOSED; wider isolation claims remain OPEN.
+
+A28 next Founder run seeded 2/2 fixtures then refused at ANONYMOUS_DENIAL, no
+authorized POST attempted. Read-only query 1f9d8dab-ba59-4d55-a942-97cca1b79865:
+each technical scope has one A26 analysis/envelope, one A28 analysis, zero
+feedback/patterns/arcs. Preserved without mutation. Verifier anonymous JSON lacked
+Content-Type; local transport reproduction yields 422 before auth versus expected
+401 for valid JSON. Minimal verifier header fix and eight local tests PASS.
+Historical response status was discarded and remains UNKNOWN pending log evidence.
+No live API isolation claim. Old seed wrapper must not be rerun; integrity hash
+now refuses corrected source until a safe existing-fixture continuation is ready.
+V37/V38 and gates unchanged; see A28 protocol for limitations.
+
+A28 Founder LIVE PASS 2026-09-23 (supersedes pending continuation below):
+BOUNDED_LEGACY_FEEDBACK_API_ISOLATION_PASS, existing-only, two fixtures verified,
+zero new inserts, two authorized unsure writes and two pattern rows verified,
+fifteen adversarial refusals. A26 snapshots unchanged, no arcs, DPAPI unchanged.
+Business writes=true; API isolation=true ONLY for A28 legacy unsure scope.
+Broader write/analysis-export/global/production flags=false. Preserve all rows;
+no rerun. Provider/Real-data CLOSED. Evidence recorded locally, not checkpointed.
+
+Founder subsequently recovered the original POST log: 422 Unprocessable Entity;
+historical status now confirmed, no new request. Verifier defect confirmed, not
+an A28 PASS. Existing-only continuation prepared: mandatory explicit mode, zero
+fixture inserts, exact original field/scope checks, refusal of existing feedback,
+before/after snapshots and numeric HTTP diagnostics. 24 targeted local tests and
+protected-wrapper CheckOnly PASS. Live continuation still pending Founder local
+execution; A26/V37/V38 unchanged. No cleanup, reseed or remote business write by
+agent. Current work remains local/uncheckpointed, admission gates CLOSED.

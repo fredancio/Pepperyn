@@ -265,3 +265,24 @@ entity refusal and tenant-query substitution via user sessions; service authorit
 only for V19 engagement reference. WHY: empty reads alone cannot establish isolation
 of existing client history. No writes/analysis/export/global/production claim.
 Evidence: `docs/Security/PEPPERYN_POPULATED_HISTORY_A26.md`, PPR-042; not checkpointed.
+
+A26 is now checkpointed at 4094416b69ec0e3af893ab56f65238edc2eb2196.
+A27 / PPR-043: legacy feedback write authority, FIX-BLOCKER. WHY: prevent caller
+report substitution and bypass of explicit governed decision authority. Local
+HTTP guard implemented/tested; live direct-write privilege gap confirmed by
+catalog read, V37 pending approval/deployment. No write-isolation PASS.
+Evidence: `docs/Security/PEPPERYN_FEEDBACK_WRITE_BOUNDARY_A27.md`.
+
+A27 update: V37 deployed with independent catalog check; six SQL-role no-row DML
+denials observed under two technical identities. Actual user-session runner ready,
+not executed; write isolation remains OPEN. Local package not checkpointed.
+
+A27 actual two-user session denial proof now Founder PASS, direct-table scope
+only. A28 positive/foreign legacy API proof pending controlled separate fixtures;
+see `docs/Security/PEPPERYN_FEEDBACK_API_REHEARSAL_A28.md`. No broader gate closed.
+
+A28 update 2026-09-23: Founder existing-only LIVE BOUNDED API PASS for two legacy
+unsure writes and fifteen refusals; zero fixture inserts, no arcs, A26 preserved.
+V38 backend-only derived-pattern table deployed and inspected. WHY: positive own
+writes plus foreign refusals, not mere denial of all writes. Wider write and
+analysis/export/global/production isolation remain OPEN. Package not checkpointed.

@@ -219,3 +219,47 @@ A26 corrected live run now Founder PASS for the two exact populated histories.
 No write/output/global/production proof. Functional closeout complete, Git
 durability pending. Next selected risk: ownership at legacy decision-feedback
 write boundary; not yet tested live. Existing A26 pairs remain unchanged.
+
+A26 durability confirmed at 4094416b69ec0e3af893ab56f65238edc2eb2196.
+A27 legacy feedback ownership correction locally tested; V1 shared write preserved.
+Live catalog read confirms decision_feedback client write grants and company-only
+RLS leave a separate direct-write gap. V37 prepared NOT_APPLIED; no live write
+probe or global isolation claim. See PEPPERYN_FEEDBACK_WRITE_BOUNDARY_A27.md.
+
+V37 now deployed with Founder GO; effective privilege postflight and six bounded
+SQL-role no-row denial probes PASS. Real user-session/PostgREST and API write
+proofs remain pending, not inferred from deployment. No A26 pair modification.
+
+A27 actual two-user sessions now Founder PASS for six direct-table DML denials.
+API ownership/positive-write proof remains OPEN. A28 protocol prepared; governed
+A26 reports are unsuitable positive legacy fixtures. Two separate synthetic
+legacy fixtures plus explicit unsure feedback/pattern effects require bounded
+write authorization. No such seed or API write performed; wider gates unchanged.
+
+A28 GO now granted within that exact scope. Runner locally tested; live blocked
+before writes by outdated running backend (authority marker absent). No live API
+write-isolation proof, no A26 changes. Reload/protected local execution pending.
+
+A28 reload succeeded but rehearsal refused before any authorized write. Live
+read-only diagnosis: user_patterns absent. Not existing-data contamination.
+V38 schema repair prepared (V7-derived columns; backend-only rights), not applied.
+Precise diagnostic stage locally tested; live API proof remains OPEN.
+
+V38 now APPLIED with explicit Founder GO; deployed read-only postflight PASS:
+user_patterns empty, RLS/no client policies or privileges, backend-only
+SELECT/INSERT/UPDATE, expected constraints/trigger. No A26/V37 modification or
+A28 reseed/cleanup. A28 live API proof remains OPEN pending the controlled rerun.
+Deployment evidence is recorded in 24 and the A28 protocol, not yet checkpointed.
+
+A28 has two persisted synthetic legacy fixtures (one per technical scope), but
+zero authorized feedback writes demonstrated. First post-seed anonymous probe
+returned historical 422 due to verifier media type, not the expected auth 401.
+Correction and existing-only continuation locally tested; live API isolation
+still OPEN. Do not run the old seeding procedure or count this refusal as PASS.
+
+A28 existing-only continuation now Founder LIVE BOUNDED PASS (2026-09-23): two
+authorized unsure writes/pattern rows and fifteen refusals, zero fixture inserts,
+A26 unchanged and no arcs. This supersedes A28 pending status, not broader write,
+analysis/export/global or production isolation. Preserve rows; no further rerun.
+Next output-isolation proof must include positive own responses; existing single
+designated-company gate must not be weakened or mistaken for ownership proof.
