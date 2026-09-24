@@ -4,6 +4,10 @@
 
 - Tester 1: Frédéric Anciaux.
 - Tester 2: one Fractional CFO design partner explicitly selected by Frédéric.
+- 2026-09-24: Founder confirms the design partner is selected. Identity/contact
+  need not be collected until B6 is ready; no account provisioning/admission yet.
+- Public brand/domain: Insight Shaper / `insightshaper.com`; same product and
+  gates. Operator: Frédéric Anciaux in his own name. Activation remains reserved.
 - No other user is authorized by default.
 - No public signup, open registration, pricing, sale or Stripe dependency.
 

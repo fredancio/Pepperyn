@@ -2,6 +2,12 @@
 
 ## Product identity
 
+Founder decision 2026-09-24: the public brand is **Insight Shaper**, continuing
+the same Pepperyn product, not a fork or rebuild. Pepperyn terminology below
+remains authoritative internal/historical terminology. All doctrine, capabilities,
+contracts and evidence retain their authority; rebranding never licenses their
+replacement. Public destination: `insightshaper.com`, activation not authorized.
+
 Pepperyn is a persistent, temporal and proactive financial operating system for
 a portfolio of SMEs. Its first professional hypothesis is:
 

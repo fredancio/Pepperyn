@@ -1,5 +1,20 @@
 # Current implementation reality
 
+## Current public-identity delta — 2026-09-24
+
+Founder decides Insight Shaper is the public continuation of Pepperyn, operated
+by Frédéric Anciaux in his own name; insightshaper.com personally purchased is
+the future Beta domain. Doctrine/architecture/code/evidence remain unchanged.
+Public-brand implementation NOT DONE; no deployed debranding PASS. Founder reports
+pepperyn.com apex/www 404 DEPLOYMENT_NOT_FOUND on 2026-09-23; no independent check
+or assertion that alternate URLs are inaccessible. Legacy domain is legally held
+by Finflate per Founder inventory and frozen; recovery no longer blocks V1.
+Infrastructure inventory and accepted separate staging/Beta target are in Canon
+14; no provisioning/activation. Design partner selected, account NOT admitted.
+PG2 PASS; PG3/PG4 OPEN; Provider/RD CLOSED; Self-Selling DEFERRED.
+Scope: documentary update only, local/uncheckpointed. Critical-path authority:
+`docs/Project_Control/INSIGHT_SHAPER_PRIVATE_BETA_CRITICAL_PATH.md`.
+
 ## Post-takeover delta — 2026-09-15
 
 Selected-client synthetic mock ingestion is IMPLEMENTED / TESTED at the HTTP

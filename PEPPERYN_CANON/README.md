@@ -1,5 +1,12 @@
 # Pepperyn Master Canon
 
+**Founder update 2026-09-24:** Insight Shaper is the public identity of this same
+product; Pepperyn remains its internal/historical identity and provenance. Target:
+`insightshaper.com`. `pepperyn.com` is frozen and no longer a V1 dependency.
+See decisions DEC-028..031 and
+`docs/Project_Control/INSIGHT_SHAPER_PRIVATE_BETA_CRITICAL_PATH.md`.
+No technical renaming, gate opening or infrastructure activation is implied.
+
 **Status:** Astra takeover approved by Founder on 2026-09-15. Autonomous technical V1 convergence authorized under contract 18; provider, real-data and production activation remain unauthorized.
 
 **Baseline:** `6fb05c11394ce33423e81697a3dd13e9513e7794`

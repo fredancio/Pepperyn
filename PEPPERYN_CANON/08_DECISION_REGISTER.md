@@ -17,12 +17,37 @@
 | DEC-013 | Do not retrofit ExpectedImpact to the existing synthetic decision | CURRENT FOUNDER DECISION | Preserve measurement integrity | Founder decision |
 | DEC-014 | Self-Selling Control Center remains parked/deferred | CURRENT STRATEGIC DECISION | Preserve vision without V1 scope creep | self-selling vision; deferred register |
 | DEC-015 | Active Pepperyn must be debranded from Finflate | CURRENT FOUNDER DECISION | Product identity; historical provenance remains internal | handover directive |
-| DEC-016 | Production destination is www.pepperyn.com | CURRENT FOUNDER DECISION | Private Beta delivery target | handover directive |
+| DEC-016 | Production destination is www.pepperyn.com | SUPERSEDED by DEC-028 on 2026-09-24 | Historical Private Beta delivery target preserved as provenance | handover directive |
 | DEC-017 | Integration Test must not be relabeled production | CURRENT INFRASTRUCTURE INVARIANT | Environment and secret separation | handover directive |
 | DEC-018 | Architecture and implementation are contestable; capabilities and guarantees are not silently contestable | CURRENT GOVERNANCE DECISION | Allow Astra improvement without identity loss | handover directive; No Silent Regression |
 | DEC-019 | Original Cowork set and 18-file divergence are not silently reconstructed | QUARANTINED_UNRESOLVED | Avoid invented history | authority inventory/map |
-| DEC-020 | Legal/operator replacement identity for debranding requires Founder confirmation | OPEN FOUNDER DECISION | Avoid false legal representation | handover directive |
+| DEC-020 | Legal/operator replacement identity for debranding requires Founder confirmation | IDENTITY RESOLVED by DEC-029; publication details still due | Avoid false legal representation | handover directive; Founder update 2026-09-24 |
 | DEC-021 | Astra takeover audit accepted; autonomous technical convergence authorized | CURRENT FOUNDER AUTHORITY 2026-09-15 | Execute HOW without routine approval; preserve WHY and all protected gates | Founder approval in this Work; contract 18 |
+
+## Public identity and infrastructure update — 2026-09-24
+
+- DEC-028 (FOUNDER): Insight Shaper is the public brand of the same product;
+  `insightshaper.com` is the future public/Beta destination. Pepperyn remains
+  internal identity/provenance. No fork, rebuild, global replacement, repository,
+  schema, fixture, migration, evidence-ID or technical-identifier rename.
+- DEC-029 (FOUNDER): operator is Frédéric Anciaux, individual/in his own name,
+  not Finflate. No invented entity/address/contact. Second CFO selected; no
+  account creation/admission or personal-data request before B6 is ready.
+- DEC-030 (FOUNDER): `pepperyn.com`, legally held by Finflate SRL according to
+  Founder inventory, is frozen: no holder/contact/DNS/OVH association/hosting
+  changes. Recovery/assignment is separate deferred work, NOT a V1 dependency.
+  Founder reports both apex/www returned Vercel DEPLOYMENT_NOT_FOUND on
+  2026-09-23; this is bounded observed unavailability, NOT debranding/security PASS.
+- DEC-031 (FOUNDER): retain distinct Integration Test; synthetic-only staging
+  (Vercel Preview, new EU Railway, new EU Supabase); distinct Beta stack/secrets
+  using Vercel/EU Railway/EU Supabase. Old US Railway and OVH hosting preserved.
+  Domain purchase/topology acceptance do not authorize provisioning, DNS,
+  deployment, migration, deletion, transfer or activation. PG2 PASS; PG3/PG4 OPEN;
+  External Provider and Real-data Admission CLOSED; Self-Selling DEFERRED.
+
+Source: Founder directive `FOUNDER UPDATE — PUBLIC DEBRANDING + INSIGHT SHAPER`
+received in this Work on 2026-09-24. Operational scope and remaining dependencies:
+`docs/Project_Control/INSIGHT_SHAPER_PRIVATE_BETA_CRITICAL_PATH.md`.
 
 ## Professional review adoption
 

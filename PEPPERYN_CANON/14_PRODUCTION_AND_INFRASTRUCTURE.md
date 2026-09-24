@@ -2,6 +2,35 @@
 
 ## Evidence rule
 
+Current Founder inventory/target update dated 2026-09-24 supersedes the unknown
+inventory statements below only to the extent explicitly recorded here. It is
+Founder-reported control-plane evidence, not an independent deployed security audit.
+
+- Vercel Pepperyn project is connected to `fredancio/Pepperyn`; Production follows
+  main; other branches are Preview; no custom staging; Production rolled back
+  to an old revision. Previews/history preserved.
+- Railway: worthy-light / Pepperyn Online at
+  `pepperyn-production.up.railway.app`, US West, old Git deployment. Preserve it;
+  no Beta secrets. fabulous-tranquility service Removed/pending deletion: do not
+  delete or reuse as part of this decision.
+- OVH: pepperyn.com holder Finflate SRL; domain, contacts, DNS, associations and
+  Free Hosting frozen. Existing ns20/dns20 OVH DNS, Vercel www CNAME, apex A and
+  redirect mechanism, MX/SPF/DKIM/DMARC/Resend records remain untouched. Domain
+  expiry reported 2027-02-28. Free Hosting eu-west-gra reports 0 MB/0 DB/Git
+  inactive; this is NOT proof of absent redirect/mail dependencies.
+- Founder private-browser check 2026-09-23: apex and www return Vercel 404
+  DEPLOYMENT_NOT_FOUND. Old public domain presence currently unavailable;
+  alternate URLs/Previews not audited or declared debranded.
+- insightshaper.com personally purchased through Founder's personal OVH account;
+  new public/Beta target. No DNS/service configuration authorized yet.
+
+Accepted minimal target: existing Integration Test unchanged; separate synthetic
+staging with Vercel Preview/recipe branch, new EU Railway and EU Supabase; separate
+Beta Vercel/EU Railway/EU Supabase and secrets. Region-specific provisioning and
+effective safeguards remain to be verified. No new VPS or OVH application hosting.
+Preserve public/mail availability; do not combine legacy-domain administrative
+work with Beta release. Legacy domain recovery is no longer on B5's critical path.
+
 Configuration files and historical deployment guides show capability or intent;
 they do not prove the effective external configuration. Production must be
 verified from the controlling services before release.
@@ -51,7 +80,10 @@ verified from the controlling services before release.
 
 ## Required environment separation
 
-`DEVELOPMENT -> INTEGRATION TEST -> STAGING/PRIVATE BETA VALIDATION -> PRODUCTION -> www.pepperyn.com`
+`DEVELOPMENT -> INTEGRATION TEST -> STAGING/PRIVATE BETA VALIDATION -> PRODUCTION / PRIVATE BETA -> insightshaper.com`
+
+This target supersedes DEC-016's historical www.pepperyn.com destination, without
+altering the environment-isolation requirement or authorizing activation.
 
 Each environment requires separate database, secrets, provider policy,
 correspondence keys, logging/observability and deployment evidence. Integration

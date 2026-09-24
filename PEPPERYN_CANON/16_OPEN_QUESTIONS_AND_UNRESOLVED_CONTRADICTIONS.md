@@ -8,10 +8,10 @@
 | U-004 | Complete RECALL-before-ASK wiring coverage | UNRESOLVED | claims that CFO repetition is fully eliminated |
 | U-005 | FTE/temporal normalizer remaining gaps and unique current-period semantics | OPEN WITH TRIGGERS | full temporal reliability claim |
 | U-006 | Evidence capture outcome semantics and assertion-level links | DEFERRED WITH TRIGGERS | dependent correctness/direct-proof claims |
-| U-007 | Production legal/operator identity replacing active Finflate identity | FOUNDER_DECISION_REQUIRED BEFORE RELEASE | debranding/legal release |
-| U-008 | Vercel effective configuration and role | UNKNOWN | production deployment |
-| U-009 | Railway effective configuration and role | UNKNOWN | production deployment |
-| U-010 | OVH DNS/VPS/TLS current state | UNKNOWN | production deployment |
+| U-007 | Operator publication details replacing active Finflate identity | NAME/STATUS DECIDED 2026-09-24: Frédéric Anciaux in his own name; contact/publication details pending | truthful legal/support release |
+| U-008 | Vercel effective Beta configuration | EXISTING INVENTORY FOUNDER_REPORTED; target configuration/deployed proof pending | Beta deployment |
+| U-009 | Railway effective Beta configuration | EXISTING US WEST INVENTORIED; separate EU target not provisioned/proven | Beta deployment |
+| U-010 | Domain/DNS/TLS | insightshaper.com TARGET NOT ACTIVATED; pepperyn.com FROZEN/deferred | new-domain activation; legacy recovery does NOT block V1 |
 | U-011 | Production Supabase topology, privileges, backup and recovery | OPEN | production/real data |
 | U-012 | Production correspondence-key custody and lifecycle | OPEN | production pseudonymization |
 | U-013 | OpenAI PG-3/PG-4 project-specific evidence | OPEN | provider activation |
