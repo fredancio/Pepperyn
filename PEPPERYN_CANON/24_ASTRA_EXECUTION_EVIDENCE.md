@@ -865,3 +865,41 @@ V39 SQL checked statically only; no running local PostgreSQL. Migration NOT appl
 no receipt or analysis written remotely, no existing row backfilled. Not live
 atomicity/RLS/financial/production proof. Pending durability checkpoint; see
 docs/Project_Control/INSIGHT_SHAPER_B1_EXECUTION_PROVENANCE.md.
+
+2026-09-24 V39 deployment proof supersedes MIGRATION_NOT_APPLIED only: code base
+1b729888df2de776a9e8cf18440faf9aba2879e2 synchronized per Founder, inspected locally.
+Explicitly approved Integration Test project ejixkplrgobgwqnhidwt visually verified;
+two read-only catalog prechecks conforming; committed migration applied exactly
+once, SQL Editor `Success. No rows returned`. Read-only postflight: expected eight
+columns/seven validated constraints; RLS=true, policies=0; clients no table/RPC
+privileges, service SELECT-only table and EXECUTE-only persistence entry point;
+PUBLIC ACLs absent; fixed function search_path and enabled immutability trigger.
+receipt_count=0. No RPC call/business write, no synthetic write rehearsal or
+provider call. This proves deployed schema/permissions, NOT live receipt atomicity,
+restart, replay, adversarial enforcement, B1, financial reliability or production.
+Separate authorization required for prospective synthetic persistence rehearsal.
+Details/hash in B1 execution-provenance document. New documentation local pending
+durability checkpoint; External Provider/Real-data Admission remain CLOSED.
+
+V39 rehearsal preparation (same date): Founder authorized four calls / at most
+three durable synthetic rows, existing technical account 1 only. Harness and
+Windows wrapper locally verified: 39 tests PASS plus actual runtime CheckOnly.
+Fresh read-only deployed RPC/trigger inspection conforms, receipt_count=0.
+NO LIVE REHEARSAL YET: Supabase keys unavailable in agent process; requires one
+Founder-local masked-input execution. Exclusive manifest blocks reruns; second
+Python process performs business-read-only recovery after first process exits.
+See B1 execution-provenance preparation addendum for exact scope, failure handling
+and residual debts. Local/uncheckpointed; no B1/gate promotion.
+
+V39 live closeout 2026-09-24 supersedes the preceding NOT RUN LIVE state. Founder
+reports BOUNDED_V39_PERSISTENCE_RECOVERY_PASS after first process exited, with
+three durable rows, P0001 binding denial, 23514 late rollback leaving no trio,
+23505 exact replay denial and unchanged existing scoped rows. Agent inspected
+the local manifest read-only: four attempts; scoped counts 2/1/0 -> 3/2/1;
+pre-existing hashes identical. Positive UUID 5c441eb9-99fc-55eb-bd33-da29d1fc2ba5.
+Second-process proof is Founder-reported terminal evidence; manifest deliberately
+retains first-process-complete status and must not be reset/rerun. Exact artifact
+hashes and evidence limits are in the B1 execution-provenance live addendum.
+No new remote action during closeout. No global B1/HTTP/browser/isolation/production
+proof. Gates CLOSED; retained synthetic rows only. Harness and documentary delta
+remain local pending durability checkpoint, not part of the current HEAD.

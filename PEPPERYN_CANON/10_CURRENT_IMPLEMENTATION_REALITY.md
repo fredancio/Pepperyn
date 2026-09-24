@@ -330,3 +330,25 @@ read; V39/preflight prepared, NOT applied. Existing routes still use V27 and no
 historical analysis is certified. 96 local tests PASS; actual SQL atomicity,
 permissions and durability unproven. Details/next authorization boundary:
 docs/Project_Control/INSIGHT_SHAPER_B1_EXECUTION_PROVENANCE.md.
+
+2026-09-24 V39 superseding deployment state: Founder-confirmed provenance
+checkpoint 1b729888df2de776a9e8cf18440faf9aba2879e2 is durable. After explicit
+approval and conforming read-only project/catalog preflight, V39 was applied ONCE
+to Pepperyn Integration Test. SQL Editor success and read-only postflight establish
+expected columns/constraints, RLS with zero policies, backend-only SELECT/RPC
+permissions and enabled immutability trigger. Receipt count is zero. No analysis,
+receipt or history write/rehearsal occurred. Application persistence, replay,
+rollback and restart proof remain OPEN; this is NOT B1 PASS or production proof.
+Separate Founder authorization is required before any synthetic write rehearsal.
+External Provider and Real-data Admission CLOSED. Deployment evidence addendum:
+docs/Project_Control/INSIGHT_SHAPER_B1_EXECUTION_PROVENANCE.md (local, not checkpointed).
+
+V39 subsequent live rehearsal: Founder reports bounded persistence/recovery PASS.
+One authorized synthetic trio persisted; invalid binding refused; late receipt
+constraint failure rolled back its analysis/envelope; exact replay refused;
+independent second Python process recovered the bound receipt. Local manifest
+inspection confirms four calls, three additions and prior scoped hashes unchanged.
+No rerun/cleanup. This closes only that mock application-service persistence proof,
+not B1, normal HTTP/browser execution, global isolation or real-data/provider gates.
+See final live addendum in INSIGHT_SHAPER_B1_EXECUTION_PROVENANCE.md for identifiers,
+hashes, evidence sources and remaining work. Local documentation pending checkpoint.
