@@ -323,3 +323,9 @@ into production. Existing guarded routes now delegate to source-independent
 application services. Generic ingestion, execution provenance and route activation
 remain OPEN; no real-data/provider authorization. See
 docs/Project_Control/INSIGHT_SHAPER_B1_SHARED_READ_BOUNDARY.md.
+
+B1 execution provenance (2026-09-24): IMPLEMENTED / LOCAL_TESTED / V39_NOT_APPLIED.
+WHY: preserve prospective execution origin rather than transplant mock disclosures
+into a generic Beta path. Closed producer, exact source/envelope/scope receipt and
+single-RPC protocol prepared; no backfill or public activation. No live durability
+or generic real-data support. See docs/Project_Control/INSIGHT_SHAPER_B1_EXECUTION_PROVENANCE.md.

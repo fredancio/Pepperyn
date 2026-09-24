@@ -322,3 +322,11 @@ existing routes delegate without changing their designation/mounting gates.
 88 targeted tests PASS; no deployment or live proof. Generic ingestion/routing and
 durable execution provenance are still missing; synthetic export disclosures must
 not be generalized. See docs/Project_Control/INSIGHT_SHAPER_B1_SHARED_READ_BOUNDARY.md.
+
+Founder confirms shared-read checkpoint dd8a99868a3fd68b8038fddc9f5c0399eec00fe0
+synchronized. Subsequent B1 execution-provenance work is local/prepared only:
+prospective registered-mock receipt, optional single-RPC persistence and verified
+read; V39/preflight prepared, NOT applied. Existing routes still use V27 and no
+historical analysis is certified. 96 local tests PASS; actual SQL atomicity,
+permissions and durability unproven. Details/next authorization boundary:
+docs/Project_Control/INSIGHT_SHAPER_B1_EXECUTION_PROVENANCE.md.

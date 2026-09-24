@@ -857,3 +857,11 @@ engagement, plus existing lifecycle/export/temporal/isolation regressions. No
 new HTTP route, migration, deployment, business write or external call. Not a
 full B1/Beta/Financial Reliability PASS. Scope and next debts are recorded in
 docs/Project_Control/INSIGHT_SHAPER_B1_SHARED_READ_BOUNDARY.md. Pending checkpoint.
+
+Founder dd8a99868a3fd68b8038fddc9f5c0399eec00fe0 synchronization supersedes that
+pending-checkpoint state. Next B1 provenance preparation: 96 local tests PASS;
+single mocked RPC binding and fail-closed acknowledgement, no provider/remote data.
+V39 SQL checked statically only; no running local PostgreSQL. Migration NOT applied,
+no receipt or analysis written remotely, no existing row backfilled. Not live
+atomicity/RLS/financial/production proof. Pending durability checkpoint; see
+docs/Project_Control/INSIGHT_SHAPER_B1_EXECUTION_PROVENANCE.md.
