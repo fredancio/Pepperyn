@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from decimal import Decimal, localcontext
+from datetime import datetime, timezone
+from uuid import uuid4
 
 import hashlib
 from dataclasses import dataclass
@@ -11,6 +13,7 @@ from typing import Any, Mapping
 from connectors import FileConnector
 from services.anonymization_service import anonymize_parsed_data
 from services.data_quality_gate import validate_excel_before_analysis
+from services.execution_provenance import ExecutionProvenance
 from services.v1_analysis_contract import (
     GovernedAnalysisEnvelope,
     GovernedFinancialAnalysis,
@@ -45,6 +48,31 @@ class SyntheticMockAnalysis:
     provider_mode: str
     provider_request: Mapping[str, Any]
     envelope: GovernedAnalysisEnvelope
+
+
+@dataclass(frozen=True)
+class RecordedSyntheticExecution:
+    analysis: SyntheticMockAnalysis
+    provenance: ExecutionProvenance
+
+
+def run_recorded_registered_mock_analysis(raw: bytes, filename: str) -> RecordedSyntheticExecution:
+    """Issue provenance only after the existing closed local executor succeeds.
+
+    No caller-provided provider, origin or transport labels are accepted.
+    This does not persist, authorize an upload, or backfill a historical run.
+    """
+    from services.governed_analysis_persistence import _digest
+    result = run_registered_mock_analysis(raw, filename)
+    record = ExecutionProvenance(
+        execution_id=uuid4(), executor="registered-workbook-mock-v1",
+        data_origin="REGISTERED_SYNTHETIC", provider_mode="LOCAL_MOCK", transport="NONE",
+        raw_source_sha256=result.source_sha256,
+        source_representation_sha256=result.envelope.source_facts.source_representation_sha256,
+        envelope_sha256=_digest(result.envelope.model_dump(mode="json")),
+        completed_at=datetime.now(timezone.utc),
+    )
+    return RecordedSyntheticExecution(result, record)
 
 
 def _registered_understanding(

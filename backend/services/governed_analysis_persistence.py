@@ -53,6 +53,7 @@ def _scope(analysis_id: str, company_id: str, entity_id: str) -> tuple[str, str,
 def save_governed_analysis(
     supabase: Any, *, analysis_row: dict[str, Any], engagement_id: str,
     envelope: GovernedAnalysisEnvelope,
+    execution_provenance=None,
 ) -> None:
     """Create the analysis and immutable envelope in one database transaction."""
 
@@ -79,9 +80,26 @@ def save_governed_analysis(
             "source_representation_sha256": source_sha256,
             "envelope_schema_version": SCHEMA_VERSION,
         }
-        supabase.rpc("persist_governed_analysis_v1", {
+        parameters = {
             "p_analysis": normalized_analysis, "p_envelope": envelope_row,
-        }).execute()
+        }
+        rpc = "persist_governed_analysis_v1"
+        if execution_provenance is not None:
+            from services.execution_provenance import validate_execution
+            record = validate_execution(
+                execution_provenance, envelope=envelope,
+                raw_source_sha256=normalized_analysis.get("source_data_hash", ""),
+            )
+            receipt = record.model_dump(mode="json")
+            receipt.update(analysis_id=analysis_id, company_id=company_id,
+                           entity_id=entity_id, engagement_id=engagement_id)
+            parameters["p_receipt"] = {"payload": receipt, "sha256": _digest(receipt)}
+            rpc = "persist_governed_execution_v1"
+        response = supabase.rpc(rpc, parameters).execute()
+        if execution_provenance is not None and response.data != analysis_id:
+            raise GovernedPersistenceRefused("GOVERNED_PERSISTENCE_ACK_UNCERTAIN")
+    except GovernedPersistenceRefused:
+        raise
     except Exception as exc:
         raise GovernedPersistenceRefused("GOVERNED_PERSISTENCE_FAILED") from exc
 
@@ -127,3 +145,38 @@ def load_governed_envelope(
     if envelope.source_facts.source_representation_sha256 != source_sha256:
         raise GovernedPersistenceRefused("GOVERNED_SOURCE_MISMATCH")
     return envelope
+
+
+def load_execution_provenance(supabase, *, analysis_id: str, company_id: str,
+                              entity_id: str, engagement_id: str):
+    """Internal owned-scope reader. None means no receipt, never local-mock proof."""
+    envelope = load_governed_envelope(
+        supabase, analysis_id=analysis_id, company_id=company_id,
+        entity_id=entity_id, engagement_id=engagement_id,
+    )
+    scope = dict(zip(("analysis_id", "company_id", "entity_id", "engagement_id"),
+                     map(_uuid, (analysis_id, company_id, entity_id, engagement_id))))
+    try:
+        query = supabase.from_("governed_execution_receipts").select("payload,sha256")
+        for key, value in scope.items():
+            query = query.eq(key, value)
+        rows = query.limit(2).execute().data
+        if not isinstance(rows, list) or len(rows) > 1:
+            raise ValueError("invalid receipt response")
+        if not rows:
+            return None
+        payload = rows[0]["payload"]
+        if (_digest(payload) != rows[0]["sha256"]
+                or any(payload.get(key) != value for key, value in scope.items())):
+            raise ValueError("receipt binding mismatch")
+        from services.execution_provenance import validate_execution
+        record = {key: value for key, value in payload.items() if key not in scope}
+        sources = (supabase.from_("analyses").select("source_data_hash")
+                   .eq("id", scope["analysis_id"]).eq("company_id", scope["company_id"])
+                   .eq("entity_id", scope["entity_id"]).limit(2).execute()).data
+        if not isinstance(sources, list) or len(sources) != 1:
+            raise ValueError("source unavailable")
+        return validate_execution(record, envelope=envelope,
+                                  raw_source_sha256=sources[0]["source_data_hash"])
+    except Exception:
+        raise GovernedPersistenceRefused("GOVERNED_EXECUTION_READ_REFUSED") from None
