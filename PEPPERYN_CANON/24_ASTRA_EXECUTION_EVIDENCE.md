@@ -836,3 +836,15 @@ analysis decision text explicitly historical. Full frontend 120 tests / TypeScri
 PASS; targeted backend 41 PASS. Actual same-session browser reload/reopen confirms
 corrected text and preserved lifecycle; NOT two-user browser isolation. See
 docs/Product/PEPPERYN_TERMINAL_STATE_REVIEW_A32.md. Local/uncheckpointed; gates CLOSED.
+
+2026-09-24: subsequent Founder reports establish A29–A32 durability and the current
+Founder/Governance base c4b414f17f63025032943159bc121c5901f65225. B1 memory-read
+correction is local, not yet checkpointed. Four registry outages are explicitly
+UNKNOWN in UI and refuse exports; independent analysis remains readable. No live
+records, gates or deployment changed. B5 target preparation is documentary and
+does not establish configured environments or a working generic Beta path.
+See INSIGHT_SHAPER_B1_MEMORY_READ_CONTRACT.md and
+INSIGHT_SHAPER_B5_DEPLOYMENT_PREPARATION.md under docs/Project_Control/.
+Final checks: 60 targeted backend tests PASS, 17 frontend suites / 121 tests PASS,
+TypeScript no-emit PASS. These local results do not promote any live, financial,
+privacy, provider, real-data or production gate. next-env.d.ts remains excluded.

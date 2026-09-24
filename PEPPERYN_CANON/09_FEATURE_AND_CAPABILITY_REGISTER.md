@@ -309,3 +309,10 @@ WHY: a CFO must distinguish initial recommendations from later confirmed decisio
 and refusal of reference selection from contradiction of amounts. LOCAL_TESTED /
 BOUNDED_BROWSER_OBSERVED, not two-user browser/global proof, not checkpointed.
 See docs/Product/PEPPERYN_TERMINAL_STATE_REVIEW_A32.md.
+
+B1 terminal-memory availability (2026-09-24): IMPLEMENTED / LOCAL_TESTED,
+not live-proven. WHY: unavailable durable memory must never invite duplicate
+professional action or become a false absence in UI/exports. Explicit unknown
+state suspends forms; all governed exports refuse incomplete registry reads.
+No migration or record change; generic non-sandbox B1 still OPEN. Contract and
+tests: docs/Project_Control/INSIGHT_SHAPER_B1_MEMORY_READ_CONTRACT.md.

@@ -301,3 +301,16 @@ rule and explains non-unique references. No data resolution or mutation. 120
 frontend tests and 41 targeted backend tests PASS; TypeScript PASS. This is not
 two-user browser isolation, financial reliability or production proof. A29-A32
 are local/uncheckpointed pending grouped durability. See A32 product evidence.
+
+2026-09-24 superseding durability note: Founder confirmed A29–A32 synchronized;
+Founder/Governance checkpoint c4b414f17f63025032943159bc121c5901f65225 is the
+current inspected base. This changes durability, not the scope of those proofs.
+
+B1 preparation now fixes unavailable lifecycle reads being presented as absent:
+explicit UNAVAILABLE projection, read-only explanatory UI, all three exports
+refused on incomplete registry reads. Local only; generic non-sandbox Beta path
+still missing. See docs/Project_Control/INSIGHT_SHAPER_B1_MEMORY_READ_CONTRACT.md.
+B5 repository preparation documents why ENVIRONMENT=staging is not a security
+profile and why the current synthetic router cannot be promoted to Beta. Target
+recipe remains unprovisioned and dependent on B1; see
+docs/Project_Control/INSIGHT_SHAPER_B5_DEPLOYMENT_PREPARATION.md.
