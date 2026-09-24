@@ -23,7 +23,7 @@ def _one(response):
     return rows[0]
 
 
-def load_owned_analysis(db, *, analysis_id: str, company_id: str):
+def load_owned_analysis_context(db, *, analysis_id: str, company_id: str):
     try:
         analysis_id, company_id = str(UUID(analysis_id)), str(UUID(company_id))
     except (ValueError, TypeError, AttributeError):
@@ -43,10 +43,11 @@ def load_owned_analysis(db, *, analysis_id: str, company_id: str):
         if engagement.get("entity_id") != entity_id:
             raise GovernedReadRefused("NOT_FOUND")
         engagement_id = str(UUID(engagement["id"]))
-        return load_governed_envelope(
+        envelope = load_governed_envelope(
             db, analysis_id=analysis_id, company_id=company_id,
             entity_id=entity_id, engagement_id=engagement_id,
         )
+        return envelope, entity_id, engagement_id
     except GovernedReadRefused:
         raise
     except GovernedPersistenceRefused as exc:
@@ -55,6 +56,10 @@ def load_owned_analysis(db, *, analysis_id: str, company_id: str):
         raise GovernedReadRefused("UNAVAILABLE") from None
     except Exception:
         raise GovernedReadRefused("UNAVAILABLE") from None
+
+
+def load_owned_analysis(db, *, analysis_id: str, company_id: str):
+    return load_owned_analysis_context(db, analysis_id=analysis_id, company_id=company_id)[0]
 
 
 def read_owned_analysis(db, *, analysis_id: str, company_id: str) -> AnalyzeResponse:

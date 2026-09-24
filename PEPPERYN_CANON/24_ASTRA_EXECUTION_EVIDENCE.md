@@ -903,3 +903,14 @@ hashes and evidence limits are in the B1 execution-provenance live addendum.
 No new remote action during closeout. No global B1/HTTP/browser/isolation/production
 proof. Gates CLOSED; retained synthetic rows only. Harness and documentary delta
 remain local pending durability checkpoint, not part of the current HEAD.
+
+Founder V39 durability confirmed; locally verified exact checkpoint is
+2348e77145b25644bcdcfd22a43afb5e5f339a81 (corrects the reported transcription).
+Subsequent B1 governed output composition is local only: 117 tests PASS, including
+receipt-to-three-export content, local ASGI owned/foreign/admission failures,
+unattested legacy behavior and regressions of shared reads/synthetic outputs/
+temporal/execution provenance. No external writes or running-server change.
+Router factory is deliberately unmounted; test dependencies are not admission
+authority. No real-session/browser/RLS/visual/financial/global B1 promotion.
+Scope/remaining debts: docs/Project_Control/INSIGHT_SHAPER_B1_GOVERNED_OUTPUT_COMPOSITION.md.
+Local files pending grouped checkpoint; both gates CLOSED, Self-Selling DEFERRED.

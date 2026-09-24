@@ -352,3 +352,13 @@ No rerun/cleanup. This closes only that mock application-service persistence pro
 not B1, normal HTTP/browser execution, global isolation or real-data/provider gates.
 See final live addendum in INSIGHT_SHAPER_B1_EXECUTION_PROVENANCE.md for identifiers,
 hashes, evidence sources and remaining work. Local documentation pending checkpoint.
+
+Founder confirms V39 checkpoint synchronized; exact locally verified hash is
+2348e77145b25644bcdcfd22a43afb5e5f339a81 (transcription corrected).
+Next B1 local block: shared governed renderers with legacy synthetic wrappers;
+ownership-bound receipt/memory/temporal composition and unmounted read/export
+router factory. Missing receipts remain UNATTESTED, invalid/unavailable reads
+refuse; verified V39 provenance reaches JSON/XLSX/PDF/PPTX. 117 targeted tests PASS.
+No main.py mounting, deployment, data/provider operation or gate opening. Not
+generic ingestion, actual authenticated Beta transport, live/visual/financial
+proof. See INSIGHT_SHAPER_B1_GOVERNED_OUTPUT_COMPOSITION.md. Pending checkpoint.
