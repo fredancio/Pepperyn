@@ -17,13 +17,13 @@ from models.schemas import AnalyzeResponse
 import routers.analyze as analyze_routes
 from sandbox.v1_golden_case import run_v1_golden_case
 from sandbox.governed_exports import generate_governed_excel, generate_governed_pdf, generate_governed_pptx
-from services.governed_analysis_persistence import (
-    GovernedPersistenceRefused, load_governed_envelope, save_governed_analysis,
-)
+from services.governed_analysis_persistence import save_governed_analysis
 from services.governed_temporal_continuity import (
     GovernedTemporalContinuityRefused, load_governed_temporal_comparison,
 )
-from services.decision_memory_service import DecisionMemoryService, make_recommendation_id
+from services.decision_memory_service import DecisionMemoryService
+from services.governed_memory_read import GovernedMemoryUnavailable, recommendations_tracking
+from services.governed_analysis_read import GovernedReadRefused, load_owned_analysis, read_owned_analysis
 from sandbox.heterogeneous_workbooks import inspect_registered_workbook, run_registered_mock_analysis
 from sandbox.v1_prerequisite_evidence import (
     PrerequisiteEvidenceRefused, load_validated_prerequisite_evidence,
@@ -36,122 +36,15 @@ logger = logging.getLogger(__name__)
 _EXECUTION_PREREQUISITES = ["Obtenir le tableau des flux mensuel et les échéanciers clients."]
 
 
-def _recommendations_tracking(
-    envelope, analysis_id: str, supabase=None, *, feedback_required: bool = False,
-) -> list[dict]:
-    """Project governed recommendations into the existing intention UI contract.
-
-    This is deliberately an intention/feedback projection only. It neither
-    creates a DecisionKernel nor represents a recommendation as a confirmed
-    professional decision.
-    """
-    priority = {"P1": "haute", "P2": "moyenne", "P3": "basse"}
-    items = [
-        {
-            "id": make_recommendation_id(analysis_id, "plan_action", index),
-            "text": item.action,
-            "rationale": item.rationale,
-            "fact_ids": list(item.fact_ids),
-            "prerequisite_validation": list(item.prerequisite_validation),
-            "source": "plan_action",
-            "priority": priority[item.priority],
-            "index": index,
-        }
-        for index, item in enumerate(envelope.governed_analysis.recommendations)
-    ]
-    if supabase is None:
-        return items
-
-    def unavailable(stage: str) -> list[dict]:
-        # Do not confuse a failed read with a verified absence. Do not log
-        # database exception bodies, which can contain sensitive context.
-        logger.warning("[V1 MEMORY] read unavailable stage=%s", stage)
-        if feedback_required:
-            raise HTTPException(
-                status_code=503,
-                detail="État décisionnel indisponible : export gouverné refusé.",
-            )
-        return [dict(item, memory_read_state="UNAVAILABLE") for item in items]
-
-    def read_rows(response):
-        rows = response.data
-        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
-            raise ValueError("Invalid memory response")
-        return rows
-
+def _recommendations_tracking(envelope, analysis_id, supabase=None, *, feedback_required=False):
     try:
-        rows = read_rows(
-            supabase.from_("decision_feedback").select(
-                "id,recommendation_id,status,comment,decision_kind,decision_text,"
-                "decision_confirmed_at,decision_confirmation_source,prerequisites_acknowledged"
-            )
-            .eq("report_id", analysis_id).execute()
+        return recommendations_tracking(
+            envelope, analysis_id, supabase, feedback_required=feedback_required,
         )
-        feedback = {row["recommendation_id"]: row for row in rows}
-        feedback_ids = [row["id"] for row in rows]
-        if len(feedback) != len(rows) or any(not value for value in feedback_ids):
-            raise ValueError("Invalid memory identity")
-    except Exception:
-        return unavailable("INTENTION")
-    followups = {}
-    executions = {}
-    prerequisite_evidence = {}
-
-    def bound_rows(rows):
-        result = {row["decision_feedback_id"]: row for row in rows}
-        if len(result) != len(rows) or not set(result).issubset(feedback_ids):
-            raise ValueError("Invalid memory binding")
-        return result
-
-    if feedback_ids:
-        try:
-            followup_rows = read_rows(
-                supabase.from_("governed_decision_followups").select(
-                    "decision_feedback_id,followup_status,professional_note,"
-                    "prerequisites_confirmed_complete,confirmation_source,recorded_at"
-                ).eq("report_id", analysis_id).execute()
-            )
-            followups = bound_rows(followup_rows)
-        except Exception:
-            return unavailable("FOLLOWUP")
-        try:
-            execution_rows = read_rows(
-                supabase.from_("governed_decision_executions").select(
-                    "decision_feedback_id,executed_on,professional_note,"
-                    "prerequisites_confirmed_complete,confirmation_source,recorded_at"
-                ).eq("report_id", analysis_id).execute()
-            )
-            executions = bound_rows(execution_rows)
-        except Exception:
-            return unavailable("EXECUTION")
-        try:
-            evidence_rows = read_rows(
-                supabase.from_("governed_decision_prerequisite_evidence").select(
-                    "id,decision_feedback_id,fixture_id,payload_sha256,period_start,period_end,"
-                    "provenance,evidence_role,recorded_at"
-                ).eq("report_id", analysis_id).execute()
-            )
-            prerequisite_evidence = bound_rows(evidence_rows)
-        except Exception:
-            return unavailable("PREREQUISITES")
-    for item in items:
-        item["memory_read_state"] = "AVAILABLE"
-        saved = feedback.get(item["id"])
-        item["status"] = saved.get("status") if saved else None
-        item["comment"] = saved.get("comment") if saved else None
-        item["decision_kind"] = saved.get("decision_kind") if saved else None
-        item["decision_text"] = saved.get("decision_text") if saved else None
-        item["decision_confirmed_at"] = saved.get("decision_confirmed_at") if saved else None
-        item["decision_confirmation_source"] = (
-            saved.get("decision_confirmation_source") if saved else None
-        )
-        item["prerequisites_acknowledged"] = (
-            saved.get("prerequisites_acknowledged") if saved else None
-        )
-        item["followup"] = followups.get(saved.get("id")) if saved else None
-        item["execution"] = executions.get(saved.get("id")) if saved else None
-        item["prerequisite_evidence"] = prerequisite_evidence.get(saved.get("id")) if saved else None
-    return items
+    except GovernedMemoryUnavailable:
+        raise HTTPException(
+            status_code=503, detail="État décisionnel indisponible : export gouverné refusé.",
+        ) from None
 
 
 class GovernedIntentionRequest(BaseModel):
@@ -350,21 +243,15 @@ def _resolve_primary_scope(supabase, company_id: str) -> tuple[str, str, str]:
 
 def _load_for_company(supabase, *, analysis_id: str, company_id: str):
     try:
-        rows = (
-            supabase.from_("analyses").select("id,entity_id")
-            .eq("id", analysis_id).eq("company_id", company_id).limit(2).execute()
-        ).data or []
-        if len(rows) != 1 or not rows[0].get("entity_id"):
-            raise GovernedPersistenceRefused("GOVERNED_ANALYSIS_NOT_FOUND")
-        _, entity_id, engagement_id = analyze_routes._resolve_analysis_entity_scope(
-            supabase, company_id=company_id, entity_id=rows[0]["entity_id"],
-        )[0]
-        return load_governed_envelope(
-            supabase, analysis_id=analysis_id, company_id=company_id,
-            entity_id=entity_id, engagement_id=engagement_id,
-        )
-    except (GovernedPersistenceRefused, HTTPException):
-        raise HTTPException(status_code=404, detail="Analyse introuvable")
+        return load_owned_analysis(supabase, analysis_id=analysis_id, company_id=company_id)
+    except GovernedReadRefused as exc:
+        raise _read_error(exc) from None
+
+
+def _read_error(exc):
+    if str(exc) == "NOT_FOUND":
+        return HTTPException(status_code=404, detail="Analyse introuvable")
+    return HTTPException(status_code=503, detail="Lecture gouvernée indisponible")
 
 
 @router.post("/synthetic-demo", response_model=AnalyzeResponse)
@@ -421,14 +308,10 @@ async def get_v1_governed_analysis(
     _require_designated_company(company_id)
     from main import get_supabase_service
     supabase = get_supabase_service()
-    envelope = _load_for_company(supabase, analysis_id=analysis_id, company_id=company_id)
-    result = envelope.analysis_result
-    result.id = analysis_id
-    return AnalyzeResponse(
-        success=True, message="Analyse gouvernée rechargée", analyse_id=analysis_id,
-        result=result, tokens_used=0, cout_estime=0,
-        recommendations_tracking=_recommendations_tracking(envelope, analysis_id, supabase),
-    )
+    try:
+        return read_owned_analysis(supabase, analysis_id=analysis_id, company_id=company_id)
+    except GovernedReadRefused as exc:
+        raise _read_error(exc) from None
 
 
 @router.get("/governed-analyses/{analysis_id}/temporal-comparison")
