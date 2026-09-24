@@ -61,66 +61,81 @@ def _recommendations_tracking(
     ]
     if supabase is None:
         return items
+
+    def unavailable(stage: str) -> list[dict]:
+        # Do not confuse a failed read with a verified absence. Do not log
+        # database exception bodies, which can contain sensitive context.
+        logger.warning("[V1 MEMORY] read unavailable stage=%s", stage)
+        if feedback_required:
+            raise HTTPException(
+                status_code=503,
+                detail="État décisionnel indisponible : export gouverné refusé.",
+            )
+        return [dict(item, memory_read_state="UNAVAILABLE") for item in items]
+
+    def read_rows(response):
+        rows = response.data
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise ValueError("Invalid memory response")
+        return rows
+
     try:
-        rows = (
+        rows = read_rows(
             supabase.from_("decision_feedback").select(
                 "id,recommendation_id,status,comment,decision_kind,decision_text,"
                 "decision_confirmed_at,decision_confirmation_source,prerequisites_acknowledged"
             )
             .eq("report_id", analysis_id).execute()
-        ).data or []
-    except Exception as exc:
-        if feedback_required:
-            raise HTTPException(
-                status_code=503,
-                detail="État décisionnel indisponible : export gouverné refusé.",
-            ) from exc
-        # The governed analysis is authoritative and already integrity-checked.
-        # A secondary feedback-registry outage must not make that analysis
-        # disappear. Absence is represented as UNKNOWN; writes remain
-        # independently fail-closed in record_v1_governed_intention().
-        logger.warning(
-            "[V1 INTENTION] feedback state unavailable for analysis=%s: %s",
-            analysis_id, exc,
         )
-        rows = []
-    feedback = {row["recommendation_id"]: row for row in rows}
-    feedback_ids = [row.get("id") for row in rows if row.get("id")]
+        feedback = {row["recommendation_id"]: row for row in rows}
+        feedback_ids = [row["id"] for row in rows]
+        if len(feedback) != len(rows) or any(not value for value in feedback_ids):
+            raise ValueError("Invalid memory identity")
+    except Exception:
+        return unavailable("INTENTION")
     followups = {}
     executions = {}
     prerequisite_evidence = {}
+
+    def bound_rows(rows):
+        result = {row["decision_feedback_id"]: row for row in rows}
+        if len(result) != len(rows) or not set(result).issubset(feedback_ids):
+            raise ValueError("Invalid memory binding")
+        return result
+
     if feedback_ids:
         try:
-            followup_rows = (
+            followup_rows = read_rows(
                 supabase.from_("governed_decision_followups").select(
                     "decision_feedback_id,followup_status,professional_note,"
                     "prerequisites_confirmed_complete,confirmation_source,recorded_at"
                 ).eq("report_id", analysis_id).execute()
-            ).data or []
-            followups = {row["decision_feedback_id"]: row for row in followup_rows}
-        except Exception as exc:
-            logger.warning("[V1 FOLLOW-UP] state unavailable for analysis=%s: %s", analysis_id, exc)
+            )
+            followups = bound_rows(followup_rows)
+        except Exception:
+            return unavailable("FOLLOWUP")
         try:
-            execution_rows = (
+            execution_rows = read_rows(
                 supabase.from_("governed_decision_executions").select(
                     "decision_feedback_id,executed_on,professional_note,"
                     "prerequisites_confirmed_complete,confirmation_source,recorded_at"
                 ).eq("report_id", analysis_id).execute()
-            ).data or []
-            executions = {row["decision_feedback_id"]: row for row in execution_rows}
-        except Exception as exc:
-            logger.warning("[V1 EXECUTION] state unavailable for analysis=%s: %s", analysis_id, exc)
+            )
+            executions = bound_rows(execution_rows)
+        except Exception:
+            return unavailable("EXECUTION")
         try:
-            evidence_rows = (
+            evidence_rows = read_rows(
                 supabase.from_("governed_decision_prerequisite_evidence").select(
                     "id,decision_feedback_id,fixture_id,payload_sha256,period_start,period_end,"
                     "provenance,evidence_role,recorded_at"
                 ).eq("report_id", analysis_id).execute()
-            ).data or []
-            prerequisite_evidence = {row["decision_feedback_id"]: row for row in evidence_rows}
-        except Exception as exc:
-            logger.warning("[V1 PREREQUISITES] state unavailable for analysis=%s: %s", analysis_id, exc)
+            )
+            prerequisite_evidence = bound_rows(evidence_rows)
+        except Exception:
+            return unavailable("PREREQUISITES")
     for item in items:
+        item["memory_read_state"] = "AVAILABLE"
         saved = feedback.get(item["id"])
         item["status"] = saved.get("status") if saved else None
         item["comment"] = saved.get("comment") if saved else None

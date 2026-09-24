@@ -64,6 +64,7 @@ export type DecisionFeedbackStatus =
 
 /** Une recommandation extraite d'un rapport, avec son feedback éventuel. */
 export interface RecommendationTracking {
+  memory_read_state?: 'AVAILABLE' | 'UNAVAILABLE';
   id: string;
   text: string;
   rationale?: string;

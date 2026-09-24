@@ -28,6 +28,18 @@ const recommendation = {
   index: 0,
 };
 
+test('une mémoire indisponible ne devient pas une absence de décision et interdit les formulaires', () => {
+  render(<FeedbackCard reportId="analysis-1" recommendations={[{
+    ...recommendation, memory_read_state: 'UNAVAILABLE',
+  }]} governedV1 />);
+  expect(screen.getByRole('alert')).toHaveTextContent('état inconnu');
+  expect(screen.getByText(recommendation.text)).toBeInTheDocument();
+  expect(screen.getByText(recommendation.prerequisite_validation[0])).toBeInTheDocument();
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  expect(screen.queryByText(/aucune décision confirmée/i)).not.toBeInTheDocument();
+  expect(mockedSubmit).not.toHaveBeenCalled();
+});
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockedSubmit.mockResolvedValue({ success: true, arc_created: false });

@@ -394,7 +394,47 @@ def test_feedback_read_outage_does_not_hide_verified_governed_analysis(monkeypat
 
     assert loaded.result == created.result
     assert loaded.recommendations_tracking
-    assert all(item["status"] is None for item in loaded.recommendations_tracking)
+    assert all(item["memory_read_state"] == "UNAVAILABLE" for item in loaded.recommendations_tracking)
+    assert all("status" not in item for item in loaded.recommendations_tracking)
+
+
+@pytest.mark.parametrize("table", [
+    "decision_feedback", "governed_decision_followups",
+    "governed_decision_executions", "governed_decision_prerequisite_evidence",
+])
+def test_memory_outage_preserves_analysis_but_refuses_all_exports(monkeypatch, table, caplog):
+    db = _Db(); _enable(monkeypatch, db)
+    created = asyncio.run(v1_routes.run_v1_synthetic_demo(
+        request=_empty_request(), authorization="Bearer test", x_auth_type=None,
+    ))
+    db.tables["decision_feedback"] = [{
+        "id": "saved-feedback", "report_id": created.analyse_id,
+        "recommendation_id": created.recommendations_tracking[0]["id"],
+        "status": "decided", "decision_confirmed_at": "2026-09-12T12:00:00Z",
+    }]
+    before = copy.deepcopy(db.tables)
+
+    class Unavailable(_Db):
+        def from_(self, name):
+            if name == table:
+                raise RuntimeError("SENSITIVE_DATABASE_CONTEXT")
+            return super().from_(name)
+
+    unavailable = Unavailable(); unavailable.tables = db.tables
+    monkeypatch.setattr(main, "get_supabase_service", lambda: unavailable)
+    loaded = asyncio.run(v1_routes.get_v1_governed_analysis(
+        created.analyse_id, authorization="Bearer test", x_auth_type=None,
+    ))
+    assert loaded.result == created.result
+    assert all(item["memory_read_state"] == "UNAVAILABLE" for item in loaded.recommendations_tracking)
+    assert all("status" not in item and "execution" not in item for item in loaded.recommendations_tracking)
+    for export in (v1_routes.export_v1_governed_excel, v1_routes.export_v1_governed_pdf,
+                   v1_routes.export_v1_governed_pptx):
+        with pytest.raises(HTTPException) as error:
+            asyncio.run(export(created.analyse_id, authorization="Bearer test", x_auth_type=None))
+        assert error.value.status_code == 503
+    assert db.tables == before
+    assert "SENSITIVE_DATABASE_CONTEXT" not in caplog.text
 
 
 def test_feedback_read_outage_refuses_export_instead_of_hiding_a_decision(monkeypatch):
@@ -412,6 +452,46 @@ def test_feedback_read_outage_refuses_export_instead_of_hiding_a_decision(monkey
         ))
     assert error.value.status_code == 503
     assert "export gouverné refusé" in error.value.detail
+
+
+@pytest.mark.parametrize("payload", [None, {}, [{"recommendation_id": "missing-id"}]])
+def test_malformed_memory_response_is_not_verified_absence(monkeypatch, payload):
+    db = _Db(); _enable(monkeypatch, db)
+    created = asyncio.run(v1_routes.run_v1_synthetic_demo(
+        request=_empty_request(), authorization="Bearer test", x_auth_type=None,
+    ))
+    original = db.from_
+
+    def query(table):
+        result = original(table)
+        if table == "decision_feedback":
+            result.execute = lambda: _Response(payload)
+        return result
+
+    monkeypatch.setattr(db, "from_", query)
+    loaded = asyncio.run(v1_routes.get_v1_governed_analysis(
+        created.analyse_id, authorization="Bearer test", x_auth_type=None,
+    ))
+    assert all(item["memory_read_state"] == "UNAVAILABLE" for item in loaded.recommendations_tracking)
+
+
+@pytest.mark.parametrize("child_ids", [["foreign-feedback"], ["saved-feedback", "saved-feedback"]])
+def test_ambiguous_or_foreign_child_memory_is_unavailable(monkeypatch, child_ids):
+    db = _Db(); _enable(monkeypatch, db)
+    created = asyncio.run(v1_routes.run_v1_synthetic_demo(
+        request=_empty_request(), authorization="Bearer test", x_auth_type=None,
+    ))
+    db.tables["decision_feedback"] = [{
+        "id": "saved-feedback", "report_id": created.analyse_id,
+        "recommendation_id": created.recommendations_tracking[0]["id"], "status": "unsure",
+    }]
+    db.tables["governed_decision_followups"] = [
+        {"report_id": created.analyse_id, "decision_feedback_id": value} for value in child_ids
+    ]
+    loaded = asyncio.run(v1_routes.get_v1_governed_analysis(
+        created.analyse_id, authorization="Bearer test", x_auth_type=None,
+    ))
+    assert all(item["memory_read_state"] == "UNAVAILABLE" for item in loaded.recommendations_tracking)
 
 
 def test_second_company_cannot_reload_first_company_analysis(monkeypatch):

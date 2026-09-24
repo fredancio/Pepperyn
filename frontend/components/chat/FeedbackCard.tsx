@@ -75,6 +75,26 @@ export function FeedbackCard({ reportId, recommendations, governedV1 = false }: 
 
   if (items.length === 0) return null;
 
+  if (governedV1 && recommendations.some(item => item.memory_read_state === 'UNAVAILABLE')) {
+    return (
+      <section aria-label="Mémoire décisionnelle indisponible">
+        <p role="alert">Mémoire décisionnelle indisponible — état inconnu.</p>
+        <p>L’analyse reste consultable. L’absence d’intention, de décision, de suivi ou
+          d’exécution ne peut pas être établie. Les formulaires sont suspendus ;
+          rouvrez cette analyse après rétablissement de la lecture.</p>
+        {items.map(item => (
+          <div key={item.id}>
+            <p>{stripMarkdown(item.text)}</p>
+            <p>Pourquoi cette recommandation : {item.rationale}</p>
+            <p>Validations requises avant toute décision</p>
+            <ul>{item.prerequisite_validation?.map(value => <li key={value}>{value}</li>)}</ul>
+            <p>Références factuelles : {item.fact_ids?.join(', ')}</p>
+          </div>
+        ))}
+      </section>
+    );
+  }
+
   const handleChoice = (rec: RecommendationTracking, choice: IntentionChoice) => {
     setChoices(prev => ({ ...prev, [rec.id]: choice }));
     // Pour "Je vais appliquer", pas de commentaire nécessaire -> on enregistre direct.
