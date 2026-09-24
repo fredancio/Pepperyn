@@ -848,3 +848,12 @@ INSIGHT_SHAPER_B5_DEPLOYMENT_PREPARATION.md under docs/Project_Control/.
 Final checks: 60 targeted backend tests PASS, 17 frontend suites / 121 tests PASS,
 TypeScript no-emit PASS. These local results do not promote any live, financial,
 privacy, provider, real-data or production gate. next-env.d.ts remains excluded.
+
+Founder d01851f7f86de47a0ccca3a4cb4cbde0f31da443 synchronization establishes
+durability of that preceding block only. B1 shared read boundary is subsequently
+LOCAL_TESTED with 88 backend tests PASS: own/cross mocked scopes, unavailable
+lookups, integrity failure without legacy fallback, invalid IDs and ambiguous
+engagement, plus existing lifecycle/export/temporal/isolation regressions. No
+new HTTP route, migration, deployment, business write or external call. Not a
+full B1/Beta/Financial Reliability PASS. Scope and next debts are recorded in
+docs/Project_Control/INSIGHT_SHAPER_B1_SHARED_READ_BOUNDARY.md. Pending checkpoint.

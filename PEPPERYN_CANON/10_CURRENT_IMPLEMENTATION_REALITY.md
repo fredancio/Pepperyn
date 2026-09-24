@@ -314,3 +314,11 @@ B5 repository preparation documents why ENVIRONMENT=staging is not a security
 profile and why the current synthetic router cannot be promoted to Beta. Target
 recipe remains unprovisioned and dependent on B1; see
 docs/Project_Control/INSIGHT_SHAPER_B5_DEPLOYMENT_PREPARATION.md.
+
+Founder confirmed the preceding B1 memory/B5 preparation checkpoint synchronized
+at d01851f7f86de47a0ccca3a4cb4cbde0f31da443. Subsequent local B1 work extracts
+owned analysis loading and memory projection into shared application services;
+existing routes delegate without changing their designation/mounting gates.
+88 targeted tests PASS; no deployment or live proof. Generic ingestion/routing and
+durable execution provenance are still missing; synthetic export disclosures must
+not be generalized. See docs/Project_Control/INSIGHT_SHAPER_B1_SHARED_READ_BOUNDARY.md.

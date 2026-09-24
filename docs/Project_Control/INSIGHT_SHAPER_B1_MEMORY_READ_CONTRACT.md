@@ -52,3 +52,8 @@ gate closure. FR-EXPECTED-2 is unchanged. No provider or real data was used.
 
 External Provider CLOSED; Real-data Admission CLOSED; Self-Selling DEFERRED.
 Local changes pending a grouped durability checkpoint.
+
+Durability update: Founder confirmed d01851f7f86de47a0ccca3a4cb4cbde0f31da443
+synchronized. Subsequent local B1 refactoring relocates the same projection to
+services/governed_memory_read.py behind the ownership-checked application read;
+the router keeps a compatibility wrapper. See INSIGHT_SHAPER_B1_SHARED_READ_BOUNDARY.md.

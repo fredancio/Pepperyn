@@ -316,3 +316,10 @@ professional action or become a false absence in UI/exports. Explicit unknown
 state suspends forms; all governed exports refuse incomplete registry reads.
 No migration or record change; generic non-sandbox B1 still OPEN. Contract and
 tests: docs/Project_Control/INSIGHT_SHAPER_B1_MEMORY_READ_CONTRACT.md.
+
+B1 shared governed reads (2026-09-24): IMPLEMENTED / LOCAL_TESTED. WHY: reuse
+ownership/integrity and memory guarantees without promoting synthetic admission
+into production. Existing guarded routes now delegate to source-independent
+application services. Generic ingestion, execution provenance and route activation
+remain OPEN; no real-data/provider authorization. See
+docs/Project_Control/INSIGHT_SHAPER_B1_SHARED_READ_BOUNDARY.md.
