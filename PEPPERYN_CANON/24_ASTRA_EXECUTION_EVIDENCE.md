@@ -914,3 +914,168 @@ Router factory is deliberately unmounted; test dependencies are not admission
 authority. No real-session/browser/RLS/visual/financial/global B1 promotion.
 Scope/remaining debts: docs/Project_Control/INSIGHT_SHAPER_B1_GOVERNED_OUTPUT_COMPOSITION.md.
 Local files pending grouped checkpoint; both gates CLOSED, Self-Selling DEFERRED.
+
+2026-09-24: preceding output-composition block synchronized at
+17ff325d26530b76a026c2260d045577228ff223. Subsequent connected-pipeline block:
+155 targeted backend tests, all 128 frontend tests and TypeScript PASS. Local
+proof connects upload, owned scope, raw hash, serialized V39 receipt, recovered
+read and all three exported UUID/hash disclosures. Real main composition tested
+with substituted authentication/database; no claim of live HTTP/browser/SQL/RLS.
+Generic parser variation is not arbitrary-source execution admission. The only
+installed producer remains registered synthetic mock; new transport flags remain
+off in the running environment. No remote mutation/provider/data admission.
+See INSIGHT_SHAPER_B1_CONNECTED_PIPELINE.md for exact next authorized rehearsal
+boundary. B1 OPEN; local changes pending durability; next-env.d.ts excluded.
+
+Live B1 authorization received; execution pending safe credential access. Prior
+to activation, a one-shot manifest/latch and loopback/exact-analysis restriction
+were added and locally falsified: 162 targeted tests PASS. Windows PowerShell
+preflight script integrity-only check PASS; no credentials/network in that run.
+Read-only actual localhost check finds no new governed routes; browser shows
+existing authenticated synthetic client. No upload/remote business mutation.
+Founder must run the prepared GET-only preflight; its result is NOT presumed.
+This is preparation evidence, not B1 live end-to-end acceptance or gate closure.
+
+B1 GET-only preflight subsequently reported PASS by Founder and corroborated by
+the non-secret local manifest: two existing analyses/envelopes, no receipts,
+scoped lifecycle hashes; fixed prospective UUID e2dc7bd5-c71a-4c88-821c-b1f2696fb04b.
+No attempt/activation marker. Exact permit expires 2026-09-24T15:40:12.249802Z.
+Prepared integrity-pinned backend/frontend restart helper; both local checks and
+28 focused tests PASS. No secret regeneration, running-server restart or remote
+write performed by agent. Pending Founder local restart, then one authorized
+application submission. B1 and both admission/provider gates retain prior state.
+
+Later activation refused at missing parent-process environment; predecessor now
+closed and preserved, no activation/analysis attempt marker. Founder subsequently
+confirmed process reconstruction and existing JWT restoration, then explicitly
+authorized a distinct successor with SAME prospective UUID and fresh GET-only
+absence/baseline checks. Renewal helper prepared, 16 local tests PASS, local-only
+PowerShell check PASS. Actual remote eligibility/successor creation pending
+Founder execution in credential-bearing shell. No B1 live PASS, reset, replacement
+UUID or provider/real-data gate opening. See B1_CONNECTED_PIPELINE chronology.
+
+2026-09-24 R2 incident postflight: Founder screenshot reports
+`B1_R2_NO_WRITE_POSTFLIGHT_PASS` for prospective UUID
+`e2dc7bd5-c71a-4c88-821c-b1f2696fb04b`: absent in all three persistence
+tables; preexisting scoped hashes and engagement binding unchanged; both closed
+permits unchanged. No business write, new permit, transport activation, provider
+or real data. This follows R2 backend/frontend activation and a single file
+selection refused by the frontend before fetch because no client was explicitly
+selected. Agent mistook a listed client for an active selection; no retry.
+Both servers subsequently stopped, R2 revoked, no attempt marker observed.
+Independent GET-only postflight is now live reported PASS, not analysis execution
+or global B1 proof. Six local postflight falsification tests PASS separately.
+Next attempt requires explicit successor authorization, same UUID, fresh baseline
+checks and verified active client selection. No R3 created or authorized yet.
+
+Subsequently Founder authorized and created R3; backend activated, frontend
+refused because the old R2 Next.js process still occupied port 3000. Agent host
+inspection identified that process; Founder stopped it normally and stopped R3
+backend. No upload/retry, R3 closed, no attempt marker. Founder now reports
+B1_R3_NO_WRITE_POSTFLIGHT_PASS: UUID absent in three tables, scoped hashes and
+engagement unchanged; no writes or activation by that GET-only postflight.
+Agent independently verifies host ports 3000/8000 free after shutdown. This is
+bounded incident closure only, not a successful connected analysis or B1 PASS.
+No R4 permit or authorization. External Provider and Real-data Admission CLOSED.
+
+2026-09-27 R5 update (supersedes the historical pending states above): after
+separate R4/R5 authorizations and verified explicit client selection, one
+registered synthetic workbook was submitted through the opt-in governed path.
+Browser displayed analysis e2dc7bd5-c71a-4c88-821c-b1f2696fb04b and its verified
+local-mock receipt. Three exports were downloaded; full artifact review remains
+pending. Founder screenshot dated 2026-09-27 10:59 reports
+BOUNDED_B1_R5_PERSISTED_TRIO_POSTFLIGHT_PASS: exactly three new durable rows,
+receipt binding verified, preexisting scoped hashes and closed permits unchanged.
+GET-only independent postflight, no new write/activation/provider/real data.
+JWT/V33 untouched. R5 is closed/expired; no replay or cleanup authorized.
+23 local inspector/provenance tests PASS separately. B1-global explicitly false;
+fresh browser reopening, full export review, general Beta admission and financial
+reliability are not established by this result. Detailed chronology and exact
+hashes: docs/Project_Control/INSIGHT_SHAPER_B1_CONNECTED_PIPELINE.md.
+
+2026-09-27 subsequent R5 artifact audit: three original exports parsed and every
+PDF page/XLSX sheet/PPTX slide visually inspected; hashes rechecked unchanged.
+Bounded provenance/content/render PASS with explicit static-XLSX/native-renderer
+and cosmetic PDF pagination limits. Details and SHA-256 evidence are in the B1
+control document. No regeneration, upload or remote write. One fresh browser
+history reopening displayed unavailable/no replacement: NOT a reread PASS.
+Exact HTTP cause unavailable; code independently confirms closed permits deny
+reads too. R5 remains closed; separate read-only transport authorization pending.
+No B1-global, real-data, provider, professional-reliability or isolation widening.
+
+Distinct read-only window subsequently Founder-authorized, locally prepared and
+tested (4 unittest cases with negative subcases; PowerShell CheckOnly PASS).
+Exact R5 UUID only, real application auth/ownership retained, GET-only data
+adapter, no ingestion/export route, independent local latch, 20-minute maximum,
+single successful read then closure. No R5 renewal. Live activation requires
+the preserved Founder credential-bearing shell; agent has no process secrets.
+Fresh browser proof remains pending, not PASS. See B1 control for implementation.
+
+Subsequent live observation: one authorized history click freshly restored R5
+result and exact receipt/source/envelope identifiers; bounded owner-read UI PASS.
+No upload/export/intention/replay. Independent read-window closure observed;
+R5 manifest hash unchanged. Final server-postflight status awaits terminal
+evidence, not assumed. Temporal secondary legacy request remained unavailable;
+local snapshot-wiring correction now avoids it and reuses the same validator.
+Targeted frontend tests/typecheck PASS; no corrected-temporal live proof claimed.
+Full evidence and B1 OPEN rationale are in the B1 connected-pipeline control.
+
+Founder subsequently reports B1_BOUNDED_READ_SERVER_PASS and CLOSED, without
+rerun: no business writes, R5 unchanged, no external provider/real data, no B1-global
+proof. This is the terminal postflight previously awaited; browser_visual_proven
+remains false in that server record, separate from the agent's observed UI PASS.
+No second read-window activation. Temporal correction remains local-test-only.
+
+Separately authorized temporal-only window subsequently consumed: one history
+read restored result but card stayed unavailable, so temporal browser acceptance
+NOT PASS. Closure marker observed; server postflight stdout pending. Browser
+script URL matches local .next chat bundle dated September 25, which lacks the
+September 27 snapshot wiring. Compiled-asset verification was missed before
+consuming the window. Repair/verify frontend delivery before another authorized
+read; do not reset/reuse either window. No upload/export/business write by agent.
+
+Subsequent frontend-version verification: corrected bundle served HTTP 200,
+then separately authorized browser-only reload establishes client-initialized
+chat root data-temporal-contract=governed-response-snapshot-v1 in the active tab.
+Marker shared with temporal component; version proof only, not output acceptance.
+No analysis selected/read or permit opened; metadata lists unavailable with backend
+closed. 22 targeted UI tests/typecheck PASS. Temporal result live proof remains OPEN.
+
+Temporal-confirmation window NOT PASS: after delayed Continue, agent clicked
+the single-read button at about 18:46; unavailable/no replacement. Local markers
+show start 14:33:44 and closure 14:53:45 September 27. Agent failed to recheck
+liveness immediately before action; previous READY was stale. No retry, reset,
+R5 modification or corrected-temporal acceptance inferred. New authorization
+would be required for any fresh window. B1 and admission gates remain unchanged.
+
+Fresh temporal-confirmation R2 authorized and prepared, NOT activated: distinct
+exclusive marker, three closed predecessor windows preserved byte-for-byte,
+unchanged shared exact-UUID authenticated owner-only GET reader. Launcher
+CheckOnly and five local boundary/lifecycle tests PASS. Fresh targeted frontend
+tab shows runtime marker governed-response-snapshot-v1 and unclicked read button.
+Immediate liveness check/click after READY is required; no delayed read if expired.
+No business write, permit renewal, V39/producer change or live acceptance. Details
+in B1_CONNECTED_PIPELINE. B1 and External Provider/Real-data Admission unchanged.
+
+2026-09-27 temporal-confirmation R2 browser PASS, bounded exact R5 UUID only:
+after READY, live marker age 87.1s/no closure/backend listener were checked, then
+one targeted authenticated UI read was performed immediately. Screenshot and
+accessibility tree show governed CONTRADICTION due to non-unique current-period
+references, its resolution guidance, exact analysis UUID, no fabricated delta
+and no causal/outcome/learning claim. No upload/export/new analysis or second read.
+Window independently CLOSED at 17:23:28 UTC and port 8000 no longer listening.
+Final server remote-postflight JSON remains Founder-console evidence pending;
+closure alone does not prove postflight PASS. No global B1/isolation/reliability
+promotion. General producer/generic governed admission remain OPEN; gates CLOSED.
+
+Founder confirms final B1_TEMPORAL_CONFIRMATION_R2_SERVER_PASS and CLOSED,
+business_write_performed=false, r5_unchanged=true, external_provider_used=false,
+real_data_used=false, b1_global_proven=false. Server browser_visual_proven=false
+correctly remains separate from the agent-observed visual PASS. No command rerun.
+Bounded temporal closeout complete. Local durability revalidation: 126 backend
+tests plus 6 subtests PASS, all 20 frontend suites/136 tests PASS, TypeScript
+no-emit PASS. Initial backend invocation used the server venv without pytest and
+failed import collection; rerun in the existing development test venv succeeded.
+No remote tests, credentials, gates or business state changed during this review.
+Accumulated B1 work still pending checkpoint; separate strategic-option deltas
+and frontend/next-env.d.ts are excluded and preserved.

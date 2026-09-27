@@ -362,3 +362,119 @@ refuse; verified V39 provenance reaches JSON/XLSX/PDF/PPTX. 117 targeted tests P
 No main.py mounting, deployment, data/provider operation or gate opening. Not
 generic ingestion, actual authenticated Beta transport, live/visual/financial
 proof. See INSIGHT_SHAPER_B1_GOVERNED_OUTPUT_COMPOSITION.md. Pending checkpoint.
+
+2026-09-24 superseding local state: output composition is now durable at
+17ff325d26530b76a026c2260d045577228ff223 (HEAD and tracking ref verified).
+Next local B1 block connects reusable workbook ingestion, owned creation and V39
+receipt persistence to real main.py composition, owned reads and three exports;
+frontend upload/history/export routing and provenance presentation are prepared.
+New transport is CLOSED BY DEFAULT and has NOT been activated. Only the existing
+registered mock producer is installable; no generic arbitrary-source admission,
+new provider or SQL contract widening. 155 backend targeted / 128 frontend tests
+and TypeScript PASS, all local evidence with mocked auth/database where specified.
+B1 remains OPEN. No remote writes/restart or old rehearsal rerun. Next required
+authorization is bounded local activation plus one prospective synthetic trio
+through the application, then read-only outputs/reload. Exact scope and proof
+debts: docs/Project_Control/INSIGHT_SHAPER_B1_CONNECTED_PIPELINE.md.
+This block is local/uncheckpointed; next-env.d.ts preserved and excluded.
+
+Founder has authorized one bounded live B1 repetition, but it has NOT started.
+Before activation the transport was tightened with a mandatory short-lived,
+scope-bound local manifest and durable one-attempt latch; only that prospective
+analysis may use its new read/exports. 162 targeted local backend tests PASS.
+Running localhost OpenAPI confirms the new transport is still absent. Founder
+browser session is available; agent lacks Supabase process credentials. Awaiting
+Founder GET-only preflight script with masked local service key, no remote writes
+or activation. Exact operational state: B1_CONNECTED_PIPELINE addendum. B1 OPEN;
+External Provider and Real-data Admission CLOSED; no live PASS claimed.
+
+Subsequent activation attempt REFUSED before Python at backend environment check.
+Frontend then refused the closed permit. Local manifest unchanged; `.closed`
+present, `.activated` and `.attempt` absent. No analysis execution reached.
+Exact missing/mismatched parent-terminal variable is unresolved pending safe
+read-only environment diagnostic. Do not reset/reuse this closed permit or
+infer a live B1 PASS. Details: B1_CONNECTED_PIPELINE activation-refusal addendum.
+
+Founder read-only environment diagnostic now confirms all seven required process
+variables MISSING. Immediate activation refusal cause established; prior process
+configuration lifetime remains unproven. Prepared process-only reconstruction
+using existing JWT DPAPI plus masked local Supabase entry, transport disabled,
+no server/network/permit creation. Actual restore not yet performed by agent.
+Closed permit remains unchanged; successor requires explicit bounded renewal,
+fresh absence/baseline checks and no replacement prospective analysis UUID.
+
+2026-09-24 update superseding pending recovery statements above: environment
+restored by Founder; distinct R2 created and backend/frontend activated. Browser
+rehearsal stopped at explicit-client guard before fetch, due to agent failing to
+select the listed client. R2 closed and both servers stopped. Founder screenshot
+of independent GET-only postflight reports B1_R2_NO_WRITE_POSTFLIGHT_PASS:
+prospective UUID absent from all three tables, scoped baseline and engagement
+unchanged, both permits closed unchanged. No new analysis or output/export proof.
+B1 remains OPEN. The ordinary upload control is not connected to the bounded
+governed path; only the opt-in synthetic mock button uses that path. Preserve this
+gap explicitly. No successor authorization or permit reset is implied by the
+postflight PASS. External Provider and Real-data Admission remain CLOSED.
+
+R3 was later explicitly authorized and created, then closed when frontend start
+detected port 3000 occupied by the surviving R2 server. Both servers now stopped;
+host ports independently verified free. Founder reports R3 GET-only postflight
+PASS (prospective UUID absent, scoped hashes/engagement unchanged). No successful
+new analysis, receipt, browser output or export proof from R3; B1 still OPEN.
+No R4 created. Future startup must precheck both host ports before permit creation
+and explicitly verify client selection before the sole upload. Gates unchanged.
+
+Current update 2026-09-27: the later authorized R5 completed one synthetic
+analysis via the opt-in mock button and governed pipeline. Its UUID is
+e2dc7bd5-c71a-4c88-821c-b1f2696fb04b. Founder-run independent GET-only postflight
+reports BOUNDED_B1_R5_PERSISTED_TRIO_POSTFLIGHT_PASS: three durable rows,
+validated receipt binding, unchanged preexisting scoped hashes and closed
+permits. Browser result/expanded provenance observed; three export downloads
+exist, but complete content/render validation and fresh browser reopening remain
+pending. R5 closed/expired, no retry. Ordinary generic upload/Beta readiness and
+B1-global are not certified by this bounded registered-synthetic/mock proof.
+External Provider and Real-data Admission remain CLOSED.
+
+2026-09-27 terminal review update: existing R5 PDF (2 pages), XLSX (6 sheets)
+and PPTX (10 slides) parsed/rendered and inspected, bounded content/provenance
+PASS. Exact artifact hashes and cosmetic limitations are recorded in the B1
+connected-pipeline control document. XLSX is static, not a formula model; this
+is not native-office or professional financial reliability certification.
+Fresh browser history reopening failed safely with no replacement result;
+HTTP status not established. Closed R5 also bars reads by design. Fresh reread
+remains OPEN and requires separate bounded read authorization, not R5 renewal.
+B1 remains OPEN for fresh reread and admitted generic non-sandbox execution.
+No gate, permit, remote row or excluded frontend/next-env.d.ts changed.
+
+Later 2026-09-27 update: distinct Founder-authorized GET-only window allowed a
+fresh history read of the exact R5 result with expected execution/source/envelope
+provenance. Bounded UI reread PASS, not global isolation. Independent closure
+marker observed; R5 hash unchanged. Final server postflight console result still
+awaited, not inferred from closure. Temporal component's extra legacy fetch was
+unavailable; fixed locally to consume the authoritative GET snapshot with existing
+validation/analysis binding. Targeted tests and TypeScript PASS; corrected browser
+temporal rendering unproven. B1 still OPEN: admitted general producer/generic
+Beta upload remain absent; current installed producer is the registered mock.
+
+Final independent read-window server postflight now Founder-confirmed PASS:
+no business write, R5 unchanged, no provider/real data, B1-global false; window
+CLOSED. Together with separate observed UI reread this closes only the original
+result/provenance fresh-read debt. Temporal UI repair still lacks fresh browser
+proof. Generic producer requires a new versioned admitted execution contract:
+V39 SQL and execution-provenance-1 intentionally bind the registered English
+fixture/mock. These must not be silently widened or reused under false labels.
+
+2026-09-27 temporal-confirmation R2 update: corrected temporal result now has
+bounded live browser PASS for e2dc7bd5-c71a-4c88-821c-b1f2696fb04b. Agent checked
+window liveness immediately after READY and clicked once; UI displays governed
+CONTRADICTION/reference ambiguity and resolution guidance, not a fabricated
+numeric comparison. Window closure and absent port-8000 listener independently
+observed. Final server remote-postflight JSON still pending from Founder console,
+not inferred from closure. B1 remains OPEN for admitted general producer and
+generic governed upload; no V39 expansion or producer change authorized here.
+External Provider and Real-data Admission remain CLOSED.
+
+Temporal R2 final server postflight now Founder-confirmed PASS: no business write,
+R5 unchanged, no provider/real data, B1-global false; window CLOSED. Combined with
+the independent browser observation, this closes the bounded temporal reread debt,
+not generic B1 admission. Current accumulated B1/R5 implementation/evidence is
+local pending durability from HEAD 17ff325; checkpoint before a new producer contract.
