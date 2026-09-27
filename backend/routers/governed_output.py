@@ -1,6 +1,7 @@
-"""Unmounted Beta read/export transport; no implicit admission defaults.
+"""Governed read/export transport; no implicit admission defaults.
 
-main.py intentionally does not mount this factory. Production integration must
+main.py may mount this factory only through the closed-by-default Integration
+composition root. Production integration must
 provide real authenticated-company resolution AND the independently approved
 admission dependency. Neither a URL parameter nor an environment flag is a grant.
 """

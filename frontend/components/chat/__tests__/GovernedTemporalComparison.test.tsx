@@ -1,11 +1,24 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { GovernedTemporalComparison } from '../GovernedTemporalComparison';
 import { fetchGovernedTemporalComparison } from '@/lib/governed-temporal-api';
-jest.mock('@/lib/governed-temporal-api', () => ({ fetchGovernedTemporalComparison: jest.fn() }));
+jest.mock('@/lib/governed-temporal-api', () => ({ ...jest.requireActual('@/lib/governed-temporal-api'), fetchGovernedTemporalComparison: jest.fn() }));
 const fetchComparison = fetchGovernedTemporalComparison as jest.Mock;
 const base = { status: 'UNKNOWN', current_analysis_id: 'a', previous_analysis_id: null,
   previous_period: null, current_period: '2025', changes: [], unknowns: ['Aucune période antérieure'], contradictions: [] };
 beforeEach(() => jest.resetAllMocks());
+
+test('bound response snapshot renders without a second transport', async () => {
+  render(<GovernedTemporalComparison analysisId="a" snapshot={{ ...base,
+    comparison_scope: 'ANNUAL_LABEL_ARITHMETIC_ONLY', financial_comparability: 'NOT_ESTABLISHED', causal_interpretation: null }} />);
+  expect(await screen.findByText(/non établie/)).toBeInTheDocument();
+  expect(fetchComparison).not.toHaveBeenCalled();
+});
+
+test.each([null, { ...base, current_analysis_id: 'foreign' }])('invalid snapshot fails without legacy fallback', async snapshot => {
+  render(<GovernedTemporalComparison analysisId="a" snapshot={snapshot} />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('indisponible');
+  expect(fetchComparison).not.toHaveBeenCalled();
+});
 
 test.each(['courante', 'antérieure la plus proche'])('explains non-unique %s reference without inventing conflicting amounts', async period => {
   fetchComparison.mockResolvedValue({ ...base, status: 'CONTRADICTION', unknowns: [],

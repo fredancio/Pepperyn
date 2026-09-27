@@ -20,6 +20,12 @@ export async function fetchGovernedTemporalComparison(analysisId: string): Promi
   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/v1/governed-analyses/${encodeURIComponent(analysisId)}/temporal-comparison`, { headers });
   if (!res.ok) throw new Error('Comparaison indisponible');
   const data = await res.json();
+  return validateTemporalComparison(data, analysisId);
+}
+
+// Both transports use the same epistemic and exact-analysis binding checks.
+export function validateTemporalComparison(input: unknown, analysisId: string): TemporalComparison {
+  const data = input as TemporalComparison | null;
   const strings = (v: unknown): v is string[] => Array.isArray(v) && v.every(x => typeof x === 'string');
   const nullableString = (v: unknown) => v === null || typeof v === 'string';
   if (!data || data.current_analysis_id !== analysisId || data.causal_interpretation !== null ||

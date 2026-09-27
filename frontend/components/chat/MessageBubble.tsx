@@ -1,6 +1,7 @@
 import type { Message, RecommendationTracking } from '@/lib/types';
 import { AnalysisResult } from './AnalysisResult';
 import { GovernedTemporalComparison } from './GovernedTemporalComparison';
+import { ExecutionProvenance } from './ExecutionProvenance';
 import { CoachingMessage } from './CoachingMessage';
 import { FeedbackCard } from './FeedbackCard';
 import { RecommendationCheckIn } from './RecommendationCheckIn';
@@ -248,8 +249,9 @@ export function MessageBubble({ message, questionsRestantes, plan = 'free', onCh
             />
           )}
           <AnalysisResult data={meta} questionsRestantes={questionsRestantes} plan={plan} />
+          <ExecutionProvenance value={meta._execution_provenance} />
           {meta.verification_tag === 'V1_GOVERNED_SINGLE_CALL' && typeof meta.id === 'string' && (
-            <GovernedTemporalComparison key={meta.id} analysisId={meta.id} />
+            <GovernedTemporalComparison key={meta.id} analysisId={meta.id} snapshot={meta._governed_temporal_snapshot} />
           )}
           <p className="text-xs text-[#5F6368] mt-1 ml-1">{formatTime(message.created_at)}</p>
         </div>

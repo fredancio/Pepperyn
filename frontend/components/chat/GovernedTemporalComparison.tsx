@@ -1,20 +1,27 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { fetchGovernedTemporalComparison, type TemporalComparison } from '@/lib/governed-temporal-api';
+import { fetchGovernedTemporalComparison, validateTemporalComparison, type TemporalComparison } from '@/lib/governed-temporal-api';
 
-export function GovernedTemporalComparison({ analysisId }: { analysisId: string }) {
+export const TEMPORAL_CONTRACT_VERSION = 'governed-response-snapshot-v1';
+
+export function GovernedTemporalComparison({ analysisId, snapshot }: { analysisId: string; snapshot?: unknown }) {
   const [state, setState] = useState<{ id: string; data?: TemporalComparison; error?: boolean }>({ id: analysisId });
   useEffect(() => {
     let active = true;
     setState({ id: analysisId });
+    if (snapshot !== undefined) {
+      try { setState({ id: analysisId, data: validateTemporalComparison(snapshot, analysisId) }); }
+      catch { setState({ id: analysisId, error: true }); }
+      return () => { active = false; };
+    }
     fetchGovernedTemporalComparison(analysisId).then(
       data => { if (active) setState({ id: analysisId, data }); },
       () => { if (active) setState({ id: analysisId, error: true }); },
     );
     return () => { active = false; };
-  }, [analysisId]);
+  }, [analysisId, snapshot]);
   const data = state.id === analysisId ? state.data : undefined;
-  return <section aria-label="Continuité temporelle" className="rounded-xl border bg-white p-4 text-sm">
+  return <section aria-label="Continuité temporelle" data-temporal-contract={TEMPORAL_CONTRACT_VERSION} className="rounded-xl border bg-white p-4 text-sm">
     <h3 className="font-semibold">Évolution depuis la période précédente</h3>
     {state.id === analysisId && state.error ? <p role="alert">Comparaison indisponible — aucune absence de changement ne peut être déduite.</p> : !data ? <p>Chargement de la comparaison…</p> : <>
       <p>{({ COMPARABLE: 'Écarts arithmétiques disponibles', PARTIALLY_COMPARABLE: 'Comparaison partielle', UNKNOWN: 'Comparaison non établie — UNKNOWN', CONTRADICTION: 'Comparaison refusée — CONTRADICTION' })[data.status]}</p>

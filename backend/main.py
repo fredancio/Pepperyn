@@ -113,6 +113,11 @@ app.include_router(contact_router)
 app.include_router(decision_memory_router)
 app.include_router(arcs_router)
 
+# Explicit opt-in only; closed by default, never a real-data/provider admission.
+from services.governed_pipeline_mount import mount_governed_pipeline
+from routers.analyze import _resolve_auth as _governed_resolve_auth
+mount_governed_pipeline(app, database=get_supabase_service, resolve_auth=_governed_resolve_auth)
+
 # The fixed synthetic V1 workflow is physically absent from production and
 # from ordinary development environments unless explicitly enabled.
 if not _is_prod and os.getenv("PEPPERYN_ENABLE_SYNTHETIC_V1_DEMO", "0") == "1":

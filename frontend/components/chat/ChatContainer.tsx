@@ -10,6 +10,8 @@ import { analyzeFile, analyzeText, analyzeV1SyntheticWorkbook, fetchAnalysesHist
 import { getCurrentAuthMode, signOutAdmin, clearGuestAuth, getGuestPlan } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { MessageBubble, TypingIndicator } from './MessageBubble';
+import { TEMPORAL_CONTRACT_VERSION } from './GovernedTemporalComparison';
+import { GovernedReadLink } from './GovernedReadLink';
 import { InputBar, type PrefillToken } from './InputBar';
 import { ReviewBriefing } from './ReviewBriefing';
 import { PwaInstallButton } from '@/components/ui/PwaInstallButton';
@@ -57,6 +59,9 @@ const LIMIT_MESSAGE = `Vous avez atteint la limite de 3 interactions contextuell
 Ou démarrez une nouvelle analyse avec un nouveau fichier.`;
 
 export function ChatContainer() {
+  // Client-executed version evidence only, never evidence of a successful read.
+  const [runtimeTemporalContract, setRuntimeTemporalContract] = useState<string>();
+  useEffect(() => { setRuntimeTemporalContract(TEMPORAL_CONTRACT_VERSION); }, []);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
@@ -206,7 +211,7 @@ export function ChatContainer() {
     }
   };
 
-  const loadSession = async (session: Session) => {
+  const loadSession = async (session: Pick<Session, 'id' | 'titre'>) => {
     const version = ++sessionReadVersion.current;
     const active = () => sessionReadVersion.current === version;
     setSessionId(session.id);
@@ -557,7 +562,7 @@ export function ChatContainer() {
   const isInputBlocked = analysisReceived && plan === 'free' && questionsPostAnalysis >= MAX_CHAT_QUESTIONS_FREE;
 
   return (
-    <div className="flex h-screen bg-[#EFF6FF] overflow-hidden">
+    <div data-temporal-contract={runtimeTemporalContract} className="flex h-screen bg-[#EFF6FF] overflow-hidden">
       {/* Sidebar */}
       {authMode !== null && (
         <>
@@ -1044,6 +1049,10 @@ export function ChatContainer() {
 
       {/* Main chat area */}
       <div className="flex-1 flex flex-col min-w-0">
+        {process.env.NODE_ENV === 'development' && V1_SYNTHETIC_DEMO_ENABLED &&
+          process.env.NEXT_PUBLIC_GOVERNED_PIPELINE_TRANSPORT === '1' && runtimeTemporalContract &&
+          <GovernedReadLink target={searchParams.get('review_analysis')} read={id =>
+            loadSession({ id, titre: 'Résultat gouverné ciblé' })} />}
         {/* Header */}
         <header className="bg-white border-b border-gray-100 px-4 py-3 flex items-center gap-3 shadow-sm">
           {/* Hamburger (admin only, mobile) */}

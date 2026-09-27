@@ -1,4 +1,9 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Presentation routing only; the server independently enforces admission.
+const GOVERNED_PIPELINE = process.env.NEXT_PUBLIC_GOVERNED_PIPELINE_TRANSPORT === '1';
+const governedPath = (id: string) => GOVERNED_PIPELINE
+  ? `/api/governed/analyses/${encodeURIComponent(id)}`
+  : `/api/v1/governed-analyses/${encodeURIComponent(id)}`;
 
 export async function getAuthHeaders(): Promise<Record<string, string>> {
   if (typeof window === 'undefined') return {};
@@ -171,28 +176,50 @@ export async function inspectV1SyntheticWorkbook(file: File): Promise<V1Syntheti
 }
 
 export async function analyzeV1SyntheticWorkbook(file: File, entityId?: string) {
+  if (GOVERNED_PIPELINE && !entityId) throw new Error('Sélectionnez explicitement le client.');
   const headers = await getAuthHeaders();
   const formData = new FormData();
   formData.append('file', file);
   if (entityId) formData.append('entity_id', entityId);
   let res: Response;
   try {
-    res = await fetch(`${API_URL}/api/v1/synthetic-workbook-analysis`, {
+    res = await fetch(`${API_URL}${GOVERNED_PIPELINE ? '/api/governed/analyses' : '/api/v1/synthetic-workbook-analysis'}`, {
       method: 'POST', headers, body: formData,
     });
   } catch {
+    if (GOVERNED_PIPELINE) throw new Error('Résultat de persistance inconnu. Ne relancez pas : faites vérifier l’historique.');
     throw new Error('Impossible de joindre le serveur Pepperyn. Vérifiez que le service est démarré puis réessayez.');
   }
   const data = await res.json().catch(() => ({}));
+  if (GOVERNED_PIPELINE) {
+    if (!res.ok || data.status !== 'PERSISTED' || typeof data.analysis_id !== 'string') {
+      throw new Error('Création non confirmée. Ne relancez pas sans vérification de la persistance.');
+    }
+    try {
+      return await fetchV1GovernedAnalysis(data.analysis_id);
+    } catch {
+      throw new Error(`Analyse enregistrée (${data.analysis_id}), mais restitution indisponible. Rouvrez-la depuis l’historique ; ne relancez pas l’analyse.`);
+    }
+  }
   if (!res.ok) throw new Error((data as { detail?: string }).detail || 'Analyse synthétique simulée indisponible');
   return data;
 }
 
 export async function fetchV1GovernedAnalysis(analyseId: string) {
   const headers = await getAuthHeaders();
-  const res = await fetch(`${API_URL}/api/v1/governed-analyses/${encodeURIComponent(analyseId)}`, { headers });
+  const res = await fetch(`${API_URL}${governedPath(analyseId)}`, { headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((data as { detail?: string }).detail || 'Analyse gouvernée introuvable');
+  if (GOVERNED_PIPELINE) {
+    if (data.analysis_id !== analyseId || !data.execution_provenance) throw new Error('Provenance indisponible.');
+    data.analyse_id = data.analysis_id;
+    if (data.result && typeof data.result === 'object' && !Array.isArray(data.result)) {
+      data.result._execution_provenance = data.execution_provenance;
+      // Keep the authoritative response together; missing is unavailable, not
+      // permission to silently fetch a different legacy transport.
+      data.result._governed_temporal_snapshot = data.temporal_comparison ?? null;
+    }
+  }
   if (data.analyse_id !== analyseId || !data.result || typeof data.result !== 'object' || Array.isArray(data.result)) {
     throw new Error('Analyse gouvernée non vérifiable.');
   }
@@ -348,7 +375,7 @@ export async function downloadPdf(analyseId: string): Promise<Blob> {
 export async function downloadV1GovernedExport(analyseId: string, format: 'xlsx' | 'pdf' | 'pptx'): Promise<Blob> {
   const headers = await getAuthHeaders();
   const res = await fetch(
-    `${API_URL}/api/v1/governed-analyses/${encodeURIComponent(analyseId)}/export.${format}`,
+    `${API_URL}${governedPath(analyseId)}/export.${format}`,
     { headers },
   );
   if (!res.ok) {

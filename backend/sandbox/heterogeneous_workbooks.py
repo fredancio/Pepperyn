@@ -10,15 +10,12 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from connectors import FileConnector
-from services.anonymization_service import anonymize_parsed_data
-from services.data_quality_gate import validate_excel_before_analysis
 from services.execution_provenance import ExecutionProvenance
+from services.governed_workbook_ingestion import ingest_governed_workbook, WorkbookIngestionRefused
 from services.v1_analysis_contract import (
     GovernedAnalysisEnvelope,
     GovernedFinancialAnalysis,
     UnderstandingResult,
-    build_financial_understanding,
     build_openai_request,
     parse_openai_response,
     to_analysis_result,
@@ -83,12 +80,11 @@ def _registered_understanding(
     if registered_name is None or filename != registered_name:
         raise SandboxRefused("UNREGISTERED_SYNTHETIC_WORKBOOK")
 
-    gate = validate_excel_before_analysis(raw, filename)
-    if not gate.can_analyze or gate.status not in {"ok", "warning"}:
-        raise SandboxRefused("SYNTHETIC_WORKBOOK_QUALITY_GATE_REFUSED")
-    parsed = FileConnector(raw, filename).fetch()
-    anonymized, _ = anonymize_parsed_data(parsed)
-    return digest, build_financial_understanding(anonymized), anonymized
+    try:
+        ingested = ingest_governed_workbook(raw, filename)
+    except WorkbookIngestionRefused:
+        raise SandboxRefused("SYNTHETIC_WORKBOOK_QUALITY_GATE_REFUSED") from None
+    return digest, ingested.understanding, ingested.local_representation
 
 
 def inspect_registered_workbook(raw: bytes, filename: str) -> dict[str, Any]:
