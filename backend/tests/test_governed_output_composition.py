@@ -1,5 +1,7 @@
 """Local full composition/ASGI proof only; no deployed session or Beta proof."""
 import copy
+import hashlib
+import json
 from io import BytesIO
 from pathlib import Path
 
@@ -32,6 +34,54 @@ def stored():
     return db, execution
 
 
+def as_v40(db, execution):
+    """Replace V39 evidence with a fully bound local V40 terminal receipt."""
+    request = '50000000-0000-0000-0000-000000000001'
+    execution_id = '60000000-0000-0000-0000-000000000001'
+    actor = '70000000-0000-0000-0000-000000000001'
+    policy = '80000000-0000-0000-0000-000000000001'
+    contract = 'A' * 64
+    input_text = execution.analysis.envelope.source_facts.model_dump_json()
+    source = execution.provenance.raw_source_sha256
+    representation = execution.provenance.source_representation_sha256
+    bindings = dict(request_id=request, actor_id=actor, execution_id=execution_id,
+        analysis_id=ANALYSIS, company_id=COMPANY_A, entity_id=ENTITY_A,
+        engagement_id=ENGAGEMENT_A, producer_id='local-synthetic-analysis-v2',
+        producer_version='producer-v2', task_id='financial-analysis', task_version='task-v1',
+        admission_contract_sha256=contract, raw_source_sha256=source,
+        source_representation_sha256=representation,
+        producer_input_sha256=hashlib.sha256(input_text.encode()).hexdigest().upper())
+    claimed = '2026-09-28T12:00:00+00:00'
+    completed = '2026-09-28T12:00:01+00:00'
+    terminal = '2026-09-28T12:00:02+00:00'
+    envelope_sha = _digest(execution.analysis.envelope.model_dump(mode='json'))
+    candidate = dict(schema_version='producer-execution-candidate-2',
+        evidence_status='UNADMITTED_CANDIDATE', bindings=bindings,
+        envelope_sha256=envelope_sha, started_at=claimed, completed_at=completed)
+    composition = 'B' * 64
+    db.tables['governed_execution_receipts'] = []
+    db.tables['analyses'][0].update(source_data_hash=source.lower(),
+        fichier_nom='pepperyn_v1_heterogeneous_english.xlsx')
+    db.tables['producer_policies_v2'] = [dict(id=policy, specification=dict(
+        company_id=COMPANY_A, entity_id=ENTITY_A, engagement_id=ENGAGEMENT_A,
+        producer_id=bindings['producer_id'], producer_version=bindings['producer_version'],
+        task_id=bindings['task_id'], task_version=bindings['task_version'],
+        source_sha256=source, filename=db.tables['analyses'][0]['fichier_nom']),
+        contract_sha256=contract, contract_version='local-synthetic-durable-admission-2',
+        enabled=False, origin='SYNTHETIC', egress='DENY')]
+    db.tables['execution_admissions_v2'] = [dict(bindings, policy_id=policy,
+        bindings=bindings, input_text=input_text, filename=db.tables['analyses'][0]['fichier_nom'],
+        composition_sha256=composition, state='COMPLETE', claim_id='90000000-0000-0000-0000-000000000001',
+        issued_at='2026-09-28T11:59:59+00:00', claimed_at=claimed, terminal_at=terminal)]
+    receipt = dict(schema_version='governed-execution-receipt-2',
+        evidence_scope='LOCAL_SYNTHETIC_ONLY', egress='DENY', candidate=candidate,
+        composition_sha256=composition, policy_id=policy,
+        issued_at='2026-09-28T11:59:59+00:00', claimed_at=claimed)
+    db.tables['execution_receipts_v2'] = [dict(execution_id=execution_id,
+        analysis_id=ANALYSIS, receipt=receipt, created_at=terminal)]
+    return bindings
+
+
 def extract(format, content):
     if format == 'xlsx':
         wb = load_workbook(BytesIO(content))
@@ -53,6 +103,34 @@ def test_owned_receipt_reaches_all_terminal_exports(stored, format):
     assert 'Fournisseur simule local' in text and 'Recu durable verifie' in text
     assert 'UNKNOWN' in text and 'Comparabilite financiere non etablie' in text
     assert db.tables == before
+
+
+@pytest.mark.parametrize('format', ['xlsx', 'pdf', 'pptx'])
+def test_v40_owned_receipt_reaches_all_terminal_exports(stored, format):
+    db, execution = stored
+    bindings = as_v40(db, execution)
+    before = copy.deepcopy(db.tables)
+    output = read_owned_output(db, analysis_id=ANALYSIS, company_id=COMPANY_A)
+    assert output['execution_provenance']['receipt_version'] == 'V40'
+    assert output['execution_provenance']['receipt']['producer_id'] == bindings['producer_id']
+    text = extract(format, export_owned_output(db, analysis_id=ANALYSIS,
+                                               company_id=COMPANY_A, format=format))
+    for expected in ('V40 / governed-execution-receipt-2', bindings['producer_id'],
+                     bindings['producer_version'], bindings['task_id'],
+                     bindings['raw_source_sha256'], bindings['source_representation_sha256'],
+                     bindings['producer_input_sha256'], 'producteur generique non admis'):
+        assert expected in text
+    assert db.tables == before
+
+
+def test_v40_receipt_selects_its_exact_engagement_not_an_entity_default(stored):
+    db, execution = stored
+    as_v40(db, execution)
+    db.tables['engagements'].append({
+        'id': '40000000-0000-0000-0000-000000000002', 'entity_id': ENTITY_A,
+    })
+    result = read_owned_output(db, analysis_id=ANALYSIS, company_id=COMPANY_A)
+    assert result['execution_provenance']['receipt_version'] == 'V40'
 
 
 @pytest.mark.parametrize('format', ['xlsx', 'pdf', 'pptx'])
@@ -79,6 +157,22 @@ def test_outage_refuses_instead_of_missing_claim(stored, monkeypatch, table):
         export_owned_output(db, analysis_id=ANALYSIS, company_id=COMPANY_A, format='pdf')
 
 
+@pytest.mark.parametrize('table', [
+    'execution_receipts_v2', 'execution_admissions_v2', 'producer_policies_v2',
+])
+def test_v40_registry_outage_refuses_without_v39_or_legacy_fallback(stored, monkeypatch, table):
+    db, execution = stored
+    as_v40(db, execution)
+    original = db.from_
+    def query(name):
+        if name == table:
+            raise RuntimeError('sensitive')
+        return original(name)
+    monkeypatch.setattr(db, 'from_', query)
+    with pytest.raises(GovernedReadRefused, match='^UNAVAILABLE$'):
+        read_owned_output(db, analysis_id=ANALYSIS, company_id=COMPANY_A)
+
+
 @pytest.mark.parametrize('field', ['analysis_id', 'entity_id', 'envelope_sha256', 'raw_source_sha256', 'provider_mode'])
 def test_forged_receipt_even_rehashed_refused(stored, field):
     db, _ = stored
@@ -95,6 +189,49 @@ def test_foreign_scope_never_reads_receipt(stored):
     with pytest.raises(GovernedReadRefused, match='NOT_FOUND'):
         read_owned_output(db, analysis_id=ANALYSIS, company_id=COMPANY_B)
     assert not any(x[0] == 'governed_execution_receipts' for x in db.log)
+
+
+@pytest.mark.parametrize('fault', [
+    'dual_receipt', 'unknown_receipt_version', 'receipt_scope', 'request_scope', 'admission_scope',
+    'missing_admission', 'missing_policy', 'policy_contract', 'policy_source',
+    'input_mutation', 'candidate_binding', 'envelope_digest', 'incomplete',
+])
+def test_v40_incomplete_substituted_or_unknown_evidence_refuses_without_fallback(stored, fault):
+    db, execution = stored
+    as_v40(db, execution)
+    if fault == 'dual_receipt':
+        payload = execution.provenance.model_dump(mode='json') | dict(
+            analysis_id=ANALYSIS, company_id=COMPANY_A, entity_id=ENTITY_A, engagement_id=ENGAGEMENT_A)
+        db.tables['governed_execution_receipts'] = [dict(payload=payload, sha256=_digest(payload),
+            analysis_id=ANALYSIS, company_id=COMPANY_A, entity_id=ENTITY_A, engagement_id=ENGAGEMENT_A)]
+    elif fault == 'unknown_receipt_version':
+        db.tables['execution_receipts_v2'][0]['receipt']['schema_version'] = 'future'
+    elif fault == 'receipt_scope':
+        db.tables['execution_receipts_v2'][0]['receipt']['candidate']['bindings']['analysis_id'] = '10000000-0000-0000-0000-000000000002'
+    elif fault == 'request_scope':
+        db.tables['execution_admissions_v2'][0]['request_id'] = '50000000-0000-0000-0000-000000000002'
+    elif fault == 'admission_scope':
+        db.tables['execution_admissions_v2'][0]['company_id'] = COMPANY_B
+    elif fault == 'missing_admission':
+        db.tables['execution_admissions_v2'] = []
+    elif fault == 'missing_policy':
+        db.tables['producer_policies_v2'] = []
+    elif fault == 'policy_contract':
+        db.tables['producer_policies_v2'][0]['contract_sha256'] = 'C' * 64
+    elif fault == 'policy_source':
+        db.tables['producer_policies_v2'][0]['specification']['source_sha256'] = 'C' * 64
+    elif fault == 'input_mutation':
+        value = json.loads(db.tables['execution_admissions_v2'][0]['input_text'])
+        value['status'] = 'CONTRADICTION'
+        db.tables['execution_admissions_v2'][0]['input_text'] = json.dumps(value)
+    elif fault == 'candidate_binding':
+        db.tables['execution_receipts_v2'][0]['receipt']['candidate']['bindings']['task_version'] = 'task-v2'
+    elif fault == 'envelope_digest':
+        db.tables['execution_receipts_v2'][0]['receipt']['candidate']['envelope_sha256'] = 'C' * 64
+    elif fault == 'incomplete':
+        db.tables['execution_admissions_v2'][0]['state'] = 'CLAIMED'
+    with pytest.raises(GovernedReadRefused, match='^UNAVAILABLE$'):
+        read_owned_output(db, analysis_id=ANALYSIS, company_id=COMPANY_A)
 
 
 def app_for(db, *, company=COMPANY_A, admitted=True):
