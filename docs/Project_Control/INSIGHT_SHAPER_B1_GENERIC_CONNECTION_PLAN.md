@@ -136,6 +136,48 @@ already governed claim and quarantine contracts. It must remain injected/local,
 must not activate or admit the genuine generic producer, and must prove that the
 producer receives no authority over scope, admission, identity or persistence.
 
+## Controlled backend producer adapter — local result
+
+Completed under DEC-033 / Sol medium. The minimal join reuses V40's existing
+`DurableProducerAdmission`, `ExecutionBindingsV2`, `UnderstandingResult`,
+`GovernedFinancialAnalysis` and `GovernedAnalysisEnvelope`; it adds no registry,
+route, grant, policy or persistence mechanism.
+
+The trusted backend constructs `GovernedProducerAdapter` with the exact expected
+producer/version, task/version and admission-contract digest. Compatibility is
+checked before claim. The producer callable receives only a frozen
+`governed-producer-invocation-2` containing task/version, the request nonce and
+governed source facts. It cannot see actor, tenant/company, entity, engagement,
+analysis/execution IDs, Auth, DB, admission or persistence. It returns only an
+untrusted analysis payload. Pepperyn isolates it, applies the closed schema and
+source/nonce/fact-lineage validation, builds the envelope, then delegates the
+single completion attempt to V40. There is no retry, fallback or replacement ID.
+
+Local falsification proves:
+
+- all five producer/task/contract substitutions refuse before claim/invocation;
+- claimed-input hash substitution refuses before invocation;
+- scope injection and nonce/source/fact substitution refuse before completion;
+- producer exceptions are sanitized and invoked once;
+- candidate, envelope digest and durable bindings are backend-constructed;
+- the serialized producer view excludes all business/execution identities;
+- a socket-denial probe observed no product network attempt;
+- V39 provenance, V40 versioned reread and output isolation regressions remain
+  passing.
+
+Consolidated result: 185 local tests PASS. The 37 database-dependent PostgreSQL
+tests in this selection were skipped for lack of their isolated runtime and are
+NOT EXECUTED, never PASS. No remote access, Auth, policy/admission creation,
+transport or real data occurred.
+
+The real producer is still not selected or admitted. This slice does not prove a
+task-specific positive privacy/egress contract, real provider behavior, live V40
+adapter execution, professional reliability or Beta readiness. B1 therefore
+remains OPEN. The next gap is to select the smallest genuine producer task and
+prove its positive data-class/privacy contract plus its controlled adapter
+implementation; an external implementation remains blocked by PG-3/PG-4, and a
+real-data execution independently remains blocked by RD.
+
 ## Durability preparation before consumer implementation
 
 Checkpoint scope: 40 implementation/test/launcher files, then 15 Canon/control

@@ -702,3 +702,30 @@ legacy absence remains UNATTESTED. 127 backend and 19 frontend tests PASS; 37
 database-dependent tests skipped without their isolated PostgreSQL runtime.
 No live V40 read/export, producer invocation, remote operation or gate change.
 Generic producer remains UNADMITTED and B1 remains OPEN.
+
+### Backend-owned V40 producer-adapter composition — local proof only
+
+The next B1 join is implemented locally without a new registry, route, grant or
+transport. `GovernedProducerAdapter` is injected by trusted backend composition.
+It compares the claimed V40 producer/version, task/version and contract digest
+against backend-selected values before the durable claim. The callable sees only
+`governed-producer-invocation-2`: task/version, the request nonce and immutable
+governed source facts. It receives no actor/company/entity/engagement/analysis/
+execution identity, Auth token, database client, admission object or persistence
+method.
+
+Producer output is isolated, schema-validated and checked against the retained
+source facts, request nonce and fact lineage. Pepperyn—not the producer—builds
+the governed envelope and candidate; the existing durable service alone attempts
+atomic completion. Adapter/profile mismatch prevents claim/invocation. Input
+mutation refuses before invocation. Output scope injection, nonce/source/fact
+substitution, malformed output and producer exceptions refuse before completion,
+without retry or diagnostic leakage.
+
+Related local regression: 185 PASS, including V39 provenance, strict V39/V40
+reread, adapter/admission contracts and output isolation. The 37 PostgreSQL tests
+in that selection were skipped because their isolated runtime was unavailable;
+they are NOT EXECUTED, not PASS. No remote operation, provider SDK/transport or
+real data was used. The actual generic producer remains UNADMITTED; no positive
+task-specific privacy/egress contract or live producer execution is established.
+B1 remains OPEN; External Provider and Real-data Admission remain CLOSED.

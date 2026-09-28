@@ -373,3 +373,16 @@ provenance. V39 and V40 are explicitly dispatched and validated; UI plus
 XLSX/PDF/PPTX share the server-owned terminal projection. Present malformed,
 ambiguous, incomplete or unavailable evidence refuses without legacy fallback.
 This does not admit or invoke the generic producer and has no live/remote proof.
+
+B1 backend-owned producer adapter composition (2026-09-28): IMPLEMENTED /
+LOCAL_TESTED / UNADMITTED. WHY: a callable selected to produce an analysis must
+never inherit authority over actor, tenant, company, engagement, analysis,
+admission, provenance or persistence. The adapter receives only an immutable
+task/version, request nonce and governed source facts; Pepperyn validates exact
+producer/task/contract bindings before claim, quarantines and validates the
+returned analysis, rebuilds the envelope and delegates the single completion to
+the existing V40 authority. Substitution, malformed output and producer failure
+stop before completion with no retry. 185 related tests PASS; 37 PostgreSQL tests
+remain NOT EXECUTED because no isolated database runtime was supplied to that
+test selection. This local composition does not select/admit the real generic
+producer, open egress, prove a live V40 execution or change either admission gate.

@@ -1394,3 +1394,31 @@ No remote read/write, Auth, producer invocation, provider call or real data.
 This is LOCAL_TESTED only: V40 live GET/browser/export and the actual generic
 producer connection remain unproved. B1 OPEN; generic producer UNADMITTED;
 global egress debt OPEN; External Provider and Real-data Admission CLOSED.
+
+### B1 backend-owned producer adapter — local bounded PASS
+
+Under Sol medium, the existing V40 claim/completion services and governed V1
+financial-analysis models were composed without adding an authority primitive.
+The backend-selected adapter verifies producer/version, task/version and exact
+admission-contract digest before claim. Its callable input contains only the
+bounded task, correlation nonce and immutable governed source facts. Tests assert
+that actor, company, entity, engagement, analysis and execution identifiers are
+absent from the serialized producer view.
+
+After one invocation, Pepperyn JSON-isolates the returned object, applies the
+closed `GovernedFinancialAnalysis` schema, nonce/source/fact-lineage checks, and
+constructs the envelope itself. Only the pre-existing `DurableProducerAdmission`
+can perform completion. Falsifications prove no invocation on profile/contract
+mismatch, no invocation on claimed-input substitution, no completion on injected
+scope, changed nonce/source/fact, malformed output or producer exception, one
+sanitized refusal and no retry. The completion candidate/envelope digest and V40
+bindings are backend-constructed. A socket denial probe observed zero product
+network attempts.
+
+Consolidated local selection: 185 PASS in 9.45s. Thirty-seven PostgreSQL cases
+were skipped because no isolated PostgreSQL runtime was supplied to this run;
+their status is explicitly NOT EXECUTED. No remote Auth/read/write, policy,
+admission, producer registration, provider call or real data. V39 regressions and
+version-aware V40 output tests remain PASS. This establishes local composition
+only: real generic producer UNADMITTED, B1 OPEN, global egress debt OPEN and both
+admission gates CLOSED.
