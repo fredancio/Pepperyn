@@ -125,9 +125,16 @@ are not yet established, so no executable remote-write protocol is READY and no
 GO for an unspecified producer is requested. External use requires Provider Gate
 approval even for synthetic inputs; real inputs independently require RD approval.
 
-Current next local slice: strict version-aware V40 owned reread and shared
-terminal provenance, then backend producer adapter composition. This advances
-the end-to-end join without inventing a new mock or opening a blocked provider.
+Completed local slice: strict version-aware V39/V40 owned reread and shared
+terminal provenance. The exact receipt-bound engagement and V40 policy/admission/
+candidate/source/envelope composition are validated before UI or XLSX/PDF/PPTX;
+unknown, dual, incomplete, substituted or unavailable evidence refuses without
+fallback. This is LOCAL_TESTED, not a live V40 output proof.
+
+Next local slice: controlled backend producer-adapter composition using the
+already governed claim and quarantine contracts. It must remain injected/local,
+must not activate or admit the genuine generic producer, and must prove that the
+producer receives no authority over scope, admission, identity or persistence.
 
 ## Durability preparation before consumer implementation
 

@@ -1363,3 +1363,34 @@ Original failed proof is not requalified. Generic remains UNADMITTED; B1 OPEN;
 global egress scan debt OPEN; both admission gates CLOSED. No HTTP/browser v2,
 database restart, global isolation, professional or production proof inferred.
 No Git index/commit/push: documentation and implementation still local/uncommitted.
+
+### B1 version-aware owned V39/V40 reread and terminal provenance — local PASS
+
+Under Sol medium and DEC-033, the owned-output path now discovers V39 and V40
+receipts only after analysis/company/entity ownership is established. V39 keeps
+its existing strict receipt validation. V40 additionally binds the exact COMPLETE
+admission, receipt, policy, actor/company/entity/engagement, analysis, source,
+input, producer/task versions, contract, composition and immutable envelope.
+The receipt-bound engagement is used directly; no current/default engagement is
+substituted. A disabled V40 policy remains historical evidence only and grants no
+new execution authority.
+
+The server emits a common terminal projection with an explicit V39 or V40
+version. The UI and XLSX/PDF/PPTX renderers consume that server-owned projection;
+V40 is labeled local synthetic / EGRESS DENY / generic producer UNADMITTED, never
+as V39 mock or as admitted generic execution. Legacy absence remains UNATTESTED.
+
+Falsifications cover dual versions, unknown receipt version, foreign/substituted
+scope, missing admission/policy, contract/source/input/candidate/envelope changes,
+non-COMPLETE state, registry outage and multi-engagement substitution. Every
+present-but-invalid receipt refuses `UNAVAILABLE`; it never falls back to legacy
+or V39. Own V39 and V40 reads and all three exports preserve exact hashes and do
+not mutate repository state. Local validation: 127 backend PASS, 37 PostgreSQL
+tests skipped without their isolated database; 19 frontend PASS; TypeScript and
+Python syntax checks PASS. The earlier pnpm dependency relocation was reverted
+inside ignored node_modules before Jest; no tracked dependency or lockfile change.
+
+No remote read/write, Auth, producer invocation, provider call or real data.
+This is LOCAL_TESTED only: V40 live GET/browser/export and the actual generic
+producer connection remain unproved. B1 OPEN; generic producer UNADMITTED;
+global egress debt OPEN; External Provider and Real-data Admission CLOSED.

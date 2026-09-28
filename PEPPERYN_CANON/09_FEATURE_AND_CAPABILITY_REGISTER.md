@@ -365,3 +365,11 @@ binding, concurrency/rollback/replay and independent process recovery. Both test
 policies disabled; four historical rows preserved. Generic producer UNADMITTED,
 B1 OPEN. See B1_V40_SUCCESSOR_LIVE_EVIDENCE.md. The next consumer/producer joins
 are assessed in B1_GENERIC_CONNECTION_PLAN.md; no actual producer or gate opened.
+
+B1 version-aware execution reread (2026-09-28): IMPLEMENTED / LOCAL_TESTED.
+WHY: a durable receipt is useful only if its exact owned execution composition
+survives to CFO-visible outputs without version confusion or reconstructed
+provenance. V39 and V40 are explicitly dispatched and validated; UI plus
+XLSX/PDF/PPTX share the server-owned terminal projection. Present malformed,
+ambiguous, incomplete or unavailable evidence refuses without legacy fallback.
+This does not admit or invoke the generic producer and has no live/remote proof.

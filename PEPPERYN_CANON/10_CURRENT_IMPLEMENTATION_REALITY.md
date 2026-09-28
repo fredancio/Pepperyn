@@ -691,3 +691,14 @@ terminal provenance and trusted adapter composition, not another mock proof.
 Exact gaps, acceptance/refusal evidence and future remote authorization boundary:
 docs/Project_Control/INSIGHT_SHAPER_B1_GENERIC_CONNECTION_PLAN.md. Assessment only;
 no admission, remote access, transport or producer activation in this step.
+
+### Version-aware terminal reread implementation
+
+B1 version-aware terminal reread is IMPLEMENTED / LOCAL_TESTED. Owned outputs now
+distinguish strict V39 and strict V40 receipts, use the receipt-bound engagement,
+and project the same correctly versioned provenance into UI and XLSX/PDF/PPTX.
+Dual/unknown/incomplete/substituted evidence and registry outages fail closed;
+legacy absence remains UNATTESTED. 127 backend and 19 frontend tests PASS; 37
+database-dependent tests skipped without their isolated PostgreSQL runtime.
+No live V40 read/export, producer invocation, remote operation or gate change.
+Generic producer remains UNADMITTED and B1 remains OPEN.
