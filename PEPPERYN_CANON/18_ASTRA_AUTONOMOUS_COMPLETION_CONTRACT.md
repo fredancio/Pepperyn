@@ -16,6 +16,12 @@ maintain this Canon.
 
 Autonomy applies to the path, not Pepperyn's identity.
 
+Current execution routing is governed by `25_MODEL_ROUTING_DOCTRINE.md`
+(DEC-033): Sol with medium reasoning is the default execution owner; Astra
+resolves uncertainty under the stated escalation criteria. This contract's
+authority, operating duties, restrictions and Founder-only boundaries apply
+equally to both models. Historical Astra takeover authority is not erased.
+
 ## Mandatory operating loop
 
 1. Read this Canon and the linked authoritative source before acting.
@@ -39,7 +45,9 @@ pricing/business model, legal/operator identity, financial commitments,
 destructive production actions, public DNS/deployment activation, credential
 rotation, or removal/weakening of a documented capability.
 
-Technical uncertainty alone is not a reason to escalate.
+Technical uncertainty alone is not a reason to request a Founder decision.
+Model escalation from Sol to Astra is separately required under doctrine 25;
+it never substitutes for a Founder-only approval.
 
 ## Non-authorizations
 

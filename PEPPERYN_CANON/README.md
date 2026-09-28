@@ -13,6 +13,10 @@ No technical renaming, gate opening or infrastructure activation is implied.
 
 **Prepared for:** Astra autonomous V1 completion
 
+**Current model routing (DEC-033):** Sol, medium reasoning, owns bounded
+execution; Astra owns uncertainty resolution. See
+`25_MODEL_ROUTING_DOCTRINE.md`. Contract 18 and all Founder gates remain binding.
+
 **Product gates:** External Provider **CLOSED**; Real-data Admission **CLOSED**; Self-Selling Control Center **PARKED / DEFERRED**
 
 This directory is the navigation and control layer for the Pepperyn corpus. It
@@ -67,6 +71,7 @@ but does not prove implementation.
 | `22_TRANSFER_VALIDATION.md` | Context-independent handover validation |
 | `23_FOUNDER_HANDOVER_AUTHORITY_RECORD.md` | Repository-resident Founder authority for transfer |
 | `24_ASTRA_EXECUTION_EVIDENCE.md` | Post-takeover bounded changes and proof debt |
+| `25_MODEL_ROUTING_DOCTRINE.md` | Sol/Astra routing, escalation and return criteria; unchanged governance |
 
 Open product and release gates are not hidden by this package. Their preparation
 status and missing evidence are recorded in `10_CURRENT_IMPLEMENTATION_REALITY.md`,

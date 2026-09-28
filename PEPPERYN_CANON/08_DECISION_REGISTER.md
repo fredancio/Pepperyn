@@ -96,3 +96,42 @@ own-row reads but no direct writes; exact entity-creation RPC becomes service-on
 No row changes or retroactive integrity claim. Candidate locally tested, pending
 remote approval/deployment; actual two-user isolation remains OPEN. Full rationale,
 scope, compatibility and rollback boundaries: `docs/Security/PEPPERYN_V36_PRIVILEGE_CONTAINMENT_A24.md`.
+
+## Privacy & AI Contract audit ruling — 2026-09-28
+
+DEC-032 (FOUNDER): architecture COMPATIBLE; MAJOR PRIVACY REFACTOR NOT REQUIRED.
+Continue B1/current roadmap. The accepted audit identifies admission conditions
+before affected real-Beta uses, not a new cross-cutting Privacy/GDPR programme.
+Treat only the next gap blocking the next gate. Positive task admission requires
+allowed data classes, necessity, governed provenance and authorized privacy
+transformation before projection/egress; availability, parsing, truncation or
+historical anonymization never suffice.
+
+The six gate-timed blockers and explicit non-objectives are preserved in
+`07_PRIVACY_AND_SECURITY_MODEL.md` under this ruling. In particular, do not silently
+widen V39/mock provenance, claim deletion success despite partial failures,
+generalize bounded isolation/privacy tests or infer provider account controls.
+External Provider and Real-data Admission remain CLOSED. This decision authorizes
+no automatic fixes, new privacy platform, real data, provider use or deployment.
+Source: Founder "Decision — Audit Privacy & AI Contract", accepted in this Work.
+Documentary adoption is local pending a separate durability checkpoint; it must
+not silently enlarge the previously prepared 79-file B1/R5 commit scope.
+
+## DEC-033 — MODEL ROUTING DOCTRINE (FOUNDER)
+
+Source: explicit Founder decision "MODEL ROUTING DOCTRINE" in this Work,
+following acknowledgement of the synchronized V40 successor checkpoint.
+Normative rules: `25_MODEL_ROUTING_DOCTRINE.md`.
+
+Default execution owner: Sol, medium reasoning. Astra owns uncertainty
+resolution under the explicit escalation criteria, including two unsuccessful
+bounded attempts on the same unresolved problem. Return to Sol once cause is
+understood, solution selected, invariants explicit and PASS/FAIL criteria defined.
+Security sensitivity alone does not require Astra when the contract is explicit.
+
+Model routing changes neither governance nor Founder-reserved authority. The
+older contract-18 sentence about technical uncertainty is clarified to concern
+Founder decisions, not model escalation. No substantive B1 architecture, gate
+semantics, evidence requirement or historical proof is changed. B1 remains OPEN,
+generic producer UNADMITTED, External Provider and Real-data Admission CLOSED.
+This documentary decision does not start the next B1 implementation tranche.
