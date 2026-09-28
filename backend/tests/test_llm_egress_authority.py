@@ -323,10 +323,16 @@ _NETWORK_ALLOWLIST = {
     "sandbox/synthetic_product.py": {"httpx"},
     "services/crm_service.py": {"httpx"},
     "services/file_parser.py": {"subprocess"},
+    # Fixed Integration Test host, no provider dispatch. Content pinned below;
+    # bounded transport falsification lives in test_v40_rehearsal_*.py.
+    "sandbox/preflight_v40_rehearsal.py": {"httpx"},
+    "sandbox/v40_rehearsal_transport.py": {"httpx"},
 }
 _NETWORK_ALLOWLIST_HASHES = {
     "services/crm_service.py": "1d66224dd716d1fe979cbb7299c59858e35857cafc81d1dd4d7b481473a75306",
     "services/file_parser.py": "ef24f779e5dfc9ccab8325315889b1db953c01837c3d7a90af7ed769b53f08db",
+    "sandbox/preflight_v40_rehearsal.py": "7a0e2fda58aab889a6b6174edb8c38ec50faeb68e8d2b276bc9c8d3c0db99622",
+    "sandbox/v40_rehearsal_transport.py": "de1767a06883d4cc97cb463be67ee5b2a08b862482c40fb51b0f7fbc2f375fa9",
 }
 _NETWORK_ROOTS = {
     "aiohttp", "anthropic", "http", "http.client", "httpx", "importlib",

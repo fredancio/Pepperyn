@@ -100,6 +100,23 @@ class OwnershipRecord:
 
 
 @dataclass(frozen=True)
+class ProspectiveExecutionAuthorization:
+    """Process-local preparation capability; NOT permission to persist or egress."""
+
+    principal: AuthenticatedPrincipal
+    scope: OwnershipScope
+    composition_sha256: str
+    expires_at: float
+    capability_id: str
+    _issuer: Any
+    _seal: object
+
+    def __post_init__(self):
+        if self._seal is not _MINT_SEAL:
+            raise OwnershipRefused("FORGED_EXECUTION_AUTHORIZATION")
+
+
+@dataclass(frozen=True)
 class DisclosureReceipt:
     scope: OwnershipScope
     request_id: str
@@ -312,6 +329,8 @@ class OwnershipAuthority:
         self._read_registry: dict[str, tuple[AuthenticatedPrincipal, OwnershipScope, str, frozenset[ProtectedResource], float]] = {}
         self._egress_registry: dict[str, tuple[OwnershipScope, str, str, frozenset[ProtectedResource], str, float, bool]] = {}
         self._lock = threading.Lock()
+        self._prospective_executions: dict[str, tuple] = {}
+        self._prospective_analysis_ids: set[str] = set()
         self._read_receipts: dict[str, tuple[str, OwnershipScope, str, ProtectedResource, Any, str, tuple | None]] = {}
         self._used_projected_receipts: set[str] = set()
         self._used_projection_source_receipts: set[str] = set()
@@ -340,6 +359,79 @@ class OwnershipAuthority:
         if not principal_id or not company_id:
             raise OwnershipRefused("MISSING_AUTHENTICATED_PRINCIPAL")
         return AuthenticatedPrincipal(principal_id, company_id, _MINT_SEAL)
+
+    def authorize_prospective_execution(self, *, principal, scope, composition_sha256):
+        """Resolve a not-yet-created analysis without inventing a read grant.
+
+        Repository must implement resolve_prospective with authoritative parent
+        checks and absence checks. This check is not a database reservation.
+        """
+        if not isinstance(principal, AuthenticatedPrincipal) or principal._seal is not _MINT_SEAL:
+            raise OwnershipRefused("INVALID_PRINCIPAL")
+        if not isinstance(scope, OwnershipScope) or scope.company_id != principal.company_id:
+            raise OwnershipRefused("EXECUTION_SCOPE_MISMATCH")
+        if (not isinstance(composition_sha256, str) or len(composition_sha256) != 64
+                or any(c not in "0123456789ABCDEF" for c in composition_sha256)):
+            raise OwnershipRefused("INVALID_COMPOSITION_HASH")
+        record = self._repository.resolve_prospective(scope)
+        if (record is None or record.ambiguous or record.analysis_id != scope.analysis_id
+                or record.company_id != scope.company_id or record.entity_id != scope.entity_id
+                or record.engagement_id != scope.engagement_id
+                or record.entity_company_id != scope.company_id
+                or record.engagement_entity_id != scope.entity_id):
+            raise OwnershipRefused("PROSPECTIVE_OWNERSHIP_UNRESOLVED")
+        grant = ProspectiveExecutionAuthorization(
+            principal, scope, composition_sha256, time.monotonic() + self._ttl_seconds,
+            _new_id(), self, _MINT_SEAL,
+        )
+        with self._lock:
+            if (scope.analysis_id in self._prospective_analysis_ids
+                    or len(self._prospective_executions) >= 1024):
+                raise OwnershipRefused("PROSPECTIVE_ID_RESERVED_OR_CAPACITY_REACHED")
+            self._prospective_analysis_ids.add(scope.analysis_id)
+            self._prospective_executions[grant.capability_id] = (
+                principal, scope, composition_sha256, grant.expires_at, "OPEN",
+            )
+        return grant
+
+    def consume_prospective_execution(self, grant, *, principal, composition_sha256):
+        if (not isinstance(grant, ProspectiveExecutionAuthorization)
+                or grant._issuer is not self or grant._seal is not _MINT_SEAL):
+            raise OwnershipRefused("INVALID_EXECUTION_AUTHORIZATION")
+        with self._lock:
+            registered = self._prospective_executions.get(grant.capability_id)
+            expected = (grant.principal, grant.scope, grant.composition_sha256, grant.expires_at, "OPEN")
+            if registered != expected:
+                raise OwnershipRefused("EXECUTION_AUTHORIZATION_CLOSED_OR_SUBSTITUTED")
+            # Burn a recognized attempt before subsequent validation/side effects.
+            self._prospective_executions[grant.capability_id] = (*registered[:-1], "CONSUMED")
+            if (time.monotonic() >= grant.expires_at or principal != grant.principal
+                    or composition_sha256 != grant.composition_sha256):
+                raise OwnershipRefused("EXECUTION_AUTHORIZATION_BINDING_OR_EXPIRY")
+        # Re-resolve parents/absence immediately before returning the scoped input.
+        record = self._repository.resolve_prospective(grant.scope)
+        if (record is None or record.ambiguous or record.analysis_id != grant.scope.analysis_id
+                or record.company_id != grant.scope.company_id or record.entity_id != grant.scope.entity_id
+                or record.engagement_id != grant.scope.engagement_id
+                or record.entity_company_id != grant.scope.company_id
+                or record.engagement_entity_id != grant.scope.entity_id):
+            raise OwnershipRefused("PROSPECTIVE_OWNERSHIP_CHANGED")
+        with self._lock:
+            if (time.monotonic() >= grant.expires_at
+                    or self._prospective_executions[grant.capability_id][-1] != "CONSUMED"):
+                raise OwnershipRefused("EXECUTION_AUTHORIZATION_CLOSED_DURING_CHECK")
+        return grant.scope
+
+    def close_prospective_execution(self, grant):
+        if (not isinstance(grant, ProspectiveExecutionAuthorization)
+                or grant._issuer is not self or grant._seal is not _MINT_SEAL):
+            raise OwnershipRefused("INVALID_EXECUTION_AUTHORIZATION")
+        with self._lock:
+            registered = self._prospective_executions.get(grant.capability_id)
+            if registered is None or registered[:4] != (
+                    grant.principal, grant.scope, grant.composition_sha256, grant.expires_at):
+                raise OwnershipRefused("INVALID_EXECUTION_AUTHORIZATION")
+            self._prospective_executions[grant.capability_id] = (*registered[:-1], "CLOSED")
 
     def resolve_and_mint_read_grant(
         self,

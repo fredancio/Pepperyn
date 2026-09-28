@@ -1,0 +1,35 @@
+-- LOCAL TEST ONLY. Observed Integration Test catalog, 2026-09-28.
+-- Not a migration. Parent tables contain synthetic ownership records only.
+CREATE TABLE sessions(id uuid PRIMARY KEY);
+CREATE TABLE analyses (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ session_id uuid CONSTRAINT analyses_session_id_fkey REFERENCES sessions(id) ON DELETE SET NULL,
+ company_id uuid NOT NULL CONSTRAINT analyses_company_id_fkey REFERENCES companies(id) ON DELETE CASCADE,
+ user_id uuid CONSTRAINT analyses_user_id_fkey REFERENCES profiles(id) ON DELETE SET NULL,
+ guest_token text,
+ fichier_nom text,
+ fichier_type text CONSTRAINT analyses_fichier_type_check CHECK (fichier_type IN ('xlsx','xls','pdf','csv')),
+ fichier_taille_bytes integer,
+ type_document text CONSTRAINT analyses_type_document_check CHECK (type_document IN ('COMPTE_RESULTAT','BUDGET','PREVISIONNEL','TRESORERIE','BILAN','COMMERCIAL','AUTRE','INCONNU')),
+ contexte_utilisateur text,
+ mode text DEFAULT 'complete' CONSTRAINT analyses_mode_check CHECK (mode IN ('quick','complete')),
+ analyse_json jsonb DEFAULT '{}'::jsonb,
+ excel_export_url text,
+ excel_export_nom text,
+ score_confiance integer CONSTRAINT analyses_score_confiance_check CHECK (score_confiance BETWEEN 0 AND 100),
+ tokens_input integer DEFAULT 0,
+ tokens_output integer DEFAULT 0,
+ cout_estime_euros numeric DEFAULT 0,
+ duree_traitement_ms integer,
+ status text DEFAULT 'pending' CONSTRAINT analyses_status_check CHECK (status IN ('pending','processing','completed','error')),
+ error_message text,
+ created_at timestamptz DEFAULT now(),
+ chat_count integer NOT NULL DEFAULT 0,
+ export_format text,
+ entity_id uuid CONSTRAINT analyses_entity_id_fkey REFERENCES entities(id) ON DELETE SET NULL,
+ decision_fingerprint text,
+ decision_fingerprint_version text,
+ source_data_hash text,
+ decision_kernel jsonb,
+ decision_kernel_version text
+);

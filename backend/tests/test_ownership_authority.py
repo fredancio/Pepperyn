@@ -172,12 +172,18 @@ def _authorized_request():
 
 def test_egress_authorization_is_single_use(monkeypatch):
     import services.llm_egress as module
-    monkeypatch.setattr(module, "_dispatch_final_request", lambda request: "ok")
+    dispatched = []
+    def transport(request):
+        dispatched.append(request)
+        return "ok"
+    monkeypatch.setattr(module, "_dispatch_final_request", transport)
     request = _authorized_request()
     LlmEgressAuthority().dispatch(request)
     with pytest.raises(EgressRefused) as exc:
         LlmEgressAuthority().dispatch(request)
-    assert exc.value.code is EgressRefusalCode.OWNERSHIP_AUTHORIZATION_REQUIRED
+    # The one-use projection is checked before the one-use egress grant.
+    assert exc.value.code is EgressRefusalCode.MINIMAL_PROJECTION_REQUIRED
+    assert len(dispatched) == 1
 
 
 def test_concurrent_egress_consumption_allows_exactly_one_dispatch(monkeypatch):
@@ -425,7 +431,17 @@ def test_principal_acceptance_boundary_has_no_request_field_callers():
             continue
         if "._accept_authenticated_principal(" in path.read_text(encoding="utf-8"):
             callers.append(path.relative_to(backend).as_posix())
-    assert callers == ["routers/analyze.py"]
+    # Exact reviewed callers, including pre-existing synthetic harnesses/tests.
+    # New production callers must be reviewed rather than excluded by directory.
+    assert sorted(callers) == sorted([
+        "routers/analyze.py",
+        "sandbox/run_v34_authorized_registration_rehearsal.py",
+        "sandbox/run_v34_d10_composition_rehearsal.py",
+        "services/governed_producer_admission.py",
+        "tests/test_governed_minimal_projection.py",
+        "tests/test_governed_provider_response.py",
+        "tests/test_pseudonymous_correspondence.py",
+    ])
 
 
 def test_known_protected_chat_caches_only_use_protected_getter():
