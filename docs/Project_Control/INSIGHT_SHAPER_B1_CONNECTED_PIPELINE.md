@@ -842,3 +842,20 @@ each commit scope and parent, excluded bytes and initial HEAD. It refuses any
 unexpected index/remote state and uses normal non-force push. Remote verification
 is deferred to Founder execution: this environment could not connect to GitHub.
 No checkpoint or push has yet been performed by this preparation.
+
+### Durable R5 checkpoint and next producer contract — 2026-09-28
+
+The pending statement above is superseded: Founder confirms commits
+5204b53a4aa683f9f70a7e628308eba34f3a5585 (76 files) and
+c1e22508fff296385014f7d82718e3e64220aa64 (3 files), normal push and synchronization.
+Agent verifies current local HEAD and origin tracking reference at the latter.
+Nine existing exclusions are preserved; strategic/DEC-032 work remains separate.
+No read window or R5 permit is reopened.
+
+Next contract preparation: see INSIGHT_SHAPER_B1_GENERIC_PRODUCER_CONTRACT.md.
+The separate v2 candidate schema checks binding consistency but issues no
+authority, permission or admitted receipt. 69 local tests PASS including existing
+v1 persistence and pipeline regressions. Candidates cannot enter the existing
+V39 adapter. This is local/uncommitted preparation, not installed generic
+execution or PostgreSQL proof. Trusted admission composition and an actual
+producer remain OPEN; External Provider and Real-data Admission remain CLOSED.

@@ -478,3 +478,216 @@ R5 unchanged, no provider/real data, B1-global false; window CLOSED. Combined wi
 the independent browser observation, this closes the bounded temporal reread debt,
 not generic B1 admission. Current accumulated B1/R5 implementation/evidence is
 local pending durability from HEAD 17ff325; checkpoint before a new producer contract.
+
+2026-09-28 update: the preceding pending-durability statement is superseded by
+Founder-confirmed commits 5204b53a (76 files) and c1e22508 (3 files), pushed with
+local/remote equality. Agent verified local HEAD and origin tracking reference
+c1e22508fff296385014f7d82718e3e64220aa64. Nine pre-existing exclusions remain
+preserved, including next-env.d.ts and DEC-032/strategic documents.
+Distinct generic-producer contract preparation is now LOCAL/TESTED, uncommitted:
+producer-execution-candidate-2 is a consistency-checked UNADMITTED_CANDIDATE,
+not an authority or durable receipt. No generic producer installed, V39 change,
+transport or gate activation. See B1_GENERIC_PRODUCER_CONTRACT for required
+trusted composition and outstanding proof. B1 remains OPEN.
+
+Founder composition framework implemented only as LOCAL PREPARATION (2026-09-28):
+existing ownership capability machinery extended for a prospective analysis;
+server-verified actor retained, tenant/client/engagement resolved authoritatively,
+whole immutable source/profile/input composition bound and consumed once.
+199 targeted tests PASS, with no write/egress effects in new falsifications.
+No actual producer admitted; registry is process-local, no distributed replay or
+new atomic persistence proof. V39 remains untouched. A broader pre-existing
+static network-import scan still fails and remains explicit verification debt.
+Accept/refuse/evidence matrix for all 18 Founder invariants:
+docs/Project_Control/INSIGHT_SHAPER_B1_ADMISSION_COMPOSITION.md.
+
+2026-09-28 durable follow-on supersedes the absence of a new SQL implementation:
+V40 and an unmounted adapter are now IMPLEMENTED / LOCAL_POSTGRESQL_TESTED,
+NOT_REMOTE_DEPLOYED / UNCOMMITTED. 29 actual local PostgreSQL tests PASS plus
+211 targeted Python tests. Immutable reservation, concurrent single claim,
+atomic result trio/late rollback and independent client-process recovery tested
+on a reduced synthetic schema. No database-server/host restart proof. V40 has
+empty policies and does not admit a producer; preparation-only authority cannot
+be promoted to its distinct durable contract. Actual generic producer, deployed
+Supabase enforcement, transport and v2 output dispatch remain OPEN, as does the
+pre-existing global static egress scan debt. No V39 change or historical
+requalification. See INSIGHT_SHAPER_B1_DURABLE_ADMISSION_V40.md. B1 OPEN;
+External Provider and Real-data Admission CLOSED. No cloud mutation performed.
+
+2026-09-28 V40 remote structural update supersedes NOT_REMOTE_DEPLOYED above:
+Founder-authorized migration applied once to Pepperyn Integration Test after
+PREFLIGHT_PASS. Three empty tables, six functions and three enabled guards
+observed with expected permissions/RLS/constraints. All 21 pre-existing public
+table fingerprints and existing function/table-permission aggregates unchanged.
+STOP: supplementary exact function-body hashes mismatch for all six functions;
+cause UNKNOWN, no correction or repeat. Full deployment conformance NOT PASS.
+Details: INSIGHT_SHAPER_B1_V40_DEPLOYMENT_INSPECTION.md. No producer/admission/
+analysis/receipt created. B1 OPEN; External Provider/Real-data Admission CLOSED.
+
+Separate Founder-authorized read-only V40 diagnosis resolves the preceding
+UNKNOWN: all six stored bodies equal expected bodies with LF changed to CRLF,
+confirmed by raw SHA-256 and PostgreSQL-normalized hash/byte-length equality.
+No bare CR, changed instructions or multiline literal differences; signatures,
+defaults, return types and execution configuration match. Representation-only
+discrepancy RESOLVED, initial exact-byte failure retained as historical evidence.
+No remote correction, function execution or verifier change performed. This is
+not a live admission/atomicity rehearsal. Generic producer UNADMITTED; B1 OPEN;
+External Provider and Real-data Admission CLOSED. Detailed raw/normalized hashes
+and bounded verifier proposal: B1_V40_DEPLOYMENT_INSPECTION.md.
+
+Follow-on: versioned dual-hash verifier now IMPLEMENTED / LOCAL_TESTED, separate
+from original postflight and unchanged V40. No remote execution this slice.
+Seven local SQL verifier variants plus original regressions: 36 PASS; source-pin
+test 1 PASS and separately selected existing-constraint rollback 1 PASS. Next
+deployed multi-process/atomicity proof requires distinct bounded remote-write GO
+per B1_V40_LIVE_REHEARSAL_PROTOCOL.md; no actual generic producer admitted.
+
+Subsequent Founder GO authorizes the bounded rehearsal conditionally; subsequent
+minimal amendment explicitly permits 19 effect-capable requests including one
+Auth login/session creation. Seven V40/application rows unchanged. Auth refresh,
+second login and any extra effect are forbidden. Local preparation implements a
+cross-process single-use 19-slot journal, fixed-project no-retry transport, and a
+separate service-only GET preflight. 32 component tests PASS; broader selected
+regression 192 PASS / 1 FAIL (the eight pre-existing global static-egress findings
+in five older sandbox scripts). New two transport modules are reviewed and
+content-pinned without suppressing that older debt. PowerShell read-only wrapper
+CheckOnly PASS, no credential read/network. Complete orchestration/worker token
+handoff/whole-run local validation and fresh remote checks still OPEN: no live
+rehearsal runner released or remotely executed, no new live V40 PASS. All changes
+remain local/uncheckpointed. Generic UNADMITTED; B1 OPEN; both gates CLOSED.
+
+Follow-on remote read-only prechecks: Founder service report inspected locally,
+three registries empty and exact account-1 synthetic scope/source captured; zero
+Auth/effect attempts. Separately, agent SQL Editor READ ONLY checks obtained
+BOUNDED_DEFINITION_CONFORMANCE_PASS for all six functions, expected table/RPC
+permissions, RLS, 21 validated constraints and three active guards. These do not
+promote the HTTP report's false authenticated_actor_proven or rehearsal_ready.
+Local verifier corrected to decode close_execution_v2's exact SQL TEXT 'CLOSED';
+no SQL/schema change. 38 preparation/transport/handoff tests PASS; selected
+regression 198 PASS / one unchanged global static-egress failure. Handoff tested
+with real independent local processes but mocked Auth GET, not live tokens.
+Complete 19-action orchestrator/whole-run validation still pending; no remote
+write rehearsal released or attempted. See B1_V40_DEPLOYMENT_INSPECTION.md and
+B1_V40_LIVE_REHEARSAL_PROTOCOL.md. B1 OPEN; generic UNADMITTED; gates CLOSED.
+
+### V40 complete local orchestration — later preparation evidence
+
+Full bounded orchestration is now locally validated: 4 actual local PostgreSQL
+whole-run tests PASS (one 19-slot/seven-row success and three fail-closed faults),
+50 launcher/component/handoff tests PASS, Windows wrapper CheckOnly PASS.
+Selected regressions: 122 PASS and the unchanged global static-egress failure.
+Auth/HTTP remain mocked in the local PostgreSQL proof. Existing remote-history
+preservation, live session, owner coordination and remote recovery are NOT proven.
+The integrity-pinned one-shot launcher awaits indispensable Founder-local DPAPI
+access, then fresh agent-verified catalog checks before any Auth or mutation.
+No remote repetition started. Details and limits in the V40 rehearsal protocol.
+B1 remains OPEN; generic UNADMITTED; both admission gates CLOSED. Git not updated.
+
+### V40 first live attempt — REFUSED, not PASS
+
+After renewed conformant read-only catalog checks, the one authorized Auth and
+16 effect slots were consumed. Positive completion was REFUSED in PostgreSQL.
+Independent read-only observation: one synthetic DENY policy still enabled,
+three admissions REFUSED/CLOSED/REFUSED, no attempted analyses/envelopes and no
+v2 receipt. Exact SQL cause unresolved (catch-all does not expose it). No retry,
+cleanup or automatic disable. Four durable control rows retained. Recovery and
+final historical comparison not reached; no global claim. Details and IDs in
+B1_V40_LIVE_REHEARSAL_PROTOCOL.md. Separate approval needed for failed-state
+policy disable. B1 OPEN; generic UNADMITTED; External Provider/Real-data CLOSED.
+
+### V40 failed-policy containment and read-only cause analysis
+
+Separate Founder GO executed: exact failed policy now enabled=false; four control
+rows preserved. Independent hashes of admissions/analyses/envelopes/V39 receipts
+unchanged across disable. Adapter emits FINANCIAL_WORKBOOK, rejected by the
+actually deployed analyses_type_document_check; local reduced SQL fixture lacks
+that check. This incompatibility is proven, but the historical first exception
+was swallowed by V40 and not recovered from logs. Do not claim a recovered 23514.
+No adapter/schema correction or new rehearsal performed. Details and correction
+proposal in docs/Project_Control/INSIGHT_SHAPER_B1_V40_REFUSAL_DIAGNOSIS.md.
+B1 OPEN; generic UNADMITTED; both gates CLOSED.
+
+### Subsequent local-only V40 storage correction
+
+Founder-authorized adapter fix uses legacy AUTRE for composite workbook storage;
+full FINANCIAL_WORKBOOK analysis JSON and source/envelope preserved exactly.
+Local analyses fixture now reflects all 30 observed columns/defaults/nullability
+and ten constraints, including the previously missing taxonomy CHECK and FKs.
+56 PostgreSQL tests PASS; final 15-test parity rerun PASS (overlap); 138 application
+tests PASS. Egress selection 34 PASS / one unchanged global scan failure.
+No V39/V40 migration edit, remote access, new live admission or rehearsal.
+Historical failure stays REFUSED; old policy disabled and rows preserved.
+Successor rehearsal is a proposal requiring populated-baseline runner validation
+and a distinct remote GO, not a READY release. See B1_V40_LOCAL_STORAGE_PARITY.md.
+
+### Subsequent V40 successor local readiness (not remote execution)
+
+Distinct successor launcher and exclusive journal prepared; old scripts and failed
+identities not reused. Historical snapshot anchored to the preserved PostgreSQL
+admissions hash, full disabled-policy equality and exact three terminal bindings;
+checked again in workers and owner transactions. Ten fresh identities required.
+Full local successor sequence and actual entry point PASS with four historical
+rows unchanged plus seven new rows, nineteen effects, one mock Auth, rollback,
+race, replay denial and independent recovery. 167 application/guard tests PASS;
+15 storage-parity and three immutability tests PASS. Global egress scan still FAIL.
+LOCAL_READY_AWAITING_DISTINCT_GO_AND_FRESH_REMOTE_PREFLIGHT, not live PASS.
+No cloud request, real Auth login, remote write, migration edit or Git staging.
+See INSIGHT_SHAPER_B1_V40_SUCCESSOR_PROTOCOL.md. B1 OPEN; generic UNADMITTED;
+External Provider and Real-data Admission CLOSED. Local work not checkpointed.
+
+### Conditional successor GO — pre-launch ordering hold
+
+Subsequent Founder GO requires new-identity absence before authentication as well
+as writes. Static inspection found that the locally validated launcher allocates
+and checks these identities after its one login, before POLICY_INSERT. Execution
+blocked before launch; no remote request, login or write and no successor attempt
+directory. Prior local PASS preserved but does not satisfy this ordering. Trusted
+pre-Auth identity allocation/binding needs local correction and validation; no code
+change made at this stop. See V40_SUCCESSOR_PROTOCOL.md appended diagnosis.
+B1 OPEN; generic UNADMITTED; both gates CLOSED.
+
+### Subsequent V40 pre-Auth sequencing correction — local proof only
+
+Under explicit local-only GO, ten prospective identities are frozen and checked
+for absence before Auth; the trusted constructor consumes exactly those triples.
+No identity parameter is accepted from the prepare/API caller. The composed
+manifest must match the original commitment before any policy ticket; durable
+bindings are verified against that same manifest. Auth/ownership remain mandatory.
+Corrected actual entry point: three local PostgreSQL cases PASS (532.30s): full
+positive, zero-Auth collision refusal, and post-Auth substitution with no new rows.
+Four historical rows unchanged, nineteen effects/one mock login/seven new rows
+on success; concurrency, rollback, replay denial and independent recovery retained.
+177 application/guard tests PASS; global egress FAIL unchanged. Windows integrity
+check PASS, V39/V40 unchanged. Literal sequencing is locally validated, but a new
+remote GO and fresh preflight remain required. No cloud read/login/write performed.
+See INSIGHT_SHAPER_B1_V40_SUCCESSOR_PROTOCOL.md. Local/uncommitted; B1 OPEN,
+generic UNADMITTED, External Provider and Real-data Admission CLOSED.
+
+### Subsequent V40 successor live proof — 2026-09-28
+
+BOUNDED_V40_SUCCESSOR_PASS under distinct Founder GO and fresh read-only catalog,
+historical-anchor and storage-parity controls. Pre-Auth frozen identities match
+authenticated composition and durable state. Exactly nineteen effect attempts,
+one Auth and seven new rows; concurrency, rollback, replay refusal and recovery
+after claim/execution workers exited into a distinct process passed. New states
+REFUSED / CLOSED / COMPLETE; both policies disabled; four old evidence rows and
+historical application baseline intact. Independent final SQL corroborates
+bindings, absent negative-case trios and unchanged historical hashes.
+See docs/Project_Control/INSIGHT_SHAPER_B1_V40_SUCCESSOR_LIVE_EVIDENCE.md.
+This proves the synthetic mock admission path only, not admission of the actual
+generic producer, v2 HTTP/browser/exports, database restart, global isolation,
+financial reliability or production. Global egress debt remains OPEN. B1 OPEN;
+generic UNADMITTED; External Provider and Real-data Admission CLOSED. Local
+documentation/implementation remains uncommitted at HEAD c1e22508; index untouched.
+
+### Next B1 connection assessment
+
+The historical general LLM pipeline, the structured governed analysis contract
+and the registered mock are distinct. No actual generic producer is currently
+admitted. V40 is explicitly LOCAL_SYNTHETIC_ONLY / DENY; it cannot be widened into
+an external/real-data receipt by configuration. Owned-output currently reads
+V39 receipts only. Minimal next local work is strict version-aware V40 reread/
+terminal provenance and trusted adapter composition, not another mock proof.
+Exact gaps, acceptance/refusal evidence and future remote authorization boundary:
+docs/Project_Control/INSIGHT_SHAPER_B1_GENERIC_CONNECTION_PLAN.md. Assessment only;
+no admission, remote access, transport or producer activation in this step.

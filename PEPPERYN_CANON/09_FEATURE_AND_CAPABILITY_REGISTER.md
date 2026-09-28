@@ -329,3 +329,39 @@ WHY: preserve prospective execution origin rather than transplant mock disclosur
 into a generic Beta path. Closed producer, exact source/envelope/scope receipt and
 single-RPC protocol prepared; no backfill or public activation. No live durability
 or generic real-data support. See docs/Project_Control/INSIGHT_SHAPER_B1_EXECUTION_PROVENANCE.md.
+
+B1 prospective producer composition (2026-09-28): LOCAL_PREPARATION / TESTED /
+UNADMITTED. WHY: individually valid actor/source/producer pieces must not be
+recombined into unauthorized execution. Reuses ownership capabilities, adds
+prospective parent resolution and immutable whole-composition binding; no fake
+persisted analysis, no V39 reinterpretation. 199 targeted tests PASS; separate
+repository-wide static egress scan debt remains OPEN. Actual generic producer,
+durable admission/atomicity and live evidence remain OPEN. See
+docs/Project_Control/INSIGHT_SHAPER_B1_ADMISSION_COMPOSITION.md.
+
+B1 durable prospective admission (2026-09-28): IMPLEMENTED / LOCAL_POSTGRESQL_TESTED /
+NOT_REMOTE_DEPLOYED / UNADMITTED. WHY: a process restart or late receipt failure
+must not permit replay or leave an incompletely governed result. Separate V40
+policy/reservation/receipt registries reuse V27; V39 unchanged. 29 actual local
+PostgreSQL tests and 211 targeted Python tests PASS. Independent client-process
+recovery is bounded evidence, not server restart or Supabase/production proof.
+No actual producer or transport activated. See
+docs/Project_Control/INSIGHT_SHAPER_B1_DURABLE_ADMISSION_V40.md.
+
+V40 remote deployment update: APPLIED_ONCE / CONFORMANCE_UNRESOLVED. Authorized
+Integration Test schema operation created empty registries and expected catalog
+protections; no producer activated. Supplementary six stored-body hash comparisons
+returned false, cause UNKNOWN; STOP without correction. Local test evidence is
+not generalized over this discrepancy. See B1_V40_DEPLOYMENT_INSPECTION.md.
+
+Subsequent authorized read-only diagnosis: V40 definition discrepancy RESOLVED
+as CRLF versus LF only, six raw/transformed hash matches plus independent SQL
+normalization checks. No semantic delta or remote repair. Original failure is
+preserved; this does not admit a producer or establish live execution behavior.
+
+Subsequent V40 successor live evidence: BOUNDED_V40_SUCCESSOR_PASS, seven new
+synthetic rows / nineteen effects including one Auth, exact pre-Auth composition
+binding, concurrency/rollback/replay and independent process recovery. Both test
+policies disabled; four historical rows preserved. Generic producer UNADMITTED,
+B1 OPEN. See B1_V40_SUCCESSOR_LIVE_EVIDENCE.md. The next consumer/producer joins
+are assessed in B1_GENERIC_CONNECTION_PLAN.md; no actual producer or gate opened.
