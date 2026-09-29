@@ -834,3 +834,24 @@ This local chain is checkpointed; its remote execution remains unproved. A
 separately authorized synthetic/injected V41 durable rehearsal remains the blocker
 before Generic Producer admission. B1 OPEN; producer UNADMITTED; External
 Provider CLOSED; Real-data Admission CLOSED. Evidence: PPR-068.
+
+### PPR-069 — bounded admission semantics and rehearsal preparation
+
+DEC-035 is implemented locally without changing V39/V40/V41 or the PPR-065
+binding. The backend now validates one closed V41 policy contract before reserve:
+exact decision, tenant/entity/engagement, source, producer/task, profile/binding,
+`LOCAL_TEST_ADMISSION`, injected-only transport, no attestation, egress CLOSED,
+real-data CLOSED and globally UNADMITTED producer. Disabled, missing, substituted
+or widened policy refuses before the reserve RPC.
+
+V41 reread applies the same contract while permitting an already-disabled policy
+as historical evidence. Its server-owned projection and common export metadata
+state that the producer is not globally admitted. The frontend accepts only the
+same injected/local, non-attested and non-global V41 projection.
+
+Local validation: 90 targeted backend PASS; frontend 7 PASS; TypeScript PASS;
+187 isolated PostgreSQL V41/PPR-067 PASS with zero NOT EXECUTED. The first
+PostgreSQL command without the required opt-in container was an environmental
+setup refusal and is not evidence; the complete run used a no-network/no-port/
+no-volume local container which was stopped afterward. No remote access occurred.
+B1 remains OPEN and the producer remains UNADMITTED.

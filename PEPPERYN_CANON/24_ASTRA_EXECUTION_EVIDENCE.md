@@ -1544,3 +1544,24 @@ this does not execute or admit the locally composed chain. The PPR-068 local pro
 is checkpointed. B1 stays OPEN, Generic Producer UNADMITTED, External Provider
 CLOSED and Real-data Admission CLOSED. A bounded synthetic/injected V41 durable
 rehearsal requires a distinct Founder GO.
+
+### PPR-069 — DEC-035 bounded-policy contract and rehearsal readiness
+
+After Astra resolved the admission-semantics ambiguity, Sol implemented only the
+local guard needed before rehearsal. The immutable PPR-065 profile and digest
+remain byte-for-byte unchanged. New policy validation binds DEC-035 and the exact
+synthetic scope while requiring local injection, false provider attestation,
+closed egress, closed real-data admission and `UNADMITTED` global producer state.
+
+Adversarial tests refuse missing/unknown decision, global-admission claim,
+profile-state mutation, scope substitution, external transport, false attestation,
+egress widening and disabled policy before reserve. Independent persisted-row
+reread retains proof after disablement and projects the non-global status through
+UI and XLSX/PDF/PPTX. Results: backend 90 PASS; frontend 7 PASS; TypeScript PASS;
+isolated PostgreSQL 187 PASS and zero NOT EXECUTED. The container was local,
+networkless, unbound and stopped after validation. No remote operation, Auth,
+policy, admission, provider or real data was used.
+
+The exact proposed live protocol is
+`docs/Project_Control/INSIGHT_SHAPER_B1_V41_INJECTED_DURABLE_REHEARSAL_PROTOCOL.md`.
+It remains NOT EXECUTED and requires a distinct Founder GO.

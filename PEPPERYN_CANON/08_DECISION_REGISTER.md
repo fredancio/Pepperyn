@@ -158,3 +158,26 @@ Deployment evidence:
 `docs/Project_Control/INSIGHT_SHAPER_B1_V41_STRUCTURAL_DEPLOYMENT_EVIDENCE.md`.
 The generic producer remains UNADMITTED. B1 stays OPEN; External Provider and
 Real-data Admission stay CLOSED.
+
+## DEC-035 — Bounded Generic Producer Admission Semantics (FOUNDER / ASTRA)
+
+Source: Founder acceptance of the Astra architecture review following the
+PPR-067 structural deployment checkpoint.
+
+Five meanings remain distinct. The PPR-065 candidate profile is immutable
+technical identity and remains historically `UNADMITTED`. A bounded producer
+admission is an authorization carried by one immutable V41 policy under this
+applicable decision. `ADMITTED_EXECUTION` describes only one database-admitted
+execution. Egress authorization and provider-execution attestation are separate
+authorities and cannot be inferred from either admission.
+
+For the next rehearsal the only admissible policy is `LOCAL_TEST_ADMISSION`,
+`INJECTED_LOCAL_ONLY`, `provider_execution_attested=false`, synthetic-only, with
+External Provider and Real-data Admission CLOSED. The policy must state that the
+producer remains globally `UNADMITTED`; its immutable evidence binds the exact
+scope, source, contract and this decision. Policy disablement prevents new
+execution but preserves historical reread. No new global admission registry,
+V39/V40/V41 rewrite or PPR-065 binding change is authorized.
+
+This decision defines semantics and local acceptance criteria. It is not the
+Founder GO for a remote rehearsal, general producer admission or provider use.
