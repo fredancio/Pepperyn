@@ -120,7 +120,9 @@ No PostgreSQL case in this protocol remains NOT EXECUTED.
 Before durable Generic Producer admission on Integration Test:
 
 1. checkpoint this local implementation and evidence;
-2. deploy the prepared PPR-067 validation hardening under a distinct Founder GO;
+2. deploy the prepared PPR-067 validation hardening under a distinct Founder GO
+   — COMPLETE as a bounded structural PASS with empty registries and unchanged
+   historical baseline;
 3. prove the deployed function definitions, ACL/RLS, empty/expected registries
    and historical baselines remain conformant;
 4. under a separate bounded GO, register one synthetic/injected V41 policy and

@@ -1508,10 +1508,15 @@ Concurrency, replay, expiry, independent reread and disabled policy are covered.
 Initial generated-SQL syntax failure and subsequent catalog parser-offset
 comparison failure are retained and explained, not requalified as successful runs.
 
-No remote operation or product-provider invocation; no actual generic producer
-admission. Global egress remains OPEN/FAIL and was not rerun. B1 OPEN; both gates
-CLOSED. Full scope, commands/selections and remaining debts:
+The local campaign itself used no remote operation or product-provider invocation
+and created no generic producer admission. The hardening was subsequently applied
+once under a separate Founder GO to Pepperyn Integration Test. Fresh preflight,
+exact guarded application and independent postflight PASS; all three V41
+registries remain empty, zero policies exist, and the exact historical baseline
+before/after is identical. Global egress is not requalified by this deployment.
+B1 OPEN; both gates CLOSED. Full local scope and live structural evidence:
 docs/Project_Control/INSIGHT_SHAPER_B1_POST_V41_VALIDATION_LOCAL_PROOF.md.
+docs/Project_Control/INSIGHT_SHAPER_B1_PPR067_STRUCTURAL_DEPLOYMENT_EVIDENCE.md.
 
 ### PPR-068 — post-review local B1 chain and egress confinement
 
@@ -1534,6 +1539,8 @@ fixed Integration Test/loopback capability inaccessible from product services.
 Global egress suite: 36 PASS; adjacent bounded network regressions: 61 PASS plus
 seven subtests. No network or credential was used in these tests.
 
-PPR-067 remains NOT DEPLOYED and this proof is NOT CHECKPOINTED. B1 stays OPEN,
-Generic Producer UNADMITTED, External Provider CLOSED and Real-data Admission
-CLOSED. The next remote act requires a distinct Founder GO.
+PPR-067 is now structurally deployed with empty registries and unchanged history;
+this does not execute or admit the locally composed chain. The PPR-068 local proof
+is checkpointed. B1 stays OPEN, Generic Producer UNADMITTED, External Provider
+CLOSED and Real-data Admission CLOSED. A bounded synthetic/injected V41 durable
+rehearsal requires a distinct Founder GO.

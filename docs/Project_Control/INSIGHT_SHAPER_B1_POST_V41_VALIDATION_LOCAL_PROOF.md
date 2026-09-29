@@ -143,5 +143,8 @@ PASS, zero skipped/not executed. PostgreSQL—not Python—derives the digest fr
 its `jsonb` representation. The first expanded full run's hardened failures and
 their fixture-serialization cause are retained in the separate PPR-068 record.
 
-PPR-067 remains NOT DEPLOYED. See
-`INSIGHT_SHAPER_B1_LOCAL_CONTRACT_OUTPUT_EGRESS_PROOF.md`.
+PPR-067 was subsequently deployed structurally under a distinct Founder GO. The
+fresh preflight, exact guarded application, conformant postflight, empty registries
+and identical historical baseline are recorded without rewriting this local
+campaign in `INSIGHT_SHAPER_B1_PPR067_STRUCTURAL_DEPLOYMENT_EVIDENCE.md`.
+See also `INSIGHT_SHAPER_B1_LOCAL_CONTRACT_OUTPUT_EGRESS_PROOF.md`.
