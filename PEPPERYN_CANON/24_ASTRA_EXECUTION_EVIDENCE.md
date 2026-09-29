@@ -1489,3 +1489,51 @@ This is structural deployment evidence only. B1 remains OPEN, genuine producer
 UNADMITTED, global egress OPEN/FAIL, External Provider CLOSED and Real-data
 Admission CLOSED. Full record:
 docs/Project_Control/INSIGHT_SHAPER_B1_V41_STRUCTURAL_DEPLOYMENT_EVIDENCE.md.
+
+### PPR-067 - post-V41 validation hardening, bounded LOCAL PASS
+
+Founder authorized local reproduction/correction only. The actual network-none
+PostgreSQL fixture reproduces policy/scope recombination, missing/null/numeric
+receipt digests and request-digest substitution. The original V41 migration is
+unchanged; prepared_v41_validation_hardening.sql is a separate undeployed
+transactional correction of two function bodies with original-body hash guards.
+Authority, signatures, owners, ACLs and other functions remain unchanged.
+
+Final complete campaign: 168 PostgreSQL PASS (84 before / 84 after); 111 related
+application PASS; 26 V39 regression PASS. No skip or unexecuted PostgreSQL case
+in this protocol. Before-phase acceptances record defects, not valid admissions.
+Refusals assert no result trio; storage/receipt tests also snapshot other public
+test tables. Late envelope insertion failure rolls back the inserted analysis.
+Concurrency, replay, expiry, independent reread and disabled policy are covered.
+Initial generated-SQL syntax failure and subsequent catalog parser-offset
+comparison failure are retained and explained, not requalified as successful runs.
+
+No remote operation or product-provider invocation; no actual generic producer
+admission. Global egress remains OPEN/FAIL and was not rerun. B1 OPEN; both gates
+CLOSED. Full scope, commands/selections and remaining debts:
+docs/Project_Control/INSIGHT_SHAPER_B1_POST_V41_VALIDATION_LOCAL_PROOF.md.
+
+### PPR-068 — post-review local B1 chain and egress confinement
+
+Under the consolidated Astra decision and Sol-medium routing, the three local
+tranches reached bounded PASS without remote access. Exact frozen request,
+single-use V41 reserve/claim/complete, backend-only result construction,
+persisted-row reread and common UI/XLSX/PDF/PPTX provenance are locally composed.
+Injected evidence remains non-attested. The actual OpenAI producer is neither
+invoked nor admitted.
+
+PostgreSQL: 187 PASS, zero skipped/not executed. The intermediate 69 hardened
+failures are retained: their cause was a Python-versus-PostgreSQL `jsonb` policy
+digest fixture. PostgreSQL now creates the policy digest used by the receipt;
+the complete rerun passed. Application selections: 223 PASS and a final 58 PASS.
+Frontend: 7 PASS and TypeScript PASS.
+
+The historical eight-findings/five-files global egress debt was closed by
+confinement, not a blanket whitelist. Those callers now use a content-pinned
+fixed Integration Test/loopback capability inaccessible from product services.
+Global egress suite: 36 PASS; adjacent bounded network regressions: 61 PASS plus
+seven subtests. No network or credential was used in these tests.
+
+PPR-067 remains NOT DEPLOYED and this proof is NOT CHECKPOINTED. B1 stays OPEN,
+Generic Producer UNADMITTED, External Provider CLOSED and Real-data Admission
+CLOSED. The next remote act requires a distinct Founder GO.

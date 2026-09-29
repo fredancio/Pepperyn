@@ -783,3 +783,46 @@ the product runtime/UI/exports do not yet consume V41. The global egress scan is
 still OPEN/FAIL (34 controls PASS, one scan FAIL with eight older findings).
 B1 remains OPEN; producer UNADMITTED; both admission gates CLOSED. Evidence:
 docs/Project_Control/INSIGHT_SHAPER_B1_V41_STRUCTURAL_DEPLOYMENT_EVIDENCE.md.
+
+### Post-V41 scope and receipt validation - PPR-067
+
+Local review defects are reproduced in actual isolated PostgreSQL: policy scope
+can differ from a valid owned reservation; missing/null/non-string receipt
+digests and an unrelated request digest can be accepted by historical V41.
+A separately prepared correction changes only reserve/complete function bodies:
+exact policy scope, required receipt members/types, null-safe digest checks and
+request-to-reserved-input digest equality. Original applied V41 is byte-unchanged.
+The correction is NOT DEPLOYED. Final before/after tests: 168 PostgreSQL PASS;
+111 related application and 26 V39 regression PASS, no skips in this protocol.
+Historical defect-characterization PASS is not admission PASS. Two intermediate
+local validation failures and their diagnoses remain in the evidence report.
+No remote access, producer admission, provider call or real data. B1 OPEN;
+generic producer UNADMITTED; global egress OPEN/FAIL; both admission gates CLOSED.
+Actual response/policy provenance, V41 product wiring and historical-version
+coexistence remain open. No next tranche without a new explicit GO. Evidence:
+docs/Project_Control/INSIGHT_SHAPER_B1_POST_V41_VALIDATION_LOCAL_PROOF.md.
+
+### Post-review B1 local composition, outputs and egress - PPR-068
+
+The deterministic local chain now freezes one literal historical V1 contract,
+reserves exactly that request through V41, accepts only the backend-selected
+injected adapter, validates the captured response and builds analysis, envelope
+and receipt solely in the backend. A fresh reader using persisted rows verifies
+V39/V40/V41 explicitly; UI and XLSX/PDF/PPTX share the same versioned provenance.
+Injected evidence and non-attested provider transport cannot acquire an attested
+OpenAI label.
+
+The undeployed PPR-067 patch additionally binds policy evidence computed from
+PostgreSQL's own `jsonb` representation. Final isolated PostgreSQL result: 187
+PASS, zero skipped/not executed. Related selections: 223 backend PASS; final
+coordinator/output selection 58 PASS; frontend 7 PASS; TypeScript PASS.
+
+The eight prior static-egress findings in five sandbox modules were individually
+confined behind one content-pinned, fixed-origin/fixed-path test capability. No
+blanket exception was added. Repository-wide egress tests now PASS 36/36; the
+adjacent transport/rehearsal selection passes 61 tests plus seven subtests.
+
+This is LOCAL PASS / NOT CHECKPOINTED / NOT DEPLOYED. PPR-067 deployment and a
+separately authorized synthetic/injected V41 durable rehearsal remain blockers
+before Generic Producer admission. B1 OPEN; producer UNADMITTED; External
+Provider CLOSED; Real-data Admission CLOSED. Evidence: PPR-068.

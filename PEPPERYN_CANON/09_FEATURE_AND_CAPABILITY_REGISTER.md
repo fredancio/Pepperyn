@@ -397,3 +397,15 @@ tests plus one candidate composition case now PASS (38); 235 related non-PG test
 PASS. V40 remains local-synthetic/egress-DENY and persists the exact composed
 identities without admitting the candidate. Future v3 durable storage, provider
 gate, global egress debt, live execution and terminal proof remain OPEN.
+
+B1 local V41 chain and egress confinement (2026-09-29): IMPLEMENTED /
+LOCAL_POSTGRESQL_TESTED / NOT DEPLOYED / UNADMITTED. WHY: the producer must not
+gain authority merely because a request/response adapter is callable, and
+versioned durable evidence must reach every CFO-visible output without being
+reconstructed. The backend freezes the exact V1 request, owns V41
+reserve/claim/complete, validates injected response capture and emits the result
+trio. Independent reread, UI and XLSX/PDF/PPTX consume the same V41 provenance.
+The historical eight static egress findings are confined behind a fixed-target
+test capability and the global scan now passes locally. This capability does not
+deploy PPR-067, admit the generic producer, authorize OpenAI transport or admit
+real data. Evidence: PPR-068.
