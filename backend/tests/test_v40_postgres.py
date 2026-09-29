@@ -16,7 +16,7 @@ from uuid import uuid4
 
 import pytest
 
-from sandbox.heterogeneous_workbooks import run_recorded_registered_mock_analysis
+from sandbox.heterogeneous_workbooks import _mock_response, run_recorded_registered_mock_analysis
 from services.governed_analysis_persistence import _binding, _canonical_bytes, _digest
 
 CONTAINER = os.getenv("PEPPERYN_LOCAL_PG_CONTAINER")
@@ -344,6 +344,77 @@ def test_new_backend_adapter_uses_actual_sql_without_v39_fallback(sql):
     result=service.complete(claimed,authorization='synthetic-test-auth',envelope=GovernedAnalysisEnvelope.model_validate(envelope))
     assert result['status']=='LOCAL_SYNTHETIC_PERSISTED' and result['generic_producer_admitted'] is False
     assert calls==['reserve_execution_v2','claim_execution_v2','complete_execution_v2']
+
+
+def test_unadmitted_generic_candidate_composes_through_actual_v40_sql_without_egress(sql):
+    """V40 proves mechanics only; its receipt must remain local/synthetic."""
+    import asyncio
+    from types import SimpleNamespace
+    from services.durable_producer_admission import DurableProducerAdmission
+    from services.generic_producer_candidate import (
+        InjectedOpenAIResponsesCandidate, PRODUCER_ID, PRODUCER_VERSION,
+        TASK_ID, TASK_VERSION,
+    )
+    from services.governed_producer_adapter import GovernedProducerAdapter, GovernedProducerCoordinator
+    from services.producer_execution_contract import ExecutionBindingsV2
+    case=setup(sql)
+    policy=str(uuid4())
+    # The old setup policy is left unused; a distinct local-only policy binds
+    # the exact genuine-producer candidate identity without admitting it.
+    spec=dict(company_id=COMPANY,entity_id=ENTITY,engagement_id=ENGAGEMENT,
+        producer_id=PRODUCER_ID,producer_version=PRODUCER_VERSION,
+        task_id=TASK_ID,task_version=TASK_VERSION,
+        source_sha256=sha256(RAW).hexdigest().upper(),filename=NAME)
+    contract=_digest({'profile':spec,'policy':'LOCAL_SYNTHETIC_DURABLE_CANDIDATE_V2'})
+    sql(f"INSERT INTO producer_policies_v2(id,specification,contract_sha256,enabled) VALUES ({literal(policy)},{js(spec)},{literal(contract)},true)")
+    b=dict(case['b'],producer_id=PRODUCER_ID,producer_version=PRODUCER_VERSION,
+        task_id=TASK_ID,task_version=TASK_VERSION,admission_contract_sha256=contract,
+        request_id=str(uuid4()),execution_id=str(uuid4()),analysis_id=str(uuid4()))
+    case=dict(case,policy=policy,b=b)
+    calls=[]
+    class Db:
+        def rpc(self,name,params):
+            calls.append(name)
+            args=','.join(js(v) if isinstance(v,dict) else literal(v) for v in params.values())
+            return SimpleNamespace(execute=lambda:SimpleNamespace(data=json.loads(sql(
+                f'SET ROLE service_role; SELECT {name}({args})'))))
+    preparation=SimpleNamespace(
+        _contract_policy='LOCAL_SYNTHETIC_DURABLE_CANDIDATE_V2',
+        _principal=lambda auth:SimpleNamespace(principal_id=ACTOR,company_id=COMPANY),
+        consume_for_local_validation=lambda prepared,**kwargs:case['input'])
+    bindings=ExecutionBindingsV2(**b)
+    prepared=SimpleNamespace(bindings=bindings,filename=NAME)
+    admission=DurableProducerAdmission(Db(),preparation=preparation,policy_id=policy)
+    reservation=admission.reserve(prepared,authorization='synthetic-test-auth',raw=RAW)
+    invocation_seen=[]
+    def transport(request):
+        invocation_seen.append(request)
+        understanding=case['envelope'].source_facts
+        nonce=bindings.request_id.hex.upper()
+        return _mock_response(understanding,nonce)
+    producer=InjectedOpenAIResponsesCandidate(transport)
+    adapter=GovernedProducerAdapter(producer=producer,producer_id=PRODUCER_ID,
+        producer_version=PRODUCER_VERSION,task_id=TASK_ID,task_version=TASK_VERSION,
+        admission_contract_sha256=contract)
+    result=asyncio.run(GovernedProducerCoordinator(admission=admission,adapter=adapter).execute(
+        reservation,authorization='synthetic-test-auth'))
+    assert result['status']=='LOCAL_SYNTHETIC_PERSISTED'
+    assert result['generic_producer_admitted'] is False
+    assert calls==['reserve_execution_v2','claim_execution_v2','complete_execution_v2']
+    assert len(invocation_seen)==1
+    evidence=producer.consume_local_evidence()
+    assert evidence.evidence_status=='UNADMITTED_LOCAL_CONFORMANCE'
+    receipt=json.loads(sql(f"SELECT receipt::text FROM execution_receipts_v2 WHERE analysis_id={literal(b['analysis_id'])}"))
+    assert receipt['evidence_scope']=='LOCAL_SYNTHETIC_ONLY'
+    assert receipt['egress']=='DENY'
+    persisted=receipt['candidate']['bindings']
+    assert persisted==bindings.model_dump(mode='json')
+    for identity in ('request_id','execution_id','analysis_id','actor_id','company_id','entity_id','engagement_id'):
+        assert persisted[identity]==b[identity]
+    assert persisted['producer_id']==PRODUCER_ID
+    assert persisted['producer_version']==PRODUCER_VERSION
+    assert persisted['task_id']==TASK_ID and persisted['task_version']==TASK_VERSION
+    assert sql(f"SELECT count(*) FROM governed_execution_receipts WHERE analysis_id={literal(b['analysis_id'])}")=='0'
 
 
 def test_independent_process_recovery_preserves_completed_and_abandoned_claim(sql):
