@@ -1444,3 +1444,23 @@ Targeted new-module scan: zero egress findings. Repository-wide egress scan:
 unchanged FAIL with eight pre-existing findings; four adjacent controls PASS.
 No remote access, provider call, real data or gate change. Full record:
 docs/Project_Control/INSIGHT_SHAPER_B1_GENERIC_PRODUCER_CANDIDATE_LOCAL_PROOF.md.
+
+### PPR-065 — durable receipt future-proofing, local only
+
+Founder DEC-034 requires the receipt to retain one indivisible binding for the
+exact fact schema, positive projection policy, task and output contract. Local
+code and the V41 migration candidate enforce canonical binding text/JSON/digest,
+the same admission-contract identity throughout reserve/claim/complete, strict
+supported-version reread and no `latest` fallback.
+
+Evidence: 15 V41 PostgreSQL PASS; 68 targeted V40/V41 PostgreSQL PASS; 134 related
+application PASS. Four-version substitutions, valid-looking recombination,
+unknown version, post-precheck mutation, persisted mismatch, concurrency, replay
+and partial completion were falsified. V39/V40 remain unchanged. Global egress:
+34 PASS / one unchanged repository-wide FAIL with eight prior findings.
+
+This is LOCAL PASS only. V41 has not been applied remotely and no policy or
+producer has been admitted. Runtime reread/UI/exports and live execution remain
+OPEN. B1 OPEN; generic producer UNADMITTED; External Provider and Real-data
+Admission CLOSED. Evidence document:
+docs/Project_Control/INSIGHT_SHAPER_B1_DURABLE_RECEIPT_FUTURE_PROOFING_LOCAL_PROOF.md.

@@ -221,3 +221,26 @@ generic-unadmitted receipt. All 37 previously unexecuted V40 PostgreSQL tests pl
 the new candidate case now PASS in the isolated local container (38 PASS). The
 candidate cannot therefore be called admitted. Exact proof and remaining remote
 protocol: INSIGHT_SHAPER_B1_GENERIC_PRODUCER_CANDIDATE_LOCAL_PROOF.md.
+
+## Durable receipt future-proofing — local result
+
+The next local step is complete under DEC-034. The candidate's durable contract
+now binds the exact fact schema, positive projection policy, task and output
+contract into one canonical digest. That digest is the admission-contract
+identity carried through composition and future persistence. There is no
+independent resolution of component versions and no fallback to current/latest.
+
+The separate V41 migration candidate persists canonical binding text, parsed
+binding and their digest, then rechecks all material component identities during
+atomic completion. It creates no enabled producer policy and exposes no policy
+registration RPC. V39/V40 are not changed or reinterpreted.
+
+Local evidence: 15 V41 PostgreSQL PASS, 68 targeted V40/V41 PostgreSQL PASS and
+134 related application PASS. Full falsification and limitations are recorded in
+INSIGHT_SHAPER_B1_DURABLE_RECEIPT_FUTURE_PROOFING_LOCAL_PROOF.md.
+
+The next gap is not another contract abstraction. V41 must first receive a
+separately authorized structural deployment and empty-registry inspection. Only
+after that may a distinct protocol propose one exact policy/admission and the
+product-runtime join. Such authorization cannot open provider egress or real-data
+admission and cannot treat the local binding proof as professional reliability.

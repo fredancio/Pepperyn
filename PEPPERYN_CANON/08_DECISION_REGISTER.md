@@ -135,3 +135,21 @@ Founder decisions, not model escalation. No substantive B1 architecture, gate
 semantics, evidence requirement or historical proof is changed. B1 remains OPEN,
 generic producer UNADMITTED, External Provider and Real-data Admission CLOSED.
 This documentary decision does not start the next B1 implementation tranche.
+
+## DEC-034 — Durable Receipt Future-Proofing (FOUNDER)
+
+Source: explicit Founder acceptance contract following synchronized PPR-064.
+
+The durable receipt for a genuinely admitted producer must bind, as one
+non-recombinable governed contract, the exact admitted-fact-schema version,
+positive-projection-policy version, task version and output-contract version.
+The binding observed at precheck, composition, execution and persistence must be
+identical. Unknown versions, independent component substitution and implicit
+`latest` fallback refuse. Future versions create new governed bindings; they do
+not alter the historical meaning of V1 receipts.
+
+This is provenance/versioning hardening only. It authorizes no new metric,
+commercial/marketing ontology, scenario engine, provider transport or real data.
+V39/V40 remain historically unchanged. Local implementation evidence is PPR-065;
+V41 remains not deployed and the generic producer remains UNADMITTED. B1 stays
+OPEN; External Provider and Real-data Admission stay CLOSED.

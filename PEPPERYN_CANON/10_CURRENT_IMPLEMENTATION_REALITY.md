@@ -755,3 +755,25 @@ repository-wide egress scan still FAILS with eight pre-existing findings and is
 not requalified. No remote access, Auth, migration, provider or real data. The
 candidate remains UNADMITTED; durable v3 storage, PG-3/PG-4, external execution,
 live reread/exports and Financial Reliability remain OPEN. B1 remains OPEN.
+
+### Durable receipt future-proofing — PPR-065 local PASS
+
+DEC-034 is implemented locally as one immutable binding over the exact admitted
+fact schema, positive projection policy, task and output contract. The whole
+binding digest is reused as the admission-contract identity; persisted contract
+text, parsed JSON and digest must agree. Unknown versions and component fallback
+refuse. A future V2 cannot change the meaning of a persisted V1 binding.
+
+The V41 candidate adds separate empty policy/admission/receipt registries and
+backend-only single-use reserve/claim/complete functions. It does not alter V39
+or V40 and creates no enabled policy. Fifteen V41 PostgreSQL tests and 68 targeted
+V40/V41 tests PASS in isolated PostgreSQL; 134 related application tests PASS.
+Substitution of each required version, mix-and-match, mutation, completion
+mismatch, concurrency and replay are refused with atomic rollback. Independent
+process reread resolves only the exact persisted supported binding.
+
+V41 is NOT DEPLOYED; no genuine producer is registered, admitted or invoked, and
+the product runtime/UI/exports do not yet consume V41. The global egress scan is
+still OPEN/FAIL (34 controls PASS, one scan FAIL with eight older findings).
+B1 remains OPEN; producer UNADMITTED; both admission gates CLOSED. Full evidence:
+docs/Project_Control/INSIGHT_SHAPER_B1_DURABLE_RECEIPT_FUTURE_PROOFING_LOCAL_PROOF.md.
