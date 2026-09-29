@@ -20,6 +20,16 @@ from services.governed_producer_adapter import GovernedProducerInvocationV2
 from services.producer_execution_contract import Digest, ExecutionBindingsV2, _Closed
 from services.v1_analysis_contract import (
     GovernedFinancialAnalysis,
+    UnderstandingResult,
+    V1_FACT_SCHEMA_ID,
+    V1_FACT_SCHEMA_VERSION,
+    V1_OUTPUT_CONTRACT_ID,
+    V1_OUTPUT_CONTRACT_VERSION,
+    V1_POSITIVE_PROJECTION_POLICY_ID,
+    V1_POSITIVE_PROJECTION_POLICY_VERSION,
+    V1_TASK_ID,
+    V1_TASK_INSTRUCTIONS,
+    V1_TASK_VERSION,
     build_openai_request_from_understanding,
     parse_openai_response,
 )
@@ -27,8 +37,8 @@ from services.v1_analysis_contract import (
 
 PRODUCER_ID = "openai-responses-financial-analysis"
 PRODUCER_VERSION = "gpt-5-contract-v1"
-TASK_ID = "governed-financial-analysis"
-TASK_VERSION = "v1-governed-single-call"
+TASK_ID = V1_TASK_ID
+TASK_VERSION = V1_TASK_VERSION
 MODEL = "gpt-5"
 RECEIPT_CONTRACT_VERSION = "governed-generic-producer-receipt-3"
 
@@ -69,11 +79,60 @@ class GenericProducerCandidateProfile(_Closed):
 
 PROFILE = GenericProducerCandidateProfile()
 PROFILE_SHA256: Digest = _digest(PROFILE.model_dump(mode="json"))
-GENERIC_ADMISSION_CONTRACT_SHA256: Digest = _digest({
-    "profile_sha256": PROFILE_SHA256,
-    "receipt_contract_version": RECEIPT_CONTRACT_VERSION,
-    "authority": "BACKEND_DURABLE_ADMISSION_ONLY",
+
+
+FACT_SCHEMA_SHA256: Digest = _digest(UnderstandingResult.model_json_schema())
+OUTPUT_CONTRACT_SHA256: Digest = _digest(GovernedFinancialAnalysis.model_json_schema())
+POSITIVE_PROJECTION_POLICY_SHA256: Digest = _digest({
+    "policy_id": V1_POSITIVE_PROJECTION_POLICY_ID,
+    "policy_version": V1_POSITIVE_PROJECTION_POLICY_VERSION,
+    "allowed_data_classes": PROFILE.allowed_data_classes,
+    "forbidden_data_classes": PROFILE.forbidden_data_classes,
+    "payload_keys": ("invocation_nonce", "source_facts"),
 })
+TASK_CONTRACT_SHA256: Digest = _digest({
+    "task_id": TASK_ID,
+    "task_version": TASK_VERSION,
+    "instructions": V1_TASK_INSTRUCTIONS,
+    "input_schema_sha256": FACT_SCHEMA_SHA256,
+    "projection_policy_sha256": POSITIVE_PROJECTION_POLICY_SHA256,
+    "output_contract_sha256": OUTPUT_CONTRACT_SHA256,
+})
+
+
+class DurableContractBindingV1(_Closed):
+    """One immutable meaning for the bounded V1 producer contract."""
+
+    schema_version: Literal["generic-durable-contract-binding-1"] = (
+        "generic-durable-contract-binding-1"
+    )
+    producer_id: Literal[PRODUCER_ID] = PRODUCER_ID
+    producer_version: Literal[PRODUCER_VERSION] = PRODUCER_VERSION
+    fact_schema_id: Literal[V1_FACT_SCHEMA_ID] = V1_FACT_SCHEMA_ID
+    fact_schema_version: Literal[V1_FACT_SCHEMA_VERSION] = V1_FACT_SCHEMA_VERSION
+    fact_schema_sha256: Digest = FACT_SCHEMA_SHA256
+    positive_projection_policy_id: Literal[V1_POSITIVE_PROJECTION_POLICY_ID] = (
+        V1_POSITIVE_PROJECTION_POLICY_ID
+    )
+    positive_projection_policy_version: Literal[V1_POSITIVE_PROJECTION_POLICY_VERSION] = (
+        V1_POSITIVE_PROJECTION_POLICY_VERSION
+    )
+    positive_projection_policy_sha256: Digest = POSITIVE_PROJECTION_POLICY_SHA256
+    task_id: Literal[TASK_ID] = TASK_ID
+    task_version: Literal[TASK_VERSION] = TASK_VERSION
+    task_contract_sha256: Digest = TASK_CONTRACT_SHA256
+    output_contract_id: Literal[V1_OUTPUT_CONTRACT_ID] = V1_OUTPUT_CONTRACT_ID
+    output_contract_version: Literal[V1_OUTPUT_CONTRACT_VERSION] = V1_OUTPUT_CONTRACT_VERSION
+    output_contract_sha256: Digest = OUTPUT_CONTRACT_SHA256
+    receipt_contract_version: Literal[RECEIPT_CONTRACT_VERSION] = RECEIPT_CONTRACT_VERSION
+    profile_sha256: Digest = PROFILE_SHA256
+
+
+CONTRACT_BINDING = DurableContractBindingV1()
+GENERIC_ADMISSION_CONTRACT_SHA256: Digest = _digest(
+    CONTRACT_BINDING.model_dump(mode="json")
+)
+SUPPORTED_CONTRACT_BINDINGS = {GENERIC_ADMISSION_CONTRACT_SHA256: CONTRACT_BINDING}
 
 
 class CandidateTransportEvidence(_Closed):
@@ -102,7 +161,8 @@ class GenericProducerReceiptContractV3(_Closed):
     schema_version: Literal[RECEIPT_CONTRACT_VERSION] = RECEIPT_CONTRACT_VERSION
     evidence_status: Literal["ADMITTED_EXECUTION"]
     bindings: ExecutionBindingsV2
-    profile_sha256: Digest
+    contract_binding: DurableContractBindingV1
+    contract_binding_sha256: Digest
     request_sha256: Digest
     response_sha256: Digest
     projection_sha256: Digest
@@ -117,10 +177,35 @@ class GenericProducerReceiptContractV3(_Closed):
             or self.bindings.task_id != TASK_ID
             or self.bindings.task_version != TASK_VERSION
             or self.bindings.admission_contract_sha256 != GENERIC_ADMISSION_CONTRACT_SHA256
-            or self.profile_sha256 != PROFILE_SHA256
+            or self.contract_binding != CONTRACT_BINDING
+            or self.contract_binding_sha256 != GENERIC_ADMISSION_CONTRACT_SHA256
+            or _digest(self.contract_binding.model_dump(mode="json"))
+               != self.contract_binding_sha256
         ):
             raise ValueError("GENERIC_RECEIPT_PROFILE_REFUSED")
         return self
+
+
+def verify_generic_receipt_contract_v3(
+    value: Mapping[str, Any] | GenericProducerReceiptContractV3,
+    *,
+    supported_contracts: Mapping[str, DurableContractBindingV1] = SUPPORTED_CONTRACT_BINDINGS,
+) -> GenericProducerReceiptContractV3:
+    """Reread one persisted receipt against its exact historical contract.
+
+    Unknown bindings refuse.  There is deliberately no ``latest`` lookup and no
+    reconstruction from the current task/profile constants.
+    """
+
+    try:
+        payload = value.model_dump(mode="json") if isinstance(value, _Closed) else value
+        receipt = GenericProducerReceiptContractV3.model_validate(payload)
+        historical = supported_contracts.get(receipt.contract_binding_sha256)
+        if historical is None or historical != receipt.contract_binding:
+            raise ValueError("unsupported binding")
+        return receipt
+    except Exception:
+        raise GenericProducerCandidateRefused("GENERIC_RECEIPT_CONTRACT_UNAVAILABLE") from None
 
 
 InjectedTransport = Callable[[Mapping[str, Any]], Mapping[str, Any]]

@@ -21,6 +21,24 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from models.schemas import AnalysisResult
 
 
+V1_FACT_SCHEMA_ID = "governed-source-facts"
+V1_FACT_SCHEMA_VERSION = "v1-understanding-result-1"
+V1_POSITIVE_PROJECTION_POLICY_ID = "governed-source-facts-positive-projection"
+V1_POSITIVE_PROJECTION_POLICY_VERSION = "v1"
+V1_TASK_ID = "governed-financial-analysis"
+V1_TASK_VERSION = "v1-governed-single-call"
+V1_OUTPUT_CONTRACT_ID = "pepperyn-v1-governed-financial-analysis"
+V1_OUTPUT_CONTRACT_VERSION = "v1"
+V1_TASK_INSTRUCTIONS = (
+    "Analyze only the supplied source facts. Keep observations, inferences, unknowns, "
+    "contradictions and recommendations epistemically separate. Cite fact_ids for every "
+    "diagnosis, observation, dimension assessment, inference, contradiction and evidence-grounded recommendation. "
+    "Dimension scores are governed inferences, never deterministic source facts. "
+    "Never treat an inference or recommendation as canonical enterprise truth. If evidence "
+    "is insufficient or ambiguous, record an unknown or contradiction. Respond in French."
+)
+
+
 class _ClosedModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -205,14 +223,7 @@ def build_openai_request_from_understanding(
     request = {
         "model": model,
         "store": False,
-        "instructions": (
-            "Analyze only the supplied source facts. Keep observations, inferences, unknowns, "
-            "contradictions and recommendations epistemically separate. Cite fact_ids for every "
-            "diagnosis, observation, dimension assessment, inference, contradiction and evidence-grounded recommendation. "
-            "Dimension scores are governed inferences, never deterministic source facts. "
-            "Never treat an inference or recommendation as canonical enterprise truth. If evidence "
-            "is insufficient or ambiguous, record an unknown or contradiction. Respond in French."
-        ),
+        "instructions": V1_TASK_INSTRUCTIONS,
         "input": json.dumps({
             "invocation_nonce": invocation_nonce,
             "source_facts": understanding.model_dump(mode="json"),

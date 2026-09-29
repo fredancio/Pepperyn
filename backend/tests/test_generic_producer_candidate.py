@@ -7,18 +7,24 @@ import pytest
 
 from sandbox.heterogeneous_workbooks import _mock_response
 from services.generic_producer_candidate import (
+    CONTRACT_BINDING,
+    FACT_SCHEMA_SHA256,
     GenericProducerCandidateRefused,
     GenericProducerReceiptContractV3,
     GENERIC_ADMISSION_CONTRACT_SHA256,
     InjectedOpenAIResponsesCandidate,
     MODEL,
+    OUTPUT_CONTRACT_SHA256,
+    POSITIVE_PROJECTION_POLICY_SHA256,
     PRODUCER_ID,
     PRODUCER_VERSION,
     PROFILE,
     PROFILE_SHA256,
     RECEIPT_CONTRACT_VERSION,
     TASK_ID,
+    TASK_CONTRACT_SHA256,
     TASK_VERSION,
+    verify_generic_receipt_contract_v3,
 )
 from services.governed_producer_adapter import GovernedProducerInvocationV2
 from services.producer_execution_contract import ExecutionBindingsV2
@@ -43,6 +49,29 @@ def response(invocation):
     return _mock_response(invocation.source_facts, invocation.invocation_nonce)
 
 
+def receipt_values(admission_system):
+    _, _, service = admission_system
+    prepared = prepare(service)
+    bindings = prepared.bindings.model_copy(update={
+        "producer_id": PRODUCER_ID,
+        "producer_version": PRODUCER_VERSION,
+        "task_id": TASK_ID,
+        "task_version": TASK_VERSION,
+        "admission_contract_sha256": GENERIC_ADMISSION_CONTRACT_SHA256,
+    })
+    return dict(
+        evidence_status="ADMITTED_EXECUTION",
+        bindings=bindings,
+        contract_binding=CONTRACT_BINDING,
+        contract_binding_sha256=GENERIC_ADMISSION_CONTRACT_SHA256,
+        request_sha256="1" * 64,
+        response_sha256="2" * 64,
+        projection_sha256="3" * 64,
+        envelope_sha256="4" * 64,
+        provider_policy_evidence_sha256="5" * 64,
+    )
+
+
 def test_profile_is_exact_closed_and_unadmitted():
     assert PROFILE.admission_state == "UNADMITTED"
     assert PROFILE.egress_state == "CLOSED"
@@ -53,6 +82,11 @@ def test_profile_is_exact_closed_and_unadmitted():
     assert PROFILE.task_id == TASK_ID
     assert PROFILE.task_version == TASK_VERSION
     assert len(PROFILE_SHA256) == 64
+    assert CONTRACT_BINDING.profile_sha256 == PROFILE_SHA256
+    assert CONTRACT_BINDING.fact_schema_sha256 == FACT_SCHEMA_SHA256
+    assert CONTRACT_BINDING.positive_projection_policy_sha256 == POSITIVE_PROJECTION_POLICY_SHA256
+    assert CONTRACT_BINDING.task_contract_sha256 == TASK_CONTRACT_SHA256
+    assert CONTRACT_BINDING.output_contract_sha256 == OUTPUT_CONTRACT_SHA256
     assert "RAW_SOURCE_BYTES" in PROFILE.forbidden_data_classes
     assert "REAL_WORLD_IDENTITY" in PROFILE.forbidden_data_classes
 
@@ -127,25 +161,8 @@ def test_candidate_performs_no_network_egress(invocation, monkeypatch):
 
 
 def test_future_receipt_contract_rejects_wrong_profile(admission_system):
-    _, _, service = admission_system
-    prepared = prepare(service)
-    b = prepared.bindings.model_copy(update={
-        "producer_id": PRODUCER_ID,
-        "producer_version": PRODUCER_VERSION,
-        "task_id": TASK_ID,
-        "task_version": TASK_VERSION,
-        "admission_contract_sha256": GENERIC_ADMISSION_CONTRACT_SHA256,
-    })
-    values = dict(
-        evidence_status="ADMITTED_EXECUTION",
-        bindings=b,
-        profile_sha256=PROFILE_SHA256,
-        request_sha256="1" * 64,
-        response_sha256="2" * 64,
-        projection_sha256="3" * 64,
-        envelope_sha256="4" * 64,
-        provider_policy_evidence_sha256="5" * 64,
-    )
+    values = receipt_values(admission_system)
+    b = values["bindings"]
     receipt = GenericProducerReceiptContractV3(**values)
     assert receipt.schema_version == RECEIPT_CONTRACT_VERSION
     with pytest.raises(ValueError, match="GENERIC_RECEIPT_PROFILE_REFUSED"):
@@ -153,3 +170,54 @@ def test_future_receipt_contract_rejects_wrong_profile(admission_system):
             **values,
             "bindings": b.model_copy(update={"producer_version": "foreign-version"}),
         })
+@pytest.mark.parametrize("field", [
+    "fact_schema_version",
+    "positive_projection_policy_version",
+    "task_version",
+    "output_contract_version",
+])
+def test_future_receipt_rejects_each_version_substitution(admission_system, field):
+    values = receipt_values(admission_system)
+    altered = CONTRACT_BINDING.model_dump(mode="json")
+    altered[field] = "v2-never-admitted"
+    with pytest.raises(Exception):
+        GenericProducerReceiptContractV3(**{**values, "contract_binding": altered})
+
+
+def test_future_receipt_rejects_mix_and_match_and_post_precheck_mutation(admission_system):
+    values = receipt_values(admission_system)
+    altered = CONTRACT_BINDING.model_dump(mode="json")
+    altered["fact_schema_sha256"] = "A" * 64
+    with pytest.raises(ValueError, match="GENERIC_RECEIPT_PROFILE_REFUSED"):
+        GenericProducerReceiptContractV3(**{
+            **values,
+            "contract_binding": CONTRACT_BINDING.model_construct(**altered),
+        })
+    with pytest.raises(ValueError, match="GENERIC_RECEIPT_PROFILE_REFUSED"):
+        GenericProducerReceiptContractV3(**{
+            **values,
+            "contract_binding_sha256": "B" * 64,
+        })
+
+
+def test_historical_reread_uses_exact_registry_and_never_latest(admission_system):
+    receipt = GenericProducerReceiptContractV3(**receipt_values(admission_system))
+    reread = verify_generic_receipt_contract_v3(
+        json.loads(receipt.model_dump_json())
+    )
+    assert reread == receipt
+    with pytest.raises(GenericProducerCandidateRefused, match="CONTRACT_UNAVAILABLE"):
+        verify_generic_receipt_contract_v3(receipt, supported_contracts={})
+    with pytest.raises(GenericProducerCandidateRefused, match="CONTRACT_UNAVAILABLE"):
+        verify_generic_receipt_contract_v3(
+            receipt,
+            supported_contracts={"F" * 64: CONTRACT_BINDING},
+        )
+
+
+def test_persisted_binding_mismatch_refuses_reread(admission_system):
+    values = receipt_values(admission_system)
+    persisted = GenericProducerReceiptContractV3(**values).model_dump(mode="json")
+    persisted["contract_binding_sha256"] = "C" * 64
+    with pytest.raises(GenericProducerCandidateRefused, match="CONTRACT_UNAVAILABLE"):
+        verify_generic_receipt_contract_v3(persisted)
