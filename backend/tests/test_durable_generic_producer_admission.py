@@ -13,8 +13,9 @@ from services.durable_generic_producer_admission import (
     DurableGenericProducerAdmission,
     PreparedGenericExecution,
 )
+from services.bounded_producer_policy import BoundedLocalTestPolicyV1
 from services.generic_producer_candidate import (
-    GENERIC_ADMISSION_CONTRACT_SHA256,
+    CONTRACT_BINDING, GENERIC_ADMISSION_CONTRACT_SHA256,
     InjectedOpenAIResponsesCandidate,
     PRODUCER_ID,
     PRODUCER_VERSION,
@@ -70,9 +71,37 @@ class Db:
         self.prepared = None
         from services.generic_producer_candidate import CONTRACT_BINDING
         self.contract = CONTRACT_BINDING.model_dump(mode="json")
+        self.policy = None
 
     def rpc(self, name, params):
         return Rpc(self, name, params)
+
+    def from_(self, name):
+        assert name == "generic_producer_policies_v3"
+        return PolicyQuery(self)
+
+
+class PolicyQuery:
+    def __init__(self, db):
+        self.db, self.policy_id = db, None
+
+    def select(self, fields):
+        return self
+
+    def eq(self, field, value):
+        assert field == "id"
+        self.policy_id = value
+        return self
+
+    def limit(self, value):
+        assert value == 2
+        return self
+
+    def execute(self):
+        rows = [] if self.db.policy is None else [deepcopy(self.db.policy)]
+        if rows and rows[0]["id"] != self.policy_id:
+            rows = []
+        return SimpleNamespace(data=rows)
 
 
 @pytest.fixture
@@ -97,6 +126,18 @@ def composed(admission_system):
         frozen_request=frozen, filename="synthetic.xlsx",
     )
     db = Db(); db.prepared = prepared
+    specification = BoundedLocalTestPolicyV1(
+        company_id=bindings.company_id, entity_id=bindings.entity_id,
+        engagement_id=bindings.engagement_id,
+        source_sha256=bindings.raw_source_sha256, filename=prepared.filename,
+        policy_evidence_sha256=POLICY_EVIDENCE,
+    ).model_dump(mode="json")
+    db.policy = {
+        "id": POLICY, "specification": specification,
+        "contract_binding": CONTRACT_BINDING.model_dump(mode="json"),
+        "contract_binding_sha256": GENERIC_ADMISSION_CONTRACT_SHA256,
+        "enabled": True,
+    }
     principal = lambda authorization: SimpleNamespace(
         principal_id=str(bindings.actor_id), company_id=str(bindings.company_id))
     return db, DurableGenericProducerAdmission(db, principal_resolver=principal), prepared
@@ -152,6 +193,36 @@ def test_pre_admission_substitution_refuses_without_rpc(composed, fault):
             SimpleNamespace(principal_id=str(uuid4()), company_id=str(prepared.bindings.company_id)))
     with pytest.raises(DurableGenericAdmissionRefused):
         service.reserve(prepared, authorization="local", raw_source=raw)
+    assert db.calls == []
+
+
+@pytest.mark.parametrize("fault", [
+    "decision", "admission_scope", "candidate_state", "global_status",
+    "transport", "attestation", "egress", "scope", "disabled",
+])
+def test_policy_cannot_claim_global_admission_or_egress(composed, fault):
+    db, service, prepared = composed
+    specification = db.policy["specification"]
+    if fault == "decision":
+        specification["governance_decision_id"] = "DEC-UNKNOWN"
+    elif fault == "admission_scope":
+        specification["admission_scope"] = "GENERIC_PRODUCER_ADMITTED"
+    elif fault == "candidate_state":
+        specification["candidate_profile_state"] = "ADMITTED"
+    elif fault == "global_status":
+        specification["producer_global_status"] = "ADMITTED"
+    elif fault == "transport":
+        specification["transport_mode"] = "OPENAI_RESPONSES"
+    elif fault == "attestation":
+        specification["provider_execution_attested"] = True
+    elif fault == "egress":
+        specification["egress_authorization"] = "OPEN"
+    elif fault == "scope":
+        specification["company_id"] = str(uuid4())
+    else:
+        db.policy["enabled"] = False
+    with pytest.raises(DurableGenericAdmissionRefused, match="NO_RETRY"):
+        service.reserve(prepared, authorization="local", raw_source=RAW)
     assert db.calls == []
 
 

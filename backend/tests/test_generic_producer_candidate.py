@@ -84,6 +84,7 @@ def test_profile_is_exact_closed_and_unadmitted():
     assert PROFILE.task_id == TASK_ID
     assert PROFILE.task_version == TASK_VERSION
     assert len(PROFILE_SHA256) == 64
+    assert PROFILE_SHA256 == "2C371E0BA997BA7D8496C8F5AB2FC4BBB94D54ECADF897CB2AEAA3B966991F73"
     assert CONTRACT_BINDING.profile_sha256 == PROFILE_SHA256
     assert CONTRACT_BINDING.fact_schema_sha256 == FACT_SCHEMA_SHA256
     assert CONTRACT_BINDING.positive_projection_policy_sha256 == POSITIVE_PROJECTION_POLICY_SHA256
@@ -91,6 +92,10 @@ def test_profile_is_exact_closed_and_unadmitted():
     assert CONTRACT_BINDING.output_contract_sha256 == OUTPUT_CONTRACT_SHA256
     assert "RAW_SOURCE_BYTES" in PROFILE.forbidden_data_classes
     assert "REAL_WORLD_IDENTITY" in PROFILE.forbidden_data_classes
+    with pytest.raises(Exception):
+        type(PROFILE).model_validate(PROFILE.model_dump(mode="json") | {
+            "admission_state": "ADMITTED"
+        })
 
 
 def test_injected_candidate_sees_only_positive_minimal_projection(invocation):

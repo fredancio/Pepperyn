@@ -16,9 +16,11 @@ export function ExecutionProvenance({ value }: { value: unknown }) {
     typeof receipt.producer_input_sha256 === 'string' && typeof receipt.composition_sha256 === 'string';
   const v41 = version === 'V41' && receipt?.schema_version === 'governed-generic-producer-receipt-3' &&
     receipt.data_origin === 'SYNTHETIC_ONLY' &&
-    (receipt.transport === 'INJECTED_LOCAL_ONLY' || receipt.transport === 'OPENAI_RESPONSES') &&
+    receipt.transport === 'INJECTED_LOCAL_ONLY' &&
     typeof receipt.provider_execution_attested === 'boolean' &&
     !(receipt.transport === 'INJECTED_LOCAL_ONLY' && receipt.provider_execution_attested) &&
+    receipt.admission_scope === 'LOCAL_TEST_ADMISSION' &&
+    receipt.producer_admission_status === 'UNADMITTED' &&
     typeof receipt.producer_id === 'string' && typeof receipt.producer_version === 'string' &&
     typeof receipt.task_id === 'string' && typeof receipt.task_version === 'string' &&
     typeof receipt.contract_binding_sha256 === 'string' &&
@@ -39,11 +41,8 @@ export function ExecutionProvenance({ value }: { value: unknown }) {
       ? 'Données synthétiques enregistrées ; fournisseur simulé local ; aucun transport fournisseur dans cet exécuteur.'
       : v40
         ? 'Exécution synthétique locale admise ; egress interdit ; le producteur générique reste non admis.'
-        : receipt.transport === 'INJECTED_LOCAL_ONLY'
-          ? 'Réponse injectée locale ; aucune exécution OpenAI attestée et aucune donnée réelle admise.'
-          : receipt.provider_execution_attested
-            ? 'Exécution fournisseur attestée par le backend ; aucune admission de données réelles.'
-            : 'Transport OpenAI déclaré, mais exécution fournisseur non attestée ; aucune admission de données réelles.'}</p>
+        : 'Réponse injectée locale ; aucune exécution OpenAI attestée et aucune donnée réelle admise.'}</p>
+    {v41 && <p>Admission du producteur : non admis globalement ; policy locale de test uniquement.</p>}
     {(v40 || v41) && <p>Producteur : {String(receipt.producer_id)} / {String(receipt.producer_version)}</p>}
     {(v40 || v41) && <p>Tâche : {String(receipt.task_id)} / {String(receipt.task_version)}</p>}
     {v40 && <p>Contrat : {String(receipt.contract_version)}</p>}

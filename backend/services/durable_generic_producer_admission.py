@@ -24,6 +24,7 @@ from services.generic_producer_candidate import (
     InjectedOpenAIResponsesCandidate,
     assert_current_v1_contract_is_pinned,
 )
+from services.bounded_producer_policy import verify_bounded_local_test_policy
 from services.governed_analysis_persistence import _binding, _canonical_bytes, _digest
 from services.governed_producer_adapter import GovernedProducerInvocationV2
 from services.producer_execution_contract import ExecutionBindingsV2
@@ -80,6 +81,17 @@ class DurableGenericProducerAdmission:
             raise DurableGenericAdmissionRefused("V41_ACTOR_REFUSED")
         return str(bindings.actor_id)
 
+    def _policy(self, prepared: PreparedGenericExecution) -> None:
+        rows = self._db.from_("generic_producer_policies_v3").select(
+            "id,specification,contract_binding,contract_binding_sha256,enabled"
+        ).eq("id", str(prepared.policy_id)).limit(2).execute().data
+        if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict):
+            raise ValueError("policy unavailable")
+        verify_bounded_local_test_policy(
+            rows[0], bindings=prepared.bindings, filename=prepared.filename,
+            require_enabled=True,
+        )
+
     @staticmethod
     def _prepared(value: PreparedGenericExecution, raw_source: bytes) -> PreparedGenericExecution:
         assert_current_v1_contract_is_pinned()
@@ -107,6 +119,7 @@ class DurableGenericProducerAdmission:
         try:
             prepared = self._prepared(prepared, raw_source)
             self._actor(authorization, prepared.bindings)
+            self._policy(prepared)
             response = self._db.rpc("reserve_generic_execution_v3", {
                 "p_policy": str(prepared.policy_id),
                 "p_bindings": prepared.bindings.model_dump(mode="json"),

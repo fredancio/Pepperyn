@@ -20,6 +20,7 @@ from services.generic_producer_candidate import (
     CONTRACT_BINDING, GENERIC_ADMISSION_CONTRACT_SHA256, PRODUCER_ID,
     PRODUCER_VERSION, TASK_ID, TASK_VERSION,
 )
+from services.bounded_producer_policy import BoundedLocalTestPolicyV1
 from services.v1_analysis_contract import build_openai_request_from_understanding
 from routers.governed_output import build_governed_output_router
 from test_governed_analysis_persistence import _db, ANALYSIS, COMPANY_A, COMPANY_B, ENTITY_A, ENGAGEMENT_A
@@ -87,7 +88,7 @@ def as_v40(db, execution):
     return bindings
 
 
-def as_v41(db, execution, *, transport='INJECTED_LOCAL_ONLY', attested=False):
+def as_v41(db, execution):
     """Replace V39 evidence with a complete, explicitly qualified V41 receipt."""
     request = '51000000-0000-0000-0000-000000000001'
     execution_id = '61000000-0000-0000-0000-000000000001'
@@ -114,16 +115,11 @@ def as_v41(db, execution, *, transport='INJECTED_LOCAL_ONLY', attested=False):
     db.tables['execution_receipts_v2'] = []
     db.tables['analyses'][0].update(source_data_hash=source.lower(),
         fichier_nom='pepperyn_v1_heterogeneous_english.xlsx')
-    specification = dict(company_id=COMPANY_A, entity_id=ENTITY_A,
-        engagement_id=ENGAGEMENT_A, producer_id=PRODUCER_ID,
-        producer_version=PRODUCER_VERSION, task_id=TASK_ID, task_version=TASK_VERSION,
+    specification = BoundedLocalTestPolicyV1(
+        company_id=COMPANY_A, entity_id=ENTITY_A, engagement_id=ENGAGEMENT_A,
         source_sha256=source, filename=db.tables['analyses'][0]['fichier_nom'],
-        data_origin='SYNTHETIC_ONLY', transport_mode=transport,
-        provider_execution_attested=attested,
-        admission_scope='LOCAL_TEST_ADMISSION' if transport == 'INJECTED_LOCAL_ONLY'
-        else 'GENERIC_PRODUCER_ADMITTED')
-    specification['policy_evidence_sha256'] = hashlib.sha256(json.dumps(
-        specification, ensure_ascii=False, sort_keys=True).encode()).hexdigest().upper()
+        policy_evidence_sha256='E' * 64,
+    ).model_dump(mode='json')
     db.tables['generic_producer_policies_v3'] = [dict(id=policy,
         specification=specification, contract_binding=contract,
         contract_binding_sha256=GENERIC_ADMISSION_CONTRACT_SHA256, enabled=False)]
@@ -211,28 +207,30 @@ def test_v41_injected_receipt_is_versioned_in_output_without_openai_attestation(
     assert output['execution_provenance']['receipt_version'] == 'V41'
     assert receipt['transport'] == 'INJECTED_LOCAL_ONLY'
     assert receipt['provider_execution_attested'] is False
+    assert receipt['admission_scope'] == 'LOCAL_TEST_ADMISSION'
+    assert receipt['producer_admission_status'] == 'UNADMITTED'
     text = extract(format, export_owned_output(
         independent_db, analysis_id=ANALYSIS, company_id=COMPANY_A, format=format))
     for expected in ('V41 / governed-generic-producer-receipt-3', PRODUCER_ID,
                      bindings['producer_input_sha256'], 'Reponse injectee locale',
-                     'aucune execution OpenAI attestee'):
+                     'aucune execution OpenAI attestee', 'Non admis globalement'):
         assert expected in text
     assert db.tables == before
     assert independent_db.tables == before
 
 
-def test_v41_declared_openai_transport_without_attestation_is_not_promoted(stored):
+def test_v41_declared_openai_transport_is_outside_local_test_policy(stored):
     db, execution = stored
-    as_v41(db, execution, transport='OPENAI_RESPONSES', attested=False)
-    rendered = extract('pdf', export_owned_output(
-        db, analysis_id=ANALYSIS, company_id=COMPANY_A, format='pdf'))
-    assert 'execution fournisseur non attestee' in rendered
-    assert 'execution fournisseur attestee par le backend' not in rendered
+    as_v41(db, execution)
+    db.tables['generic_producer_policies_v3'][0]['specification']['transport_mode'] = 'OPENAI_RESPONSES'
+    with pytest.raises(GovernedReadRefused, match='^UNAVAILABLE$'):
+        export_owned_output(db, analysis_id=ANALYSIS, company_id=COMPANY_A, format='pdf')
 
 
 @pytest.mark.parametrize('fault', [
     'dual_v40', 'unknown_contract', 'scope', 'request', 'response_claim',
-    'source', 'projection', 'incomplete', 'missing_policy',
+    'source', 'projection', 'incomplete', 'missing_policy', 'decision',
+    'global_admission', 'egress',
 ])
 def test_v41_incomplete_substituted_or_ambiguous_evidence_refuses(stored, fault):
     db, execution = stored
@@ -259,6 +257,12 @@ def test_v41_incomplete_substituted_or_ambiguous_evidence_refuses(stored, fault)
         db.tables['generic_execution_admissions_v3'][0]['state'] = 'CLAIMED'
     elif fault == 'missing_policy':
         db.tables['generic_producer_policies_v3'] = []
+    elif fault == 'decision':
+        db.tables['generic_producer_policies_v3'][0]['specification']['governance_decision_id'] = 'DEC-UNKNOWN'
+    elif fault == 'global_admission':
+        db.tables['generic_producer_policies_v3'][0]['specification']['producer_global_status'] = 'ADMITTED'
+    elif fault == 'egress':
+        db.tables['generic_producer_policies_v3'][0]['specification']['egress_authorization'] = 'OPEN'
     with pytest.raises(GovernedReadRefused, match='^UNAVAILABLE$'):
         read_owned_output(db, analysis_id=ANALYSIS, company_id=COMPANY_A)
 

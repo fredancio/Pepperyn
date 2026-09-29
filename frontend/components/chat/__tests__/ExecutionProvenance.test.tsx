@@ -33,6 +33,7 @@ test('verified V41 injected receipt never claims an attested OpenAI execution',(
   render(<ExecutionProvenance value={{status:'VERIFIED_RECEIPT',receipt_version:'V41',receipt:{
     schema_version:'governed-generic-producer-receipt-3',data_origin:'SYNTHETIC_ONLY',
     transport:'INJECTED_LOCAL_ONLY',provider_execution_attested:false,
+    admission_scope:'LOCAL_TEST_ADMISSION',producer_admission_status:'UNADMITTED',
     producer_id:'openai-responses-financial-analysis',producer_version:'gpt-5-contract-v1',
     task_id:'governed-financial-analysis',task_version:'v1-governed-single-call',
     contract_binding_sha256:'contract-hash',fact_schema_version:'facts-v1',
@@ -43,6 +44,7 @@ test('verified V41 injected receipt never claims an attested OpenAI execution',(
     envelope_sha256:'envelope-hash'}}} />);
   expect(screen.getByText(/reçu V41 durable vérifié/)).toBeInTheDocument();
   expect(screen.getByText(/aucune exécution OpenAI attestée/)).toBeInTheDocument();
+  expect(screen.getByText(/non admis globalement/)).toBeInTheDocument();
   expect(screen.getByText(/request-hash/)).toBeInTheDocument();
   expect(screen.getByText(/response-hash/)).toBeInTheDocument();
 });
@@ -57,7 +59,7 @@ test('V41 injected receipt claiming provider attestation refuses',()=>{
     source_representation_sha256:'x',envelope_sha256:'x'}}} />);
   expect(screen.getByRole('alert')).toHaveTextContent('non vérifiable');
 });
-test('V41 OpenAI transport without attestation never claims an attested execution',()=>{
+test('V41 OpenAI transport is outside the bounded local-test contract',()=>{
   render(<ExecutionProvenance value={{status:'VERIFIED_RECEIPT',receipt_version:'V41',receipt:{
     schema_version:'governed-generic-producer-receipt-3',data_origin:'SYNTHETIC_ONLY',
     transport:'OPENAI_RESPONSES',provider_execution_attested:false,
@@ -66,8 +68,7 @@ test('V41 OpenAI transport without attestation never claims an attested executio
     output_contract_version:'o',request_sha256:'r',response_sha256:'s',
     provider_policy_evidence_sha256:'e',execution_id:'x',raw_source_sha256:'x',
     source_representation_sha256:'x',envelope_sha256:'x'}}} />);
-  expect(screen.getByText(/exécution fournisseur non attestée/)).toBeInTheDocument();
-  expect(screen.queryByText(/Exécution fournisseur attestée par/)).not.toBeInTheDocument();
+  expect(screen.getByRole('alert')).toHaveTextContent('non vérifiable');
 });
 test('unknown provenance refuses rather than showing mock claims',()=>{
   render(<ExecutionProvenance value={{status:'VERIFIED_RECEIPT',receipt:{provider_mode:'unknown'}}} />);

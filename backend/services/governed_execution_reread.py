@@ -28,6 +28,7 @@ from services.generic_producer_candidate import (
     GenericProducerCandidateRefused,
     verify_generic_receipt_contract_v3,
 )
+from services.bounded_producer_policy import verify_bounded_local_test_policy
 
 V40_RECEIPT_VERSION = "governed-execution-receipt-2"
 V40_CONTRACT_VERSION = "local-synthetic-durable-admission-2"
@@ -258,32 +259,15 @@ def _v41(db, *, analysis_id, company_id, entity_id, analysis, receipt_row):
             or admission.get("contract_binding") != contract.model_dump(mode="json")):
         raise ValueError("V41 terminal binding")
 
-    specification = policy.get("specification")
-    transport_mode = specification.get("transport_mode") if isinstance(specification, dict) else None
-    provider_attested = specification.get("provider_execution_attested") if isinstance(specification, dict) else None
-    admission_scope = specification.get("admission_scope") if isinstance(specification, dict) else None
-    policy_evidence = specification.get("policy_evidence_sha256") if isinstance(specification, dict) else None
-    if (not isinstance(specification, dict)
-            or type(policy.get("enabled")) is not bool
-            or policy.get("contract_binding") != contract.model_dump(mode="json")
+    specification = verify_bounded_local_test_policy(
+        policy, bindings=bindings, filename=str(admission.get("filename")),
+        require_enabled=False,
+    )
+    if (policy.get("contract_binding") != contract.model_dump(mode="json")
             or policy.get("contract_binding_sha256") != receipt.contract_binding_sha256
             or admission.get("policy_id") != policy_id
-            or any(str(specification.get(key)) != str(getattr(bindings, key)) for key in (
-                "company_id", "entity_id", "engagement_id", "producer_id",
-                "producer_version", "task_id", "task_version",
-            ))
-            or specification.get("source_sha256") != bindings.raw_source_sha256
-            or specification.get("filename") != admission.get("filename")
-            or specification.get("data_origin") != "SYNTHETIC_ONLY"
-            or transport_mode not in {"INJECTED_LOCAL_ONLY", "OPENAI_RESPONSES"}
-            or type(provider_attested) is not bool
-            or admission_scope not in {"LOCAL_TEST_ADMISSION", "GENERIC_PRODUCER_ADMITTED"}
-            or (transport_mode == "INJECTED_LOCAL_ONLY" and provider_attested is not False)
-            or not isinstance(policy_evidence, str)
-            or len(policy_evidence) != 64
-            or policy_evidence.upper() != policy_evidence
-            or any(character not in "0123456789ABCDEF" for character in policy_evidence)
-            or receipt.provider_policy_evidence_sha256 != policy_evidence):
+            or receipt.provider_policy_evidence_sha256
+               != specification.policy_evidence_sha256):
         raise ValueError("V41 policy binding")
 
     projection_text = admission.get("projection_text")
@@ -319,9 +303,11 @@ def _v41(db, *, analysis_id, company_id, entity_id, analysis, receipt_row):
         "producer_input_sha256": bindings.producer_input_sha256,
         "envelope_sha256": receipt.envelope_sha256,
         "provider_policy_evidence_sha256": receipt.provider_policy_evidence_sha256,
-        "transport": transport_mode,
-        "provider_execution_attested": provider_attested,
-        "admission_scope": admission_scope,
+        "transport": specification.transport_mode,
+        "provider_execution_attested": specification.provider_execution_attested,
+        "admission_scope": specification.admission_scope,
+        "producer_admission_status": specification.producer_global_status,
+        "governance_decision_id": specification.governance_decision_id,
         "data_origin": "SYNTHETIC_ONLY",
         "raw_source_sha256": bindings.raw_source_sha256,
         "source_representation_sha256": bindings.source_representation_sha256,
@@ -330,18 +316,16 @@ def _v41(db, *, analysis_id, company_id, entity_id, analysis, receipt_row):
     }
     transport_label = (
         "Reponse injectee locale; aucune execution OpenAI attestee"
-        if transport_mode == "INJECTED_LOCAL_ONLY"
-        else (
-            "OpenAI Responses; execution fournisseur attestee par le backend"
-            if provider_attested
-            else "OpenAI Responses declare; execution fournisseur non attestee"
-        )
+        if specification.transport_mode == "INJECTED_LOCAL_ONLY"
+        else "Transport non supporte"
     )
     return envelope, engagement_id, {
         "status": "VERIFIED_RECEIPT", "receipt_version": "V41", "receipt": projected,
     }, (
         ("Version du recu", "V41 / governed-generic-producer-receipt-3"),
         ("Perimetre", "Execution synthetique gouvernee; donnees reelles non admises"),
+        ("Admission du producteur", "Non admis globalement; policy locale de test uniquement"),
+        ("Decision de gouvernance", specification.governance_decision_id),
         ("Fournisseur", f"{bindings.producer_id} / {bindings.producer_version}"),
         ("Transport", transport_label),
         ("Tache", f"{bindings.task_id} / {bindings.task_version}"),
@@ -349,7 +333,7 @@ def _v41(db, *, analysis_id, company_id, entity_id, analysis, receipt_row):
         ("Schema de faits", contract.fact_schema_version),
         ("Projection positive", contract.positive_projection_policy_version),
         ("Contrat de sortie", contract.output_contract_version),
-        ("Reseau externe", "Aucun" if transport_mode == "INJECTED_LOCAL_ONLY" else "Autorisation distincte requise"),
+        ("Reseau externe", "Aucun"),
         ("Provenance d'execution", "Recu V41 backend verifie; le mode et le niveau d'attestation restent explicitement qualifies"),
         ("Execution UUID", execution_id),
         ("Source brute SHA-256", bindings.raw_source_sha256),
