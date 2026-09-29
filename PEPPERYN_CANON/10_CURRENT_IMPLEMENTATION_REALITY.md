@@ -772,8 +772,14 @@ Substitution of each required version, mix-and-match, mutation, completion
 mismatch, concurrency and replay are refused with atomic rollback. Independent
 process reread resolves only the exact persisted supported binding.
 
-V41 is NOT DEPLOYED; no genuine producer is registered, admitted or invoked, and
+V41 is now STRUCTURALLY DEPLOYED on Pepperyn Integration Test with all three
+registries empty. The first definition postcontrol refused because its local
+CRLF expectation columns duplicated LF hashes; the refusal is preserved. The
+corrected read-only verifier accepts the five exact raw CRLF bodies and exact LF
+normalizations, while local PostgreSQL tests refuse semantic and whitespace
+mutations. Final definition, structure/ACL/RLS/emptiness and historical-baseline
+postcontrols PASS. No genuine producer is registered, admitted or invoked, and
 the product runtime/UI/exports do not yet consume V41. The global egress scan is
 still OPEN/FAIL (34 controls PASS, one scan FAIL with eight older findings).
-B1 remains OPEN; producer UNADMITTED; both admission gates CLOSED. Full evidence:
-docs/Project_Control/INSIGHT_SHAPER_B1_DURABLE_RECEIPT_FUTURE_PROOFING_LOCAL_PROOF.md.
+B1 remains OPEN; producer UNADMITTED; both admission gates CLOSED. Evidence:
+docs/Project_Control/INSIGHT_SHAPER_B1_V41_STRUCTURAL_DEPLOYMENT_EVIDENCE.md.

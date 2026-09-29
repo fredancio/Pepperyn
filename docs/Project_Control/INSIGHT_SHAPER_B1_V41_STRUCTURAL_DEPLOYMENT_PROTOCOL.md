@@ -1,6 +1,6 @@
 # B1 — V41 Structural Deployment Protocol
 
-**Status:** PREPARED / NOT AUTHORIZED / NOT EXECUTED
+**Status:** EXECUTED ON INTEGRATION TEST / STRUCTURAL PASS / SEE PPR-066 EVIDENCE
 **Target:** Supabase Pepperyn Integration Test (`ejixkplrgobgwqnhidwt`)
 **Repository authority:** `9900cfb86c2884ec28ae16a375c2b689d2b24ca8`
 
@@ -23,6 +23,15 @@ meaning of V39, V40 or their historical evidence.
 | `v41_postflight_read_only.sql` | `756670601CEE51CD5B13F25FC6434501573E39E76446FECA774CD54A6DF5208B` | same |
 | `v41_definition_conformance_read_only.sql` | `F89EDC64A8E1108A3861280ABC5C95480956B327760A13A8FBF5C9085E26E0AC` | same |
 | `v41_historical_baseline_read_only.sql` | `618EDFD4BBD794B1FD7C228D72ECA28D4AA3F002CD43E46FC749519C4A62354D` | same |
+
+Execution preserved the original definition-verifier artifact above and its
+initial `REFUSED` result. Post-execution diagnosis proved that its CRLF columns
+incorrectly duplicated the LF hashes. The corrected read-only verifier is
+versioned at SHA-256
+`8BCCB41C2A9599DB07218AEC34AA47B6EEE573BD3D9CD2A5C6491CBF28A61FE4`;
+it changes only the five CRLF expectations and performs no remote mutation.
+Cause, falsification and final live results are recorded in
+`INSIGHT_SHAPER_B1_V41_STRUCTURAL_DEPLOYMENT_EVIDENCE.md`.
 
 Only these exact committed artifacts may be used. A raw mismatch refuses. For
 PostgreSQL-returned definitions, retain both raw hashes and the single versioned

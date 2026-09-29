@@ -1464,3 +1464,28 @@ producer has been admitted. Runtime reread/UI/exports and live execution remain
 OPEN. B1 OPEN; generic producer UNADMITTED; External Provider and Real-data
 Admission CLOSED. Evidence document:
 docs/Project_Control/INSIGHT_SHAPER_B1_DURABLE_RECEIPT_FUTURE_PROOFING_LOCAL_PROOF.md.
+
+### PPR-066 — V41 empty structural deployment, live bounded PASS
+
+V41 was applied exactly once to Pepperyn Integration Test after fresh preflight
+and historical baseline PASS. Structural postflight confirms three empty
+RLS-enabled registries, one immutable guard trigger per table, no direct client
+read, service-role SELECT only, and service-only execution functions.
+
+The initial definition check returned `REFUSED` and remains preserved evidence.
+All normalized hashes already matched; diagnosis proved its CRLF columns had
+mistakenly duplicated LF hashes. The five observed raw hashes exactly equal the
+independently recomputed CRLF bodies. Only the read-only verifier expectations
+were corrected. Three static controls and four isolated PostgreSQL cases PASS:
+LF and CRLF accept; semantic and whitespace mutations refuse. The corrected live
+check reports `V41_DEFINITION_CONFORMANCE_PASS` for all five functions.
+
+Pre/post row counts and hashes for analyses, V39 envelopes/receipts and V40
+policies/admissions/receipts are identical; the relevant 59-item catalog hash is
+also identical. Final V41 counts are 0/0/0. No policy, admission, analysis,
+receipt, producer call, provider use or real data occurred.
+
+This is structural deployment evidence only. B1 remains OPEN, genuine producer
+UNADMITTED, global egress OPEN/FAIL, External Provider CLOSED and Real-data
+Admission CLOSED. Full record:
+docs/Project_Control/INSIGHT_SHAPER_B1_V41_STRUCTURAL_DEPLOYMENT_EVIDENCE.md.

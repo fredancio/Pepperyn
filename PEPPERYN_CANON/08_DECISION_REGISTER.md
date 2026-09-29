@@ -150,6 +150,11 @@ not alter the historical meaning of V1 receipts.
 
 This is provenance/versioning hardening only. It authorizes no new metric,
 commercial/marketing ontology, scenario engine, provider transport or real data.
-V39/V40 remain historically unchanged. Local implementation evidence is PPR-065;
-V41 remains not deployed and the generic producer remains UNADMITTED. B1 stays
-OPEN; External Provider and Real-data Admission stay CLOSED.
+V39/V40 remain historically unchanged. At this decision point, implementation
+evidence was PPR-065 and V41 was not deployed. The later bounded structural
+deployment installed only the empty V41 registries after the documented
+CRLF-verifier correction; it did not admit a producer or alter this decision.
+Deployment evidence:
+`docs/Project_Control/INSIGHT_SHAPER_B1_V41_STRUCTURAL_DEPLOYMENT_EVIDENCE.md`.
+The generic producer remains UNADMITTED. B1 stays OPEN; External Provider and
+Real-data Admission stay CLOSED.
