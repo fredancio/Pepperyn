@@ -2,6 +2,7 @@
 
 import copy
 import json
+import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -56,6 +57,43 @@ def v3sql(sql):
                 f"SELECT has_table_privilege('service_role','{table}','{privilege}')"
             ) == "f"
     return sql
+
+
+@pytest.mark.parametrize(
+    "variant,expected",
+    [("lf", True), ("crlf", True), ("semantic", False), ("space", False)],
+)
+def test_v41_definition_verifier_accepts_only_pinned_line_endings(v3sql, variant, expected):
+    migration = (ROOT / "migrations/v41_generic_producer_receipts_v3.sql").read_text(
+        encoding="utf-8"
+    )
+    original = re.search(
+        r"CREATE FUNCTION public\.close_generic_execution_v3\([\s\S]*?END \$\$;",
+        migration,
+    )[0].replace("CREATE FUNCTION", "CREATE OR REPLACE FUNCTION", 1)
+    changed = original
+    if variant == "crlf":
+        changed = changed.replace("\n", "\r\n")
+    elif variant == "semantic":
+        changed = changed.replace("RETURN 'CLOSED';", "RETURN 'REFUSED';")
+    elif variant == "space":
+        changed = changed.replace("BEGIN", "BEGIN ", 1)
+    try:
+        v3sql(changed)
+        report = json.loads(v3sql(
+            (ROOT / "migrations/v41_definition_conformance_read_only.sql").read_text(
+                encoding="utf-8"
+            )
+        ))
+        assert (report["status"] == "V41_DEFINITION_CONFORMANCE_PASS") is expected
+        assert report["write_performed"] is False
+        assert len(report["functions"]) == 5
+        assert all(
+            "raw_sha256" in row and "lf_sha256" in row
+            for row in report["functions"]
+        )
+    finally:
+        v3sql(original)
 
 
 def _canonical(value):

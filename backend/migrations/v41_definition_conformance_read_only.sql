@@ -2,11 +2,11 @@
 -- Raw fingerprints remain evidence. No prior inspection record is replaced.
 BEGIN TRANSACTION READ ONLY;
 WITH expected(name, arguments, result, defaults, definer, lf_hash, crlf_hash) AS (VALUES
- ('claim_generic_execution_v3','p_execution uuid, p_actor uuid, p_composition text','jsonb',NULL::text,true,'420ebbd115e06029e932cfe8c289f8102abb473cdd0f4dd4f626af3cc6d285ae','420ebbd115e06029e932cfe8c289f8102abb473cdd0f4dd4f626af3cc6d285ae'),
- ('close_generic_execution_v3','p_execution uuid, p_actor uuid','text',NULL,true,'d89cc5c10baa78c4d9389f4e971410d3eb4bec22bc41f0cdb9f11810628528d7','d89cc5c10baa78c4d9389f4e971410d3eb4bec22bc41f0cdb9f11810628528d7'),
- ('complete_generic_execution_v3','p_execution uuid, p_actor uuid, p_claim uuid, p_receipt jsonb, p_analysis jsonb, p_envelope jsonb, p_envelope_text text','jsonb',NULL,true,'6e4c051d172b001373ea63218fc5d80d2894ab87a7c4fb085b0508287ec29857','6e4c051d172b001373ea63218fc5d80d2894ab87a7c4fb085b0508287ec29857'),
- ('guard_generic_execution_v3','','trigger',NULL,false,'41a59ba0cf223915db3d42c44a935cd0470d61bef4dfa5a0bd8349c3705e9935','41a59ba0cf223915db3d42c44a935cd0470d61bef4dfa5a0bd8349c3705e9935'),
- ('reserve_generic_execution_v3','p_policy uuid, p_bindings jsonb, p_contract_binding jsonb, p_source_facts jsonb, p_projection_text text, p_filename text, p_ttl integer','jsonb','30',true,'9f66360c4e7320c9fd9c67ac079116aa6ba77396996588a7732280310d499a57','9f66360c4e7320c9fd9c67ac079116aa6ba77396996588a7732280310d499a57')
+ ('claim_generic_execution_v3','p_execution uuid, p_actor uuid, p_composition text','jsonb',NULL::text,true,'420ebbd115e06029e932cfe8c289f8102abb473cdd0f4dd4f626af3cc6d285ae','dde4fcc4d001b160a5fc3234cb8cbc58167a8b073f68babd5fe06b1bc51ab444'),
+ ('close_generic_execution_v3','p_execution uuid, p_actor uuid','text',NULL,true,'d89cc5c10baa78c4d9389f4e971410d3eb4bec22bc41f0cdb9f11810628528d7','22b42dba0cf34b62333f69a0fa21b7c2a61587102e53ac65b0e3f0bcc00014ae'),
+ ('complete_generic_execution_v3','p_execution uuid, p_actor uuid, p_claim uuid, p_receipt jsonb, p_analysis jsonb, p_envelope jsonb, p_envelope_text text','jsonb',NULL,true,'6e4c051d172b001373ea63218fc5d80d2894ab87a7c4fb085b0508287ec29857','3d12a27c23fd8dbb2f54f362ae8abbac74bb0a9a06be3dcfeabc732b56a9dd4d'),
+ ('guard_generic_execution_v3','','trigger',NULL,false,'41a59ba0cf223915db3d42c44a935cd0470d61bef4dfa5a0bd8349c3705e9935','176f58d59f89bbbcd4d1eebd9257dd4ff81013c57484b500a1cf37b8fdfc9055'),
+ ('reserve_generic_execution_v3','p_policy uuid, p_bindings jsonb, p_contract_binding jsonb, p_source_facts jsonb, p_projection_text text, p_filename text, p_ttl integer','jsonb','30',true,'9f66360c4e7320c9fd9c67ac079116aa6ba77396996588a7732280310d499a57','8db30acdc7edec04aca48b9348ade9099f9e1dd4c615b6032effcab74c574512')
 ), observed AS (
  SELECT e.*,p.oid,p.prosecdef,p.proconfig,l.lanname,
    pg_get_function_identity_arguments(p.oid) AS actual_arguments,
