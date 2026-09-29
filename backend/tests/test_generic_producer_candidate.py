@@ -24,6 +24,8 @@ from services.generic_producer_candidate import (
     TASK_ID,
     TASK_CONTRACT_SHA256,
     TASK_VERSION,
+    FrozenGenericProducerRequest,
+    freeze_generic_producer_request,
     verify_generic_receipt_contract_v3,
 )
 from services.governed_producer_adapter import GovernedProducerInvocationV2
@@ -113,6 +115,9 @@ def test_injected_candidate_sees_only_positive_minimal_projection(invocation):
     evidence = producer.consume_local_evidence()
     assert evidence.evidence_status == "UNADMITTED_LOCAL_CONFORMANCE"
     assert evidence.profile_sha256 == PROFILE_SHA256
+    assert evidence.transport_mode == "INJECTED_LOCAL_ONLY"
+    assert evidence.provider_execution_attested is False
+    assert len(evidence.response_capture_sha256) == 64
     with pytest.raises(GenericProducerCandidateRefused, match="EVIDENCE_UNAVAILABLE"):
         producer.consume_local_evidence()
 
@@ -122,6 +127,27 @@ def test_transport_is_single_use_and_no_fallback(invocation):
     producer(invocation)
     with pytest.raises(GenericProducerCandidateRefused, match="REPLAY_REFUSED"):
         producer(invocation)
+
+
+@pytest.mark.parametrize("field", ["request", "source", "nonce", "contract"])
+def test_frozen_request_substitution_refuses_before_transport(invocation, field):
+    frozen = freeze_generic_producer_request(invocation)
+    data = frozen.model_dump(mode="json")
+    if field == "request":
+        data["canonical_request"] += " "
+        data["request_sha256"] = "A" * 64
+    elif field == "source":
+        data["source_representation_sha256"] = "B" * 64
+    elif field == "nonce":
+        data["invocation_nonce"] = "C" * 32
+    else:
+        data["contract_binding_sha256"] = "D" * 64
+    seen = []
+    candidate = InjectedOpenAIResponsesCandidate(
+        lambda request: seen.append(request) or response(invocation))
+    with pytest.raises((GenericProducerCandidateRefused, ValueError)):
+        candidate.execute_frozen(FrozenGenericProducerRequest.model_validate(data), invocation)
+    assert seen == []
 
 
 @pytest.mark.parametrize("fault", ["nonce", "source", "shape", "status"])

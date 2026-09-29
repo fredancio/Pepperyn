@@ -14,7 +14,11 @@ from types import SimpleNamespace
 from uuid import NAMESPACE_URL, UUID, uuid5
 from unittest.mock import patch
 
-import httpx
+from sandbox.bounded_test_transport import (
+    INTEGRATION_TEST_ORIGIN,
+    integration_get,
+    integration_request,
+)
 
 from sandbox.heterogeneous_workbooks import run_recorded_registered_mock_analysis
 from sandbox.provision_isolation_accounts import URL, EMAILS
@@ -58,12 +62,12 @@ class Query:
 class Database:
     """Transport without retries, redirects, provider clients or generic writes."""
     def __init__(self, key):
-        self.client = httpx.Client(base_url=URL, headers={"apikey": key, "Authorization": "Bearer " + key},
-                                   timeout=30, follow_redirects=False, trust_env=False)
+        require(URL == INTEGRATION_TEST_ORIGIN)
+        self.headers = {"apikey": key, "Authorization": "Bearer " + key}
 
     def get(self, table, params):
         require(table in TABLES + ("companies", "entities", "engagements"))
-        response = self.client.get("/rest/v1/" + table, params=params)
+        response = integration_get("/rest/v1/" + table, headers=self.headers, params=params)
         require(response.status_code == 200)
         data = response.json()
         require(isinstance(data, list))
@@ -73,30 +77,33 @@ class Database:
         return Query(self, table)
 
     def close(self):
-        self.client.close()
+        pass
 
 
 def resolve_scope(db, bundle, anon):
     require(bundle["project_url"] == URL and bundle["purpose"] == "A24_TECHNICAL_ISOLATION_ONLY")
     require([a["email"] for a in bundle["accounts"]] == EMAILS)
     account = bundle["accounts"][0]
-    with httpx.Client(base_url=URL, headers={"apikey": anon}, timeout=30,
-                      follow_redirects=False, trust_env=False) as client:
-        login = client.post("/auth/v1/token?grant_type=password", json={"email": account["email"], "password": account["password"]})
-        require(login.status_code == 200)
-        token = login.json()["access_token"]
-        headers = {"Authorization": "Bearer " + token}
-        response = client.get("/auth/v1/user", headers=headers)
-        require(response.status_code == 200)
-        user = response.json()
-        require(user["email"] == EMAILS[0] and user["role"] == "authenticated")
-        uid = str(UUID(user["id"]))
-        response = client.get("/rest/v1/profiles", headers=headers,
-                              params={"select": "id,company_id", "id": "eq." + uid, "limit": "2"})
-        require(response.status_code == 200)
-        profiles = response.json()
-        require(len(profiles) == 1 and profiles[0]["id"] == uid)
-        company = str(UUID(profiles[0]["company_id"]))
+    login = integration_request(
+        "POST", "/auth/v1/token?grant_type=password", headers={"apikey": anon},
+        json={"email": account["email"], "password": account["password"]},
+    )
+    require(login.status_code == 200)
+    token = login.json()["access_token"]
+    headers = {"apikey": anon, "Authorization": "Bearer " + token}
+    response = integration_request("GET", "/auth/v1/user", headers=headers)
+    require(response.status_code == 200)
+    user = response.json()
+    require(user["email"] == EMAILS[0] and user["role"] == "authenticated")
+    uid = str(UUID(user["id"]))
+    response = integration_request(
+        "GET", "/rest/v1/profiles", headers=headers,
+        params={"select": "id,company_id", "id": "eq." + uid, "limit": "2"},
+    )
+    require(response.status_code == 200)
+    profiles = response.json()
+    require(len(profiles) == 1 and profiles[0]["id"] == uid)
+    company = str(UUID(profiles[0]["company_id"]))
     rows = db.get("companies", {"select": "id,admin_user_id,name", "id": "eq." + company, "limit": "2"})
     require(len(rows) == 1 and rows[0]["admin_user_id"] == uid and rows[0]["name"] == "Pepperyn A24 Isolation Synthetic 1")
     rows = db.get("entities", {"select": "id,company_id,name,is_primary", "company_id": "eq." + company, "limit": "2"})

@@ -1,12 +1,12 @@
 """Temporary loopback Uvicorn transport; never touches the server on port 8000."""
 from contextlib import contextmanager
-import socket
 import threading
 import time
 
-import httpx
 import uvicorn
 from starlette.responses import JSONResponse
+
+from sandbox.bounded_test_transport import loopback_client, open_loopback_socket
 
 
 class ReadSurface:
@@ -29,8 +29,7 @@ class ReadSurface:
 
 @contextmanager
 def live_client(app, ids):
-    sock = socket.socket()
-    sock.bind(('127.0.0.1', 0))
+    sock = open_loopback_socket()
     port = sock.getsockname()[1]
     config = uvicorn.Config(ReadSurface(app, ids), log_config=None, access_log=False,
                             lifespan='on', timeout_graceful_shutdown=3)
@@ -43,8 +42,7 @@ def live_client(app, ids):
             if not thread.is_alive() or time.monotonic() > deadline:
                 raise RuntimeError('A30_UVICORN_START_REFUSED')
             time.sleep(.05)
-        with httpx.Client(base_url=f'http://127.0.0.1:{port}', timeout=30,
-                          trust_env=False, follow_redirects=False) as client:
+        with loopback_client(port) as client:
             yield client
     finally:
         server.should_exit = True

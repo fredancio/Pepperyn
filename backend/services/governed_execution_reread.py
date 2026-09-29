@@ -24,9 +24,14 @@ from services.producer_execution_contract import (
     ProducerExecutionCandidateV2,
     validate_candidate_consistency,
 )
+from services.generic_producer_candidate import (
+    GenericProducerCandidateRefused,
+    verify_generic_receipt_contract_v3,
+)
 
 V40_RECEIPT_VERSION = "governed-execution-receipt-2"
 V40_CONTRACT_VERSION = "local-synthetic-durable-admission-2"
+V41_RECEIPT_VERSION = "governed-generic-producer-receipt-3"
 
 
 def _uuid(value) -> str:
@@ -205,6 +210,156 @@ def _v40(db, *, analysis_id, company_id, entity_id, analysis, receipt_row):
     )
 
 
+def _v41(db, *, analysis_id, company_id, entity_id, analysis, receipt_row):
+    """Validate a V41 receipt without reconstructing provenance from current code."""
+
+    execution_id = _uuid(receipt_row.get("execution_id"))
+    if receipt_row.get("analysis_id") != analysis_id:
+        raise ValueError("V41 analysis mismatch")
+    admissions = _rows(db.from_("generic_execution_admissions_v3").select("*").eq(
+        "execution_id", execution_id).eq("analysis_id", analysis_id))
+    if len(admissions) != 1:
+        raise ValueError("V41 admission unavailable")
+    admission = admissions[0]
+    policy_id = _uuid(admission.get("policy_id"))
+    policies = _rows(db.from_("generic_producer_policies_v3").select("*").eq(
+        "id", policy_id))
+    if len(policies) != 1:
+        raise ValueError("V41 policy unavailable")
+    policy = policies[0]
+    receipt = verify_generic_receipt_contract_v3(receipt_row.get("receipt"))
+    bindings = receipt.bindings
+    contract = receipt.contract_binding
+    engagement_id = _uuid(admission.get("engagement_id"))
+    envelope = load_governed_envelope(
+        db, analysis_id=analysis_id, company_id=company_id,
+        entity_id=entity_id, engagement_id=engagement_id,
+    )
+
+    expected_scope = {
+        "analysis_id": analysis_id,
+        "company_id": company_id,
+        "entity_id": entity_id,
+        "engagement_id": engagement_id,
+    }
+    if any(str(getattr(bindings, key)) != value for key, value in expected_scope.items()):
+        raise ValueError("V41 receipt scope")
+    if any(str(admission.get(key)) != str(getattr(bindings, key)) for key in (
+        "request_id", "execution_id", "analysis_id", "actor_id", "company_id",
+        "entity_id", "engagement_id",
+    )):
+        raise ValueError("V41 admission binding")
+    if (str(bindings.execution_id) != execution_id
+            or admission.get("state") != "COMPLETE"
+            or not admission.get("claim_id")
+            or not admission.get("claimed_at")
+            or not admission.get("terminal_at")
+            or admission.get("bindings") != bindings.model_dump(mode="json")
+            or admission.get("contract_binding") != contract.model_dump(mode="json")):
+        raise ValueError("V41 terminal binding")
+
+    specification = policy.get("specification")
+    transport_mode = specification.get("transport_mode") if isinstance(specification, dict) else None
+    provider_attested = specification.get("provider_execution_attested") if isinstance(specification, dict) else None
+    admission_scope = specification.get("admission_scope") if isinstance(specification, dict) else None
+    policy_evidence = specification.get("policy_evidence_sha256") if isinstance(specification, dict) else None
+    if (not isinstance(specification, dict)
+            or type(policy.get("enabled")) is not bool
+            or policy.get("contract_binding") != contract.model_dump(mode="json")
+            or policy.get("contract_binding_sha256") != receipt.contract_binding_sha256
+            or admission.get("policy_id") != policy_id
+            or any(str(specification.get(key)) != str(getattr(bindings, key)) for key in (
+                "company_id", "entity_id", "engagement_id", "producer_id",
+                "producer_version", "task_id", "task_version",
+            ))
+            or specification.get("source_sha256") != bindings.raw_source_sha256
+            or specification.get("filename") != admission.get("filename")
+            or specification.get("data_origin") != "SYNTHETIC_ONLY"
+            or transport_mode not in {"INJECTED_LOCAL_ONLY", "OPENAI_RESPONSES"}
+            or type(provider_attested) is not bool
+            or admission_scope not in {"LOCAL_TEST_ADMISSION", "GENERIC_PRODUCER_ADMITTED"}
+            or (transport_mode == "INJECTED_LOCAL_ONLY" and provider_attested is not False)
+            or not isinstance(policy_evidence, str)
+            or len(policy_evidence) != 64
+            or policy_evidence.upper() != policy_evidence
+            or any(character not in "0123456789ABCDEF" for character in policy_evidence)
+            or receipt.provider_policy_evidence_sha256 != policy_evidence):
+        raise ValueError("V41 policy binding")
+
+    projection_text = admission.get("projection_text")
+    source_facts = admission.get("source_facts")
+    if (type(projection_text) is not str
+            or sha256(projection_text.encode("utf-8")).hexdigest().upper()
+               != bindings.producer_input_sha256
+            or receipt.request_sha256 != bindings.producer_input_sha256
+            or receipt.projection_sha256 != bindings.producer_input_sha256
+            or source_facts != envelope.source_facts.model_dump(mode="json")
+            or source_facts != admission.get("source_facts")
+            or envelope.source_facts.source_representation_sha256
+               != bindings.source_representation_sha256
+            or receipt.envelope_sha256 != _digest(envelope.model_dump(mode="json"))
+            or analysis.get("source_data_hash", "").upper() != bindings.raw_source_sha256
+            or analysis.get("fichier_nom") != admission.get("filename")):
+        raise ValueError("V41 source/request/result binding")
+
+    projected = {
+        "schema_version": V41_RECEIPT_VERSION,
+        "execution_id": execution_id,
+        "request_id": str(bindings.request_id),
+        "producer_id": bindings.producer_id,
+        "producer_version": bindings.producer_version,
+        "task_id": bindings.task_id,
+        "task_version": bindings.task_version,
+        "contract_binding_sha256": receipt.contract_binding_sha256,
+        "fact_schema_version": contract.fact_schema_version,
+        "positive_projection_policy_version": contract.positive_projection_policy_version,
+        "output_contract_version": contract.output_contract_version,
+        "request_sha256": receipt.request_sha256,
+        "response_sha256": receipt.response_sha256,
+        "producer_input_sha256": bindings.producer_input_sha256,
+        "envelope_sha256": receipt.envelope_sha256,
+        "provider_policy_evidence_sha256": receipt.provider_policy_evidence_sha256,
+        "transport": transport_mode,
+        "provider_execution_attested": provider_attested,
+        "admission_scope": admission_scope,
+        "data_origin": "SYNTHETIC_ONLY",
+        "raw_source_sha256": bindings.raw_source_sha256,
+        "source_representation_sha256": bindings.source_representation_sha256,
+        "policy_id": policy_id,
+        "policy_enabled_at_read": policy.get("enabled") is True,
+    }
+    transport_label = (
+        "Reponse injectee locale; aucune execution OpenAI attestee"
+        if transport_mode == "INJECTED_LOCAL_ONLY"
+        else (
+            "OpenAI Responses; execution fournisseur attestee par le backend"
+            if provider_attested
+            else "OpenAI Responses declare; execution fournisseur non attestee"
+        )
+    )
+    return envelope, engagement_id, {
+        "status": "VERIFIED_RECEIPT", "receipt_version": "V41", "receipt": projected,
+    }, (
+        ("Version du recu", "V41 / governed-generic-producer-receipt-3"),
+        ("Perimetre", "Execution synthetique gouvernee; donnees reelles non admises"),
+        ("Fournisseur", f"{bindings.producer_id} / {bindings.producer_version}"),
+        ("Transport", transport_label),
+        ("Tache", f"{bindings.task_id} / {bindings.task_version}"),
+        ("Contrat d'admission", receipt.contract_binding_sha256),
+        ("Schema de faits", contract.fact_schema_version),
+        ("Projection positive", contract.positive_projection_policy_version),
+        ("Contrat de sortie", contract.output_contract_version),
+        ("Reseau externe", "Aucun" if transport_mode == "INJECTED_LOCAL_ONLY" else "Autorisation distincte requise"),
+        ("Provenance d'execution", "Recu V41 backend verifie; le mode et le niveau d'attestation restent explicitement qualifies"),
+        ("Execution UUID", execution_id),
+        ("Source brute SHA-256", bindings.raw_source_sha256),
+        ("Representation SHA-256", bindings.source_representation_sha256),
+        ("Requete SHA-256", receipt.request_sha256),
+        ("Reponse SHA-256", receipt.response_sha256),
+        ("Enveloppe SHA-256", receipt.envelope_sha256),
+    )
+
+
 def load_owned_versioned_execution(db, *, analysis_id: str, company_id: str):
     """Return envelope plus terminal provenance; refuse any present invalid evidence."""
     try:
@@ -215,7 +370,10 @@ def load_owned_versioned_execution(db, *, analysis_id: str, company_id: str):
         v40 = _rows(db.from_("execution_receipts_v2").select(
             "execution_id,analysis_id,receipt,created_at"
         ).eq("analysis_id", analysis_id))
-        if v39 and v40:
+        v41 = _rows(db.from_("generic_execution_receipts_v3").select(
+            "execution_id,analysis_id,receipt,created_at"
+        ).eq("analysis_id", analysis_id))
+        if sum(bool(rows) for rows in (v39, v40, v41)) > 1:
             raise ValueError("multiple receipt versions")
         if v39:
             return _v39(db, analysis_id=analysis_id, company_id=company_id,
@@ -223,6 +381,9 @@ def load_owned_versioned_execution(db, *, analysis_id: str, company_id: str):
         if v40:
             return _v40(db, analysis_id=analysis_id, company_id=company_id,
                         entity_id=entity_id, analysis=analysis, receipt_row=v40[0])
+        if v41:
+            return _v41(db, analysis_id=analysis_id, company_id=company_id,
+                        entity_id=entity_id, analysis=analysis, receipt_row=v41[0])
         envelope, _, engagement_id = load_owned_analysis_context(
             db, analysis_id=analysis_id, company_id=company_id)
         return envelope, engagement_id, {"status": "UNATTESTED", "receipt": None}, (

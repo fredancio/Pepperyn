@@ -321,6 +321,9 @@ def test_logs_contain_metadata_but_not_payload_or_output(caplog, monkeypatch):
 
 _NETWORK_ALLOWLIST = {
     "sandbox/synthetic_product.py": {"httpx"},
+    # Dedicated bounded test capabilities.  These entries are content-pinned
+    # and structurally inspected below; they are not a wildcard exemption.
+    "sandbox/bounded_test_transport.py": {"httpx", "socket", "urllib", "urllib.parse"},
     "services/crm_service.py": {"httpx"},
     "services/file_parser.py": {"subprocess"},
     # Fixed Integration Test host, no provider dispatch. Content pinned below;
@@ -329,6 +332,8 @@ _NETWORK_ALLOWLIST = {
     "sandbox/v40_rehearsal_transport.py": {"httpx"},
 }
 _NETWORK_ALLOWLIST_HASHES = {
+    "sandbox/synthetic_product.py": "7dd8e44fd17956b307921d277c608c9652187ac8818a86a3ab3d9ae317665a9e",
+    "sandbox/bounded_test_transport.py": "b95a642e5aa75bd1457c99258dce9bd0fd02b7968074f5f9064e0258dba220ed",
     "services/crm_service.py": "1d66224dd716d1fe979cbb7299c59858e35857cafc81d1dd4d7b481473a75306",
     "services/file_parser.py": "ef24f779e5dfc9ccab8325315889b1db953c01837c3d7a90af7ed769b53f08db",
     "sandbox/preflight_v40_rehearsal.py": "7a0e2fda58aab889a6b6174edb8c38ec50faeb68e8d2b276bc9c8d3c0db99622",
@@ -411,9 +416,26 @@ def test_repository_wide_provider_bypass_policy():
 
 
 def test_unrelated_network_allowlist_is_content_pinned():
+    assert set(_NETWORK_ALLOWLIST) == set(_NETWORK_ALLOWLIST_HASHES)
     for relative, expected_hash in _NETWORK_ALLOWLIST_HASHES.items():
         content = (BACKEND / relative).read_bytes()
         assert hashlib.sha256(content).hexdigest() == expected_hash
+
+
+def test_bounded_test_network_capabilities_cannot_become_provider_transport():
+    bounded = (BACKEND / "sandbox/bounded_test_transport.py").read_text(encoding="utf-8")
+    loopback = (BACKEND / "sandbox/output_live_transport.py").read_text(encoding="utf-8")
+    assert "ejixkplrgobgwqnhidwt.supabase.co" in bounded
+    assert '"/rest/v1/", "/auth/v1/"' in bounded
+    assert "follow_redirects=False" in bounded and "trust_env=False" in bounded
+    assert "api.openai.com" not in bounded and "OPENAI_API_KEY" not in bounded
+    assert "loopback_client" in loopback and "open_loopback_socket" in loopback
+    assert "import httpx" not in loopback and "import socket" not in loopback
+    assert "127.0.0.1" in bounded and "https://api.openai.com" not in bounded
+    for path in (BACKEND / "services").rglob("*.py"):
+        source = path.read_text(encoding="utf-8")
+        assert "sandbox.bounded_test_transport" not in source
+        assert "sandbox.output_live_transport" not in source
 
 
 @pytest.mark.parametrize(

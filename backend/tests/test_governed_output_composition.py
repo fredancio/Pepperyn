@@ -16,6 +16,11 @@ from sandbox.heterogeneous_workbooks import run_recorded_registered_mock_analysi
 from services.governed_analysis_persistence import save_governed_analysis, _digest
 from services.governed_analysis_read import GovernedReadRefused
 from services.governed_output import read_owned_output, export_owned_output
+from services.generic_producer_candidate import (
+    CONTRACT_BINDING, GENERIC_ADMISSION_CONTRACT_SHA256, PRODUCER_ID,
+    PRODUCER_VERSION, TASK_ID, TASK_VERSION,
+)
+from services.v1_analysis_contract import build_openai_request_from_understanding
 from routers.governed_output import build_governed_output_router
 from test_governed_analysis_persistence import _db, ANALYSIS, COMPANY_A, COMPANY_B, ENTITY_A, ENGAGEMENT_A
 
@@ -82,6 +87,63 @@ def as_v40(db, execution):
     return bindings
 
 
+def as_v41(db, execution, *, transport='INJECTED_LOCAL_ONLY', attested=False):
+    """Replace V39 evidence with a complete, explicitly qualified V41 receipt."""
+    request = '51000000-0000-0000-0000-000000000001'
+    execution_id = '61000000-0000-0000-0000-000000000001'
+    actor = '71000000-0000-0000-0000-000000000001'
+    policy = '81000000-0000-0000-0000-000000000001'
+    nonce = request.replace('-', '').upper()
+    source_facts = execution.analysis.envelope.source_facts
+    request_payload = build_openai_request_from_understanding(
+        source_facts, invocation_nonce=nonce, model='gpt-5')
+    projection_text = json.dumps(request_payload, ensure_ascii=False, allow_nan=False,
+                                 sort_keys=True, separators=(',', ':'))
+    source = execution.provenance.raw_source_sha256
+    representation = execution.provenance.source_representation_sha256
+    contract = CONTRACT_BINDING.model_dump(mode='json')
+    bindings = dict(request_id=request, actor_id=actor, execution_id=execution_id,
+        analysis_id=ANALYSIS, company_id=COMPANY_A, entity_id=ENTITY_A,
+        engagement_id=ENGAGEMENT_A, producer_id=PRODUCER_ID,
+        producer_version=PRODUCER_VERSION, task_id=TASK_ID, task_version=TASK_VERSION,
+        admission_contract_sha256=GENERIC_ADMISSION_CONTRACT_SHA256,
+        raw_source_sha256=source, source_representation_sha256=representation,
+        producer_input_sha256=hashlib.sha256(projection_text.encode()).hexdigest().upper())
+    envelope_sha = _digest(execution.analysis.envelope.model_dump(mode='json'))
+    db.tables['governed_execution_receipts'] = []
+    db.tables['execution_receipts_v2'] = []
+    db.tables['analyses'][0].update(source_data_hash=source.lower(),
+        fichier_nom='pepperyn_v1_heterogeneous_english.xlsx')
+    specification = dict(company_id=COMPANY_A, entity_id=ENTITY_A,
+        engagement_id=ENGAGEMENT_A, producer_id=PRODUCER_ID,
+        producer_version=PRODUCER_VERSION, task_id=TASK_ID, task_version=TASK_VERSION,
+        source_sha256=source, filename=db.tables['analyses'][0]['fichier_nom'],
+        data_origin='SYNTHETIC_ONLY', transport_mode=transport,
+        provider_execution_attested=attested,
+        admission_scope='LOCAL_TEST_ADMISSION' if transport == 'INJECTED_LOCAL_ONLY'
+        else 'GENERIC_PRODUCER_ADMITTED')
+    specification['policy_evidence_sha256'] = hashlib.sha256(json.dumps(
+        specification, ensure_ascii=False, sort_keys=True).encode()).hexdigest().upper()
+    db.tables['generic_producer_policies_v3'] = [dict(id=policy,
+        specification=specification, contract_binding=contract,
+        contract_binding_sha256=GENERIC_ADMISSION_CONTRACT_SHA256, enabled=False)]
+    db.tables['generic_execution_admissions_v3'] = [dict(bindings,
+        policy_id=policy, bindings=bindings, contract_binding=contract,
+        source_facts=source_facts.model_dump(mode='json'), projection_text=projection_text,
+        filename=db.tables['analyses'][0]['fichier_nom'], state='COMPLETE',
+        claim_id='91000000-0000-0000-0000-000000000001',
+        claimed_at='2026-09-29T10:00:00+00:00', terminal_at='2026-09-29T10:00:02+00:00')]
+    receipt = dict(schema_version='governed-generic-producer-receipt-3',
+        evidence_status='ADMITTED_EXECUTION', bindings=bindings, contract_binding=contract,
+        contract_binding_sha256=GENERIC_ADMISSION_CONTRACT_SHA256,
+        request_sha256=bindings['producer_input_sha256'], response_sha256='D' * 64,
+        projection_sha256=bindings['producer_input_sha256'], envelope_sha256=envelope_sha,
+        provider_policy_evidence_sha256=specification['policy_evidence_sha256'])
+    db.tables['generic_execution_receipts_v3'] = [dict(execution_id=execution_id,
+        analysis_id=ANALYSIS, receipt=receipt, created_at='2026-09-29T10:00:01+00:00')]
+    return bindings
+
+
 def extract(format, content):
     if format == 'xlsx':
         wb = load_workbook(BytesIO(content))
@@ -131,6 +193,74 @@ def test_v40_receipt_selects_its_exact_engagement_not_an_entity_default(stored):
     })
     result = read_owned_output(db, analysis_id=ANALYSIS, company_id=COMPANY_A)
     assert result['execution_provenance']['receipt_version'] == 'V40'
+
+
+@pytest.mark.parametrize('format', ['xlsx', 'pdf', 'pptx'])
+def test_v41_injected_receipt_is_versioned_in_output_without_openai_attestation(stored, format):
+    db, execution = stored
+    bindings = as_v41(db, execution)
+    before = copy.deepcopy(db.tables)
+    # A newly constructed reader receives only persisted rows.  This prevents
+    # process-local orchestration state from satisfying the reread contract.
+    independent_db = _db()
+    independent_db.tables = copy.deepcopy(db.tables)
+    output = read_owned_output(
+        independent_db, analysis_id=ANALYSIS, company_id=COMPANY_A
+    )
+    receipt = output['execution_provenance']['receipt']
+    assert output['execution_provenance']['receipt_version'] == 'V41'
+    assert receipt['transport'] == 'INJECTED_LOCAL_ONLY'
+    assert receipt['provider_execution_attested'] is False
+    text = extract(format, export_owned_output(
+        independent_db, analysis_id=ANALYSIS, company_id=COMPANY_A, format=format))
+    for expected in ('V41 / governed-generic-producer-receipt-3', PRODUCER_ID,
+                     bindings['producer_input_sha256'], 'Reponse injectee locale',
+                     'aucune execution OpenAI attestee'):
+        assert expected in text
+    assert db.tables == before
+    assert independent_db.tables == before
+
+
+def test_v41_declared_openai_transport_without_attestation_is_not_promoted(stored):
+    db, execution = stored
+    as_v41(db, execution, transport='OPENAI_RESPONSES', attested=False)
+    rendered = extract('pdf', export_owned_output(
+        db, analysis_id=ANALYSIS, company_id=COMPANY_A, format='pdf'))
+    assert 'execution fournisseur non attestee' in rendered
+    assert 'execution fournisseur attestee par le backend' not in rendered
+
+
+@pytest.mark.parametrize('fault', [
+    'dual_v40', 'unknown_contract', 'scope', 'request', 'response_claim',
+    'source', 'projection', 'incomplete', 'missing_policy',
+])
+def test_v41_incomplete_substituted_or_ambiguous_evidence_refuses(stored, fault):
+    db, execution = stored
+    as_v41(db, execution)
+    if fault == 'dual_v40':
+        as_v40(db, execution)
+        # Restore a minimal V41 marker so the cross-version ambiguity is observed first.
+        as_v41(db, execution)
+        db.tables['execution_receipts_v2'] = [dict(execution_id='x', analysis_id=ANALYSIS,
+                                                   receipt={}, created_at='x')]
+    elif fault == 'unknown_contract':
+        db.tables['generic_execution_receipts_v3'][0]['receipt']['contract_binding_sha256'] = 'A' * 64
+    elif fault == 'scope':
+        db.tables['generic_execution_admissions_v3'][0]['company_id'] = COMPANY_B
+    elif fault == 'request':
+        db.tables['generic_execution_receipts_v3'][0]['receipt']['request_sha256'] = 'B' * 64
+    elif fault == 'response_claim':
+        db.tables['generic_producer_policies_v3'][0]['specification']['provider_execution_attested'] = True
+    elif fault == 'source':
+        db.tables['generic_execution_admissions_v3'][0]['source_facts']['status'] = 'CONTRADICTION'
+    elif fault == 'projection':
+        db.tables['generic_execution_admissions_v3'][0]['projection_text'] += ' '
+    elif fault == 'incomplete':
+        db.tables['generic_execution_admissions_v3'][0]['state'] = 'CLAIMED'
+    elif fault == 'missing_policy':
+        db.tables['generic_producer_policies_v3'] = []
+    with pytest.raises(GovernedReadRefused, match='^UNAVAILABLE$'):
+        read_owned_output(db, analysis_id=ANALYSIS, company_id=COMPANY_A)
 
 
 @pytest.mark.parametrize('format', ['xlsx', 'pdf', 'pptx'])

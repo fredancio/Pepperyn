@@ -128,11 +128,50 @@ class DurableContractBindingV1(_Closed):
     profile_sha256: Digest = PROFILE_SHA256
 
 
-CONTRACT_BINDING = DurableContractBindingV1()
-GENERIC_ADMISSION_CONTRACT_SHA256: Digest = _digest(
-    CONTRACT_BINDING.model_dump(mode="json")
+# This is a historical descriptor, not an alias for whatever the current Python
+# models happen to become.  A later schema/task version must add a new entry;
+# changing a model in place can therefore neither rewrite V1 nor make reread
+# silently resolve to "latest".
+_V1_HISTORICAL_BINDING = {
+    "schema_version": "generic-durable-contract-binding-1",
+    "producer_id": PRODUCER_ID,
+    "producer_version": PRODUCER_VERSION,
+    "fact_schema_id": "governed-source-facts",
+    "fact_schema_version": "v1-understanding-result-1",
+    "fact_schema_sha256": "1DA5F3CEB05FF5B856772BFE348CFF2AFF46C91E1E09275696BF8FB34BE34FC2",
+    "positive_projection_policy_id": "governed-source-facts-positive-projection",
+    "positive_projection_policy_version": "v1",
+    "positive_projection_policy_sha256": "77EA1CD44A3F4F120A4DEF008EF4C708905CD5367509D16AB882E9A9B1EA093C",
+    "task_id": TASK_ID,
+    "task_version": TASK_VERSION,
+    "task_contract_sha256": "6C9D7D766FA88E5EB1D981622177E616148448519DA76D794F6CE75BA236224E",
+    "output_contract_id": "pepperyn-v1-governed-financial-analysis",
+    "output_contract_version": "v1",
+    "output_contract_sha256": "5CBCC0DA72BC154CF71A7B4D1832C54FE93C671A39D0CD3CF318DCCCA5906D61",
+    "receipt_contract_version": RECEIPT_CONTRACT_VERSION,
+    "profile_sha256": "2C371E0BA997BA7D8496C8F5AB2FC4BBB94D54ECADF897CB2AEAA3B966991F73",
+}
+CONTRACT_BINDING = DurableContractBindingV1.model_validate(_V1_HISTORICAL_BINDING)
+GENERIC_ADMISSION_CONTRACT_SHA256: Digest = (
+    "CDC4BC07EA6F67275B985E76B24467CC3A1A11891EFA1953E0F6137344F73645"
 )
 SUPPORTED_CONTRACT_BINDINGS = {GENERIC_ADMISSION_CONTRACT_SHA256: CONTRACT_BINDING}
+
+
+def assert_current_v1_contract_is_pinned() -> None:
+    """Refuse candidate execution after an unversioned contract mutation."""
+
+    current = DurableContractBindingV1(
+        fact_schema_sha256=FACT_SCHEMA_SHA256,
+        positive_projection_policy_sha256=POSITIVE_PROJECTION_POLICY_SHA256,
+        task_contract_sha256=TASK_CONTRACT_SHA256,
+        output_contract_sha256=OUTPUT_CONTRACT_SHA256,
+        profile_sha256=PROFILE_SHA256,
+    )
+    if (current != CONTRACT_BINDING
+            or _digest(current.model_dump(mode="json"))
+            != GENERIC_ADMISSION_CONTRACT_SHA256):
+        raise GenericProducerCandidateRefused("GENERIC_CURRENT_CONTRACT_UNVERSIONED")
 
 
 class CandidateTransportEvidence(_Closed):
@@ -149,6 +188,33 @@ class CandidateTransportEvidence(_Closed):
     response_sha256: Digest
     source_representation_sha256: Digest
     invocation_nonce: str = Field(pattern=r"^[A-F0-9]{32}$")
+    contract_binding_sha256: Literal[GENERIC_ADMISSION_CONTRACT_SHA256] = (
+        GENERIC_ADMISSION_CONTRACT_SHA256
+    )
+    transport_mode: Literal["INJECTED_LOCAL_ONLY"] = "INJECTED_LOCAL_ONLY"
+    provider_execution_attested: Literal[False] = False
+    response_capture_sha256: Digest
+
+
+class FrozenGenericProducerRequest(_Closed):
+    """Backend-built request committed before any transport can see it."""
+
+    schema_version: Literal["frozen-generic-producer-request-1"] = (
+        "frozen-generic-producer-request-1"
+    )
+    contract_binding_sha256: Literal[GENERIC_ADMISSION_CONTRACT_SHA256] = (
+        GENERIC_ADMISSION_CONTRACT_SHA256
+    )
+    invocation_nonce: str = Field(pattern=r"^[A-F0-9]{32}$")
+    source_representation_sha256: Digest
+    canonical_request: str
+    request_sha256: Digest
+
+    @model_validator(mode="after")
+    def exact_request_digest(self) -> "FrozenGenericProducerRequest":
+        if sha256(self.canonical_request.encode("utf-8")).hexdigest().upper() != self.request_sha256:
+            raise ValueError("GENERIC_FROZEN_REQUEST_DIGEST_REFUSED")
+        return self
 
 
 class GenericProducerReceiptContractV3(_Closed):
@@ -177,8 +243,6 @@ class GenericProducerReceiptContractV3(_Closed):
             or self.bindings.task_id != TASK_ID
             or self.bindings.task_version != TASK_VERSION
             or self.bindings.admission_contract_sha256 != GENERIC_ADMISSION_CONTRACT_SHA256
-            or self.contract_binding != CONTRACT_BINDING
-            or self.contract_binding_sha256 != GENERIC_ADMISSION_CONTRACT_SHA256
             or _digest(self.contract_binding.model_dump(mode="json"))
                != self.contract_binding_sha256
         ):
@@ -217,11 +281,21 @@ class InjectedOpenAIResponsesCandidate:
     def __init__(self, transport: InjectedTransport) -> None:
         if not callable(transport):
             raise GenericProducerCandidateRefused("GENERIC_TRANSPORT_CONFIGURATION_REFUSED")
+        assert_current_v1_contract_is_pinned()
         self.__transport = transport
         self.__used = False
         self.__evidence: CandidateTransportEvidence | None = None
 
     def __call__(self, invocation: GovernedProducerInvocationV2) -> GovernedFinancialAnalysis:
+        return self.execute_frozen(freeze_generic_producer_request(invocation), invocation)
+
+    def execute_frozen(
+        self,
+        frozen: FrozenGenericProducerRequest,
+        invocation: GovernedProducerInvocationV2,
+    ) -> GovernedFinancialAnalysis:
+        """Consume exactly the backend-frozen request; never rebuild after admission."""
+
         if self.__used:
             raise GenericProducerCandidateRefused("GENERIC_TRANSPORT_REPLAY_REFUSED")
         self.__used = True
@@ -231,24 +305,34 @@ class InjectedOpenAIResponsesCandidate:
             )
             if invocation.task_id != TASK_ID or invocation.task_version != TASK_VERSION:
                 raise ValueError("task")
-            request = build_openai_request_from_understanding(
-                invocation.source_facts,
-                invocation_nonce=invocation.invocation_nonce,
-                model=MODEL,
-            )
-            _assert_minimal_request(request, invocation)
-            request_bytes = _canonical_bytes(request)
+            frozen = FrozenGenericProducerRequest.model_validate_json(frozen.model_dump_json())
+            expected = freeze_generic_producer_request(invocation)
+            if frozen != expected:
+                raise ValueError("reserved request mismatch")
+            request_bytes = frozen.canonical_request.encode("utf-8")
+            request = json.loads(request_bytes)
             response = self.__transport(json.loads(request_bytes))
             response_bytes = _canonical_bytes(response)
             analysis = parse_openai_response(
                 json.loads(response_bytes), invocation.source_facts,
                 invocation.invocation_nonce,
             )
+            request_sha256 = sha256(request_bytes).hexdigest().upper()
+            response_sha256 = sha256(response_bytes).hexdigest().upper()
+            capture = _digest({
+                "contract_binding_sha256": GENERIC_ADMISSION_CONTRACT_SHA256,
+                "invocation_nonce": invocation.invocation_nonce,
+                "request_sha256": request_sha256,
+                "response_sha256": response_sha256,
+                "source_representation_sha256": invocation.source_facts.source_representation_sha256,
+                "transport_mode": "INJECTED_LOCAL_ONLY",
+            })
             self.__evidence = CandidateTransportEvidence(
-                request_sha256=sha256(request_bytes).hexdigest().upper(),
-                response_sha256=sha256(response_bytes).hexdigest().upper(),
+                request_sha256=request_sha256,
+                response_sha256=response_sha256,
                 source_representation_sha256=invocation.source_facts.source_representation_sha256,
                 invocation_nonce=invocation.invocation_nonce,
+                response_capture_sha256=capture,
             )
             return analysis
         except GenericProducerCandidateRefused:
@@ -282,6 +366,37 @@ def _assert_minimal_request(
     ):
         if forbidden in serialized:
             raise ValueError("forbidden data class")
+
+
+def freeze_generic_producer_request(
+    invocation: GovernedProducerInvocationV2,
+) -> FrozenGenericProducerRequest:
+    """Create the sole request eligible for later reservation and execution."""
+
+    try:
+        assert_current_v1_contract_is_pinned()
+        invocation = GovernedProducerInvocationV2.model_validate_json(
+            invocation.model_dump_json()
+        )
+        if invocation.task_id != TASK_ID or invocation.task_version != TASK_VERSION:
+            raise ValueError("task")
+        request = build_openai_request_from_understanding(
+            invocation.source_facts,
+            invocation_nonce=invocation.invocation_nonce,
+            model=MODEL,
+        )
+        _assert_minimal_request(request, invocation)
+        canonical = _canonical_bytes(request).decode("utf-8")
+        return FrozenGenericProducerRequest(
+            invocation_nonce=invocation.invocation_nonce,
+            source_representation_sha256=invocation.source_facts.source_representation_sha256,
+            canonical_request=canonical,
+            request_sha256=sha256(canonical.encode("utf-8")).hexdigest().upper(),
+        )
+    except GenericProducerCandidateRefused:
+        raise
+    except Exception:
+        raise GenericProducerCandidateRefused("GENERIC_REQUEST_FREEZE_REFUSED") from None
 
 
 def _canonical_bytes(value: Mapping[str, Any]) -> bytes:

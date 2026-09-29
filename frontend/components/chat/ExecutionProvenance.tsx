@@ -14,8 +14,22 @@ export function ExecutionProvenance({ value }: { value: unknown }) {
     typeof receipt.task_version === 'string' && typeof receipt.contract_version === 'string' &&
     typeof receipt.admission_contract_sha256 === 'string' &&
     typeof receipt.producer_input_sha256 === 'string' && typeof receipt.composition_sha256 === 'string';
-  if (provenance.status !== 'VERIFIED_RECEIPT' || !receipt || (!v39 && !v40) ||
-      receipt.data_origin !== 'REGISTERED_SYNTHETIC' ||
+  const v41 = version === 'V41' && receipt?.schema_version === 'governed-generic-producer-receipt-3' &&
+    receipt.data_origin === 'SYNTHETIC_ONLY' &&
+    (receipt.transport === 'INJECTED_LOCAL_ONLY' || receipt.transport === 'OPENAI_RESPONSES') &&
+    typeof receipt.provider_execution_attested === 'boolean' &&
+    !(receipt.transport === 'INJECTED_LOCAL_ONLY' && receipt.provider_execution_attested) &&
+    typeof receipt.producer_id === 'string' && typeof receipt.producer_version === 'string' &&
+    typeof receipt.task_id === 'string' && typeof receipt.task_version === 'string' &&
+    typeof receipt.contract_binding_sha256 === 'string' &&
+    typeof receipt.fact_schema_version === 'string' &&
+    typeof receipt.positive_projection_policy_version === 'string' &&
+    typeof receipt.output_contract_version === 'string' &&
+    typeof receipt.request_sha256 === 'string' && typeof receipt.response_sha256 === 'string' &&
+    typeof receipt.provider_policy_evidence_sha256 === 'string';
+  const historicalDataOrigin = receipt?.data_origin === 'REGISTERED_SYNTHETIC';
+  if (provenance.status !== 'VERIFIED_RECEIPT' || !receipt || (!v39 && !v40 && !v41) ||
+      ((!v41 && !historicalDataOrigin) || (v41 && receipt.data_origin !== 'SYNTHETIC_ONLY')) ||
       typeof receipt.execution_id !== 'string' || typeof receipt.raw_source_sha256 !== 'string' ||
       typeof receipt.source_representation_sha256 !== 'string' ||
       typeof receipt.envelope_sha256 !== 'string') return <p role="alert">Provenance d’exécution non vérifiable.</p>;
@@ -23,15 +37,25 @@ export function ExecutionProvenance({ value }: { value: unknown }) {
     <summary>Provenance d’exécution — reçu {String(version)} durable vérifié</summary>
     <p>{v39
       ? 'Données synthétiques enregistrées ; fournisseur simulé local ; aucun transport fournisseur dans cet exécuteur.'
-      : 'Exécution synthétique locale admise ; egress interdit ; le producteur générique reste non admis.'}</p>
-    {v40 && <p>Producteur : {String(receipt.producer_id)} / {String(receipt.producer_version)}</p>}
-    {v40 && <p>Tâche : {String(receipt.task_id)} / {String(receipt.task_version)}</p>}
+      : v40
+        ? 'Exécution synthétique locale admise ; egress interdit ; le producteur générique reste non admis.'
+        : receipt.transport === 'INJECTED_LOCAL_ONLY'
+          ? 'Réponse injectée locale ; aucune exécution OpenAI attestée et aucune donnée réelle admise.'
+          : receipt.provider_execution_attested
+            ? 'Exécution fournisseur attestée par le backend ; aucune admission de données réelles.'
+            : 'Transport OpenAI déclaré, mais exécution fournisseur non attestée ; aucune admission de données réelles.'}</p>
+    {(v40 || v41) && <p>Producteur : {String(receipt.producer_id)} / {String(receipt.producer_version)}</p>}
+    {(v40 || v41) && <p>Tâche : {String(receipt.task_id)} / {String(receipt.task_version)}</p>}
     {v40 && <p>Contrat : {String(receipt.contract_version)}</p>}
+    {v41 && <p>Binding du contrat : {String(receipt.contract_binding_sha256)}</p>}
+    {v41 && <p>Versions : faits {String(receipt.fact_schema_version)} · projection {String(receipt.positive_projection_policy_version)} · sortie {String(receipt.output_contract_version)}</p>}
     <p>Exécution : {receipt.execution_id}</p>
     <p>Source SHA-256 : {receipt.raw_source_sha256}</p>
     <p>Représentation SHA-256 : {receipt.source_representation_sha256}</p>
     {v40 && <p>Entrée producteur SHA-256 : {String(receipt.producer_input_sha256)}</p>}
     {v40 && <p>Composition SHA-256 : {String(receipt.composition_sha256)}</p>}
+    {v41 && <p>Requête SHA-256 : {String(receipt.request_sha256)}</p>}
+    {v41 && <p>Réponse SHA-256 : {String(receipt.response_sha256)}</p>}
     <p>Enveloppe SHA-256 : {receipt.envelope_sha256}</p>
     <p>Ce reçu n’est pas une certification de l’infrastructure ni de la fiabilité financière.</p>
   </details>;

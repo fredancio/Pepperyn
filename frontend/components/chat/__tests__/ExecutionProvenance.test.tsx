@@ -29,6 +29,46 @@ test('verified V40 receipt displays versioned producer, task and limits',()=>{
   expect(screen.getByText(/composition-hash/)).toBeInTheDocument();
   expect(screen.getByText(/producteur générique reste non admis/)).toBeInTheDocument();
 });
+test('verified V41 injected receipt never claims an attested OpenAI execution',()=>{
+  render(<ExecutionProvenance value={{status:'VERIFIED_RECEIPT',receipt_version:'V41',receipt:{
+    schema_version:'governed-generic-producer-receipt-3',data_origin:'SYNTHETIC_ONLY',
+    transport:'INJECTED_LOCAL_ONLY',provider_execution_attested:false,
+    producer_id:'openai-responses-financial-analysis',producer_version:'gpt-5-contract-v1',
+    task_id:'governed-financial-analysis',task_version:'v1-governed-single-call',
+    contract_binding_sha256:'contract-hash',fact_schema_version:'facts-v1',
+    positive_projection_policy_version:'projection-v1',output_contract_version:'output-v1',
+    request_sha256:'request-hash',response_sha256:'response-hash',
+    provider_policy_evidence_sha256:'policy-hash',execution_id:'execution-id',
+    raw_source_sha256:'source-hash',source_representation_sha256:'representation-hash',
+    envelope_sha256:'envelope-hash'}}} />);
+  expect(screen.getByText(/reçu V41 durable vérifié/)).toBeInTheDocument();
+  expect(screen.getByText(/aucune exécution OpenAI attestée/)).toBeInTheDocument();
+  expect(screen.getByText(/request-hash/)).toBeInTheDocument();
+  expect(screen.getByText(/response-hash/)).toBeInTheDocument();
+});
+test('V41 injected receipt claiming provider attestation refuses',()=>{
+  render(<ExecutionProvenance value={{status:'VERIFIED_RECEIPT',receipt_version:'V41',receipt:{
+    schema_version:'governed-generic-producer-receipt-3',data_origin:'SYNTHETIC_ONLY',
+    transport:'INJECTED_LOCAL_ONLY',provider_execution_attested:true,
+    producer_id:'p',producer_version:'v',task_id:'t',task_version:'v',
+    contract_binding_sha256:'c',fact_schema_version:'f',positive_projection_policy_version:'p',
+    output_contract_version:'o',request_sha256:'r',response_sha256:'s',
+    provider_policy_evidence_sha256:'e',execution_id:'x',raw_source_sha256:'x',
+    source_representation_sha256:'x',envelope_sha256:'x'}}} />);
+  expect(screen.getByRole('alert')).toHaveTextContent('non vérifiable');
+});
+test('V41 OpenAI transport without attestation never claims an attested execution',()=>{
+  render(<ExecutionProvenance value={{status:'VERIFIED_RECEIPT',receipt_version:'V41',receipt:{
+    schema_version:'governed-generic-producer-receipt-3',data_origin:'SYNTHETIC_ONLY',
+    transport:'OPENAI_RESPONSES',provider_execution_attested:false,
+    producer_id:'p',producer_version:'v',task_id:'t',task_version:'v',
+    contract_binding_sha256:'c',fact_schema_version:'f',positive_projection_policy_version:'p',
+    output_contract_version:'o',request_sha256:'r',response_sha256:'s',
+    provider_policy_evidence_sha256:'e',execution_id:'x',raw_source_sha256:'x',
+    source_representation_sha256:'x',envelope_sha256:'x'}}} />);
+  expect(screen.getByText(/exécution fournisseur non attestée/)).toBeInTheDocument();
+  expect(screen.queryByText(/Exécution fournisseur attestée par/)).not.toBeInTheDocument();
+});
 test('unknown provenance refuses rather than showing mock claims',()=>{
   render(<ExecutionProvenance value={{status:'VERIFIED_RECEIPT',receipt:{provider_mode:'unknown'}}} />);
   expect(screen.getByRole('alert')).toHaveTextContent('non vérifiable');

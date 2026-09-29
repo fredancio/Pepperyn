@@ -9,22 +9,16 @@ import logging
 import os
 import warnings
 from uuid import UUID
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError
+from sandbox.bounded_test_transport import request as bounded_request
 
 URL = 'https://ejixkplrgobgwqnhidwt.supabase.co'
 EMAILS = [f'pepperyn-isolation-a24-{s}@pepperyn-test.invalid' for s in ('a', 'b')]
 
 
 def live_request(method, url, headers, payload):
-    request = Request(url, data=None if payload is None else json.dumps(payload).encode(),
-                      headers=headers, method=method)
     # No automatic retry. Never print exception text or response bodies.
-    try:
-        with urlopen(request, timeout=20) as response:
-            return response.status, json.loads(response.read() or b'{}')
-    except HTTPError as error:
-        return error.code, json.loads(error.read() or b'{}')
+    response = bounded_request(method, url, headers=headers, json=payload)
+    return response.status_code, response.json()
 
 
 def verify(bundle, anon_key, factory, request):

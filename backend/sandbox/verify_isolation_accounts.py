@@ -93,17 +93,9 @@ def verify(bundle, anon_key, factory, get, *, include_history=False):
 
 
 def live_get(url, headers):
-    import httpx
-    # Fixed origins; no redirects and no data in output, even on a detected leak.
-    from urllib.parse import urlsplit
-    target = urlsplit(url)
-    if not (url.startswith(URL + "/rest/v1/") or
-            (target.scheme == "http" and target.netloc == "127.0.0.1:8000"
-             and target.path in ("/api/entities", "/api/analyses/history"))):
-        raise ValueError("TARGET_REFUSED")
-    with httpx.Client(timeout=15, follow_redirects=False, trust_env=False) as http:
-        response = http.get(url, headers=headers)
-        return response.status_code, response.json()
+    from sandbox.bounded_test_transport import request
+    response = request("GET", url, headers=headers, loopback=True)
+    return response.status_code, response.json()
 
 
 if __name__ == "__main__":

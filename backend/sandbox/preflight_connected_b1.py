@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4, UUID
 from types import SimpleNamespace
-import httpx
+from sandbox.bounded_test_transport import INTEGRATION_TEST_ORIGIN, integration_get
 from services.governed_rehearsal_permit import PROJECT, COMPANY, ENTITY, FILENAME, SOURCE_HASH, scoped_snapshot
 from services.governed_rehearsal_permit import PROTECTED_TABLES, TABLES
 
@@ -19,8 +19,11 @@ class SafeRefusal(ValueError):
 
 class ReadOnlyDatabase:
     def __init__(self, key):
-        self.client = httpx.Client(base_url=PROJECT,headers={'apikey':key,'Authorization':'Bearer '+key},
-                                  timeout=30,follow_redirects=False,trust_env=False)
+        if PROJECT != INTEGRATION_TEST_ORIGIN:
+            raise ValueError('PROJECT_REFUSED')
+        self.headers={'apikey':key,'Authorization':'Bearer '+key}
+    def close(self):
+        pass
     def from_(self, table):
         if table not in set(TABLES + PROTECTED_TABLES + ('companies','engagements')):
             raise ValueError('READ_SCOPE')
@@ -31,7 +34,7 @@ class ReadOnlyDatabase:
             def eq(self,column,value): self.params[column]='eq.'+value; return self
             def limit(self,count): self.params['limit']=str(count); return self
             def execute(self):
-                response=db.client.get('/rest/v1/'+table,params=self.params)
+                response=integration_get('/rest/v1/'+table,headers=db.headers,params=self.params)
                 if response.status_code != 200: raise SafeRefusal('READ_'+table.upper()+'_HTTP_'+str(response.status_code))
                 data=response.json()
                 if not isinstance(data,list): raise ValueError('READ_SHAPE')
@@ -92,7 +95,7 @@ def main():
                              business_write_performed=False,transport_activated=False)))
         return 1
     finally:
-        if db: db.client.close()
+        if db: db.close()
 
 
 if __name__=='__main__':

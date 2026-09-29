@@ -145,17 +145,6 @@ def setup(v3sql):
         "source_representation_sha256": source_facts.source_representation_sha256,
         "producer_input_sha256": sha256(projection_text.encode()).hexdigest().upper(),
     }
-    receipt = GenericProducerReceiptContractV3(
-        evidence_status="ADMITTED_EXECUTION",
-        bindings=bindings,
-        contract_binding=CONTRACT_BINDING,
-        contract_binding_sha256=GENERIC_ADMISSION_CONTRACT_SHA256,
-        request_sha256=sha256(projection_text.encode()).hexdigest().upper(),
-        response_sha256=sha256(_canonical(response).encode()).hexdigest().upper(),
-        projection_sha256=bindings["producer_input_sha256"],
-        envelope_sha256=envelope_sha,
-        provider_policy_evidence_sha256="E" * 64,
-    ).model_dump(mode="json")
     result = envelope.analysis_result.model_dump(mode="json")
     result["id"] = analysis_id
     analysis_row = {
@@ -184,12 +173,31 @@ def setup(v3sql):
             source_sha256=source_facts.source_representation_sha256,
         ),
     }
+    base_specification = js(spec)
     v3sql(
         "INSERT INTO generic_producer_policies_v3(id,specification,contract_binding,"
         "contract_binding_text,contract_binding_sha256,enabled) VALUES ("
-        f"{literal(policy_id)},{js(spec)},{js(contract)},{literal(_canonical(contract))},"
+        f"{literal(policy_id)},({base_specification}::jsonb || jsonb_build_object("
+        "'policy_evidence_sha256',upper(encode(sha256(convert_to("
+        f"{base_specification}::jsonb::text,'UTF8')),'hex')))),"
+        f"{js(contract)},{literal(_canonical(contract))},"
         f"{literal(GENERIC_ADMISSION_CONTRACT_SHA256)},true)"
     )
+    policy_evidence_sha256 = v3sql(
+        "SELECT specification->>'policy_evidence_sha256' "
+        "FROM generic_producer_policies_v3 WHERE id=" + literal(policy_id)
+    )
+    receipt = GenericProducerReceiptContractV3(
+        evidence_status="ADMITTED_EXECUTION",
+        bindings=bindings,
+        contract_binding=CONTRACT_BINDING,
+        contract_binding_sha256=GENERIC_ADMISSION_CONTRACT_SHA256,
+        request_sha256=sha256(projection_text.encode()).hexdigest().upper(),
+        response_sha256=sha256(_canonical(response).encode()).hexdigest().upper(),
+        projection_sha256=bindings["producer_input_sha256"],
+        envelope_sha256=envelope_sha,
+        provider_policy_evidence_sha256=policy_evidence_sha256,
+    ).model_dump(mode="json")
     return SimpleNamespace(
         policy_id=policy_id, bindings=bindings, contract=contract,
         source=source_facts.model_dump(mode="json"), projection_text=projection_text,
