@@ -386,3 +386,14 @@ stop before completion with no retry. 185 related tests PASS; 37 PostgreSQL test
 remain NOT EXECUTED because no isolated database runtime was supplied to that
 test selection. This local composition does not select/admit the real generic
 producer, open egress, prove a live V40 execution or change either admission gate.
+
+B1 genuine-producer candidate (2026-09-28): IMPLEMENTED / LOCAL_POSTGRESQL_TESTED /
+UNADMITTED. WHY: choosing a real producer identity must not silently imply that
+its provider, disclosure or durable receipt is authorized. The single candidate
+is fixed to OpenAI Responses `gpt-5` for governed financial analysis, with a
+positive source-facts-only projection, injected one-use local transport and a
+separate future receipt-v3 contract. All 37 formerly unexecuted V40 PostgreSQL
+tests plus one candidate composition case now PASS (38); 235 related non-PG tests
+PASS. V40 remains local-synthetic/egress-DENY and persists the exact composed
+identities without admitting the candidate. Future v3 durable storage, provider
+gate, global egress debt, live execution and terminal proof remain OPEN.

@@ -202,3 +202,22 @@ writes and no network. Targeted contract/composition/adapter/definition/process/
 budget/launcher/successor regression: 178 PASS (8.07s), no cache provider, fresh
 isolated temporary test directory. These are local tests; no cloud rehearsal,
 Auth login or producer activation was repeated. Global egress debt remains OPEN.
+
+## Genuine-producer candidate — local follow-on
+
+The previously unspecified candidate is now fixed locally as OpenAI Responses,
+`gpt-5`, for the single governed financial-analysis task. Its backend profile is
+immutable and explicitly `UNADMITTED`, `SYNTHETIC_ONLY`, egress `CLOSED`. The
+positive projection contains only the claimed governed source facts, invocation
+nonce and static task/schema material. The injected one-use transport has no SDK,
+URL, credential or network implementation; output remains untrusted and passes
+the existing strict response/source/nonce/fact validation.
+
+A distinct future receipt contract, `governed-generic-producer-receipt-3`, binds
+profile/request/response/projection/envelope/provider-policy evidence. No issuer
+or durable store for it exists yet. V40 was not changed: the actual PostgreSQL
+conformance case persists only a truthful `LOCAL_SYNTHETIC_ONLY`, `egress=DENY`,
+generic-unadmitted receipt. All 37 previously unexecuted V40 PostgreSQL tests plus
+the new candidate case now PASS in the isolated local container (38 PASS). The
+candidate cannot therefore be called admitted. Exact proof and remaining remote
+protocol: INSIGHT_SHAPER_B1_GENERIC_PRODUCER_CANDIDATE_LOCAL_PROOF.md.

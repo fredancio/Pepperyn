@@ -729,3 +729,29 @@ they are NOT EXECUTED, not PASS. No remote operation, provider SDK/transport or
 real data was used. The actual generic producer remains UNADMITTED; no positive
 task-specific privacy/egress contract or live producer execution is established.
 B1 remains OPEN; External Provider and Real-data Admission remain CLOSED.
+
+### B1 fixed genuine-producer candidate — local proof only
+
+The next local slice fixes one candidate rather than admitting an arbitrary
+callable: OpenAI Responses `gpt-5`, governed financial analysis v1. Its immutable
+profile says UNADMITTED / SYNTHETIC_ONLY / egress CLOSED. The provider projection
+contains only claimed governed source facts, the request nonce and static task
+schema/instructions. The transport is injected, single-use and has no provider
+SDK, URL, credential or network code. Existing response quarantine validates
+strict shape, source digest, nonce and fact lineage.
+
+`governed-generic-producer-receipt-3` is a separate future receipt contract,
+including profile/request/response/projection/envelope/provider-policy evidence;
+no local issuer or durable store can mint it as authority. V39/V40 are unchanged.
+The actual PostgreSQL proof uses a fresh isolated V40 policy and therefore retains
+its truthful LOCAL_SYNTHETIC_ONLY / EGRESS DENY / generic-unadmitted semantics.
+Prechecked execution/scope/producer/task identities equal composed and persisted
+bindings, and no V39 fallback exists.
+
+Final evidence: 52 focused PASS; 235 related non-PostgreSQL PASS; all 37 formerly
+NOT EXECUTED V40 PostgreSQL tests plus one candidate case now actually executed
+and PASS (38, isolated container). New-module egress scan has zero findings. The
+repository-wide egress scan still FAILS with eight pre-existing findings and is
+not requalified. No remote access, Auth, migration, provider or real data. The
+candidate remains UNADMITTED; durable v3 storage, PG-3/PG-4, external execution,
+live reread/exports and Financial Reliability remain OPEN. B1 remains OPEN.

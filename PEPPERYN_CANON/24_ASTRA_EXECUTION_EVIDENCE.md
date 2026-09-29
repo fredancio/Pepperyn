@@ -1422,3 +1422,25 @@ admission, producer registration, provider call or real data. V39 regressions an
 version-aware V40 output tests remain PASS. This establishes local composition
 only: real generic producer UNADMITTED, B1 OPEN, global egress debt OPEN and both
 admission gates CLOSED.
+
+### Genuine generic-producer candidate local proof — PPR-064
+
+Sol medium fixed the candidate profile to OpenAI Responses `gpt-5` for the one
+governed financial-analysis task, while leaving its state UNADMITTED and egress
+CLOSED. A claimed-input request builder preserves the backend nonce and exposes
+only governed source facts plus static task/schema material. The only transport
+is an injected single-use local callable. The strict existing response validator
+and PPR-063 adapter retain quarantine and backend-only completion authority.
+
+The future `governed-generic-producer-receipt-3` contract is defined separately;
+it cannot be minted by this slice. V40 SQL remains unchanged and its local test
+receipt remains LOCAL_SYNTHETIC_ONLY / egress DENY / generic unadmitted. Actual
+local PostgreSQL proves exact prechecked/composed/persisted identities, atomic
+completion and no V39 fallback for the candidate mechanics.
+
+Evidence: 52 focused PASS; 235 related non-PG PASS; 38 PostgreSQL PASS in the
+isolated container, including every one of the 37 previously NOT EXECUTED tests.
+Targeted new-module scan: zero egress findings. Repository-wide egress scan:
+unchanged FAIL with eight pre-existing findings; four adjacent controls PASS.
+No remote access, provider call, real data or gate change. Full record:
+docs/Project_Control/INSIGHT_SHAPER_B1_GENERIC_PRODUCER_CANDIDATE_LOCAL_PROOF.md.
