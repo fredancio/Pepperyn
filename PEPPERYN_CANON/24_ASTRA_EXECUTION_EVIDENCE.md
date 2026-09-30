@@ -1565,3 +1565,19 @@ policy, admission, provider or real data was used.
 The exact proposed live protocol is
 `docs/Project_Control/INSIGHT_SHAPER_B1_V41_INJECTED_DURABLE_REHEARSAL_PROTOCOL.md`.
 It remains NOT EXECUTED and requires a distinct Founder GO.
+
+## PPR-069 attempt 1 incident and successor preparation (2026-09-30)
+
+Attempt 1 refused at `POLICY_INSERT` after its 1,200-second observer timeout.
+Read-only evidence proved the exact policy committed after runner termination.
+A distinct Founder-authorized safety action disabled it; postcontrol proved one
+disabled policy and zero admission/analysis/envelope/receipt rows.  This is
+historical failure evidence, not V41 execution evidence.
+
+The locally prepared successor retains PPR-069 semantics and bounds while
+making late owner SQL transactionally impossible and delaying the single Auth
+until after exact policy observation.  Executed local evidence: 7 focused PASS,
+110 governed regression PASS, 1 isolated-PostgreSQL PASS, frontend 7 PASS with
+the live-result-only test correctly SKIPPED.  No remote write, Auth, provider,
+egress or real data was used.  Successor checkpoint and distinct Founder GO are
+still required.

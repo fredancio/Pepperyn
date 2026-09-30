@@ -855,3 +855,17 @@ PostgreSQL command without the required opt-in container was an environmental
 setup refusal and is not evidence; the complete run used a no-network/no-port/
 no-volume local container which was stopped afterward. No remote access occurred.
 B1 remains OPEN and the producer remains UNADMITTED.
+
+## 2026-09-30 — PPR-069 attempt 1 stopped; successor prepared locally
+
+The first injected V41 rehearsal did not reach execution.  Its runner timed out
+before the exact owner policy insert; that insert committed later and was then
+closed through a separately authorized irreversible safety disable.  The sole
+historical policy remains present and disabled.  No admission, analysis,
+envelope or receipt was created.
+
+The minimal successor orchestration is LOCAL PASS and NOT CHECKPOINTED.  It
+binds the SQL validity deadline to the runner deadline, moves the single Auth
+login after exact policy observation, requires the failed policy unchanged and
+disabled, and uses four new identities.  Ceilings and admission semantics are
+unchanged.  No successor remote write or Auth has occurred.
