@@ -1581,3 +1581,11 @@ until after exact policy observation.  Executed local evidence: 7 focused PASS,
 the live-result-only test correctly SKIPPED.  No remote write, Auth, provider,
 egress or real data was used.  Successor checkpoint and distinct Founder GO are
 still required.
+
+## PPR-069 successor attempt 2 local expiry (2026-09-30)
+
+The `v41-injected-2` preparation expired without Supabase SQL, authentication
+or remote write. Its artifacts and identifiers remain preserved and cannot be
+reused. A timing-only successor revision targets `v41-injected-3` with new
+identities and a single 24-hour manifest/runner/PostgreSQL deadline. It remains
+local, not checkpointed and not remotely executed.

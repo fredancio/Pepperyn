@@ -76,7 +76,7 @@ from services.v1_analysis_contract import UnderstandingResult
 
 REPO = Path("C:/Users/ADMIN-FRED/Documents/Codex/Pepperyn-development")
 RUNTIME = Path("C:/Users/ADMIN-FRED/Documents/Codex/Pepperyn-runtime")
-ATTEMPT = RUNTIME / "v41-injected-2"
+ATTEMPT = RUNTIME / "v41-injected-3"
 FIXTURE = REPO / "backend/tests/golden/fixtures" / FIXTURE_NAME
 BASELINE_TABLES = (
     "analyses", "governed_analysis_envelopes", "governed_execution_receipts",

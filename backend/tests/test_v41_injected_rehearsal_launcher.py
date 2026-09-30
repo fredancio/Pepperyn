@@ -113,6 +113,7 @@ def test_effect_order_can_record_policy_before_single_auth(tmp_path):
 
 
 def test_successor_manifest_freezes_new_ids_deadline_and_failed_history(tmp_path):
+    assert OWNER_ACTION_WINDOW_SECONDS == 86400
     frozen = freeze_manifest(REPO, tmp_path / 'attempt')
     created = datetime.fromisoformat(frozen['created_at'])
     deadline = datetime.fromisoformat(frozen['owner_action_deadline'])

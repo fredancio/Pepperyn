@@ -59,8 +59,11 @@ No admission semantic, authority or ceiling changed.  The successor:
 
 ## Limits and next boundary
 
-The successor is prepared but not checkpointed.  No successor attempt directory
-or remote identity has been created.  A durability checkpoint must precede a
-distinct Founder GO.  Any eventual GO remains bounded to the existing PPR-069
+The first prepared successor directory, `v41-injected-2`, expired without SQL,
+Auth or remote access and remains unchanged as local non-execution evidence.
+The second successor is prepared for `v41-injected-3` with new identities and
+an exact 24-hour deadline shared by its manifest, runner and PostgreSQL guard.
+This timing-only revision must be checkpointed before its local preparation or
+any remote precontrol. Any eventual GO remains bounded to the existing PPR-069
 claim; B1 remains OPEN, the producer remains UNADMITTED, and External Provider
 and Real-data Admission remain CLOSED.

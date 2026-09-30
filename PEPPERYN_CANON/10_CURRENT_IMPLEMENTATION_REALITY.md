@@ -869,3 +869,11 @@ binds the SQL validity deadline to the runner deadline, moves the single Auth
 login after exact policy observation, requires the failed policy unchanged and
 disabled, and uses four new identities.  Ceilings and admission semantics are
 unchanged.  No successor remote write or Auth has occurred.
+
+## 2026-09-30 — PPR-069 successor attempt 2 expired before remote use
+
+The locally prepared `v41-injected-2` identities and artifacts expired before
+any SQL, Auth or remote access. They remain unchanged and are not reusable.
+The minimal next revision uses `v41-injected-3`, four new identities and one
+24-hour deadline enforced identically by the runner and PostgreSQL insert.
+This is a timing-only preparation and is not yet checkpointed or executed.

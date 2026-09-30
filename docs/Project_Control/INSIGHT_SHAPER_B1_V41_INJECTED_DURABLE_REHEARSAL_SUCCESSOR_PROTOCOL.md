@@ -51,9 +51,18 @@ No token exists while waiting for the Founder.  A policy insert attempted after
 the runner deadline is transactionally refused by its own SQL and cannot create
 a late active policy.
 
+The first prepared successor directory, `v41-injected-2`, expired before any
+SQL, Auth or remote access was performed. It is retained unchanged as local
+non-execution evidence and is never reused. A second distinct successor uses
+`v41-injected-3`, four newly generated identities and an exact 24-hour
+owner-action window. The same frozen deadline remains embedded in both the
+manifest and PostgreSQL guard; increasing its duration does not decouple the
+two enforcement boundaries.
+
 ## Frozen scope and ceilings
 
 - four new and non-substitutable policy/request/execution/analysis UUIDs;
+- a 24-hour owner-action validity window, identical in the runner and SQL;
 - technical account 1 and its existing company/entity/engagement only;
 - approved synthetic workbook and frozen hashes only;
 - maximum five new durable rows;
