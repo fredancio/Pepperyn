@@ -956,3 +956,12 @@ new login or authority movement. 104 local tests PASS; no PostgreSQL/live rerun.
 See docs/Project_Control/PPR069_ATTEMPT5_COMPOSITION_DIAGNOSIS.md. Old launcher
 pins remain unchanged and intentionally reject the modified source. No successor
 prepared; attempt 5 NO PASS, historical evidence and all gates unchanged.
+
+2026-10-01 prospective two-policy history adaptation: LOCAL PASS, no attempt
+allocated. Explicit versioned successor branch validates BOTH disabled historical
+policies exactly, preserving old single-policy SQL/manifest semantics. 218 Python
+tests and four isolated PostgreSQL tests PASS; no required test skipped. Complete
+row baseline must still be captured by a future authorized read-only precontrol;
+no full-row historical evidence invented. READY for local freeze after checkpoint,
+not for remote launch. See PPR069_TWO_POLICY_HISTORY_LOCAL_PROOF.md under
+docs/Project_Control. Attempt 5 NO PASS and all admission gates unchanged.

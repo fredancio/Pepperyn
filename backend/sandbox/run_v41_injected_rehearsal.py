@@ -121,11 +121,22 @@ def rows(db, table: str, **filters: str) -> list[dict]:
     return data
 
 
-def snapshot(db) -> dict[str, dict[str, Any]]:
+def snapshot(db, manifest=None, *, observed_policies=None) -> dict[str, dict[str, Any]]:
     result = {}
     for table in BASELINE_TABLES:
         observed = rows(db, table)
         result[table] = {"count": len(observed), "sha256": digest(sorted(observed, key=digest))}
+    if manifest is not None:
+        from sandbox import v41_two_policy_history as history
+        if history.enabled(manifest):
+            policies = rows(db, 'generic_producer_policies_v3') if observed_policies is None else observed_policies
+            old = [p for p in policies if p.get('id') in history.POLICY_IDS]
+            require(len(policies) in (2, 3) and all(p.get('id') in (*history.POLICY_IDS, manifest['identities']['policy_id']) for p in policies),
+                    'V41_HISTORY_SNAPSHOT_SET_REFUSED')
+            pinned = (history.accepted_history(ATTEMPT, manifest, datetime.now(timezone.utc))
+                      if len(policies) == 2 else
+                      json.loads((ATTEMPT / 'baseline-before.json').read_text(encoding='utf-8'))['historical_policies_v3'])
+            result['historical_policies_v3'] = history.validate(old, pinned=pinned)
     return result
 
 
@@ -219,6 +230,10 @@ class RecordingDb:
 
 
 def precontrol_attestation(manifest: dict[str, Any]) -> dict[str, Any]:
+    from sandbox import v41_two_policy_history as history
+    if history.enabled(manifest):
+        history.accepted_history(ATTEMPT, manifest, datetime.now(timezone.utc))
+        return json.loads((ATTEMPT / 'precontrol-ready.json').read_text(encoding='utf-8'))
     path = ATTEMPT / "precontrol-ready.json"
     require(path.is_file(), "V41_PRECONTROL_ATTESTATION_ABSENT")
     report = json.loads(path.read_text(encoding="utf-8"))
@@ -311,8 +326,16 @@ def failed_policy_exact(row: dict[str, Any]) -> bool:
 
 def prepolicy_remote(db, manifest: dict[str, Any]) -> tuple[dict, dict]:
     policies = rows(db, "generic_producer_policies_v3")
-    require(len(policies) == 1 and failed_policy_exact(policies[0]),
-            "V41_FAILED_POLICY_HISTORY_REFUSED")
+    from sandbox import v41_two_policy_history as history
+    if history.enabled(manifest):
+        history.validate(policies, pinned=history.accepted_history(ATTEMPT, manifest, datetime.now(timezone.utc)))
+        for analysis_id in history.ANALYSIS_IDS:
+            for table, column in (('analyses','id'), ('governed_analysis_envelopes','analysis_id'),
+                                  ('governed_execution_receipts','analysis_id'), ('execution_receipts_v2','analysis_id')):
+                require(rows(db, table, **{column: analysis_id}) == [], 'V41_HISTORY_APPLICATION_REFUSED')
+    else:
+        require(len(policies) == 1 and failed_policy_exact(policies[0]),
+                "V41_FAILED_POLICY_HISTORY_REFUSED")
     require(rows(db, "generic_execution_admissions_v3") == [] and
             rows(db, "generic_execution_receipts_v3") == [],
             "V41_SUCCESSOR_REGISTRIES_REFUSED")
@@ -333,6 +356,16 @@ def prepolicy_remote(db, manifest: dict[str, Any]) -> tuple[dict, dict]:
 
 
 def postpolicy_remote(db, manifest: dict[str, Any], baseline: dict[str, Any], policies) -> dict:
+    from sandbox import v41_two_policy_history as history
+    if history.enabled(manifest):
+        old, current = history.split(policies, manifest)
+        history.validate(old, pinned=baseline['historical_policies_v3'])
+        require(current.get('enabled') is True and
+                rows(db, 'generic_execution_admissions_v3') == [] and
+                rows(db, 'generic_execution_receipts_v3') == [] and
+                snapshot(db, manifest, observed_policies=policies) == baseline, 'V41_SUCCESSOR_POSTPOLICY_STATE_REFUSED')
+        validate_observed_owner_policies(policies, manifest, enabled=True)
+        return current
     policy_id = manifest["identities"]["policy_id"]
     failed = [row for row in policies if row.get("id") == FAILED_POLICY_ID]
     successor = [row for row in policies if row.get("id") == policy_id]
@@ -434,6 +467,13 @@ def wait_policy(db, manifest: dict[str, Any], *, enabled: bool) -> dict:
 
 
 def validate_observed_owner_policies(policies, manifest, *, enabled):
+    from sandbox import v41_two_policy_history as history
+    if history.enabled(manifest):
+        old, current = history.split(policies, manifest)
+        baseline = json.loads((ATTEMPT / 'baseline-before.json').read_text(encoding='utf-8'))
+        history.validate(old, pinned=baseline['historical_policies_v3'])
+        # Reuse the unchanged current-policy checks below with its original history.
+        policies = [next(p for p in old if p['id'] == FAILED_POLICY_ID), current]
     require(type(policies) is list and len(policies) == 2, "V41_OWNER_POLICY_SET_REFUSED")
     historical = [p for p in policies if p.get("id") == FAILED_POLICY_ID]
     current = [p for p in policies if p.get("id") == manifest["identities"]["policy_id"]]
@@ -473,6 +513,11 @@ def exact_v41_rows(db, manifest: dict[str, Any], *, state: str, enabled: bool) -
 def independent_recovery(packet: dict[str, Any]) -> dict[str, Any]:
     client(packet["anon"])
     service = client(packet["service"])
+    manifest = read_manifest(ATTEMPT)
+    from sandbox import v41_two_policy_history as history
+    if history.enabled(manifest):
+        policies = rows(service, 'generic_producer_policies_v3')
+        validate_observed_owner_policies(policies, manifest, enabled=False)
     token = packet["token"]
     user = service.auth.get_user(token).user
     require(user is not None and str(UUID(user.id)) == SCOPE["actor_id"], "V41_RECOVERY_ACTOR_REFUSED")
@@ -583,7 +628,8 @@ def execute(packet: dict[str, Any]) -> int:
         service = client(packet["service"])
         stage = "FRESH_PREPOLICY_REMOTE"
         own, foreign = prepolicy_remote(service, manifest)
-        baseline = snapshot(service)
+        from sandbox import v41_two_policy_history as history
+        baseline = snapshot(service, manifest) if history.enabled(manifest) else snapshot(service)
         write_new(ATTEMPT / "baseline-before.json", baseline)
         budget = EffectBudget(ATTEMPT / "effects.json")
 
@@ -693,7 +739,7 @@ def execute(packet: dict[str, Any]) -> int:
         require(ui.returncode == 0, "V41_UI_COMPONENT_REFUSED")
 
         stage = "POSTCONTROL"
-        after = snapshot(service)
+        after = snapshot(service, manifest) if history.enabled(manifest) else snapshot(service)
         require(after == baseline, "V41_HISTORICAL_BASELINE_CHANGED")
         require(len(budget.effects) == 10 and budget.auth_logins == 1 and
                 [entry["name"] for entry in budget.effects] == [

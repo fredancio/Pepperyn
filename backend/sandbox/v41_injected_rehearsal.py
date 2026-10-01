@@ -197,6 +197,9 @@ def _sql_json(value: Mapping[str, Any]) -> str:
 
 
 def policy_insert_sql(manifest: Mapping[str, Any]) -> str:
+    from sandbox import v41_two_policy_history as history
+    if history.enabled(manifest):
+        return history.sql(None, manifest, insert=True)
     policy_id = str(UUID(manifest["identities"]["policy_id"]))
     deadline = datetime.fromisoformat(str(manifest["owner_action_deadline"]))
     if deadline.utcoffset() is None:
@@ -218,6 +221,9 @@ def policy_disable_sql(manifest: Mapping[str, Any]) -> str:
 
 
 def precontrol_sql(repo: Path, manifest: Mapping[str, Any]) -> str:
+    from sandbox import v41_two_policy_history as history
+    if history.enabled(manifest):
+        return history.sql(repo, manifest)
     structural = (repo / "backend/migrations/ppr067_hardening_postflight_read_only.sql").read_text(encoding="utf-8")
     historical = (repo / "backend/migrations/v41_historical_baseline_read_only.sql").read_text(encoding="utf-8")
     ids = manifest["identities"]

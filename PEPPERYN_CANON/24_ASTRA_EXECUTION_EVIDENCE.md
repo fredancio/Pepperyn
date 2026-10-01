@@ -1676,3 +1676,11 @@ owner-handoff suites. No original live traceback recovered; deterministic local
 call-chain reproduction, not retroactive live PASS. No PostgreSQL/remote tests,
 credentials, successor identities or gate changes. Existing wrappers remain pinned
 to old source. See docs/Project_Control/PPR069_ATTEMPT5_COMPOSITION_DIAGNOSIS.md.
+
+PPR-069 exact two-policy successor-history adaptation (2026-10-01): 218 Python
+PASS plus four actual isolated PostgreSQL PASS, zero required skips. Singleton
+refusal reproduced before correction; new exact-set/binding/row comparisons
+falsified with missing/extra/active/substituted/altered history. Legacy artifacts
+and seven exclusions preserved. No Attempt 6 or distant access. Complete-row
+baseline capture remains prospective, not retroactively attested. Evidence and
+limits: docs/Project_Control/PPR069_TWO_POLICY_HISTORY_LOCAL_PROOF.md.
