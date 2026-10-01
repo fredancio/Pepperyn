@@ -928,3 +928,31 @@ separately 2 PASS. See docs/Project_Control/PPR069_OWNER_ACK_SUCCESSOR_LOCAL_PRO
 for all identities/hashes and the 2026-10-02T16:02:17.336525Z deadline. No distant
 precontrol or execution has occurred. Checkpoint remains required before presenting
 the exact read-only GO. This does not admit the producer or close B1/other gates.
+
+## 2026-10-01 - attempt 5 terminal; disabled state independently observed
+
+Superseding its preparation state: checkpoint 62834f948a093eff7f7859928abad9a1b61af219
+and the separately authorized precontrol/rehearsal were followed by a COMPOSITION
+AdmissionRefused after one observed policy insertion and one successful Auth.
+Runner policy_disabled=false is preserved as lack of confirmation before exit.
+Owner SQL disable succeeded; later independent read-only observation establishes
+enabled=false, zero admission/analysis/envelope/receipt and checked historical
+policy fields conformant and disabled. Attempt 5 remains FAIL-CLOSED / NO PASS.
+
+The late disable publisher hit the existing refused.json terminal guard. Local
+timing corroborates expiry of the fixed 20-minute handoff. No bypass is needed
+or permitted. Minimal correction is to prepare/verify the disable transfer and
+ack command before a future run and publish immediately after successful SQL.
+Seven new local falsifications plus existing handoff regressions: 35 PASS.
+The initial COMPOSITION cause remains unresolved; no successor or new GO proposed.
+See docs/Project_Control/PPR069_ATTEMPT5_STOP_POSTCONTROL.md for evidence limits.
+B1 OPEN; Generic Producer UNADMITTED; External Provider and Real-data Admission CLOSED.
+
+2026-10-01 local follow-up to attempt-5 COMPOSITION: deterministic cause established.
+RecordingDb omitted auth forwarding, so _principal could not reach backend
+get_user and the AttributeError was wrapped as AdmissionRefused. A read-only
+auth property restores the same underlying backend verifier, without bypass,
+new login or authority movement. 104 local tests PASS; no PostgreSQL/live rerun.
+See docs/Project_Control/PPR069_ATTEMPT5_COMPOSITION_DIAGNOSIS.md. Old launcher
+pins remain unchanged and intentionally reject the modified source. No successor
+prepared; attempt 5 NO PASS, historical evidence and all gates unchanged.

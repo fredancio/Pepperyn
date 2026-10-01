@@ -1653,3 +1653,26 @@ now separately 2 PASS without rewriting prior evidence. Atomic publisher, launch
 new timestamped precontrol and independent recovery path compose locally.
 Attempts 1-4 preserved; unknown network cause and SUBMISSION_UNRESOLVED unchanged.
 Checkpoint pending; no distant precontrol, Auth, policy or rehearsal authorized.
+
+2026-10-01 subsequent authorized attempt 5: checkpoint 62834f948a093eff7f7859928abad9a1b61af219;
+precontrol PASS with exact historical comparison, then COMPOSITION AdmissionRefused
+after one Auth. Runner terminal evidence and later remote enabled=false observation
+remain distinct. One disabled policy preserved; zero admission/analysis/envelope/receipt.
+No rehearsal PASS. Local OWNER_HANDOFF_TERMINATED diagnostic identifies refused.json
+guard before publication. Seven new tests plus 28 handoff regressions: 35 PASS,
+zero skipped, three dependency warnings. Initial seven test setups failed on the
+default temporary-directory permission; corrected test invocation used fresh local
+basetemp. No runtime behavioral change, no new attempt/identity, no remote operation
+in this diagnostic slice. Original COMPOSITION cause remains an independent blocker.
+Evidence: docs/Project_Control/PPR069_ATTEMPT5_STOP_POSTCONTROL.md.
+Historical SUBMISSION_UNRESOLVED/UNESTABLISHED preserved; all gates unchanged.
+
+Attempt-5 composition root cause, local only: RecordingDb lacks auth at checkpoint;
+actual preparation wraps AttributeError as COMPOSITION_PREPARATION_REFUSED.
+Controlled pre-fix result 7 PASS / 1 FAIL (after correcting one test-fixture setup
+error). Minimal read-only auth forwarding property: 104 PASS / zero skipped,
+three dependency warnings across composition, admission, durable coordinator and
+owner-handoff suites. No original live traceback recovered; deterministic local
+call-chain reproduction, not retroactive live PASS. No PostgreSQL/remote tests,
+credentials, successor identities or gate changes. Existing wrappers remain pinned
+to old source. See docs/Project_Control/PPR069_ATTEMPT5_COMPOSITION_DIAGNOSIS.md.

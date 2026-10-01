@@ -204,6 +204,12 @@ class RecordingDb:
         self.db = db
         self.rpc_params: dict[str, dict[str, Any]] = {}
 
+    @property
+    def auth(self):
+        # Preserve backend token verification through the recording adapter.
+        # No login, cached principal or producer-provided identity is introduced.
+        return self.db.auth
+
     def from_(self, table):
         return self.db.from_(table)
 
