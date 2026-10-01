@@ -72,6 +72,22 @@ two enforcement boundaries.
 
 ## Fresh read-only precontrol
 
+The successor generator emits one JSON result in one REPEATABLE READ / READ
+ONLY transaction. It nests structural, historical and frozen-scope results;
+any failed component makes the aggregate REFUSED. The deployment SQL remains
+historically unchanged. Only its successor composition expects exactly one
+policy instead of zero; the frozen-scope component additionally requires the
+exact disabled historical identity and both pinned evidence hashes.
+
+`V41_SUCCESSOR_PRECONTROL_CHECKS_PASS` is not by itself permission to proceed:
+the returned historical row/catalog hashes must also match the preserved
+baseline. `historical_comparison_required=true` makes this remaining check
+explicit. No precontrol-ready attestation is written from a partial result.
+
+The original attempt-3 three-result SQL and its observed frozen-scope PASS
+remain preserved. Its unobserved structural and historical results are not
+requalified. No corrected SQL is to be executed remotely before a new GO.
+
 Before owner SQL or Auth, fail closed unless:
 
 - PPR-067 structures and functions remain conformant;

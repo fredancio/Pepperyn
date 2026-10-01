@@ -28,7 +28,7 @@ PROTOCOL_RELATIVE = (
     "docs/Project_Control/"
     "INSIGHT_SHAPER_B1_V41_INJECTED_DURABLE_REHEARSAL_SUCCESSOR_PROTOCOL.md"
 )
-PROTOCOL_SHA256 = "3FC9D439F6D6D206C3F86469496A5960333D7A1594A25847CEDA880A2B9621D8"
+PROTOCOL_SHA256 = "FB7AA56B9209392B6E64E4C125DACF4551CA27F129A91E175269152FE7B8861F"
 FIXTURE_NAME = "pepperyn_v1_heterogeneous_english.xlsx"
 FIXTURE_SHA256 = "FE7FE4CC8FC6CE649F1FF61D18FDD3D45E2097031FD05AA8C9E2B7A47FAD3B93"
 SCOPE_BASELINE_SHA256 = "35759DA949A93E0FB4DF030DBE8F9760B27C115D0EF9E2C1E833E830F6CD6F63"
@@ -253,4 +253,51 @@ SELECT jsonb_build_object(
 ) AS v41_injected_frozen_scope_precontrol;
 ROLLBACK;
 """
-    return structural.rstrip() + "\n\n" + historical.rstrip() + "\n" + identity_sql
+    # Preserve the deployment verifier itself. Its empty-policy requirement
+    # belongs to deployment, while the successor expects the disabled evidence
+    # policy. The exact identity and evidence checks remain in frozen_scope.
+    old_counts = "policy_rows = 0 AND admission_rows = 0 AND receipt_rows = 0"
+    if structural.count(old_counts) != 1:
+        raise ValueError("V41_STRUCTURAL_TEMPLATE_DRIFT")
+    structural = structural.replace(old_counts,
+        "policy_rows = 1 AND admission_rows = 0 AND receipt_rows = 0")
+
+    def query_body(text: str) -> str:
+        begin = "BEGIN TRANSACTION READ ONLY;"
+        end = "ROLLBACK;"
+        if text.count(begin) != 1 or text.count(end) != 1:
+            raise ValueError("V41_PRECONTROL_TEMPLATE_DRIFT")
+        before, body = text.split(begin)
+        body, after = body.split(end)
+        if after.strip() or any(
+            line.strip() and not line.lstrip().startswith("--")
+            for line in before.splitlines()
+        ):
+            raise ValueError("V41_PRECONTROL_TEMPLATE_DRIFT")
+        body = body.strip()
+        if not body.endswith(";"):
+            raise ValueError("V41_PRECONTROL_TEMPLATE_DRIFT")
+        return body[:-1]
+
+    return (
+        "-- v41-successor-single-result-precontrol-2\n"
+        "BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;\n"
+        "WITH structural AS (\n" + query_body(structural) + "\n),\n"
+        "historical AS (\n" + query_body(historical) + "\n),\n"
+        "frozen_scope AS (\n" + query_body(identity_sql) + "\n)\n"
+        "SELECT jsonb_build_object(\n"
+        " 'check_version','v41-successor-single-result-precontrol-2',\n"
+        " 'status',CASE WHEN\n"
+        "  s->>'status'='PPR067_HARDENING_STRUCTURAL_POSTFLIGHT_PASS'\n"
+        "  AND h->>'status'='V41_HISTORICAL_BASELINE_PASS'\n"
+        "  AND f->>'status'='V41_INJECTED_SUCCESSOR_FROZEN_SCOPE_PRECONTROL_PASS'\n"
+        " THEN 'V41_SUCCESSOR_PRECONTROL_CHECKS_PASS' ELSE 'REFUSED' END,\n"
+        " 'structural',s,'historical',h,'frozen_scope',f,\n"
+        " 'historical_comparison_required',true,\n"
+        " 'write_performed',false,'auth_performed',false\n"
+        ") AS v41_successor_precontrol\n"
+        "FROM (SELECT ppr067_hardening_postflight AS s FROM structural) a\n"
+        "CROSS JOIN (SELECT v41_historical_baseline AS h FROM historical) b\n"
+        "CROSS JOIN (SELECT v41_injected_frozen_scope_precontrol AS f FROM frozen_scope) c;\n"
+        "ROLLBACK;\n"
+    )

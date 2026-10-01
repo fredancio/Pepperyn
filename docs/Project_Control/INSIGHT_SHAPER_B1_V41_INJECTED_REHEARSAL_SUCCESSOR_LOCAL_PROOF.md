@@ -67,3 +67,30 @@ This timing-only revision must be checkpointed before its local preparation or
 any remote precontrol. Any eventual GO remains bounded to the existing PPR-069
 claim; B1 remains OPEN, the producer remains UNADMITTED, and External Provider
 and Real-data Admission remain CLOSED.
+
+## Single-result precontrol correction — local evidence
+
+Attempt 3 exposed only the last frozen-scope PASS in Supabase SQL Editor.
+Local inspection established that the inherited structural block required
+zero policies while the successor scope correctly required one disabled
+historical policy. Neither missing result is inferred to be PASS.
+
+The generator now composes all three queries into one repeatable-read,
+read-only transaction and one JSON result. It adapts only the successor count
+to one, retaining exact historical-policy identity/evidence checks, all five
+function checks, table protections and the historical snapshot output. The
+original deployment SQL and runtime attempt artifacts remain unchanged.
+
+Executed validation: 9 tests PASS, zero skipped, including two actual isolated
+PostgreSQL tests. The full generated SQL accepts the expected disabled history
+and refuses missing/active/extra policies, evidence/binding mismatches, scope
+drift, search_path drift and authenticated-role SELECT access. The read leaves
+the historical policy unchanged and dependent/application tables empty. The
+existing expired-insert and valid-insert PostgreSQL test also passes.
+
+An initial validation invocation had 4 PASS / 4 setup errors from an inaccessible
+default pytest temporary directory. The complete invocation with a dedicated
+new local temporary directory produced the 9 PASS above. No remote query,
+authentication or write occurred. Historical baseline comparison remains a
+required separate evaluation of the returned hashes. The broader historical
+110-test evidence is not claimed as rerun for this correction.

@@ -53,7 +53,12 @@ def test_owner_sql_is_exactly_one_insert_then_one_disable():
 def test_precontrol_is_read_only_and_contains_no_patch_markers():
     sql = precontrol_sql(REPO, MANIFEST)
     assert '\n+  ' not in sql
-    assert sql.count('BEGIN TRANSACTION READ ONLY') >= 3
+    assert sql.count('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY;') == 1
+    assert sql.count('ROLLBACK;') == 1
+    assert 'policy_rows = 0' not in sql
+    assert 'policy_rows = 1 AND admission_rows = 0 AND receipt_rows = 0' in sql
+    assert 'AS v41_successor_precontrol' in sql
+    assert "'historical_comparison_required',true" in sql
     assert 'V41_INJECTED_SUCCESSOR_FROZEN_SCOPE_PRECONTROL_PASS' in sql
     assert FAILED_POLICY_ID in sql
     assert FAILED_POLICY_EVIDENCE_SHA256 in sql

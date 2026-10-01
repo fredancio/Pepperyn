@@ -877,3 +877,11 @@ any SQL, Auth or remote access. They remain unchanged and are not reusable.
 The minimal next revision uses `v41-injected-3`, four new identities and one
 24-hour deadline enforced identically by the runner and PostgreSQL insert.
 This is a timing-only preparation and is not yet checkpointed or executed.
+
+The subsequent attempt-3 precontrol exposed only its frozen-scope PASS. Local
+inspection found an incompatible zero-policy predicate inherited from the
+deployment verifier. The successor generator now expects the exact disabled
+historical policy and returns all components in one read-only JSON result.
+Local validation: 9 PASS including actual isolated PostgreSQL. Original runtime
+artifacts and deployment SQL are preserved; remote corrected verification is
+pending a new Founder GO. No global precontrol PASS is inferred.

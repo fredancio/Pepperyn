@@ -1589,3 +1589,11 @@ or remote write. Its artifacts and identifiers remain preserved and cannot be
 reused. A timing-only successor revision targets `v41-injected-3` with new
 identities and a single 24-hour manifest/runner/PostgreSQL deadline. It remains
 local, not checkpointed and not remotely executed.
+
+PPR-069 single-result precontrol correction: 9 local tests PASS, zero skipped,
+including full generated SQL on isolated PostgreSQL and the existing owner
+deadline test. The observed attempt-3 frozen-scope PASS remains bounded;
+unobserved structural/history results remain unproven. Successor composition
+accepts exactly the disabled historical policy, retains structural checks and
+exposes all components in one JSON. Historical hashes still require comparison.
+No remote execution or artifact replacement occurred during this correction.
