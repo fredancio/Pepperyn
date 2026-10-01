@@ -1603,3 +1603,16 @@ including generated single-result SQL on isolated PostgreSQL. Actual frozen
 manifest and SQL roundtrip verified; new identities disjoint from attempts 1–3.
 Evidence: docs/Project_Control/PPR069_ATTEMPT4_LOCAL_PREPARATION.md and its
 preserved-artifact inventory. No Supabase access or remote PASS in this slice.
+
+2026-10-01 attempt-4 authorized read-only UI submission: INCONCLUSIVE / STOP.
+One Run-control click was attempted, but only the old safety-disable result
+remained visible. Actual SQL submission is unconfirmed; no retry, complete JSON,
+historical comparison or precontrol PASS. See
+docs/Project_Control/PPR069_ATTEMPT4_READ_ONLY_OBSERVATION.md. Gates unchanged.
+
+The later Founder-supplied complete attempt-4 JSON matches all six historical
+row counts/digests and the catalog count/digest. This does not resolve the
+earlier UI submission uncertainty. Founder subsequently authorized an explicit
+conservative temporal bound, never an observed_at substitution. Local v2
+attestation validation: 31 PASS / zero skipped; no PostgreSQL rerun or remote
+operation. See docs/Project_Control/PPR069_ATTEMPT4_CONSERVATIVE_FRESHNESS.md.

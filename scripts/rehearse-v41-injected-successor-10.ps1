@@ -11,7 +11,9 @@ $source = Join-Path $repo 'backend\sandbox\run_v41_injected_rehearsal.py'
 $secretFile = Join-Path $runtime 'secrets\a24-isolation-accounts.dpapi'
 $attempt = Join-Path $runtime 'v41-injected-4'
 $pins = @{
-    'backend/sandbox/run_v41_injected_rehearsal.py' = '510A63CE8D970167C7FBC725AE83C3600C79A38BEF14BB3A6EEA1E6A2FBB2661'
+    'backend/sandbox/run_v41_injected_rehearsal.py' = '5FA56092DD7B5EFE92B1935028D95D2C8720279DCDCDE0ADBF47E14708CB85B1'
+    'backend/tests/test_v41_conservative_freshness.py' = '6D260EFD9798B15962A32468B2C2F1367A515E0AC7C21DD3A53BDF353953EB4D'
+    'backend/tests/fixtures/v41_attempt4_accepted_precontrol.json' = '7205B6612A16746E768AFCC596D5D0B193DF547CAC08E2748A301F8ABE0C3853'
     'backend/sandbox/v41_injected_rehearsal.py' = '7BFDB68478C3ABD7770E735D92E96C7604358DB8E7F21B442D27685272A98F8F'
     'backend/tests/test_v41_injected_rehearsal_launcher.py' = '6B34A91E02F022D95B53419A6FCB3A2E8A8D6BA16A7F8C6618658C1956807C55'
     'backend/tests/test_v41_successor_precontrol_postgres.py' = '38504210E46E86EFED1269EC817B824429BE0C05B56122CECEF7DD68F4DC48C0'
@@ -50,7 +52,8 @@ try {
     Push-Location -LiteralPath $repo
     try {
         & $python -B -m pytest -q --basetemp (Join-Path $runtime "v41-injected-pytest-$PID") `
-            (Join-Path $repo 'backend\tests\test_v41_injected_rehearsal_launcher.py')
+            (Join-Path $repo 'backend\tests\test_v41_injected_rehearsal_launcher.py') `
+            (Join-Path $repo 'backend\tests\test_v41_conservative_freshness.py')
     } finally { Pop-Location }
     if ($LASTEXITCODE -ne 0) { throw 'LOCAL_TESTS_REFUSED' }
     if (-not $ExecuteAfterFounderGO) {

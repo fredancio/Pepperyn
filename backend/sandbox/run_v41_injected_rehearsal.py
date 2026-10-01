@@ -218,8 +218,11 @@ def precontrol_attestation(manifest: dict[str, Any]) -> dict[str, Any]:
         "historical_status", "frozen_scope_status", "historical_snapshot_sha256",
         "observed_at", "write_performed", "auth_performed",
     }
+    bounded = report.get("schema_version") == "v41-injected-successor-precontrol-attestation-2"
+    if bounded:
+        expected_keys = (expected_keys - {"observed_at"}) | {"freshness_evidence"}
     require(set(report) == expected_keys, "V41_PRECONTROL_ATTESTATION_SHAPE_REFUSED")
-    require(report["schema_version"] == "v41-injected-successor-precontrol-attestation-1" and
+    require((bounded or report["schema_version"] == "v41-injected-successor-precontrol-attestation-1") and
             report["project_url"] == PROJECT_URL and
             report["sql_sha256"] == file_sha256(ATTEMPT / "precontrol.sql") and
             report["structural_status"] == "PPR067_HARDENING_STRUCTURAL_POSTFLIGHT_PASS" and
@@ -229,13 +232,59 @@ def precontrol_attestation(manifest: dict[str, Any]) -> dict[str, Any]:
             len(report["historical_snapshot_sha256"]) == 64 and
             report["write_performed"] is False and report["auth_performed"] is False,
             "V41_PRECONTROL_ATTESTATION_REFUSED")
-    stamp = datetime.fromisoformat(report["observed_at"])
-    require(stamp.utcoffset() is not None and
-            0 <= (datetime.now(timezone.utc) - stamp).total_seconds()
-            <= OWNER_ACTION_WINDOW_SECONDS,
-            "V41_PRECONTROL_ATTESTATION_EXPIRED")
+    if bounded:
+        validate_conservative_freshness(report, manifest, datetime.now(timezone.utc))
+    else:
+        stamp = datetime.fromisoformat(report["observed_at"])
+        require(stamp.utcoffset() is not None and
+                0 <= (datetime.now(timezone.utc) - stamp).total_seconds()
+                <= OWNER_ACTION_WINDOW_SECONDS,
+                "V41_PRECONTROL_ATTESTATION_EXPIRED")
     require(manifest["checkpoint_head"] == CHECKPOINT_HEAD, "V41_CHECKPOINT_REFUSED")
     return report
+
+
+def validate_conservative_freshness(report, manifest, now):
+    """Founder-qualified attempt-4 bound; never an execution/observation time."""
+    evidence = report.get("freshness_evidence")
+    expected = {
+        "kind": "PROVEN_CONSERVATIVE_LOWER_BOUND",
+        "lower_bound_utc": "2026-10-01T07:24:01Z",
+        "qualification": "NOT_EXECUTION_OR_OBSERVATION_TIME",
+        "authority": "FOUNDER_ATTEMPT4_CONSERVATIVE_BOUND_2026_10_01",
+        "provenance": "FROZEN_IDENTITIES_PRESENT_IN_ACCEPTED_PRECONTROL_RESULT",
+        "manifest_sha256": "750A16888ADC70D2EFC4F3AF7199CC821458E1C75715A76999CAACD451D890CA",
+        "result_file": "accepted-precontrol-result.json",
+        "result_sha256": "7205B6612A16746E768AFCC596D5D0B193DF547CAC08E2748A301F8ABE0C3853",
+    }
+    require(evidence == expected and "observed_at" not in report,
+            "V41_CONSERVATIVE_EVIDENCE_REFUSED")
+    # Revalidate the immutable manifest rather than accepting caller assertions.
+    require(read_manifest(ATTEMPT) == manifest and
+            manifest["manifest_sha256"] == expected["manifest_sha256"],
+            "V41_CONSERVATIVE_MANIFEST_REFUSED")
+    path = ATTEMPT / expected["result_file"]
+    require(file_sha256(path) == evidence["result_sha256"],
+            "V41_CONSERVATIVE_RESULT_HASH_REFUSED")
+    result = json.loads(path.read_text(encoding="utf-8"))
+    require(result.get("check_version") == "v41-successor-single-result-precontrol-2" and
+            result.get("status") == "V41_SUCCESSOR_PRECONTROL_CHECKS_PASS" and
+            result.get("auth_performed") is False and result.get("write_performed") is False and
+            result.get("historical_comparison_required") is True and
+            digest(result["historical"]) == report["historical_snapshot_sha256"],
+            "V41_CONSERVATIVE_RESULT_REFUSED")
+    for field, component in (("structural_status", "structural"),
+                             ("historical_status", "historical"),
+                             ("frozen_scope_status", "frozen_scope")):
+        require(result[component]["status"] == report[field], "V41_CONSERVATIVE_STATUS_REFUSED")
+    require(all(result["frozen_scope"].get(k) == v for k, v in manifest["identities"].items()),
+            "V41_CONSERVATIVE_IDENTITIES_REFUSED")
+    bound = datetime.fromisoformat(expected["lower_bound_utc"].replace("Z", "+00:00"))
+    created = datetime.fromisoformat(manifest["created_at"])
+    deadline = datetime.fromisoformat(manifest["owner_action_deadline"])
+    require(now.utcoffset() is not None and bound <= created <= now < deadline and
+            0 <= (now - bound).total_seconds() < 86400,
+            "V41_CONSERVATIVE_FRESHNESS_REFUSED")
 
 
 def failed_policy_exact(row: dict[str, Any]) -> bool:
@@ -491,6 +540,9 @@ def execute(packet: dict[str, Any]) -> int:
         policy_observed = True
         budget.owner_observed("POLICY_INSERT")
         policy = postpolicy_remote(service, manifest, baseline)
+
+        # Waiting for owner action cannot renew the precontrol's freshness.
+        precontrol_attestation(manifest)
 
         stage = "SINGLE_AUTH"
         anon = client(packet["anon"])

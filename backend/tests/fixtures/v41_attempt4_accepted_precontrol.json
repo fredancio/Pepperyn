@@ -1,0 +1,148 @@
+{
+  "status": "V41_SUCCESSOR_PRECONTROL_CHECKS_PASS",
+  "historical": {
+    "rows": [
+      {
+        "name": "analyses",
+        "row_count": 10,
+        "rows_sha256": "383bd5c9d22c89f1f204e5b6bce1f176dbe913e265d305119dc9eae7ed9844c9"
+      },
+      {
+        "name": "execution_admissions_v2",
+        "row_count": 6,
+        "rows_sha256": "a75f7490c4d3139a8105fa29fc0c4759230a8034ec91c65eafaad30df2aa225d"
+      },
+      {
+        "name": "execution_receipts_v2",
+        "row_count": 1,
+        "rows_sha256": "a073a966d7a556a2d66ad79efbc5d92a802a5ab6b8b594839d50e1b3ed11d9ba"
+      },
+      {
+        "name": "governed_analysis_envelopes",
+        "row_count": 7,
+        "rows_sha256": "fa6be4d85082428cd0c4980bc91dbfb906bd12c54b7ecb073c2912b46cd6bd15"
+      },
+      {
+        "name": "governed_execution_receipts",
+        "row_count": 2,
+        "rows_sha256": "a79bf3cb87a90289f86d874412837d1a64f58c0ab707d0880d659e999cb7df48"
+      },
+      {
+        "name": "producer_policies_v2",
+        "row_count": 2,
+        "rows_sha256": "4f60b68d4c84f40baef38ea0a6b0024415fb85dcf21de6211b29c082b7d05394"
+      }
+    ],
+    "phase": "V41_HISTORICAL_BASELINE_READ_ONLY",
+    "status": "V41_HISTORICAL_BASELINE_PASS",
+    "catalog": {
+      "item_count": 59,
+      "catalog_sha256": "8b4517f438d5bfc2ffa08ecbe3dc599858e382eaf9bb9c332b906c3932b7c7fa"
+    },
+    "write_performed": false,
+    "row_content_returned": false
+  },
+  "structural": {
+    "rows": {
+      "policy_rows": 1,
+      "receipt_rows": 0,
+      "admission_rows": 0
+    },
+    "status": "PPR067_HARDENING_STRUCTURAL_POSTFLIGHT_PASS",
+    "tables": [
+      {
+        "name": "generic_execution_admissions_v3",
+        "owner": "postgres",
+        "present": true,
+        "anon_select": false,
+        "rls_enabled": true,
+        "policy_count": 0,
+        "service_delete": false,
+        "service_insert": false,
+        "service_select": true,
+        "service_update": false,
+        "authenticated_select": false,
+        "immutable_trigger_count": 1
+      },
+      {
+        "name": "generic_execution_receipts_v3",
+        "owner": "postgres",
+        "present": true,
+        "anon_select": false,
+        "rls_enabled": true,
+        "policy_count": 0,
+        "service_delete": false,
+        "service_insert": false,
+        "service_select": true,
+        "service_update": false,
+        "authenticated_select": false,
+        "immutable_trigger_count": 1
+      },
+      {
+        "name": "generic_producer_policies_v3",
+        "owner": "postgres",
+        "present": true,
+        "anon_select": false,
+        "rls_enabled": true,
+        "policy_count": 0,
+        "service_delete": false,
+        "service_insert": false,
+        "service_select": true,
+        "service_update": false,
+        "authenticated_select": false,
+        "immutable_trigger_count": 1
+      }
+    ],
+    "functions": [
+      {
+        "name": "claim_generic_execution_v3",
+        "lf_sha256": "420ebbd115e06029e932cfe8c289f8102abb473cdd0f4dd4f626af3cc6d285ae",
+        "conformant": true,
+        "raw_sha256": "dde4fcc4d001b160a5fc3234cb8cbc58167a8b073f68babd5fe06b1bc51ab444"
+      },
+      {
+        "name": "close_generic_execution_v3",
+        "lf_sha256": "d89cc5c10baa78c4d9389f4e971410d3eb4bec22bc41f0cdb9f11810628528d7",
+        "conformant": true,
+        "raw_sha256": "22b42dba0cf34b62333f69a0fa21b7c2a61587102e53ac65b0e3f0bcc00014ae"
+      },
+      {
+        "name": "complete_generic_execution_v3",
+        "lf_sha256": "aafa916300af7b47fe619c0e833515ef838a2fd35db3bb3a5ed45427c019cc32",
+        "conformant": true,
+        "raw_sha256": "e10c16fc82af6e8b631b602f4defd4409ed057d5d055c7a162ec9e6e1aa0f287"
+      },
+      {
+        "name": "guard_generic_execution_v3",
+        "lf_sha256": "41a59ba0cf223915db3d42c44a935cd0470d61bef4dfa5a0bd8349c3705e9935",
+        "conformant": true,
+        "raw_sha256": "176f58d59f89bbbcd4d1eebd9257dd4ff81013c57484b500a1cf37b8fdfc9055"
+      },
+      {
+        "name": "reserve_generic_execution_v3",
+        "lf_sha256": "d8c004ce0b0df839929e55594c921610a65849c691e28fcd6b86fd05ea4a7e2d",
+        "conformant": true,
+        "raw_sha256": "5e5b154d93146c7cce09778d558b00e3f6e0e336f487b8a480e29baed86e46c3"
+      }
+    ],
+    "check_version": "ppr067-hardening-postflight-1",
+    "real_data_used": false,
+    "write_performed": false,
+    "b1_global_proven": false,
+    "producer_admitted": false,
+    "external_provider_used": false
+  },
+  "frozen_scope": {
+    "status": "V41_INJECTED_SUCCESSOR_FROZEN_SCOPE_PRECONTROL_PASS",
+    "policy_id": "7d25327c-a7e4-47d5-a072-0c47762ae869",
+    "request_id": "7a1ae69d-d46e-46cf-8e60-a495da6a9e36",
+    "analysis_id": "4ee7a1cd-75ed-49d3-8956-10bf3aa6f1c4",
+    "execution_id": "2d3ca8b3-77a5-4dfc-886b-f7447f5ab616",
+    "auth_performed": false,
+    "write_performed": false
+  },
+  "check_version": "v41-successor-single-result-precontrol-2",
+  "auth_performed": false,
+  "write_performed": false,
+  "historical_comparison_required": true
+}
