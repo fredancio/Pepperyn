@@ -1616,3 +1616,22 @@ earlier UI submission uncertainty. Founder subsequently authorized an explicit
 conservative temporal bound, never an observed_at substitution. Local v2
 attestation validation: 31 PASS / zero skipped; no PostgreSQL rerun or remote
 operation. See docs/Project_Control/PPR069_ATTEMPT4_CONSERVATIVE_FRESHNESS.md.
+
+2026-10-01 attempt 4 STOPPED FAIL-CLOSED at POLICY_INSERT with RemoteProtocolError.
+The precise transport cause is unestablished. Local effects record zero Auth
+and no effects; the Founder reports no owner SQL execution. A distinct authorized
+read-only postcontrol at 14:47:10.764672 UTC proves zero attempt policy, admission,
+analysis, envelope and receipt. The sole historical policy is disabled with its
+checked contract/specification integrity conformant. No partial state in this
+scope; NO REHEARSAL PASS. Earlier SUBMISSION_UNRESOLVED remains unchanged.
+See docs/Project_Control/PPR069_ATTEMPT4_STOP_POSTCONTROL.md for evidence, limits
+and the local-only continuation proposal. No successor created or authorized.
+
+2026-10-01 local owner-ack evolution: 57 PASS, 2 manifest-generation tests
+deliberately deselected (no new identities), 3 dependency warnings. Human wait
+performs local reads only; a bound acknowledgement precedes exactly one remote
+policy observation, never substitutes for it. Integrated refusal tests reach
+no Auth/effect. Old Windows wrapper pins and frozen protocol are unchanged and
+do not admit this modified runner. No successor prepared, no remote operation.
+See docs/Project_Control/PPR069_LOCAL_OWNER_ACK_PROOF.md for scope and remaining
+protocol preparation. No change to B1 or admission/gate status.

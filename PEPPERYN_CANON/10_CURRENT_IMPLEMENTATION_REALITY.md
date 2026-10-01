@@ -891,3 +891,25 @@ pending a new Founder GO. No global precontrol PASS is inferred.
 See docs/Project_Control/PPR069_ATTEMPT4_LOCAL_PREPARATION.md for exact identities,
 hashes, deadline and the next read-only-only GO. No remote readiness is inferred;
 no Auth, policy or rehearsal execution is authorized. Gates remain unchanged.
+
+## 2026-10-01 - attempt 4 terminated; read-only postcontrol complete
+
+Superseding the preparation state above: the separately authorized attempt 4
+stopped fail-closed before Auth at POLICY_INSERT (RemoteProtocolError; precise
+cause unknown). Subsequent separately authorized READ ONLY postcontrol confirms
+0 policy / 0 admission / 0 analysis / 0 envelope / 0 receipt for the attempt.
+Historical policy remains present, conformant in checked bindings and disabled.
+There is no partial remote state in the checked scope and no rehearsal PASS.
+SUBMISSION_UNRESOLVED for the earlier precontrol submission remains unchanged.
+Attempt 4 must not be resumed or reused. No attempt 5 has been prepared.
+Evidence and minimal local continuation proposal:
+docs/Project_Control/PPR069_ATTEMPT4_STOP_POSTCONTROL.md.
+B1 OPEN; Generic Producer UNADMITTED; External Provider CLOSED;
+Real-data Admission CLOSED.
+
+Local-only follow-up: the owner wait now uses a manifest/action/SQL-bound local
+acknowledgement followed by one policy observation, with no network polling or
+retry. Bounded tests: 57 PASS, 2 identity-generation tests not executed. This is
+not a prepared successor: old protocol/artifacts/wrapper pins remain unchanged;
+no attempt 5, new identities or distant permission exists. See
+docs/Project_Control/PPR069_LOCAL_OWNER_ACK_PROOF.md. Gates unchanged.

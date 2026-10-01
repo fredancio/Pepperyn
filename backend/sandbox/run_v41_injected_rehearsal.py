@@ -47,7 +47,9 @@ from sandbox.v41_injected_rehearsal import (
     freeze_manifest,
     read_manifest,
     write_new,
+    specification_without_evidence,
 )
+from sandbox.v41_owner_handoff import OwnerPolicyHandoff
 from services.bounded_producer_policy import verify_bounded_local_test_policy
 from services.durable_generic_producer_admission import (
     DurableGenericAdmissionRefused,
@@ -323,8 +325,7 @@ def prepolicy_remote(db, manifest: dict[str, Any]) -> tuple[dict, dict]:
     return own, other
 
 
-def postpolicy_remote(db, manifest: dict[str, Any], baseline: dict[str, Any]) -> dict:
-    policies = rows(db, "generic_producer_policies_v3")
+def postpolicy_remote(db, manifest: dict[str, Any], baseline: dict[str, Any], policies) -> dict:
     policy_id = manifest["identities"]["policy_id"]
     failed = [row for row in policies if row.get("id") == FAILED_POLICY_ID]
     successor = [row for row in policies if row.get("id") == policy_id]
@@ -391,17 +392,57 @@ def wait_policy(db, manifest: dict[str, Any], *, enabled: bool) -> dict:
         require(deadline.utcoffset() is not None, "V41_OWNER_ACTION_DEADLINE_REFUSED")
     else:
         deadline = datetime.now(timezone.utc) + timedelta(seconds=1200)
-    policy_id = manifest["identities"]["policy_id"]
-    while datetime.now(timezone.utc) <= deadline:
-        observed = rows(db, "generic_producer_policies_v3", id=policy_id)
-        if len(observed) == 1 and observed[0].get("enabled") is enabled:
-            return observed[0]
-        require(len(observed) <= 1, "V41_POLICY_CARDINALITY_REFUSED")
-        time.sleep(1)
-    observed = rows(db, "generic_producer_policies_v3", id=policy_id)
-    if len(observed) == 1 and observed[0].get("enabled") is enabled:
-        return observed[0]
-    raise ValueError("V41_POLICY_OWNER_ACTION_TIMEOUT")
+    action = "insert" if enabled else "disable"
+    artifact = ATTEMPT / f"policy-{action}.sql"
+    expected = {
+        "schema_version": "v41-owner-local-ack-1",
+        "action": action,
+        "manifest_sha256": manifest["manifest_sha256"],
+        "policy_id": manifest["identities"]["policy_id"],
+        "sql_sha256": file_sha256(artifact),
+    }
+    write_new(ATTEMPT / f"owner-{action}-handoff-started.json", expected)
+    original = deepcopy(manifest)
+
+    def freshness():
+        require(read_manifest(ATTEMPT) == original, "V41_OWNER_MANIFEST_CHANGED")
+        require(file_sha256(artifact) == expected["sql_sha256"], "V41_OWNER_SQL_CHANGED")
+        if enabled:
+            precontrol_attestation(original)
+
+    def acknowledge(check_time):
+        path = ATTEMPT / f"owner-{action}-ack.json"
+        while not path.exists():
+            check_time()
+            time.sleep(1)  # Local filesystem only during human intervention.
+        return json.loads(path.read_text(encoding="utf-8"))
+
+    handoff = OwnerPolicyHandoff(expected, deadline=deadline, freshness=freshness,
+                                 clock=lambda: datetime.now(timezone.utc))
+    return handoff.observe(acknowledge,
+        lambda: rows(db, "generic_producer_policies_v3"),
+        lambda policies: validate_observed_owner_policies(policies, original, enabled=enabled))
+
+
+def validate_observed_owner_policies(policies, manifest, *, enabled):
+    require(type(policies) is list and len(policies) == 2, "V41_OWNER_POLICY_SET_REFUSED")
+    historical = [p for p in policies if p.get("id") == FAILED_POLICY_ID]
+    current = [p for p in policies if p.get("id") == manifest["identities"]["policy_id"]]
+    require(len(historical) == 1 and failed_policy_exact(historical[0]) and
+            len(current) == 1, "V41_OWNER_POLICY_ID_REFUSED")
+    policy = current[0]
+    spec = policy.get("specification")
+    require(type(spec) is dict and
+            set(spec) == set(specification_without_evidence(manifest)) | {"policy_evidence_sha256"},
+            "V41_OWNER_SPEC_REFUSED")
+    require({k: v for k, v in spec.items() if k != "policy_evidence_sha256"}
+            == specification_without_evidence(manifest), "V41_OWNER_SCOPE_REFUSED")
+    require(policy.get("enabled") is enabled and
+            policy.get("contract_binding") == CONTRACT_BINDING.model_dump(mode="json") and
+            policy.get("contract_binding_sha256") == GENERIC_ADMISSION_CONTRACT_SHA256,
+            "V41_OWNER_CONTRACT_REFUSED")
+    from services.bounded_producer_policy import BoundedLocalTestPolicyV1
+    BoundedLocalTestPolicyV1.model_validate(spec)
 
 
 def exact_v41_rows(db, manifest: dict[str, Any], *, state: str, enabled: bool) -> dict[str, list[dict]]:
@@ -526,6 +567,9 @@ def execute(packet: dict[str, Any]) -> int:
                 bundle["accounts"][0].get("email") ==
                 "pepperyn-isolation-a24-a@pepperyn-test.invalid",
                 "V41_DPAPI_BUNDLE_REFUSED")
+        require(not any((ATTEMPT / name).exists() for name in (
+            "refused.json", "result.json", "effects.json", "baseline-before.json")),
+            "V41_ATTEMPT_ALREADY_STARTED")
         precontrol_attestation(manifest)
         service = client(packet["service"])
         stage = "FRESH_PREPOLICY_REMOTE"
@@ -536,10 +580,10 @@ def execute(packet: dict[str, Any]) -> int:
 
         stage = "POLICY_INSERT"
         print("V41_INJECTED_OWNER_ACTION_REQUIRED: POLICY_INSERT", flush=True)
-        wait_policy(service, manifest, enabled=True)
+        observed_policies = wait_policy(service, manifest, enabled=True)
         policy_observed = True
         budget.owner_observed("POLICY_INSERT")
-        policy = postpolicy_remote(service, manifest, baseline)
+        policy = postpolicy_remote(service, manifest, baseline, observed_policies)
 
         # Waiting for owner action cannot renew the precontrol's freshness.
         precontrol_attestation(manifest)
@@ -681,6 +725,7 @@ def execute(packet: dict[str, Any]) -> int:
             "status": "V41_INJECTED_REHEARSAL_REFUSED", "stage": stage,
             "policy_observed": policy_observed, "policy_disabled": policy_disabled,
             "automatic_retry_permitted": False, "error_type": type(error).__name__,
+            "observation_limit": "NOT_PROOF_OF_REMOTE_ABSENCE",
         }
         if not (ATTEMPT / "refused.json").exists():
             write_new(ATTEMPT / "refused.json", failure)
