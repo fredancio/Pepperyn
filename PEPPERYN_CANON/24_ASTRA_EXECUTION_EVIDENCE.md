@@ -1597,3 +1597,9 @@ unobserved structural/history results remain unproven. Successor composition
 accepts exactly the disabled historical policy, retains structural checks and
 exposes all components in one JSON. Historical hashes still require comparison.
 No remote execution or artifact replacement occurred during this correction.
+
+2026-10-01 attempt-4 local preparation: 10 PASS / zero skipped in 27.05s,
+including generated single-result SQL on isolated PostgreSQL. Actual frozen
+manifest and SQL roundtrip verified; new identities disjoint from attempts 1–3.
+Evidence: docs/Project_Control/PPR069_ATTEMPT4_LOCAL_PREPARATION.md and its
+preserved-artifact inventory. No Supabase access or remote PASS in this slice.

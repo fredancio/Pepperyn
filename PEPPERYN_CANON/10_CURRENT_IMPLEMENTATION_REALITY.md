@@ -885,3 +885,9 @@ historical policy and returns all components in one read-only JSON result.
 Local validation: 9 PASS including actual isolated PostgreSQL. Original runtime
 artifacts and deployment SQL are preserved; remote corrected verification is
 pending a new Founder GO. No global precontrol PASS is inferred.
+
+2026-10-01: attempt 4 is frozen separately against the corrected protocol;
+10 local tests PASS, including isolated PostgreSQL. Attempts 1–3 are preserved.
+See docs/Project_Control/PPR069_ATTEMPT4_LOCAL_PREPARATION.md for exact identities,
+hashes, deadline and the next read-only-only GO. No remote readiness is inferred;
+no Auth, policy or rehearsal execution is authorized. Gates remain unchanged.

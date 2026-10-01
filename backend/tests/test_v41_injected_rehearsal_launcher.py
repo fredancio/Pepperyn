@@ -130,3 +130,25 @@ def test_successor_manifest_freezes_new_ids_deadline_and_failed_history(tmp_path
     generated = (tmp_path / 'attempt' / 'policy-insert.sql').read_text(encoding='utf-8')
     assert frozen['owner_action_deadline'] in generated
     assert 'V41_OWNER_ACTION_DEADLINE_EXPIRED' in generated
+
+
+def test_distinct_attempt_roundtrip_no_reuse_or_manifest_mutation(tmp_path):
+    from sandbox.run_v41_injected_rehearsal import ATTEMPT
+    from sandbox.v41_injected_rehearsal import read_manifest
+    assert ATTEMPT.name == 'v41-injected-4'
+    first = tmp_path / 'first'
+    second = tmp_path / 'second'
+    old = freeze_manifest(REPO, first)
+    snapshot = {p.name: p.read_bytes() for p in first.iterdir()}
+    new = freeze_manifest(REPO, second)
+    assert read_manifest(second) == new
+    assert set(old['identities'].values()).isdisjoint(new['identities'].values())
+    assert {p.name: p.read_bytes() for p in first.iterdir()} == snapshot
+    with pytest.raises(ValueError, match='V41_ATTEMPT_ALREADY_EXISTS'):
+        freeze_manifest(REPO, first)
+    for field in ('protocol_sha256', 'identities', 'owner_action_deadline'):
+        changed = dict(new)
+        changed[field] = 'substituted'
+        (second / 'manifest.json').write_text(json.dumps(changed), encoding='utf-8')
+        with pytest.raises(ValueError, match='V41_MANIFEST_MUTATED'):
+            read_manifest(second)
