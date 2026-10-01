@@ -1635,3 +1635,21 @@ no Auth/effect. Old Windows wrapper pins and frozen protocol are unchanged and
 do not admit this modified runner. No successor prepared, no remote operation.
 See docs/Project_Control/PPR069_LOCAL_OWNER_ACK_PROOF.md for scope and remaining
 protocol preparation. No change to B1 or admission/gate status.
+
+Owner Ack checkpoint confirmed by Founder and local HEAD:
+ff14a3237152388c6b32989f29f5fd80f39874e9. Seven files and seven exclusions;
+57 PASS / two identity-generation tests NOT EXECUTED retained. No fresh remote
+HEAD verification was performed in the subsequent local-only formalization.
+Transfer proposal: docs/Project_Control/PPR069_OWNER_ACK_TRANSFER_PROPOSAL.md.
+Five additional local Windows publication checks PASS (no-overwrite rename,
+complete bytes, no partial final, pending consumption/preservation). These are
+not a successor execution proof. No new identity or attempt allocated.
+
+Subsequent explicit Founder local-preparation GO: distinct Owner Ack successor
+frozen on 2026-10-01, no remote access. Evidence:
+docs/Project_Control/PPR069_OWNER_ACK_SUCCESSOR_LOCAL_PROOF.md. Local selection
+84 PASS; isolated PostgreSQL 2 PASS; the two formerly unexecuted generation tests
+now separately 2 PASS without rewriting prior evidence. Atomic publisher, launcher,
+new timestamped precontrol and independent recovery path compose locally.
+Attempts 1-4 preserved; unknown network cause and SUBMISSION_UNRESOLVED unchanged.
+Checkpoint pending; no distant precontrol, Auth, policy or rehearsal authorized.

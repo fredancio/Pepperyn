@@ -1,0 +1,130 @@
+[
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-1\\baseline-before.json",
+    "hash": "6D60BE05D7A0FDD1EFD2E3210EB51C55DCF00669A8002A69699179F0B6259548"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-1\\effects.json",
+    "hash": "F4ECC17B68D46EC9B0BEB8CA668BEA88402F7777E71AA0679196C0010A984D3C"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-1\\manifest.json",
+    "hash": "F611323AA4CB3E5DE5113579DFB10DD20113C84915EB1AC6EF111E8255C51350"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-1\\policy-disable.sql",
+    "hash": "423A4E6FD45FEA7AF347660EB3E4BB63A61F1E1781E27FA6D9610A8E113981CB"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-1\\policy-insert.sql",
+    "hash": "2218EE4D691053DCFFC510FEA44904346308B6A1487A32AF574B715B484542CB"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-1\\precontrol-ready.json",
+    "hash": "AF2FEBFFF0348979904651F445EDC71F0CF1F9D5915F9C5026474C127698F9D7"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-1\\precontrol.sql",
+    "hash": "3DA1DDF0278FFB32876BED5E3B74736D723AC2CD58A8130DACA14C93D5AB62CF"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-1\\refused.json",
+    "hash": "D135EA1405343DCE2005D433D5520EF7360559BABB3510669C48D8E45D8E743D"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-1\\source-snapshot\\backend__sandbox__run_v41_injected_rehearsal.py",
+    "hash": "6775A868BE1400C6EEE85530273569C17F1809993E7B7DB251BEA2ED269A38C7"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-1\\source-snapshot\\backend__sandbox__v41_injected_rehearsal.py",
+    "hash": "E1154B3918103B1306A57771563297869D8F5FD9930FC8905D7B34EC5C325E20"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-1\\source-snapshot\\backend__tests__test_v41_injected_rehearsal_launcher.py",
+    "hash": "C19740E56D5153437EBB5D88819C7FA9BB0C9D1422B60EAE97116FCA2058973F"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-1\\source-snapshot\\frontend__components__chat____tests____ExecutionProvenance.rehearsal.test.tsx",
+    "hash": "D5720168189DF96302A92D7CAE255E5A5C6C7D2DC0B2508D1DAD773A400E059A"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-1\\source-snapshot\\scripts__rehearse-v41-injected-10.ps1",
+    "hash": "87CE4C80FD2CD5386658E97D86C6AED086D0DA03A63825790582D4E5AFB32DC8"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-2\\manifest.json",
+    "hash": "9DBDA2B182E942EDA70D1B15CE651CA3C52938EC251CEB37175DA7E56DA9A83B"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-2\\policy-disable.sql",
+    "hash": "786C1EEB9EBC8D189C2FA01F13F0A8B0AFFDDBAF7793E120D1BC2CB92059C308"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-2\\policy-insert.sql",
+    "hash": "D0B7D6BC12A78A53EC70C646CEE528B6D04939DDB1C71BC13462AE92C55D801E"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-2\\precontrol.sql",
+    "hash": "01B1D04EFB6B18B2C09724BE95D410DA01C2A25398B3496926AB9A42C9154813"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-3\\manifest.json",
+    "hash": "A568C71B75D52AC60C740A25DEC33F58D49C84266413CDBF001A2FC6BD4CE280"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-3\\policy-disable.sql",
+    "hash": "C1A1B5BC6210AB7A039A640AFED681460003631FC42B472E7AAC78597F310D61"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-3\\policy-insert.sql",
+    "hash": "ADB6633F4042A111DDB5CCECA36CEDD272B5A03EB05F3EC18887D71D7CD69B3E"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-3\\precontrol.sql",
+    "hash": "8F22A3FA13F7BF2112D967C0564BFD7359F18648ABA48AEF62B584852F281D26"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-4\\accepted-precontrol-result.json",
+    "hash": "7205B6612A16746E768AFCC596D5D0B193DF547CAC08E2748A301F8ABE0C3853"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-4\\baseline-before.json",
+    "hash": "6D60BE05D7A0FDD1EFD2E3210EB51C55DCF00669A8002A69699179F0B6259548"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-4\\effects.json",
+    "hash": "FE295BBB6FB04D87006C2418F6054F0DD80FC93DEAF06436115929E30D307859"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-4\\manifest.json",
+    "hash": "520E5AF5400C888F0C6285BC9D9D0B14B43A7422EE9701A2C8207D3256CA11E7"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-4\\policy-disable.sql",
+    "hash": "74A4B93645CC1C91AF5C8BE2034F9D5A7704A095ECF44940C3B769E2EE60CF34"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-4\\policy-insert.sql",
+    "hash": "100595FCE7C83B9616896C568347454455153B2FCB482FD084AFD443613BA37A"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-4\\precontrol-ready.json",
+    "hash": "886C6F3D45901E7106330EA4E2EF7BC4BBE3DC9BC9B7B0A9137AC1BC665AD626"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-4\\precontrol-ui-inconclusive.png",
+    "hash": "F5F1765F68E47CD241D1D59ED1321F248C7926C6DC10BB65DEFB53F13C26DC8A"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-4\\precontrol.sql",
+    "hash": "2CC9AAFEE6045AD03BA617E3E2003EBFA9BD8C482EEAFD21F6E5185E261AB10E"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-4\\refused.json",
+    "hash": "A2340F96B35C68538A37AB3BD39EFAAE8D343E2B248D41024ECCFB8989A5A32E"
+  },
+  {
+    "path": "C:\\Users\\ADMIN-FRED\\Documents\\Codex\\Pepperyn-runtime\\v41-injected-4\\stop-read-only-postcontrol-result.json",
+    "hash": "E628E0F5FF033AADAEE55072B69E8BE0E5E4BC44AD8AB86035CC9EEE85469DA7"
+  }
+]

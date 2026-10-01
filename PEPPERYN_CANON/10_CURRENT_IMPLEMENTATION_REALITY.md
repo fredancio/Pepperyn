@@ -913,3 +913,18 @@ retry. Bounded tests: 57 PASS, 2 identity-generation tests not executed. This is
 not a prepared successor: old protocol/artifacts/wrapper pins remain unchanged;
 no attempt 5, new identities or distant permission exists. See
 docs/Project_Control/PPR069_LOCAL_OWNER_ACK_PROOF.md. Gates unchanged.
+
+Owner Ack is now checkpointed at ff14a3237152388c6b32989f29f5fd80f39874e9.
+The local transfer/protocol proposal specifies atomic no-overwrite acknowledgement
+publication and terminal safety behavior; five Windows publication checks PASS.
+See docs/Project_Control/PPR069_OWNER_ACK_TRANSFER_PROPOSAL.md. No concrete
+successor publisher/manifest is yet READY. New identity/deadline preparation
+and any later remote execution remain separately authorized steps.
+
+Following explicit local-preparation GO, v41-injected-5 is now frozen separately
+with Owner Ack publisher/launcher and timestamped precontrol. Local evidence:
+84 PASS plus 2 isolated PostgreSQL PASS; two earlier unexecuted generation tests
+separately 2 PASS. See docs/Project_Control/PPR069_OWNER_ACK_SUCCESSOR_LOCAL_PROOF.md
+for all identities/hashes and the 2026-10-02T16:02:17.336525Z deadline. No distant
+precontrol or execution has occurred. Checkpoint remains required before presenting
+the exact read-only GO. This does not admit the producer or close B1/other gates.

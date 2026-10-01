@@ -79,6 +79,7 @@ from services.v1_analysis_contract import UnderstandingResult
 REPO = Path("C:/Users/ADMIN-FRED/Documents/Codex/Pepperyn-development")
 RUNTIME = Path("C:/Users/ADMIN-FRED/Documents/Codex/Pepperyn-runtime")
 ATTEMPT = RUNTIME / "v41-injected-4"
+ENTRYPOINT = Path(__file__).resolve()
 FIXTURE = REPO / "backend/tests/golden/fixtures" / FIXTURE_NAME
 BASELINE_TABLES = (
     "analyses", "governed_analysis_envelopes", "governed_execution_receipts",
@@ -401,7 +402,9 @@ def wait_policy(db, manifest: dict[str, Any], *, enabled: bool) -> dict:
         "policy_id": manifest["identities"]["policy_id"],
         "sql_sha256": file_sha256(artifact),
     }
-    write_new(ATTEMPT / f"owner-{action}-handoff-started.json", expected)
+    write_new(ATTEMPT / f"owner-{action}-handoff-started.json", {
+        "ack": expected, "deadline_utc": deadline.isoformat(),
+    })
     original = deepcopy(manifest)
 
     def freshness():
@@ -663,7 +666,7 @@ def execute(packet: dict[str, Any]) -> int:
         recovery_packet = {"anon": packet["anon"], "service": packet["service"],
                            "token": token, "analysis_id": manifest["identities"]["analysis_id"]}
         recovered = subprocess.run(
-            [sys.executable, "-B", str(Path(__file__).resolve()), "--recover"],
+            [sys.executable, "-B", str(ENTRYPOINT), "--recover"],
             input=json.dumps(recovery_packet), text=True, capture_output=True,
             timeout=180, check=False, env={**os.environ, "PYTHONPATH": str(REPO / "backend")},
         )

@@ -67,17 +67,19 @@ def write_new(path: Path, value: Any) -> None:
         stream.write("\n")
 
 
-def freeze_manifest(repo: Path, attempt: Path) -> dict[str, Any]:
+def freeze_manifest(repo: Path, attempt: Path, *, protocol_relative=PROTOCOL_RELATIVE,
+                    protocol_sha256=PROTOCOL_SHA256, checkpoint_head=CHECKPOINT_HEAD,
+                    precontrol_builder=None) -> dict[str, Any]:
     if attempt.exists():
         raise ValueError("V41_ATTEMPT_ALREADY_EXISTS")
-    protocol = repo / PROTOCOL_RELATIVE
+    protocol = repo / protocol_relative
     fixture = repo / "backend/tests/golden/fixtures" / FIXTURE_NAME
     scope_baseline = (
         Path("C:/Users/ADMIN-FRED/Documents/Codex/Pepperyn-runtime")
         / "v40-service-readonly-preflight-19.json"
     )
     if (
-        file_sha256(protocol) != PROTOCOL_SHA256
+        file_sha256(protocol) != protocol_sha256
         or file_sha256(fixture) != FIXTURE_SHA256
         or file_sha256(scope_baseline) != SCOPE_BASELINE_SHA256
     ):
@@ -97,8 +99,8 @@ def freeze_manifest(repo: Path, attempt: Path) -> dict[str, Any]:
     manifest = {
         "schema_version": "v41-injected-rehearsal-successor-manifest-1",
         "project_url": PROJECT_URL,
-        "checkpoint_head": CHECKPOINT_HEAD,
-        "protocol_sha256": PROTOCOL_SHA256,
+        "checkpoint_head": checkpoint_head,
+        "protocol_sha256": protocol_sha256,
         "created_at": created_at.isoformat(),
         "owner_action_deadline": (
             created_at + timedelta(seconds=OWNER_ACTION_WINDOW_SECONDS)
@@ -128,7 +130,7 @@ def freeze_manifest(repo: Path, attempt: Path) -> dict[str, Any]:
     attempt.mkdir(parents=False)
     write_new(attempt / "manifest.json", manifest)
     (attempt / "precontrol.sql").write_text(
-        precontrol_sql(repo, manifest), encoding="utf-8", newline="\n"
+        (precontrol_builder or precontrol_sql)(repo, manifest), encoding="utf-8", newline="\n"
     )
     (attempt / "policy-insert.sql").write_text(
         policy_insert_sql(manifest), encoding="utf-8", newline="\n"
@@ -139,7 +141,8 @@ def freeze_manifest(repo: Path, attempt: Path) -> dict[str, Any]:
     return manifest
 
 
-def read_manifest(attempt: Path) -> dict[str, Any]:
+def read_manifest(attempt: Path, *, protocol_sha256=PROTOCOL_SHA256,
+                  checkpoint_head=CHECKPOINT_HEAD) -> dict[str, Any]:
     manifest = json.loads((attempt / "manifest.json").read_text(encoding="utf-8"))
     digest_payload = dict(manifest)
     observed = digest_payload.pop("manifest_sha256", None)
@@ -150,8 +153,8 @@ def read_manifest(attempt: Path) -> dict[str, Any]:
         UUID(value)
     if (
         manifest.get("project_url") != PROJECT_URL
-        or manifest.get("checkpoint_head") != CHECKPOINT_HEAD
-        or manifest.get("protocol_sha256") != PROTOCOL_SHA256
+        or manifest.get("checkpoint_head") != checkpoint_head
+        or manifest.get("protocol_sha256") != protocol_sha256
         or manifest.get("scope") != SCOPE
         or manifest.get("source") != {"filename": FIXTURE_NAME, "sha256": FIXTURE_SHA256}
         or manifest.get("predecessor") != {
