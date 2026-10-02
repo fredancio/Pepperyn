@@ -69,7 +69,8 @@ def write_new(path: Path, value: Any) -> None:
 
 def freeze_manifest(repo: Path, attempt: Path, *, protocol_relative=PROTOCOL_RELATIVE,
                     protocol_sha256=PROTOCOL_SHA256, checkpoint_head=CHECKPOINT_HEAD,
-                    precontrol_builder=None) -> dict[str, Any]:
+                    precontrol_builder=None, historical_policy_contract=None,
+                    forbidden_identities=()) -> dict[str, Any]:
     if attempt.exists():
         raise ValueError("V41_ATTEMPT_ALREADY_EXISTS")
     protocol = repo / protocol_relative
@@ -93,7 +94,7 @@ def freeze_manifest(repo: Path, attempt: Path, *, protocol_relative=PROTOCOL_REL
         "execution_id": str(uuid4()),
         "analysis_id": str(uuid4()),
     }
-    if len(set(identities.values())) != 4:
+    if len(set(identities.values())) != 4 or set(identities.values()) & set(forbidden_identities):
         raise ValueError("V41_IDENTITY_COLLISION")
     created_at = datetime.now(timezone.utc)
     manifest = {
@@ -126,6 +127,11 @@ def freeze_manifest(repo: Path, attempt: Path, *, protocol_relative=PROTOCOL_REL
             "real_data_admission": "CLOSED",
         },
     }
+    if historical_policy_contract is not None:
+        from sandbox import v41_two_policy_history as history
+        if historical_policy_contract != history.VERSION:
+            raise ValueError('V41_HISTORY_VERSION_REFUSED')
+        manifest[history.FIELD] = historical_policy_contract
     manifest["manifest_sha256"] = sha256(canonical_bytes(manifest)).hexdigest().upper()
     attempt.mkdir(parents=False)
     write_new(attempt / "manifest.json", manifest)

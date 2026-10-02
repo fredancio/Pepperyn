@@ -1684,3 +1684,12 @@ falsified with missing/extra/active/substituted/altered history. Legacy artifact
 and seven exclusions preserved. No Attempt 6 or distant access. Complete-row
 baseline capture remains prospective, not retroactively attested. Evidence and
 limits: docs/Project_Control/PPR069_TWO_POLICY_HISTORY_LOCAL_PROOF.md.
+
+Attempt 6 local readiness (2026-10-01): 437 distinct tests PASS / zero skipped:
+249 core/preparation, 1 exact frozen-SQL test, 187 SQL atomicity/hardening tests.
+Separate default launcher 173 PASS is repeated subset, not additional coverage.
+No remote operation, Auth, Owner SQL/ack or rehearsal occurred. Two historical
+policies remain exact disabled evidence; 45 runtime files and seven exclusions
+unchanged. Full-row timestamps not historically observed are captured only by a
+future separately authorized precontrol. READY FOR FOUNDER REVIEW, not execution.
+Evidence: docs/Project_Control/PPR069_ATTEMPT6_READINESS.md.

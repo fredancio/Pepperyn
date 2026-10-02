@@ -965,3 +965,12 @@ row baseline must still be captured by a future authorized read-only precontrol;
 no full-row historical evidence invented. READY for local freeze after checkpoint,
 not for remote launch. See PPR069_TWO_POLICY_HISTORY_LOCAL_PROOF.md under
 docs/Project_Control. Attempt 5 NO PASS and all admission gates unchanged.
+
+2026-10-01 Attempt 6 local preparation from synchronized 0250a52c: distinct
+manifest/identities and 24-hour expiry, exact two-history contract, fixed Auth
+adapter and pre-prepared insert/disable ack commands. 437 distinct tests PASS
+(245 Python, 192 isolated PostgreSQL), zero required skipped. Default launcher
+and publisher local checks PASS; no secret read, cloud access or execution.
+READY FOR FOUNDER REVIEW only. No remote precontrol or transfer-ready assertion;
+historical full-row capture remains prospective. No checkpoint/push in this slice.
+See docs/Project_Control/PPR069_ATTEMPT6_READINESS.md. All gates unchanged.
